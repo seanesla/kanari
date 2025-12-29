@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useMemo, useRef } from "react"
 import { Link } from "next-view-transitions"
-import { Mic, TrendingUp, Calendar as CalendarIcon, Lightbulb, AlertTriangle, TrendingDown, Minus } from "lucide-react"
+import { Mic, TrendingUp, Calendar as CalendarIcon, Lightbulb, AlertTriangle, TrendingDown, Minus, ChevronDown } from "lucide-react"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   AreaChart,
   Area,
   RadialBarChart,
   RadialBar,
-  PolarGrid,
+  PolarAngleAxis,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -40,6 +41,7 @@ export default function DashboardPage() {
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
   const [isCalendarSheetOpen, setIsCalendarSheetOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [wellnessExpanded, setWellnessExpanded] = useState(false)
   const chartsRef = useRef<HTMLDivElement>(null)
   const calendarRef = useRef<HTMLDivElement>(null)
 
@@ -507,10 +509,11 @@ export default function DashboardPage() {
               {/* Chart 2: Wellness Score Gauge */}
               <div
                 className={cn(
-                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40",
+                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
                   chartsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
                 )}
                 style={{ transitionDelay: chartsVisible ? "500ms" : "0ms" }}
+                onClick={() => stats.totalRecordings > 0 && setWellnessExpanded(!wellnessExpanded)}
               >
                 <h3 className="text-lg font-semibold mb-4">Wellness Score</h3>
                 {stats.totalRecordings === 0 ? (
@@ -530,8 +533,8 @@ export default function DashboardPage() {
                       startAngle={90}
                       endAngle={-270}
                     >
-                      <PolarGrid gridType="circle" stroke="#333" />
-                      <RadialBar dataKey="value" cornerRadius={10} fill={wellnessColor} />
+                      <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                      <RadialBar dataKey="value" cornerRadius={10} fill={wellnessColor} background={{ fill: "hsl(var(--muted))" }} />
                       <text
                         x="50%"
                         y="50%"
@@ -552,10 +555,56 @@ export default function DashboardPage() {
                     ? "Start recording to see your wellness score"
                     : wellnessScore > 70
                     ? "You're doing great!"
-                    : wellnessScore > 50
+                    : wellnessScore > 40
                     ? "Room for improvement"
                     : "Consider taking a break"}
                 </p>
+                {stats.totalRecordings > 0 && (
+                  <>
+                    <div className="flex items-center justify-center gap-1 mt-2 text-xs text-muted-foreground/70">
+                      <span>Tap for details</span>
+                      <ChevronDown className={cn("h-3 w-3 transition-transform duration-300", wellnessExpanded && "rotate-180")} />
+                    </div>
+                    <AnimatePresence>
+                      {wellnessExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3, ease: "easeInOut" }}
+                          className="overflow-hidden"
+                        >
+                          <div className="pt-4 mt-4 border-t border-border/50 space-y-4 text-sm">
+                            <div>
+                              <p className="font-medium text-foreground mb-1">How it's calculated</p>
+                              <p className="text-muted-foreground text-xs">
+                                Wellness = 100 − (Stress + Fatigue) ÷ 2
+                              </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                                <p className="text-muted-foreground mb-1">Avg Stress</p>
+                                <p className="font-semibold text-base">{stats.avgStress}%</p>
+                              </div>
+                              <div className="p-3 rounded-lg bg-muted/30 border border-border/50">
+                                <p className="text-muted-foreground mb-1">Avg Fatigue</p>
+                                <p className="font-semibold text-base">{stats.avgFatigue}%</p>
+                              </div>
+                            </div>
+                            <div>
+                              <p className="font-medium text-foreground mb-2">Score meaning</p>
+                              <ul className="text-muted-foreground text-xs space-y-1.5">
+                                <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-green-500" /> 71-100: Healthy range</li>
+                                <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500" /> 41-70: Monitor closely</li>
+                                <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-red-500" /> 0-40: Take action</li>
+                              </ul>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                )}
               </div>
             </div>
           </div>
