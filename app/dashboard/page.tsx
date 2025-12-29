@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react"
 import { Link } from "next-view-transitions"
-import { Mic, TrendingUp, Calendar, Lightbulb } from "lucide-react"
+import { Mic, TrendingUp, Calendar, Lightbulb, AlertTriangle, TrendingDown, Minus } from "lucide-react"
 import {
   AreaChart,
   Area,
@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { useSceneMode } from "@/lib/scene-context"
+import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
 import { cn } from "@/lib/utils"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart"
 import { useDashboardStats, useTrendData } from "@/hooks/use-storage"
+import type { BurnoutPrediction } from "@/lib/types"
 
 export default function DashboardPage() {
   const { setMode } = useSceneMode()
@@ -68,6 +70,45 @@ export default function DashboardPage() {
     currentStreak: dashboardStats.currentStreak,
     avgStress: dashboardStats.averageStress,
     suggestionsAccepted: dashboardStats.suggestionsAccepted,
+  }
+
+  // Calculate burnout prediction from historical data
+  // In production, this would come from IndexedDB with real recordings
+  const burnoutPrediction: BurnoutPrediction | null = useMemo(() => {
+    // Example: If we had recordings with metrics
+    // const trendData = recordingsToTrendData(recordings)
+    // return predictBurnoutRisk(trendData)
+
+    // For now, return null until we have actual recording data
+    return null
+  }, [])
+
+  // Risk level styling
+  const riskLevelConfig = {
+    low: {
+      color: "text-success",
+      bg: "bg-success/10",
+      border: "border-success/50",
+      icon: TrendingUp,
+    },
+    moderate: {
+      color: "text-accent",
+      bg: "bg-accent/10",
+      border: "border-accent/50",
+      icon: Minus,
+    },
+    high: {
+      color: "text-destructive",
+      bg: "bg-destructive/10",
+      border: "border-destructive/50",
+      icon: TrendingDown,
+    },
+    critical: {
+      color: "text-destructive",
+      bg: "bg-destructive/20",
+      border: "border-destructive",
+      icon: AlertTriangle,
+    },
   }
 
   // Chart config
@@ -178,6 +219,110 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground mt-2">Suggestions taken</p>
           </div>
         </div>
+
+        {/* BURNOUT PREDICTION */}
+        {burnoutPrediction && (
+          <div
+            className={cn(
+              "relative mb-16 transition-all duration-1000 delay-300",
+              visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+            )}
+          >
+            <div
+              className={cn(
+                "rounded-lg border p-8 md:p-12 backdrop-blur-xl",
+                riskLevelConfig[burnoutPrediction.riskLevel].bg,
+                riskLevelConfig[burnoutPrediction.riskLevel].border
+              )}
+            >
+              <div className="flex items-start gap-6">
+                <div
+                  className={cn(
+                    "h-14 w-14 rounded-lg flex items-center justify-center",
+                    riskLevelConfig[burnoutPrediction.riskLevel].bg
+                  )}
+                >
+                  {(() => {
+                    const Icon = riskLevelConfig[burnoutPrediction.riskLevel].icon
+                    return <Icon className={cn("h-7 w-7", riskLevelConfig[burnoutPrediction.riskLevel].color)} />
+                  })()}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h3 className="text-2xl font-serif">Burnout Risk Forecast</h3>
+                    <span
+                      className={cn(
+                        "px-3 py-1 rounded-full text-xs font-medium uppercase tracking-wider",
+                        riskLevelConfig[burnoutPrediction.riskLevel].bg,
+                        riskLevelConfig[burnoutPrediction.riskLevel].color
+                      )}
+                    >
+                      {burnoutPrediction.riskLevel}
+                    </span>
+                  </div>
+                  <p className="text-muted-foreground mb-6">
+                    {burnoutPrediction.riskLevel === "low" && "Your wellness patterns look stable. Keep up the good work!"}
+                    {burnoutPrediction.riskLevel === "moderate" && "Your stress levels are elevated. Consider taking some recovery time soon."}
+                    {burnoutPrediction.riskLevel === "high" && "Your patterns indicate increasing risk. Prioritize rest and recovery."}
+                    {burnoutPrediction.riskLevel === "critical" && "Urgent attention needed. Please schedule recovery time immediately."}
+                  </p>
+
+                  <div className="grid md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Risk Score</p>
+                      <p className="text-3xl font-serif tabular-nums">{burnoutPrediction.riskScore}/100</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Forecast Window</p>
+                      <p className="text-3xl font-serif tabular-nums">{burnoutPrediction.predictedDays} days</p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Trend</p>
+                      <p className="text-3xl font-serif capitalize">{burnoutPrediction.trend}</p>
+                    </div>
+                  </div>
+
+                  {burnoutPrediction.factors.length > 0 && (
+                    <div className="mb-6">
+                      <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Contributing Factors</p>
+                      <ul className="space-y-2">
+                        {burnoutPrediction.factors.map((factor, index) => (
+                          <li key={index} className="flex items-start gap-2 text-sm">
+                            <span className="text-muted-foreground">•</span>
+                            <span>{factor}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span>Confidence: {Math.round(burnoutPrediction.confidence * 100)}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {burnoutPrediction.riskLevel !== "low" && (
+                <div className="mt-8 pt-8 border-t border-border/50">
+                  <div className="flex flex-wrap gap-4">
+                    <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+                      <Link href="/dashboard/suggestions">
+                        <Lightbulb className="mr-2 h-4 w-4" />
+                        View Suggestions
+                      </Link>
+                    </Button>
+                    <Button asChild variant="outline">
+                      <Link href="/dashboard/record">
+                        <Mic className="mr-2 h-4 w-4" />
+                        Record Check-in
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* CHARTS SECTION */}
         <div ref={chartsRef} className="relative mb-20 md:mb-24">
