@@ -256,9 +256,12 @@ export function RecordingWaveform({
     const normalizedData = waveformDataRef.current
     if (normalizedData.length === 0) return
 
-    // Clear canvas
-    ctx.fillStyle = backgroundColor
-    ctx.fillRect(0, 0, width, height)
+    // Clear canvas properly (clearRect needed for transparent backgrounds)
+    ctx.clearRect(0, 0, width, height)
+    if (backgroundColor !== "transparent") {
+      ctx.fillStyle = backgroundColor
+      ctx.fillRect(0, 0, width, height)
+    }
 
     // Redraw waveform
     ctx.strokeStyle = color

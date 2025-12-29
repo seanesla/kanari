@@ -11,6 +11,8 @@ export interface AudioPlayerProps {
   duration: number
   onTimeUpdate?: (currentTime: number) => void
   onPlayStateChange?: (isPlaying: boolean) => void
+  /** External seek position (0-1 normalized). When set, audio seeks to this position. */
+  seekPosition?: number
   className?: string
 }
 
@@ -26,6 +28,7 @@ export function AudioPlayer({
   duration,
   onTimeUpdate,
   onPlayStateChange,
+  seekPosition,
   className,
 }: AudioPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false)
@@ -152,18 +155,19 @@ export function AudioPlayer({
     sourceNodeRef.current = source
     startTimeRef.current = ctx.currentTime
 
-    // Start from offset
-    source.start(0, pauseOffsetRef.current)
+    // Start from offset with defensive bounds check
+    const offset = Math.max(0, Math.min(pauseOffsetRef.current, duration))
+    source.start(0, offset)
     setIsPlaying(true)
     onPlayStateChange?.(true)
-  }, [isReady, isPlaying, onPlayStateChange, onTimeUpdate])
+  }, [isReady, isPlaying, duration, onPlayStateChange, onTimeUpdate])
 
   const pause = useCallback(() => {
     if (!audioContextRef.current || !sourceNodeRef.current) return
 
-    // Save current position
+    // Save current position with bounds checking
     const elapsed = audioContextRef.current.currentTime - startTimeRef.current
-    pauseOffsetRef.current = Math.min(pauseOffsetRef.current + elapsed, duration)
+    pauseOffsetRef.current = Math.max(0, Math.min(pauseOffsetRef.current + elapsed, duration))
 
     // Stop source
     try {
@@ -217,6 +221,15 @@ export function AudioPlayer({
     const position = (e.clientX - rect.left) / rect.width
     seek(position)
   }, [seek])
+
+  // Handle external seek position changes
+  const lastSeekPositionRef = useRef<number | undefined>(undefined)
+  useEffect(() => {
+    if (seekPosition !== undefined && seekPosition !== lastSeekPositionRef.current) {
+      lastSeekPositionRef.current = seekPosition
+      seek(seekPosition)
+    }
+  }, [seekPosition, seek])
 
   const progress = duration > 0 ? currentTime / duration : 0
 

@@ -39,6 +39,8 @@ function getStressIcon(level?: string) {
 function RecordingCard({ recording, onDelete }: { recording: Recording; onDelete: () => void }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [playheadPosition, setPlayheadPosition] = useState(0)
+  // Track seek position separately to pass to AudioPlayer
+  const [seekPosition, setSeekPosition] = useState<number | undefined>(undefined)
   const StressIcon = getStressIcon(recording.metrics?.stressLevel)
 
   const hasAudioData = recording.audioData && recording.audioData.length > 0
@@ -51,6 +53,8 @@ function RecordingCard({ recording, onDelete }: { recording: Recording; onDelete
 
   const handleSeek = useCallback((position: number) => {
     setPlayheadPosition(position)
+    // Update seekPosition to trigger AudioPlayer seek
+    setSeekPosition(position)
   }, [])
 
   const toggleExpand = () => {
@@ -145,6 +149,7 @@ function RecordingCard({ recording, onDelete }: { recording: Recording; onDelete
               sampleRate={recording.sampleRate || 16000}
               duration={recording.duration}
               onTimeUpdate={handleTimeUpdate}
+              seekPosition={seekPosition}
             />
           </div>
         </div>
