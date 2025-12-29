@@ -14,6 +14,7 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core"
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable"
+import { snapCenterToCursor } from "@dnd-kit/modifiers"
 import { KanbanColumn } from "./kanban-column"
 import { SuggestionCardOverlay } from "./suggestion-card"
 import type { Suggestion, KanbanColumn as KanbanColumnType, SuggestionStatus } from "@/lib/types"
@@ -170,7 +171,7 @@ export function KanbanBoard({
         />
       </div>
 
-      <DragOverlay>
+      <DragOverlay modifiers={[snapCenterToCursor]}>
         {activeSuggestion && <SuggestionCardOverlay suggestion={activeSuggestion} />}
       </DragOverlay>
     </DndContext>
