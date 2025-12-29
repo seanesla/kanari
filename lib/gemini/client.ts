@@ -5,11 +5,18 @@
  * Used exclusively in API routes (never client-side).
  */
 
+import type { GeminiSemanticAnalysis } from "@/lib/types"
+import { AUDIO_SEMANTIC_PROMPT, AUDIO_SEMANTIC_SCHEMA } from "./prompts"
+
 export interface GeminiRequest {
   contents: Array<{
     role: "user" | "model"
     parts: Array<{
-      text: string
+      text?: string
+      inlineData?: {
+        mimeType: string
+        data: string
+      }
     }>
   }>
   systemInstruction?: {
@@ -23,6 +30,7 @@ export interface GeminiRequest {
     topP?: number
     maxOutputTokens?: number
     responseMimeType?: string
+    responseSchema?: object
   }
 }
 
@@ -158,4 +166,96 @@ export function validateAPIKey(apiKey: string | undefined): string {
   }
 
   return apiKey
+}
+
+/**
+ * Analyze audio for semantic content and emotion
+ *
+ * @param apiKey - Gemini API key
+ * @param audioBase64 - Base64-encoded audio data
+ * @param mimeType - Audio MIME type (e.g., "audio/wav", "audio/webm")
+ * @returns Semantic analysis with transcription, emotions, and observations
+ */
+export async function analyzeAudioSemantic(
+  apiKey: string,
+  audioBase64: string,
+  mimeType: string
+): Promise<GeminiSemanticAnalysis> {
+  const request: GeminiRequest = {
+    contents: [
+      {
+        role: "user",
+        parts: [
+          {
+            inlineData: {
+              mimeType,
+              data: audioBase64,
+            },
+          },
+          {
+            text: AUDIO_SEMANTIC_PROMPT,
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      temperature: 0.3, // Lower temperature for more consistent analysis
+      topK: 40,
+      topP: 0.95,
+      maxOutputTokens: 2048,
+      responseMimeType: "application/json",
+      responseSchema: AUDIO_SEMANTIC_SCHEMA,
+    },
+  }
+
+  const response = await callGeminiAPI(apiKey, request)
+
+  // Extract text from first candidate
+  if (!response.candidates || response.candidates.length === 0) {
+    throw new Error("No response from Gemini API")
+  }
+
+  const text = response.candidates[0].content.parts[0].text
+
+  // Parse JSON response
+  try {
+    const analysis = JSON.parse(text) as GeminiSemanticAnalysis
+
+    // Validate structure
+    if (!analysis.segments || !Array.isArray(analysis.segments)) {
+      throw new Error("Missing or invalid segments array")
+    }
+
+    if (!analysis.overallEmotion || typeof analysis.emotionConfidence !== "number") {
+      throw new Error("Missing or invalid emotion data")
+    }
+
+    if (!analysis.observations || !Array.isArray(analysis.observations)) {
+      throw new Error("Missing or invalid observations array")
+    }
+
+    if (!analysis.stressInterpretation || !analysis.fatigueInterpretation || !analysis.summary) {
+      throw new Error("Missing required interpretation fields")
+    }
+
+    // Validate segments
+    for (const segment of analysis.segments) {
+      if (!segment.timestamp || !segment.content || !segment.emotion) {
+        throw new Error("Invalid segment structure")
+      }
+    }
+
+    // Validate observations
+    for (const obs of analysis.observations) {
+      if (!obs.type || !obs.observation || !obs.relevance) {
+        throw new Error("Invalid observation structure")
+      }
+    }
+
+    return analysis
+  } catch (error) {
+    throw new Error(
+      `Failed to parse Gemini audio semantic response: ${error instanceof Error ? error.message : "Unknown error"}`
+    )
+  }
 }

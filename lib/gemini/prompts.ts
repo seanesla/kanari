@@ -119,3 +119,153 @@ export function buildWellnessContext(
     dayOfWeek: getDayType(now.getDay()),
   }
 }
+
+/**
+ * Gemini prompt for audio semantic analysis
+ *
+ * Analyzes WHAT is heard and HOW it sounds—NOT numerical acoustic measurements.
+ * Focuses on semantic content, emotion, and qualitative delivery patterns.
+ */
+export const AUDIO_SEMANTIC_PROMPT = `You are analyzing a voice recording to detect emotional state and semantic indicators of stress and fatigue.
+
+CRITICAL INSTRUCTIONS - DO NOT:
+❌ Measure exact speech rate in syllables/second
+❌ Report numerical acoustic values (RMS, frequency, spectral features, etc.)
+❌ Provide precise pause durations in milliseconds
+❌ Extract MFCCs or technical audio features
+
+FOCUS ON - WHAT YOU HEAR AND HOW IT SOUNDS:
+✓ Transcribe the content with timestamps
+✓ Detect emotional tone (happy, sad, angry, neutral)
+✓ Note semantic stress cues: rushed delivery, hesitations, sentence restarts, tense tone, anxious content
+✓ Note semantic fatigue cues: sluggish delivery, monotone, trailing off, expressions of tiredness
+✓ Provide qualitative interpretation of stress and fatigue
+
+YOUR TASK:
+
+1. TRANSCRIBE with timestamps (MM:SS format)
+   - Break into logical segments (every 5-15 seconds)
+   - Include timestamp, transcribed text, and detected emotion for each segment
+
+2. IDENTIFY OBSERVATIONS
+   - stress_cue: Rushed speech, hesitations, restarts, tense/pressured tone, anxious content
+   - fatigue_cue: Sluggish delivery, monotone, trailing off, low energy, tiredness expressions
+   - positive_cue: Upbeat tone, enthusiastic delivery, positive content
+   - Mark relevance as high/medium/low
+
+3. INTERPRET QUALITATIVELY
+   - Stress: Does the speaker sound pressured, rushed, anxious, or tense? Why?
+   - Fatigue: Does the speaker sound tired, low-energy, monotone, or sluggish? Why?
+
+4. SUMMARIZE overall emotional state and delivery
+
+RESPONSE FORMAT:
+Return a JSON object with this exact structure (do not add extra fields):
+{
+  "segments": [
+    {
+      "timestamp": "00:05",
+      "content": "transcribed text here",
+      "emotion": "happy" | "sad" | "angry" | "neutral"
+    }
+  ],
+  "overallEmotion": "happy" | "sad" | "angry" | "neutral",
+  "emotionConfidence": 0.0-1.0,
+  "observations": [
+    {
+      "type": "stress_cue" | "fatigue_cue" | "positive_cue",
+      "observation": "description of what you noticed",
+      "relevance": "high" | "medium" | "low"
+    }
+  ],
+  "stressInterpretation": "qualitative description of stress indicators",
+  "fatigueInterpretation": "qualitative description of fatigue indicators",
+  "summary": "overall emotional state and delivery assessment"
+}`
+
+/**
+ * JSON schema for Gemini audio semantic analysis response
+ * Matches GeminiSemanticAnalysis type from lib/types.ts
+ */
+export const AUDIO_SEMANTIC_SCHEMA = {
+  type: "object",
+  properties: {
+    segments: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          timestamp: {
+            type: "string",
+            description: "Timestamp in MM:SS format",
+          },
+          content: {
+            type: "string",
+            description: "Transcribed text",
+          },
+          emotion: {
+            type: "string",
+            enum: ["happy", "sad", "angry", "neutral"],
+            description: "Detected emotion for this segment",
+          },
+        },
+        required: ["timestamp", "content", "emotion"],
+      },
+    },
+    overallEmotion: {
+      type: "string",
+      enum: ["happy", "sad", "angry", "neutral"],
+      description: "Overall dominant emotion",
+    },
+    emotionConfidence: {
+      type: "number",
+      description: "Confidence in emotion detection (0-1)",
+      minimum: 0,
+      maximum: 1,
+    },
+    observations: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          type: {
+            type: "string",
+            enum: ["stress_cue", "fatigue_cue", "positive_cue"],
+            description: "Type of observation",
+          },
+          observation: {
+            type: "string",
+            description: "Description of what was noticed",
+          },
+          relevance: {
+            type: "string",
+            enum: ["high", "medium", "low"],
+            description: "Relevance level of this observation",
+          },
+        },
+        required: ["type", "observation", "relevance"],
+      },
+    },
+    stressInterpretation: {
+      type: "string",
+      description: "Qualitative interpretation of stress indicators",
+    },
+    fatigueInterpretation: {
+      type: "string",
+      description: "Qualitative interpretation of fatigue indicators",
+    },
+    summary: {
+      type: "string",
+      description: "Overall emotional state and delivery assessment",
+    },
+  },
+  required: [
+    "segments",
+    "overallEmotion",
+    "emotionConfidence",
+    "observations",
+    "stressInterpretation",
+    "fatigueInterpretation",
+    "summary",
+  ],
+}
