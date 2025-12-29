@@ -17,6 +17,7 @@ import {
   KanbanBoard,
   CategoryFilterTabs,
   SuggestionDetailDialog,
+  ScheduleTimeDialog,
   filterSuggestionsByCategory,
   countSuggestionsByCategory,
   type FilterValue,
@@ -92,6 +93,7 @@ export default function SuggestionsPage() {
   const [visible, setVisible] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<FilterValue>("all")
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
+  const [scheduleDialogSuggestion, setScheduleDialogSuggestion] = useState<Suggestion | null>(null)
   const [showAllPending, setShowAllPending] = useState(false)
 
   const { isConnected, scheduleEvent } = useCalendar()
@@ -206,33 +208,30 @@ export default function SuggestionsPage() {
     moveSuggestion(suggestionId, newStatus)
   }
 
-  // Handle schedule request (from drag to scheduled column)
-  const handleScheduleRequest = async (suggestion: Suggestion) => {
-    if (!isConnected) {
-      setSelectedSuggestion(suggestion)
-      return
-    }
-
-    // Schedule for next available slot (default: next hour)
-    const scheduledFor = getNextAvailableSlot()
-    const recoveryBlock = await scheduleEvent(suggestion)
-
-    if (recoveryBlock) {
-      scheduleSuggestion(suggestion.id, scheduledFor)
-    }
+  // Handle schedule request (from drag to scheduled column or dialog)
+  const handleScheduleRequest = (suggestion: Suggestion) => {
+    // Always open time picker dialog for scheduling
+    setScheduleDialogSuggestion(suggestion)
   }
 
-  // Handle schedule from dialog
-  const handleSchedule = async (suggestion: Suggestion) => {
-    if (!isConnected) return
+  // Handle schedule confirmation from time picker dialog
+  const handleScheduleConfirm = async (suggestion: Suggestion, scheduledFor: string) => {
+    // Local scheduling (always works)
+    scheduleSuggestion(suggestion.id, scheduledFor)
 
-    const scheduledFor = getNextAvailableSlot()
-    const recoveryBlock = await scheduleEvent(suggestion)
-
-    if (recoveryBlock) {
-      scheduleSuggestion(suggestion.id, scheduledFor)
-      setSelectedSuggestion(null)
+    // Optional: sync to Google Calendar if connected
+    if (isConnected) {
+      scheduleEvent(suggestion).catch(console.error) // Don't block on this
     }
+
+    setScheduleDialogSuggestion(null)
+  }
+
+  // Handle schedule from detail dialog
+  const handleSchedule = (suggestion: Suggestion) => {
+    // Open time picker dialog
+    setSelectedSuggestion(null)
+    setScheduleDialogSuggestion(suggestion)
   }
 
   return (
@@ -412,6 +411,14 @@ export default function SuggestionsPage() {
             setSelectedSuggestion(null)
           }}
           isCalendarConnected={isConnected}
+        />
+
+        {/* Schedule time picker dialog */}
+        <ScheduleTimeDialog
+          suggestion={scheduleDialogSuggestion}
+          open={!!scheduleDialogSuggestion}
+          onOpenChange={(open) => !open && setScheduleDialogSuggestion(null)}
+          onSchedule={handleScheduleConfirm}
         />
       </main>
     </div>

@@ -220,7 +220,6 @@ export function SuggestionDetailDialog({
               <Button
                 size="sm"
                 onClick={() => onSchedule?.(suggestion)}
-                disabled={!isCalendarConnected}
                 className="bg-accent text-accent-foreground hover:bg-accent/90"
               >
                 <CalendarPlus className="h-4 w-4 mr-2" />
@@ -261,13 +260,6 @@ export function SuggestionDetailDialog({
             </Button>
           )}
         </DialogFooter>
-
-        {/* Calendar connection hint */}
-        {isPending && !isCalendarConnected && (
-          <p className="text-xs text-muted-foreground text-center -mt-2">
-            Connect your calendar in Settings to schedule recovery blocks
-          </p>
-        )}
       </DialogContent>
     </Dialog>
   )
