@@ -12,6 +12,8 @@ import {
   scoreToStressLevel,
   scoreToFatigueLevel,
 } from "@/lib/ml/hybrid-scoring"
+import { extractFeatures } from "@/lib/audio/feature-extractor"
+import { analyzeWithBreakdown, analyzeVoiceMetrics } from "@/lib/ml/inference"
 
 /**
  * React hook for hybrid analysis combining acoustic and semantic processing
@@ -131,8 +133,7 @@ export function useHybridAnalysis() {
 /**
  * Run acoustic analysis on raw audio data
  *
- * NOTE: This is a stub that will be replaced when the acoustic-breakdown
- * branch is merged. For now, it returns mock data.
+ * Uses Meyda for feature extraction and local heuristics for scoring.
  */
 async function runAcousticAnalysis(audioData: Float32Array): Promise<{
   breakdown: AcousticBreakdown
@@ -140,162 +141,45 @@ async function runAcousticAnalysis(audioData: Float32Array): Promise<{
   fatigueScore: number
   features: AudioFeatures
 }> {
-  // TODO: Replace with actual analyzeWithBreakdown from @/lib/ml/inference
-  // when the acoustic-breakdown branch is merged
-  //
-  // import { analyzeWithBreakdown } from "@/lib/ml/inference"
-  // return analyzeWithBreakdown(features)
+  // Extract audio features using Meyda
+  const features = extractFeatures(audioData)
 
-  // For now, return stub data
-  // This will be replaced with real implementation
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // Extract features from audio (stub - will use real feature extraction)
-      const features: AudioFeatures = {
-        mfcc: Array(13).fill(0),
-        spectralCentroid: 0.5,
-        spectralFlux: 0.12,
-        spectralRolloff: 0.8,
-        rms: 0.2,
-        zcr: 0.06,
-        speechRate: 4.5,
-        pauseRatio: 0.25,
-        pauseCount: 8,
-        avgPauseDuration: 450,
-      }
+  // Get acoustic breakdown with per-feature contributions
+  const breakdown = analyzeWithBreakdown(features)
 
-      // Generate mock breakdown (will be replaced with real acoustic analysis)
-      const breakdown: AcousticBreakdown = {
-        speechRate: {
-          featureName: "speechRate",
-          displayName: "Speech Rate",
-          rawValue: 4.5,
-          normalizedValue: 0.6,
-          status: "normal",
-          contribution: 10,
-          maxContribution: 30,
-          description: "Speech rate is normal at 4.5 syllables/sec",
-        },
-        rmsEnergy: {
-          featureName: "rms",
-          displayName: "Voice Energy",
-          rawValue: 0.2,
-          normalizedValue: 0.5,
-          status: "normal",
-          contribution: 12,
-          maxContribution: 25,
-          description: "Voice energy is normal",
-        },
-        spectralFlux: {
-          featureName: "spectralFlux",
-          displayName: "Spectral Flux",
-          rawValue: 0.12,
-          normalizedValue: 0.6,
-          status: "normal",
-          contribution: 12,
-          maxContribution: 25,
-          description: "Spectral flux is normal",
-        },
-        spectralCentroid: {
-          featureName: "spectralCentroid",
-          displayName: "Voice Brightness",
-          rawValue: 0.5,
-          normalizedValue: 0.5,
-          status: "normal",
-          contribution: 10,
-          maxContribution: 20,
-          description: "Voice brightness is normal",
-        },
-        pauseRatio: {
-          featureName: "pauseRatio",
-          displayName: "Pause Ratio",
-          rawValue: 0.25,
-          normalizedValue: 0.4,
-          status: "normal",
-          contribution: 12,
-          maxContribution: 25,
-          description: "Pause ratio is normal at 25%",
-        },
-        zcr: {
-          featureName: "zcr",
-          displayName: "Zero Crossing Rate",
-          rawValue: 0.06,
-          normalizedValue: 0.5,
-          status: "normal",
-          contribution: 10,
-          maxContribution: 20,
-          description: "Zero crossing rate is normal",
-        },
-      }
+  // Get stress/fatigue scores using existing heuristics
+  const metrics = analyzeVoiceMetrics(features)
 
-      resolve({
-        breakdown,
-        stressScore: 42,
-        fatigueScore: 38,
-        features,
-      })
-    }, 500) // Simulate processing delay
-  })
+  return {
+    breakdown,
+    stressScore: metrics.stressScore,
+    fatigueScore: metrics.fatigueScore,
+    features,
+  }
 }
 
 /**
  * Run Gemini semantic analysis on audio
  *
- * NOTE: This is a stub that will call the /api/gemini/analyze endpoint
- * when it's implemented in the gemini-semantic-api branch.
+ * Calls the /api/gemini/analyze endpoint for emotion detection and semantic analysis.
  */
 async function runSemanticAnalysis(
   audioBase64: string,
   mimeType: string
 ): Promise<GeminiSemanticAnalysis> {
-  // TODO: Replace with actual API call when gemini-semantic-api branch is merged
-  //
-  // const response = await fetch("/api/gemini/analyze", {
-  //   method: "POST",
-  //   headers: { "Content-Type": "application/json" },
-  //   body: JSON.stringify({ audio: audioBase64, mimeType }),
-  // })
-  // if (!response.ok) throw new Error("Gemini API failed")
-  // return await response.json()
-
-  // For now, return stub data
-  // This will be replaced with real API implementation
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve({
-        segments: [
-          {
-            timestamp: "00:00",
-            content: "I'm feeling a bit overwhelmed with all the tasks today.",
-            emotion: "neutral",
-          },
-          {
-            timestamp: "00:05",
-            content: "There's just so much to get done.",
-            emotion: "sad",
-          },
-        ],
-        overallEmotion: "neutral",
-        emotionConfidence: 0.75,
-        observations: [
-          {
-            type: "stress_cue",
-            observation: "Speaker mentions feeling overwhelmed",
-            relevance: "high",
-          },
-          {
-            type: "fatigue_cue",
-            observation: "Tone suggests low energy",
-            relevance: "medium",
-          },
-        ],
-        stressInterpretation: "Speaker sounds pressured by workload",
-        fatigueInterpretation: "Voice lacks enthusiasm, suggests tiredness",
-        summary:
-          "Speaker expresses being overwhelmed by tasks, with neutral-to-low emotional tone suggesting mild stress and fatigue.",
-      })
-    }, 800) // Simulate API delay
+  const response = await fetch("/api/gemini/analyze", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ audioData: audioBase64, mimeType }),
   })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}))
+    throw new Error(error.error || `Gemini API failed: ${response.status}`)
+  }
+
+  const data = await response.json()
+  return data.analysis
 }
 
 /**
