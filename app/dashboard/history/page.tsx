@@ -2,12 +2,88 @@
 
 import { useEffect, useState } from "react"
 import { Link } from "next-view-transitions"
-import { Mic, Clock, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { Mic, Clock, TrendingUp, TrendingDown, Minus, Trash2 } from "lucide-react"
 import { useSceneMode } from "@/lib/scene-context"
 import { cn } from "@/lib/utils"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
 import { Empty } from "@/components/ui/empty"
+import { useRecordings, useRecordingActions } from "@/hooks/use-storage"
+import type { Recording } from "@/lib/types"
+
+function formatDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = seconds % 60
+  return `${mins}:${secs.toString().padStart(2, "0")}`
+}
+
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+function getStressIcon(level?: string) {
+  if (!level) return Minus
+  if (level === "low" || level === "moderate") return TrendingDown
+  return TrendingUp
+}
+
+function RecordingCard({ recording, onDelete }: { recording: Recording; onDelete: () => void }) {
+  const StressIcon = getStressIcon(recording.metrics?.stressLevel)
+
+  return (
+    <div className="group rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-all duration-300 hover:border-accent/50 hover:bg-card/40">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="p-3 rounded-full bg-accent/10">
+            <Mic className="h-5 w-5 text-accent" />
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">{formatDate(recording.createdAt)}</p>
+            <p className="text-lg font-medium mt-1">
+              {formatDuration(recording.duration)} recording
+            </p>
+            {recording.metrics && (
+              <div className="flex items-center gap-4 mt-2">
+                <div className="flex items-center gap-1">
+                  <StressIcon className="h-4 w-4 text-destructive" />
+                  <span className="text-sm">Stress: {recording.metrics.stressScore}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4 text-accent" />
+                  <span className="text-sm">Fatigue: {recording.metrics.fatigueScore}</span>
+                </div>
+              </div>
+            )}
+            {!recording.metrics && recording.status === "complete" && (
+              <p className="text-sm text-muted-foreground mt-2">Analysis pending</p>
+            )}
+            {recording.status === "processing" && (
+              <p className="text-sm text-accent mt-2">Processing...</p>
+            )}
+            {recording.status === "error" && (
+              <p className="text-sm text-destructive mt-2">Analysis failed</p>
+            )}
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-4 w-4 text-muted-foreground hover:text-destructive" />
+        </Button>
+      </div>
+    </div>
+  )
+}
 
 export default function HistoryPage() {
   const { setMode } = useSceneMode()
@@ -24,8 +100,9 @@ export default function HistoryPage() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Placeholder - will be replaced with IndexedDB data
-  const recordings: unknown[] = []
+  // Real data from IndexedDB
+  const recordings = useRecordings()
+  const { deleteRecording } = useRecordingActions()
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
@@ -79,7 +156,13 @@ export default function HistoryPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Recording cards will go here */}
+              {recordings.map((recording) => (
+                <RecordingCard
+                  key={recording.id}
+                  recording={recording}
+                  onDelete={() => deleteRecording(recording.id)}
+                />
+              ))}
             </div>
           )}
         </div>

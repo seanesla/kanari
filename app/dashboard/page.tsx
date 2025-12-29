@@ -24,6 +24,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import { useDashboardStats, useTrendData } from "@/hooks/use-storage"
 
 export default function DashboardPage() {
   const { setMode } = useSceneMode()
@@ -58,12 +59,15 @@ export default function DashboardPage() {
     return () => observer.disconnect()
   }, [])
 
-  // Placeholder data - will be replaced with real data from IndexedDB
+  // Real data from IndexedDB
+  const dashboardStats = useDashboardStats()
+  const storedTrendData = useTrendData(7)
+
   const stats = {
-    totalRecordings: 0,
-    currentStreak: 0,
-    avgStress: 0,
-    suggestionsAccepted: 0,
+    totalRecordings: dashboardStats.totalRecordings,
+    currentStreak: dashboardStats.currentStreak,
+    avgStress: dashboardStats.averageStress,
+    suggestionsAccepted: dashboardStats.suggestionsAccepted,
   }
 
   // Chart config
@@ -78,22 +82,34 @@ export default function DashboardPage() {
     },
   }
 
-  // Placeholder trend data
-  const trendData = useMemo(
-    () => [
-      { day: "Mon", stress: 0, fatigue: 0 },
-      { day: "Tue", stress: 0, fatigue: 0 },
-      { day: "Wed", stress: 0, fatigue: 0 },
-      { day: "Thu", stress: 0, fatigue: 0 },
-      { day: "Fri", stress: 0, fatigue: 0 },
-      { day: "Sat", stress: 0, fatigue: 0 },
-      { day: "Sun", stress: 0, fatigue: 0 },
-    ],
-    []
-  )
+  // Transform stored trend data for chart display
+  const trendData = useMemo(() => {
+    if (storedTrendData.length === 0) {
+      // Show empty days if no data
+      const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+      return days.map((day) => ({ day, stress: 0, fatigue: 0 }))
+    }
 
-  // Wellness score (placeholder)
-  const wellnessScore = 0
+    // Convert stored data to chart format
+    return storedTrendData.map((data) => {
+      const date = new Date(data.date)
+      const day = date.toLocaleDateString("en-US", { weekday: "short" })
+      return {
+        day,
+        stress: data.stressScore,
+        fatigue: data.fatigueScore,
+      }
+    })
+  }, [storedTrendData])
+
+  // Wellness score calculated from average stress and fatigue (inverse)
+  const wellnessScore = useMemo(() => {
+    if (dashboardStats.totalRecordings === 0) return 0
+    // Wellness = 100 - average of stress and fatigue
+    const avgNegative = (dashboardStats.averageStress + dashboardStats.averageFatigue) / 2
+    return Math.max(0, Math.round(100 - avgNegative))
+  }, [dashboardStats])
+
   const wellnessData = useMemo(
     () => [{ name: "wellness", value: wellnessScore, fill: "#22c55e" }],
     [wellnessScore]
