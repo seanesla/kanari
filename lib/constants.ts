@@ -5,10 +5,10 @@ export const BREAKPOINTS = {
   desktop: 1280,
 } as const
 
-// Scene colors for 3D rendering (CSS variables handle UI colors)
+// Scene colors for 3D rendering
+// Note: accent colors are now managed by SceneProvider for dynamic theming
+// Use useSceneMode().accentColor instead of SCENE_COLORS.accent
 export const SCENE_COLORS = {
-  accent: "#d4a574",
-  accentDark: "#8b4513",
   background: "#0a0908",
 } as const
 

@@ -5,7 +5,7 @@ import { useFrame } from "@react-three/fiber"
 import { MeshTransmissionMaterial } from "@react-three/drei"
 import * as THREE from "three"
 import type { SceneMode } from "@/lib/types"
-import { SCENE_COLORS } from "@/lib/constants"
+import { useSceneMode } from "@/lib/scene-context"
 import { ORBITAL_RINGS } from "./constants"
 
 interface TruthCoreProps {
@@ -14,6 +14,7 @@ interface TruthCoreProps {
 }
 
 export function TruthCore({ scrollProgressRef, mode }: TruthCoreProps) {
+  const { accentColor } = useSceneMode()
   const groupRef = useRef<THREE.Group>(null)
   const innerRef = useRef<THREE.Mesh>(null)
   const middleRef = useRef<THREE.Mesh>(null)
@@ -103,8 +104,8 @@ export function TruthCore({ scrollProgressRef, mode }: TruthCoreProps) {
       <mesh ref={innerRef} scale={0.6}>
         <octahedronGeometry args={[1, 0]} />
         <meshStandardMaterial
-          color={SCENE_COLORS.accent}
-          emissive={SCENE_COLORS.accent}
+          color={accentColor}
+          emissive={accentColor}
           emissiveIntensity={1.5}
           metalness={0.9}
           roughness={0.1}
@@ -116,8 +117,8 @@ export function TruthCore({ scrollProgressRef, mode }: TruthCoreProps) {
       <mesh ref={middleRef} scale={1.3}>
         <icosahedronGeometry args={[1, 1]} />
         <meshStandardMaterial
-          color={SCENE_COLORS.accent}
-          emissive={SCENE_COLORS.accent}
+          color={accentColor}
+          emissive={accentColor}
           emissiveIntensity={0.3}
           wireframe
           transparent
@@ -139,7 +140,7 @@ export function TruthCore({ scrollProgressRef, mode }: TruthCoreProps) {
           temporalDistortion={0.1}
           metalness={0.1}
           roughness={0}
-          color={SCENE_COLORS.accent}
+          color={accentColor}
           transmission={0.9}
         />
       </mesh>
@@ -149,8 +150,8 @@ export function TruthCore({ scrollProgressRef, mode }: TruthCoreProps) {
         <mesh key={i} ref={(el) => { ringRefs.current[i] = el }} rotation={[Math.PI / 2 + i * 0.4, i * 0.3, 0]} scale={1}>
           <torusGeometry args={[radius, 0.015, 16, 100]} />
           <meshStandardMaterial
-            color={SCENE_COLORS.accent}
-            emissive={SCENE_COLORS.accent}
+            color={accentColor}
+            emissive={accentColor}
             emissiveIntensity={0.5 - i * 0.1}
             metalness={0.9}
             roughness={0.1}

@@ -5,7 +5,8 @@ import { AnimatePresence, motion } from "framer-motion"
 import { ResponsiveLine, type Serie, type SliceTooltipProps } from "@nivo/line"
 import { TrendingUp, TrendingDown, Minus, Mic, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { nivoTheme, chartColors, areaFillDefinitions } from "@/lib/chart-theme"
+import { getNivoTheme, getChartColors, getAreaFillDefinitions } from "@/lib/chart-theme"
+import { useSceneMode } from "@/lib/scene-context"
 
 interface TrendDataPoint {
   day: string
@@ -162,6 +163,13 @@ export function StressFatigueChart({
   onExpandChange,
   aggregatedFeatures,
 }: StressFatigueChartProps) {
+  const { accentColor } = useSceneMode()
+
+  // Get dynamic theme and colors based on accent color
+  const nivoTheme = useMemo(() => getNivoTheme(accentColor), [accentColor])
+  const chartColors = useMemo(() => getChartColors(accentColor), [accentColor])
+  const areaFillDefinitions = useMemo(() => getAreaFillDefinitions(accentColor), [accentColor])
+
   // Transform data to Nivo format
   const chartData: Serie[] = useMemo(() => {
     if (data.length === 0) return []
@@ -178,7 +186,7 @@ export function StressFatigueChart({
         data: data.map((d) => ({ x: d.day, y: d.fatigue })),
       },
     ]
-  }, [data])
+  }, [data, chartColors])
 
   const trend = useMemo(() => calculateTrend(data), [data])
 

@@ -3,7 +3,7 @@
 import type { MutableRefObject } from "react"
 import { Environment } from "@react-three/drei"
 import type { SceneMode } from "@/lib/types"
-import { SCENE_COLORS } from "@/lib/constants"
+import { useSceneMode } from "@/lib/scene-context"
 import { SECTION_POSITIONS, SECTION_THRESHOLDS } from "./constants"
 import { TruthCore } from "./truth-core"
 import { SectionAccent } from "./section-accent"
@@ -16,13 +16,15 @@ interface SceneProps {
 }
 
 export function Scene({ scrollProgressRef, mode }: SceneProps) {
+  const { accentColor } = useSceneMode()
+
   return (
     <>
       {/* Lighting */}
       <ambientLight intensity={0.1} />
-      <pointLight position={[5, 5, 5]} intensity={1} color={SCENE_COLORS.accent} />
+      <pointLight position={[5, 5, 5]} intensity={1} color={accentColor} />
       <pointLight position={[-5, -3, -5]} intensity={0.4} color="#ffffff" />
-      <spotLight position={[0, 10, 0]} intensity={0.8} angle={0.6} penumbra={1} color={SCENE_COLORS.accent} />
+      <spotLight position={[0, 10, 0]} intensity={0.8} angle={0.6} penumbra={1} color={accentColor} />
 
       <Environment preset="night" />
 

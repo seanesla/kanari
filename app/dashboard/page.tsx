@@ -24,7 +24,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import type { BurnoutPrediction, Suggestion } from "@/lib/types"
 
 export default function DashboardPage() {
-  const { setMode } = useSceneMode()
+  const { setMode, accentColor } = useSceneMode()
   const [visible, setVisible] = useState(false)
   const [chartsVisible, setChartsVisible] = useState(false)
   const [calendarVisible, setCalendarVisible] = useState(false)
@@ -178,9 +178,9 @@ export default function DashboardPage() {
   // Determine wellness color based on score thresholds
   const wellnessColor = useMemo(() => {
     if (wellnessScore <= 40) return "#ef4444" // Red/destructive for low wellness
-    if (wellnessScore <= 70) return "#d4a574" // Amber/warning for medium wellness
+    if (wellnessScore <= 70) return accentColor // Accent color for medium wellness
     return "#22c55e" // Green/success for high wellness
-  }, [wellnessScore])
+  }, [wellnessScore, accentColor])
 
   const wellnessData = useMemo(
     () => [{ name: "wellness", value: wellnessScore, fill: wellnessColor }],

@@ -4,9 +4,10 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Calendar, Key, Mic, Shield, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Calendar, Key, Mic, Shield, AlertCircle, CheckCircle2, Paintbrush } from "lucide-react"
 import { useCalendar } from "@/hooks/use-calendar"
 import { GeminiMemorySection } from "./settings-gemini-memory"
+import { ColorPicker } from "./color-picker"
 
 export function SettingsContent() {
   const [settings, setSettings] = useState({
@@ -136,6 +137,16 @@ export function SettingsContent() {
               Clear All Data
             </Button>
           </div>
+        </div>
+
+        {/* Appearance */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <Paintbrush className="h-5 w-5 text-accent" />
+            <h2 className="text-lg font-semibold">Appearance</h2>
+          </div>
+
+          <ColorPicker />
         </div>
 
         {/* Calendar Integration */}

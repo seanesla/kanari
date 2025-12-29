@@ -4,7 +4,7 @@ import { useRef, useMemo, type MutableRefObject } from "react"
 import { useFrame } from "@react-three/fiber"
 import * as THREE from "three"
 import type { SceneMode } from "@/lib/types"
-import { SCENE_COLORS } from "@/lib/constants"
+import { useSceneMode } from "@/lib/scene-context"
 import { PARTICLES } from "./constants"
 
 interface AmbientParticlesProps {
@@ -13,6 +13,7 @@ interface AmbientParticlesProps {
 }
 
 export function AmbientParticles({ scrollProgressRef, mode }: AmbientParticlesProps) {
+  const { accentColor } = useSceneMode()
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const dummy = useMemo(() => new THREE.Object3D(), [])
   const tempVec3 = useMemo(() => new THREE.Vector3(), [])
@@ -108,8 +109,8 @@ export function AmbientParticles({ scrollProgressRef, mode }: AmbientParticlesPr
     <instancedMesh ref={meshRef} args={[undefined, undefined, particles.length]}>
       <sphereGeometry args={[1, 8, 8]} />
       <meshStandardMaterial
-        color={SCENE_COLORS.accent}
-        emissive={SCENE_COLORS.accent}
+        color={accentColor}
+        emissive={accentColor}
         emissiveIntensity={0.6}
         transparent
         opacity={0.8}

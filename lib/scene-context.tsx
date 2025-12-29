@@ -1,6 +1,8 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, useRef, useMemo, type ReactNode, type MutableRefObject } from "react"
+import { createContext, useContext, useState, useCallback, useRef, useMemo, useEffect, type ReactNode, type MutableRefObject } from "react"
+import { db } from "@/lib/storage/db"
+import { DEFAULT_ACCENT } from "@/lib/color-utils"
 
 export type SceneMode = "landing" | "transitioning" | "dashboard"
 
@@ -11,6 +13,8 @@ interface SceneContextValue {
   resetToLanding: () => void
   isLoading: boolean
   setIsLoading: (loading: boolean) => void
+  accentColor: string
+  setAccentColor: (color: string) => void
 }
 
 const SceneContext = createContext<SceneContextValue | null>(null)
@@ -19,6 +23,18 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<SceneMode>("landing")
   const scrollProgressRef = useRef(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [accentColor, setAccentColorState] = useState(DEFAULT_ACCENT)
+
+  // Load saved accent color from IndexedDB on mount
+  useEffect(() => {
+    db.settings.get("default").then((settings) => {
+      if (settings?.accentColor) {
+        setAccentColorState(settings.accentColor)
+      }
+    }).catch(() => {
+      // IndexedDB not available or error, use default
+    })
+  }, [])
 
   const setMode = useCallback((newMode: SceneMode) => {
     setModeState(newMode)
@@ -32,6 +48,27 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const setAccentColor = useCallback((color: string) => {
+    setAccentColorState(color)
+    // Persist to IndexedDB
+    db.settings.update("default", { accentColor: color }).catch(() => {
+      // If no default settings exist, create them
+      db.settings.put({
+        id: "default",
+        defaultRecordingDuration: 30,
+        enableVAD: true,
+        enableNotifications: true,
+        calendarConnected: false,
+        autoScheduleRecovery: false,
+        preferredRecoveryTimes: [],
+        localStorageOnly: true,
+        accentColor: color,
+      }).catch(() => {
+        // IndexedDB not available
+      })
+    })
+  }, [])
+
   const contextValue = useMemo(() => ({
     mode,
     setMode,
@@ -39,7 +76,9 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     resetToLanding,
     isLoading,
     setIsLoading,
-  }), [mode, isLoading, setMode, resetToLanding])
+    accentColor,
+    setAccentColor,
+  }), [mode, isLoading, accentColor, setMode, resetToLanding, setAccentColor])
 
   return (
     <SceneContext.Provider value={contextValue}>

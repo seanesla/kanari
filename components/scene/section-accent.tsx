@@ -5,7 +5,8 @@ import { useFrame } from "@react-three/fiber"
 import { MeshTransmissionMaterial, Float } from "@react-three/drei"
 import * as THREE from "three"
 import type { SceneMode } from "@/lib/types"
-import { SCENE_COLORS } from "@/lib/constants"
+import { useSceneMode } from "@/lib/scene-context"
+import { generateDarkVariant } from "@/lib/color-utils"
 
 export type SectionType = "stats" | "problem" | "how" | "cta"
 
@@ -24,6 +25,8 @@ export function SectionAccent({
   type,
   mode,
 }: SectionAccentProps) {
+  const { accentColor } = useSceneMode()
+  const accentDark = generateDarkVariant(accentColor)
   const ref = useRef<THREE.Group>(null)
   const visibilityRef = useRef(0)
   const modeMultiplierRef = useRef(mode === "landing" ? 1 : 0)
@@ -90,15 +93,15 @@ export function SectionAccent({
 
   return (
     <group ref={ref} position={position}>
-      {type === "stats" && <StatsAccent />}
-      {type === "problem" && <ProblemAccent />}
-      {type === "how" && <HowAccent />}
-      {type === "cta" && <CtaAccent />}
+      {type === "stats" && <StatsAccent accentColor={accentColor} />}
+      {type === "problem" && <ProblemAccent accentColor={accentColor} accentDark={accentDark} />}
+      {type === "how" && <HowAccent accentColor={accentColor} />}
+      {type === "cta" && <CtaAccent accentColor={accentColor} />}
     </group>
   )
 }
 
-function StatsAccent() {
+function StatsAccent({ accentColor }: { accentColor: string }) {
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const dummy = useRef(new THREE.Object3D()).current
 
@@ -122,8 +125,8 @@ function StatsAccent() {
     <instancedMesh ref={meshRef} args={[undefined, undefined, 16]}>
       <boxGeometry args={[1, 1, 1]} />
       <meshStandardMaterial
-        color={SCENE_COLORS.accent}
-        emissive={SCENE_COLORS.accent}
+        color={accentColor}
+        emissive={accentColor}
         emissiveIntensity={0.5}
         metalness={0.9}
         roughness={0.1}
@@ -134,7 +137,7 @@ function StatsAccent() {
   )
 }
 
-function ProblemAccent() {
+function ProblemAccent({ accentColor, accentDark }: { accentColor: string; accentDark: string }) {
   return (
     <Float speed={2} rotationIntensity={0.3}>
       <group>
@@ -147,8 +150,8 @@ function ProblemAccent() {
           >
             <tetrahedronGeometry args={[1, 0]} />
             <meshStandardMaterial
-              color={i % 2 === 0 ? SCENE_COLORS.accent : SCENE_COLORS.accentDark}
-              emissive={i % 2 === 0 ? SCENE_COLORS.accent : SCENE_COLORS.accentDark}
+              color={i % 2 === 0 ? accentColor : accentDark}
+              emissive={i % 2 === 0 ? accentColor : accentDark}
               emissiveIntensity={0.4}
               metalness={0.8}
               roughness={0.2}
@@ -162,7 +165,7 @@ function ProblemAccent() {
   )
 }
 
-function HowAccent() {
+function HowAccent({ accentColor }: { accentColor: string }) {
   const nodePositions: [number, number, number][] = [
     [0, 0, 0],
     [1.5, 0.5, 0],
@@ -177,8 +180,8 @@ function HowAccent() {
             <mesh position={pos} scale={0.3}>
               <sphereGeometry args={[1, 16, 16]} />
               <meshStandardMaterial
-                color={SCENE_COLORS.accent}
-                emissive={SCENE_COLORS.accent}
+                color={accentColor}
+                emissive={accentColor}
                 emissiveIntensity={0.6}
                 metalness={0.9}
                 roughness={0.1}
@@ -193,8 +196,8 @@ function HowAccent() {
               >
                 <cylinderGeometry args={[0.02, 0.02, 1.8, 8]} />
                 <meshStandardMaterial
-                  color={SCENE_COLORS.accent}
-                  emissive={SCENE_COLORS.accent}
+                  color={accentColor}
+                  emissive={accentColor}
                   emissiveIntensity={0.3}
                   transparent
                   opacity={0.6}
@@ -208,7 +211,7 @@ function HowAccent() {
   )
 }
 
-function CtaAccent() {
+function CtaAccent({ accentColor }: { accentColor: string }) {
   return (
     <Float speed={1} rotationIntensity={0.4}>
       <mesh scale={1.2}>
@@ -225,7 +228,7 @@ function CtaAccent() {
           temporalDistortion={0.1}
           metalness={0.1}
           roughness={0}
-          color={SCENE_COLORS.accent}
+          color={accentColor}
           transmission={0.9}
         />
       </mesh>

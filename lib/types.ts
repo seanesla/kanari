@@ -291,6 +291,8 @@ export interface UserSettings {
   localStorageOnly: boolean
   // Coach preferences
   coachVoice?: CoachVoice
+  // Appearance
+  accentColor?: string // Hex color string (e.g., "#d4a574")
 }
 
 // ============================================

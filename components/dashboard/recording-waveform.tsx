@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react"
 import { cn } from "@/lib/utils"
+import { useSceneMode } from "@/lib/scene-context"
 
 export interface RecordingWaveformProps {
   /**
@@ -67,13 +68,15 @@ export function RecordingWaveform({
   audioData,
   width = 400,
   height = 100,
-  color = "#d4a574", // accent color
+  color: colorProp,
   backgroundColor = "transparent",
   mode = "realtime",
   playheadPosition,
   onSeek,
   className,
 }: RecordingWaveformProps) {
+  const { accentColor } = useSceneMode()
+  const color = colorProp || accentColor // Use accent color from context if not provided
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const barsRef = useRef<number[]>([])
   const animationFrameRef = useRef<number>()
