@@ -112,7 +112,7 @@ export async function generateSuggestions(
       temperature: 0.8, // Slightly creative for varied suggestions
       topK: 40,
       topP: 0.95,
-      maxOutputTokens: 1024,
+      maxOutputTokens: 2048, // Increased for Gemini 3's thinking tokens
       responseMimeType: "application/json", // Request JSON response
     },
   }
