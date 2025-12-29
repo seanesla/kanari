@@ -42,7 +42,7 @@ interface UseSuggestionsResult {
 /**
  * Convert audio features to qualitative voice patterns
  */
-function featuresToVoicePatterns(features?: AudioFeatures): VoicePatterns {
+export function featuresToVoicePatterns(features?: AudioFeatures): VoicePatterns {
   if (!features) {
     return { speechRate: "normal", energyLevel: "moderate", pauseFrequency: "normal", voiceTone: "neutral" }
   }
@@ -58,7 +58,7 @@ function featuresToVoicePatterns(features?: AudioFeatures): VoicePatterns {
 /**
  * Compute historical context from recordings
  */
-function computeHistoricalContext(recordings: Recording[]): HistoricalContext {
+export function computeHistoricalContext(recordings: Recording[]): HistoricalContext {
   const validRecordings = recordings.filter(r => r.metrics)
 
   if (validRecordings.length === 0) {

@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
-import type { Suggestion, SuggestionCategory } from "@/lib/types"
+import type { Suggestion, SuggestionCategory, VoicePatterns, HistoricalContext, BurnoutPrediction, AudioFeatures } from "@/lib/types"
 
 const categoryIcons: Record<SuggestionCategory, typeof Coffee> = {
   break: Coffee,
@@ -41,6 +41,11 @@ interface SuggestionDetailDialogProps {
   onDismiss?: (suggestion: Suggestion) => void
   onComplete?: (suggestion: Suggestion) => void
   isCalendarConnected?: boolean
+  // Enriched context for "Why this suggestion?"
+  voicePatterns?: VoicePatterns
+  history?: HistoricalContext
+  burnoutPrediction?: BurnoutPrediction
+  features?: AudioFeatures
 }
 
 export function SuggestionDetailDialog({
@@ -52,8 +57,13 @@ export function SuggestionDetailDialog({
   onDismiss,
   onComplete,
   isCalendarConnected = false,
+  voicePatterns,
+  history,
+  burnoutPrediction,
+  features,
 }: SuggestionDetailDialogProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showRawValues, setShowRawValues] = useState(false)
 
   if (!suggestion) return null
 
@@ -97,74 +107,100 @@ export function SuggestionDetailDialog({
             <ChevronDown className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-180")} />
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3 space-y-3 text-sm">
-            {/* TODO: Voice patterns detected - needs AudioFeatures from recording */}
-            <div className="rounded-lg bg-muted/50 p-3 space-y-1">
-              <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Voice patterns detected</p>
-              <p className="text-muted-foreground">
-                {/* TODO: Extract patterns from recording.features (e.g., "Fast speech rate, elevated energy, frequent pauses") */}
-                Analysis based on your voice biomarkers
-              </p>
-            </div>
-
-            {/* TODO: Historical comparison - needs trend data from parent */}
-            {/*
-            {history && history.recordingCount > 1 && (
+            {/* Voice patterns detected */}
+            {voicePatterns ? (
               <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Voice patterns detected</p>
+                <p className="text-foreground">
+                  {voicePatterns.speechRate === "fast" ? "Fast" : voicePatterns.speechRate === "slow" ? "Slow" : "Normal"} speech, {voicePatterns.energyLevel} energy, {voicePatterns.pauseFrequency} pauses, {voicePatterns.voiceTone} tone
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Voice patterns detected</p>
+                <p className="text-muted-foreground">Analysis based on your voice biomarkers</p>
+              </div>
+            )}
+
+            {/* Historical comparison */}
+            {history && history.recordingCount > 1 && (
+              <div className="rounded-lg bg-muted/50 p-3 space-y-2">
                 <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Compared to your baseline</p>
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="flex items-center gap-1">
-                    <span>Stress</span>
-                    {history.stressChange > 0 ? (
-                      <TrendingUp className="h-3 w-3 text-destructive" />
-                    ) : history.stressChange < 0 ? (
-                      <TrendingDown className="h-3 w-3 text-success" />
-                    ) : (
-                      <Minus className="h-3 w-3 text-muted-foreground" />
-                    )}
+                <div className="text-sm space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span>Stress:</span>
+                    <span className={cn(
+                      history.stressChange.startsWith("+") ? "text-destructive" :
+                      history.stressChange.startsWith("-") ? "text-success" :
+                      "text-muted-foreground"
+                    )}>
+                      {history.stressChange}
+                    </span>
+                    {history.stressChange.startsWith("+") && <TrendingUp className="h-3 w-3 text-destructive" />}
+                    {history.stressChange.startsWith("-") && <TrendingDown className="h-3 w-3 text-success" />}
+                    {history.stressChange === "stable" && <Minus className="h-3 w-3 text-muted-foreground" />}
                   </div>
-                  <span className="text-muted-foreground">•</span>
-                  <div className="flex items-center gap-1">
-                    <span>Fatigue</span>
-                    {history.fatigueChange > 0 ? (
-                      <TrendingUp className="h-3 w-3 text-destructive" />
-                    ) : history.fatigueChange < 0 ? (
-                      <TrendingDown className="h-3 w-3 text-success" />
-                    ) : (
-                      <Minus className="h-3 w-3 text-muted-foreground" />
-                    )}
+                  <div className="flex items-center gap-2">
+                    <span>Fatigue:</span>
+                    <span className={cn(
+                      history.fatigueChange.startsWith("+") ? "text-destructive" :
+                      history.fatigueChange.startsWith("-") ? "text-success" :
+                      "text-muted-foreground"
+                    )}>
+                      {history.fatigueChange}
+                    </span>
+                    {history.fatigueChange.startsWith("+") && <TrendingUp className="h-3 w-3 text-destructive" />}
+                    {history.fatigueChange.startsWith("-") && <TrendingDown className="h-3 w-3 text-success" />}
+                    {history.fatigueChange === "stable" && <Minus className="h-3 w-3 text-muted-foreground" />}
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Based on {history.recordingCount} recordings over {history.daysOfData} days
+                  </p>
                 </div>
               </div>
             )}
-            */}
 
-            {/* TODO: Burnout warning - needs burnoutPrediction from parent */}
-            {/*
+            {/* Burnout warning */}
             {burnoutPrediction && (burnoutPrediction.riskLevel === "moderate" || burnoutPrediction.riskLevel === "high" || burnoutPrediction.riskLevel === "critical") && (
               <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 space-y-1">
                 <p className="font-medium text-xs uppercase tracking-wide text-destructive flex items-center gap-1">
                   <AlertTriangle className="h-3 w-3" /> Burnout risk: {burnoutPrediction.riskLevel}
                 </p>
                 <p className="text-sm">Predicted in {burnoutPrediction.predictedDays} days if patterns continue</p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {burnoutPrediction.factors.map((factor, idx) => (
-                    <Badge key={idx} variant="outline" className="text-xs border-destructive/50 text-destructive">
-                      {factor}
-                    </Badge>
-                  ))}
-                </div>
+                {burnoutPrediction.factors.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {burnoutPrediction.factors.map((factor, idx) => (
+                      <Badge key={idx} variant="outline" className="text-xs border-destructive/50 text-destructive">
+                        {factor}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
-            */}
 
-            {/* Advanced toggle for raw values */}
-            <button
-              onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-xs text-muted-foreground hover:text-foreground underline"
-            >
-              {/* TODO: Toggle to show recording.features raw values */}
-              Show raw values (coming soon)
-            </button>
+            {/* Advanced: Raw values toggle */}
+            {features && (
+              <>
+                <button
+                  onClick={() => setShowRawValues(!showRawValues)}
+                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                >
+                  {showRawValues ? "Hide" : "Show"} raw values
+                </button>
+                {showRawValues && (
+                  <div className="rounded-lg bg-muted/30 p-3 font-mono text-xs space-y-1">
+                    <div>Speech rate: {features.speechRate.toFixed(2)} syl/s</div>
+                    <div>RMS energy: {features.rms.toFixed(4)}</div>
+                    <div>Pause ratio: {(features.pauseRatio * 100).toFixed(1)}%</div>
+                    <div>Avg pause: {features.avgPauseDuration.toFixed(0)} ms</div>
+                    <div>Spectral centroid: {features.spectralCentroid.toFixed(4)}</div>
+                    <div>Spectral flux: {features.spectralFlux.toFixed(4)}</div>
+                    <div>ZCR: {features.zcr.toFixed(4)}</div>
+                  </div>
+                )}
+              </>
+            )}
           </CollapsibleContent>
         </Collapsible>
 

@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Empty } from "@/components/ui/empty"
 import { Spinner } from "@/components/ui/spinner"
 import { useCalendar } from "@/hooks/use-calendar"
-import { useSuggestions } from "@/hooks/use-suggestions"
+import { useSuggestions, featuresToVoicePatterns, computeHistoricalContext } from "@/hooks/use-suggestions"
 import { useRecordings } from "@/hooks/use-storage"
 import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
 import {
@@ -110,6 +110,17 @@ export default function SuggestionsPage() {
     const trendData = recordingsToTrendData(recordings)
     const prediction = predictBurnoutRisk(trendData)
     return { trend: prediction.trend, burnoutPrediction: prediction }
+  }, [recordings])
+
+  // Compute voice patterns from latest recording features
+  const voicePatterns = useMemo(() => {
+    if (!latestRecording?.features) return undefined
+    return featuresToVoicePatterns(latestRecording.features)
+  }, [latestRecording?.features])
+
+  // Compute historical context from all recordings
+  const historyContext = useMemo(() => {
+    return computeHistoricalContext(recordings)
   }, [recordings])
 
   // Real suggestions from Gemini API
@@ -411,6 +422,10 @@ export default function SuggestionsPage() {
             setSelectedSuggestion(null)
           }}
           isCalendarConnected={isConnected}
+          voicePatterns={voicePatterns}
+          history={historyContext}
+          burnoutPrediction={burnoutPrediction ?? undefined}
+          features={latestRecording?.features}
         />
 
         {/* Schedule time picker dialog */}
