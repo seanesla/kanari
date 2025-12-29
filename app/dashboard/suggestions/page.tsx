@@ -1,22 +1,34 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Link } from "next-view-transitions"
-import { Lightbulb, Mic, Calendar as CalendarIcon, Coffee, Dumbbell, Brain, Users, CheckCircle2, Clock } from "lucide-react"
+import { Lightbulb, Mic, Calendar as CalendarIcon, Coffee, Dumbbell, Brain, Users, CheckCircle2, Clock, RefreshCw } from "lucide-react"
 import { useSceneMode } from "@/lib/scene-context"
 import { cn } from "@/lib/utils"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
 import { Empty } from "@/components/ui/empty"
+import { Spinner } from "@/components/ui/spinner"
 import { useCalendar } from "@/hooks/use-calendar"
-import type { Suggestion } from "@/lib/types"
+import { useSuggestions } from "@/hooks/use-suggestions"
+import { useRecordings } from "@/hooks/use-storage"
+import type { Suggestion, TrendDirection } from "@/lib/types"
 
 export default function SuggestionsPage() {
   const { setMode } = useSceneMode()
   const [visible, setVisible] = useState(false)
   const { isConnected, isLoading, scheduleEvent } = useCalendar()
   const [schedulingId, setSchedulingId] = useState<string | null>(null)
-  const [localSuggestions, setLocalSuggestions] = useState<Suggestion[]>([])
+
+  // Real suggestions from Gemini API
+  const { suggestions, loading, error, fetchSuggestions, updateSuggestion } = useSuggestions()
+
+  // Get latest recording for metrics
+  const recordings = useRecordings(1)
+  const latestRecording = recordings[0]
+
+  // Track if we've already fetched to prevent duplicate calls
+  const hasFetched = useRef(false)
 
   // Set scene to dashboard mode
   useEffect(() => {
@@ -29,40 +41,15 @@ export default function SuggestionsPage() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Load suggestions (placeholder - will be populated by Gemini API)
+  // Fetch suggestions when we have metrics from a recording
   useEffect(() => {
-    // Mock data for demonstration
-    const mockSuggestions: Suggestion[] = [
-      {
-        id: "sugg_1",
-        content: "Take a 15-minute walk outside to reset your nervous system",
-        rationale: "Your voice analysis shows elevated stress markers. Light exercise can reduce cortisol levels.",
-        duration: 15,
-        category: "exercise",
-        status: "pending",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "sugg_2",
-        content: "Practice box breathing for 5 minutes",
-        rationale: "Speech rate variability suggests tension. Controlled breathing activates the parasympathetic nervous system.",
-        duration: 5,
-        category: "mindfulness",
-        status: "pending",
-        createdAt: new Date().toISOString(),
-      },
-      {
-        id: "sugg_3",
-        content: "Schedule a coffee chat with a friend or colleague",
-        rationale: "Social connection is a proven stress buffer. Your recent patterns suggest isolation.",
-        duration: 30,
-        category: "social",
-        status: "pending",
-        createdAt: new Date().toISOString(),
-      },
-    ]
-    setLocalSuggestions(mockSuggestions)
-  }, [])
+    if (latestRecording?.metrics && !hasFetched.current && !loading && suggestions.length === 0) {
+      hasFetched.current = true
+      // Use stable trend for now - could calculate from useTrendData for real trend
+      const trend: TrendDirection = "stable"
+      fetchSuggestions(latestRecording.metrics, trend)
+    }
+  }, [latestRecording, loading, suggestions.length, fetchSuggestions])
 
   const handleSchedule = async (suggestion: Suggestion) => {
     setSchedulingId(suggestion.id)
@@ -71,19 +58,22 @@ export default function SuggestionsPage() {
       const recoveryBlock = await scheduleEvent(suggestion)
 
       if (recoveryBlock) {
-        // Update suggestion status
-        setLocalSuggestions((prev) =>
-          prev.map((s) =>
-            s.id === suggestion.id
-              ? { ...s, status: "scheduled" as const, calendarEventId: recoveryBlock.calendarEventId }
-              : s
-          )
-        )
+        // Update suggestion status via hook
+        updateSuggestion(suggestion.id, "scheduled")
       }
-    } catch (error) {
-      console.error("Failed to schedule:", error)
+    } catch (err) {
+      console.error("Failed to schedule:", err)
     } finally {
       setSchedulingId(null)
+    }
+  }
+
+  // Handle retry fetching suggestions
+  const handleRetry = () => {
+    if (latestRecording?.metrics) {
+      hasFetched.current = false
+      const trend: TrendDirection = "stable"
+      fetchSuggestions(latestRecording.metrics, trend)
     }
   }
 
@@ -138,7 +128,27 @@ export default function SuggestionsPage() {
             visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
           )}
         >
-          {localSuggestions.length === 0 ? (
+          {/* Loading state */}
+          {loading ? (
+            <div className="rounded-2xl border border-border/70 bg-card/30 backdrop-blur-xl p-12">
+              <div className="flex flex-col items-center justify-center gap-4">
+                <Spinner className="h-8 w-8 text-accent" />
+                <p className="text-muted-foreground">Generating personalized suggestions...</p>
+              </div>
+            </div>
+          ) : error ? (
+            /* Error state */
+            <div className="rounded-2xl border border-destructive/50 bg-destructive/10 backdrop-blur-xl p-12">
+              <div className="flex flex-col items-center justify-center gap-4 text-center">
+                <p className="text-destructive">{error}</p>
+                <Button variant="outline" onClick={handleRetry} className="gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : suggestions.length === 0 ? (
+            /* Empty state - no recording yet */
             <div className="rounded-2xl border border-border/70 bg-card/30 backdrop-blur-xl p-12">
               <Empty
                 icon={Lightbulb}
@@ -155,7 +165,7 @@ export default function SuggestionsPage() {
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {localSuggestions.map((suggestion, index) => {
+              {suggestions.map((suggestion, index) => {
                 const Icon = categoryIcons[suggestion.category]
                 const isScheduling = schedulingId === suggestion.id
                 const isScheduled = suggestion.status === "scheduled"
@@ -223,11 +233,7 @@ export default function SuggestionsPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => {
-                              setLocalSuggestions((prev) =>
-                                prev.map((s) => (s.id === suggestion.id ? { ...s, status: "accepted" as const } : s))
-                              )
-                            }}
+                            onClick={() => updateSuggestion(suggestion.id, "accepted")}
                           >
                             Accept
                           </Button>
