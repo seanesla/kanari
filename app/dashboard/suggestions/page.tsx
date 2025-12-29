@@ -207,12 +207,19 @@ export default function SuggestionsPage() {
 
   // Handle schedule confirmation from time picker dialog
   const handleScheduleConfirm = async (suggestion: Suggestion, scheduledFor: string) => {
-    // Local scheduling (always works)
-    scheduleSuggestion(suggestion.id, scheduledFor)
+    // Local scheduling - await to ensure DB write completes
+    const success = await scheduleSuggestion(suggestion.id, scheduledFor)
+
+    if (!success) {
+      console.error("Failed to schedule suggestion")
+      return // Don't close dialog on failure
+    }
 
     // Optional: sync to Google Calendar if connected
     if (isConnected) {
-      scheduleEvent(suggestion).catch(console.error) // Don't block on this
+      // Pass updated suggestion with scheduledFor for calendar sync
+      const updatedSuggestion: Suggestion = { ...suggestion, scheduledFor, status: "scheduled" }
+      scheduleEvent(updatedSuggestion).catch(console.error)
     }
 
     setScheduleDialogSuggestion(null)
