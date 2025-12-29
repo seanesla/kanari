@@ -28,6 +28,7 @@ import {
 import { useDashboardStats, useTrendData, useScheduledSuggestions } from "@/hooks/use-storage"
 import { WeekCalendar } from "@/components/dashboard/calendar"
 import { SuggestionDetailDialog } from "@/components/dashboard/suggestions"
+import { JourneyProgress } from "@/components/dashboard/journey-progress"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import type { BurnoutPrediction, Suggestion } from "@/lib/types"
 
@@ -102,19 +103,27 @@ export default function DashboardPage() {
     totalRecordings: dashboardStats.totalRecordings,
     currentStreak: dashboardStats.currentStreak,
     avgStress: dashboardStats.averageStress,
+    avgFatigue: dashboardStats.averageFatigue,
     suggestionsAccepted: dashboardStats.suggestionsAccepted,
   }
 
-  // Calculate burnout prediction from historical data
-  // In production, this would come from IndexedDB with real recordings
-  const burnoutPrediction: BurnoutPrediction | null = useMemo(() => {
-    // Example: If we had recordings with metrics
-    // const trendData = recordingsToTrendData(recordings)
-    // return predictBurnoutRisk(trendData)
+  // Helper function to get threshold label and color for stress/fatigue scores
+  const getScoreThreshold = (score: number) => {
+    if (score === 0) return { label: "N/A", color: "text-muted-foreground", bgColor: "bg-muted/20" }
+    if (score <= 30) return { label: "Low", color: "text-success", bgColor: "bg-success/10" }
+    if (score <= 60) return { label: "Moderate", color: "text-accent", bgColor: "bg-accent/10" }
+    if (score <= 80) return { label: "Elevated", color: "text-orange-500", bgColor: "bg-orange-500/10" }
+    return { label: "High", color: "text-destructive", bgColor: "bg-destructive/10" }
+  }
 
-    // For now, return null until we have actual recording data
-    return null
-  }, [])
+  const stressThreshold = getScoreThreshold(stats.avgStress)
+  const fatigueThreshold = getScoreThreshold(stats.avgFatigue)
+
+  // Calculate burnout prediction from historical data
+  const burnoutPrediction: BurnoutPrediction | null = useMemo(() => {
+    if (storedTrendData.length < 2) return null
+    return predictBurnoutRisk(storedTrendData)
+  }, [storedTrendData])
 
   // Risk level styling
   const riskLevelConfig = {
@@ -184,9 +193,16 @@ export default function DashboardPage() {
     return Math.max(0, Math.round(100 - avgNegative))
   }, [dashboardStats])
 
+  // Determine wellness color based on score thresholds
+  const wellnessColor = useMemo(() => {
+    if (wellnessScore <= 40) return "#ef4444" // Red/destructive for low wellness
+    if (wellnessScore <= 70) return "#d4a574" // Amber/warning for medium wellness
+    return "#22c55e" // Green/success for high wellness
+  }, [wellnessScore])
+
   const wellnessData = useMemo(
-    () => [{ name: "wellness", value: wellnessScore, fill: "#22c55e" }],
-    [wellnessScore]
+    () => [{ name: "wellness", value: wellnessScore, fill: wellnessColor }],
+    [wellnessScore, wellnessColor]
   )
 
   return (
@@ -224,6 +240,21 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* JOURNEY PROGRESS */}
+        <div
+          className={cn(
+            "mb-16 md:mb-20 transition-all duration-1000 delay-200",
+            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          )}
+        >
+          <JourneyProgress
+            hasRecordings={stats.totalRecordings > 0}
+            hasAnalysis={dashboardStats.averageStress > 0 || dashboardStats.averageFatigue > 0}
+            hasSuggestions={stats.suggestionsAccepted > 0}
+            hasScheduledRecovery={scheduledSuggestions.length > 0}
+          />
+        </div>
+
         {/* QUICK STATS BAR */}
         <div
           className={cn(
@@ -243,8 +274,21 @@ export default function DashboardPage() {
           </div>
           <div className="text-center p-4 md:p-5 rounded-lg border border-border/70 bg-card/20 backdrop-blur-xl">
             <CalendarIcon className="h-5 w-5 mx-auto mb-2 text-accent" />
-            <p className="text-3xl md:text-4xl font-serif tabular-nums">{stats.avgStress}</p>
-            <p className="text-xs text-muted-foreground mt-2">Avg stress</p>
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <p className="text-3xl md:text-4xl font-serif tabular-nums">{stats.avgStress}</p>
+              {stats.avgStress > 0 && (
+                <span
+                  className={cn(
+                    "text-xs font-medium px-2 py-0.5 rounded-full",
+                    stressThreshold.color,
+                    stressThreshold.bgColor
+                  )}
+                >
+                  {stressThreshold.label}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Avg stress</p>
           </div>
           <div className="text-center p-4 md:p-5 rounded-lg border border-border/70 bg-card/20 backdrop-blur-xl">
             <Lightbulb className="h-5 w-5 mx-auto mb-2 text-success" />
@@ -428,6 +472,36 @@ export default function DashboardPage() {
                     </AreaChart>
                   </ChartContainer>
                 )}
+                {stats.totalRecordings > 0 && (
+                  <div className="mt-4 flex items-center justify-center gap-6 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Stress:</span>
+                      <span
+                        className={cn(
+                          "font-medium px-2 py-0.5 rounded-full",
+                          stressThreshold.color,
+                          stressThreshold.bgColor
+                        )}
+                      >
+                        {stressThreshold.label}
+                      </span>
+                      <span className="text-muted-foreground tabular-nums">({stats.avgStress})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">Fatigue:</span>
+                      <span
+                        className={cn(
+                          "font-medium px-2 py-0.5 rounded-full",
+                          fatigueThreshold.color,
+                          fatigueThreshold.bgColor
+                        )}
+                      >
+                        {fatigueThreshold.label}
+                      </span>
+                      <span className="text-muted-foreground tabular-nums">({stats.avgFatigue})</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Chart 2: Wellness Score Gauge */}
@@ -457,7 +531,7 @@ export default function DashboardPage() {
                       endAngle={-270}
                     >
                       <PolarGrid gridType="circle" stroke="#333" />
-                      <RadialBar dataKey="value" cornerRadius={10} fill="#22c55e" />
+                      <RadialBar dataKey="value" cornerRadius={10} fill={wellnessColor} />
                       <text
                         x="50%"
                         y="50%"
@@ -466,7 +540,7 @@ export default function DashboardPage() {
                         fontSize={32}
                         fontFamily="serif"
                         fontWeight="600"
-                        fill="#22c55e"
+                        fill={wellnessColor}
                       >
                         {wellnessScore}%
                       </text>
