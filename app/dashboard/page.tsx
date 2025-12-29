@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react"
 import { Link } from "next-view-transitions"
-import { Mic, TrendingUp, Calendar as CalendarIcon, Lightbulb, AlertTriangle, TrendingDown, Minus, ChevronDown } from "lucide-react"
+import { Mic, TrendingUp, Calendar as CalendarIcon, Lightbulb, AlertTriangle, TrendingDown, Minus, ChevronDown, ArrowRight } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   AreaChart,
@@ -234,9 +234,9 @@ export default function DashboardPage() {
               Track your vocal biomarkers, monitor stress and fatigue trends, and receive personalized recovery suggestions.
             </p>
             <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">
-              <Link href="/dashboard/record">
-                <Mic className="mr-2 h-5 w-5" />
-                Start Recording
+              <Link href="/dashboard/recordings">
+                Go to Recordings
+                <ArrowRight className="ml-2 h-5 w-5" />
               </Link>
             </Button>
           </div>
@@ -391,7 +391,7 @@ export default function DashboardPage() {
                       </Link>
                     </Button>
                     <Button asChild variant="outline">
-                      <Link href="/dashboard/record">
+                      <Link href="/dashboard/recordings?newRecording=true">
                         <Mic className="mr-2 h-4 w-4" />
                         Record Check-in
                       </Link>
@@ -717,7 +717,7 @@ export default function DashboardPage() {
             </p>
             <div className="flex flex-wrap gap-4">
               <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-                <Link href="/dashboard/record">
+                <Link href="/dashboard/recordings?newRecording=true">
                   <Mic className="mr-2 h-4 w-4" />
                   Record Now
                 </Link>

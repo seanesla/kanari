@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Mic, History, Lightbulb, Settings, ChevronLeft } from "lucide-react"
+import { LayoutDashboard, Mic, Lightbulb, Settings, ChevronLeft } from "lucide-react"
 import { useState } from "react"
 
 export interface SidebarProps {
@@ -16,8 +16,7 @@ export function Sidebar({ defaultCollapsed = false }: SidebarProps) {
 
   const navItems = [
     { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
-    { href: "/dashboard/record", label: "Record", icon: Mic },
-    { href: "/dashboard/history", label: "History", icon: History },
+    { href: "/dashboard/recordings", label: "Recordings", icon: Mic },
     { href: "/dashboard/suggestions", label: "Suggestions", icon: Lightbulb },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },
   ]

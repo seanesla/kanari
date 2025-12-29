@@ -339,7 +339,7 @@ export default function SuggestionsPage() {
                 description="Record a voice sample to receive personalized recovery suggestions based on your stress and fatigue patterns."
               >
                 <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90 mt-4">
-                  <Link href="/dashboard/record">
+                  <Link href="/dashboard/recordings?newRecording=true">
                     <Mic className="mr-2 h-4 w-4" />
                     Record Now
                   </Link>

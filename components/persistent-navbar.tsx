@@ -18,8 +18,7 @@ const landingLinks = [
 
 const dashboardLinks = [
   { id: "overview", href: "/dashboard", label: "Overview", exact: true },
-  { id: "record", href: "/dashboard/record", label: "Record", exact: true },
-  { id: "history", href: "/dashboard/history", label: "History", exact: false },
+  { id: "recordings", href: "/dashboard/recordings", label: "Recordings", exact: false },
   { id: "suggestions", href: "/dashboard/suggestions", label: "Suggestions", exact: false },
   { id: "settings", href: "/dashboard/settings", label: "Settings", exact: true },
 ]
