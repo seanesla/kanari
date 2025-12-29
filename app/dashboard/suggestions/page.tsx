@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useMemo } from "react"
 import { Link } from "next-view-transitions"
-import { Lightbulb, Mic, RefreshCw } from "lucide-react"
+import { Lightbulb, Mic, RefreshCw, ChevronDown, Calendar } from "lucide-react"
 import { useSceneMode } from "@/lib/scene-context"
 import { cn } from "@/lib/utils"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
@@ -22,11 +22,76 @@ import {
 } from "@/components/dashboard/suggestions"
 import type { Suggestion, TrendDirection, SuggestionStatus } from "@/lib/types"
 
+// Deduplication helper
+function deduplicateSuggestions(suggestions: Suggestion[]): Suggestion[] {
+  const seen = new Set<string>()
+  const deduped: Suggestion[] = []
+
+  for (const suggestion of suggestions) {
+    // Create a key from category, duration, and first 20 chars of content
+    const key = `${suggestion.category}-${Math.floor(suggestion.duration / 5)}-${suggestion.content.slice(0, 20)}`
+
+    if (!seen.has(key)) {
+      seen.add(key)
+      deduped.push(suggestion)
+    }
+  }
+
+  return deduped
+}
+
+// Smart prioritization helper - ranks suggestions by relevance
+function prioritizeSuggestions(suggestions: Suggestion[], metrics?: { stressLevel: string; fatigueLevel: string }): Suggestion[] {
+  if (!metrics) return suggestions
+
+  // Create a copy to avoid mutating original
+  const sorted = [...suggestions]
+
+  // Priority scoring based on current state
+  const getRelevanceScore = (s: Suggestion): number => {
+    let score = 0
+
+    // High stress - prioritize breaks and mindfulness
+    if (metrics.stressLevel === "high" || metrics.stressLevel === "elevated") {
+      if (s.category === "break") score += 3
+      if (s.category === "mindfulness") score += 2
+    }
+
+    // High fatigue - prioritize rest and exercise
+    if (metrics.fatigueLevel === "exhausted" || metrics.fatigueLevel === "tired") {
+      if (s.category === "rest") score += 3
+      if (s.category === "exercise") score += 1
+    }
+
+    // Moderate state - prioritize social and exercise
+    if (metrics.stressLevel === "moderate" && metrics.fatigueLevel === "normal") {
+      if (s.category === "social") score += 2
+      if (s.category === "exercise") score += 2
+    }
+
+    // Shorter activities get slight boost for quick wins
+    if (s.duration <= 15) score += 1
+
+    return score
+  }
+
+  sorted.sort((a, b) => {
+    const scoreA = getRelevanceScore(a)
+    const scoreB = getRelevanceScore(b)
+    if (scoreA !== scoreB) return scoreB - scoreA
+    // Fallback to creation time (newest first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
+
+  return sorted
+}
+
 export default function SuggestionsPage() {
   const { setMode } = useSceneMode()
   const [visible, setVisible] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<FilterValue>("all")
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
+  const [showAllPending, setShowAllPending] = useState(false)
 
   const { isConnected, scheduleEvent } = useCalendar()
 
@@ -80,16 +145,42 @@ export default function SuggestionsPage() {
     }
   }, [latestRecording?.id, latestRecording?.metrics, loading, suggestionsLoading, forRecordingId, suggestions.length, fetchSuggestions])
 
+  // Deduplicate and prioritize suggestions
+  const processedSuggestions = useMemo(() => {
+    // First deduplicate
+    const deduped = deduplicateSuggestions(suggestions)
+
+    // Separate by status
+    const pending = deduped.filter(s => s.status === "pending")
+    const nonPending = deduped.filter(s => s.status !== "pending")
+
+    // Prioritize pending suggestions
+    const prioritizedPending = prioritizeSuggestions(pending, latestRecording?.metrics)
+
+    // Limit pending to top 5 unless showAllPending is true
+    const limitedPending = showAllPending ? prioritizedPending : prioritizedPending.slice(0, 5)
+
+    // Combine back together
+    return [...limitedPending, ...nonPending]
+  }, [suggestions, latestRecording?.metrics, showAllPending])
+
+  // Count of hidden pending suggestions
+  const hiddenPendingCount = useMemo(() => {
+    const pending = suggestions.filter(s => s.status === "pending")
+    const deduped = deduplicateSuggestions(pending)
+    return Math.max(0, deduped.length - 5)
+  }, [suggestions])
+
   // Filter suggestions by category
   const filteredSuggestions = useMemo(
-    () => filterSuggestionsByCategory(suggestions, selectedCategory),
-    [suggestions, selectedCategory]
+    () => filterSuggestionsByCategory(processedSuggestions, selectedCategory),
+    [processedSuggestions, selectedCategory]
   )
 
-  // Category counts
+  // Category counts (use processed suggestions)
   const categoryCounts = useMemo(
-    () => countSuggestionsByCategory(suggestions),
-    [suggestions]
+    () => countSuggestionsByCategory(processedSuggestions),
+    [processedSuggestions]
   )
 
   // Handle regenerate suggestions
@@ -174,6 +265,31 @@ export default function SuggestionsPage() {
           </div>
         </div>
 
+        {/* CALENDAR CONNECTION BANNER */}
+        {!isConnected && (
+          <div
+            className={cn(
+              "mb-6 transition-all duration-1000 delay-150",
+              visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+            )}
+          >
+            <div className="rounded-lg border border-accent/30 bg-accent/5 backdrop-blur-sm p-4">
+              <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-5 w-5 text-accent flex-shrink-0" />
+                  <div>
+                    <p className="font-medium text-sm">Connect your calendar</p>
+                    <p className="text-sm text-muted-foreground">Schedule recovery blocks directly to Google Calendar</p>
+                  </div>
+                </div>
+                <Button asChild variant="outline" className="border-accent text-accent hover:bg-accent/10">
+                  <Link href="/dashboard/settings">Connect</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* CATEGORY FILTER */}
         <div
           className={cn(
@@ -239,6 +355,21 @@ export default function SuggestionsPage() {
                 onMoveCard={handleMoveCard}
                 onScheduleRequest={handleScheduleRequest}
               />
+
+              {/* Show all pending button */}
+              {!showAllPending && hiddenPendingCount > 0 && (
+                <div className="mt-4 text-center">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAllPending(true)}
+                    className="gap-2 text-muted-foreground hover:text-foreground"
+                  >
+                    Show all pending ({hiddenPendingCount} more)
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
 
               {/* Calendar connection hint */}
               {!isConnected && (

@@ -106,6 +106,13 @@ export function SuggestionCard({ suggestion, onClick, isDragging }: SuggestionCa
             {title}
           </p>
 
+          {/* Rationale */}
+          {suggestion.rationale && (
+            <p className="text-xs text-muted-foreground mt-1 italic line-clamp-1">
+              {suggestion.rationale}
+            </p>
+          )}
+
           {/* Status indicator for scheduled items */}
           {isScheduled && suggestion.scheduledFor && (
             <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
