@@ -386,6 +386,35 @@ export default function RecordPage() {
               </div>
             )}
 
+            {/* Contextual guidance after recording is saved */}
+            {isSaved && savedRecordingRef.current?.metrics && (
+              <div className="mt-4 p-4 rounded-lg bg-card border">
+                {savedRecordingRef.current.metrics.stressLevel === 'high' || savedRecordingRef.current.metrics.stressLevel === 'elevated' ? (
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Your stress levels appear elevated
+                    </p>
+                    <Button asChild>
+                      <Link href="/dashboard/suggestions">
+                        View Recovery Suggestions →
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      Looking good! Your levels are within normal range
+                    </p>
+                    <Button asChild variant="outline">
+                      <Link href="/dashboard">
+                        View Dashboard →
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Recording button */}
             <div className="flex flex-wrap justify-center gap-4">
               {!isRecording && !isProcessing ? (

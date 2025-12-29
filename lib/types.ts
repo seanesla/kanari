@@ -142,6 +142,8 @@ export interface RecoveryBlock {
 // Settings Types
 // ============================================
 
+export type CoachVoice = 'warm' | 'professional' | 'minimal'
+
 export interface UserSettings {
   // Recording preferences
   defaultRecordingDuration: number // seconds (30-60)
@@ -155,6 +157,8 @@ export interface UserSettings {
   preferredRecoveryTimes: string[] // Array of HH:mm
   // Privacy
   localStorageOnly: boolean
+  // Coach preferences
+  coachVoice?: CoachVoice
 }
 
 // ============================================
