@@ -59,7 +59,7 @@ export interface GeminiSuggestionRaw {
  * @returns Gemini API response
  */
 export async function callGeminiAPI(apiKey: string, request: GeminiRequest): Promise<GeminiResponse> {
-  const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent"
+  const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
 
   const response = await fetch(`${endpoint}?key=${apiKey}`, {
     method: "POST",
