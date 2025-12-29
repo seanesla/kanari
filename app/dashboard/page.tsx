@@ -5,14 +5,9 @@ import { Link } from "next-view-transitions"
 import { Mic, TrendingUp, Calendar as CalendarIcon, Lightbulb, AlertTriangle, TrendingDown, Minus, ChevronDown, ArrowRight } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  AreaChart,
-  Area,
   RadialBarChart,
   RadialBar,
   PolarAngleAxis,
-  CartesianGrid,
-  XAxis,
-  YAxis,
   ResponsiveContainer,
 } from "recharts"
 import { useSceneMode } from "@/lib/scene-context"
@@ -20,13 +15,8 @@ import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
 import { cn } from "@/lib/utils"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart"
-import { useDashboardStats, useTrendData, useScheduledSuggestions } from "@/hooks/use-storage"
+import { StressFatigueChart } from "@/components/dashboard/stress-fatigue-chart"
+import { useDashboardStats, useTrendData, useScheduledSuggestions, useRecordings } from "@/hooks/use-storage"
 import { WeekCalendar } from "@/components/dashboard/calendar"
 import { SuggestionDetailDialog } from "@/components/dashboard/suggestions"
 import { JourneyProgress } from "@/components/dashboard/journey-progress"
@@ -42,6 +32,7 @@ export default function DashboardPage() {
   const [isCalendarSheetOpen, setIsCalendarSheetOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [wellnessExpanded, setWellnessExpanded] = useState(false)
+  const [stressChartExpanded, setStressChartExpanded] = useState(false)
   const chartsRef = useRef<HTMLDivElement>(null)
   const calendarRef = useRef<HTMLDivElement>(null)
 
@@ -100,6 +91,7 @@ export default function DashboardPage() {
   const dashboardStats = useDashboardStats()
   const storedTrendData = useTrendData(7)
   const scheduledSuggestions = useScheduledSuggestions()
+  const allRecordings = useRecordings()
 
   const stats = {
     totalRecordings: dashboardStats.totalRecordings,
@@ -155,18 +147,6 @@ export default function DashboardPage() {
     },
   }
 
-  // Chart config
-  const chartConfig: ChartConfig = {
-    stress: {
-      label: "Stress",
-      color: "#ef4444",
-    },
-    fatigue: {
-      label: "Fatigue",
-      color: "#d4a574",
-    },
-  }
-
   // Transform stored trend data for chart display
   const trendData = useMemo(() => {
     if (storedTrendData.length === 0) {
@@ -206,6 +186,48 @@ export default function DashboardPage() {
     () => [{ name: "wellness", value: wellnessScore, fill: wellnessColor }],
     [wellnessScore, wellnessColor]
   )
+
+  // Aggregate AudioFeatures from last 7 days for biomarker analysis
+  const aggregatedFeatures = useMemo(() => {
+    if (!allRecordings || allRecordings.length === 0) return null
+
+    // Get last 7 days recordings with features
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+    const recentRecordings = allRecordings.filter(r => {
+      const recordingDate = new Date(r.createdAt)
+      return recordingDate >= sevenDaysAgo && r.features
+    })
+
+    if (recentRecordings.length === 0) return null
+
+    // Average key features
+    const avg = {
+      speechRate: 0,
+      rms: 0,
+      pauseRatio: 0,
+      spectralCentroid: 0,
+      spectralFlux: 0,
+      zcr: 0,
+    }
+
+    recentRecordings.forEach(r => {
+      avg.speechRate += r.features!.speechRate
+      avg.rms += r.features!.rms
+      avg.pauseRatio += r.features!.pauseRatio
+      avg.spectralCentroid += r.features!.spectralCentroid
+      avg.spectralFlux += r.features!.spectralFlux
+      avg.zcr += r.features!.zcr
+    })
+
+    const count = recentRecordings.length
+    Object.keys(avg).forEach(key => {
+      avg[key as keyof typeof avg] /= count
+    })
+
+    return avg
+  }, [allRecordings])
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
@@ -426,84 +448,22 @@ export default function DashboardPage() {
               {/* Chart 1: 7-Day Trend */}
               <div
                 className={cn(
-                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40",
+                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
                   chartsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
                 )}
                 style={{ transitionDelay: chartsVisible ? "400ms" : "0ms" }}
+                onClick={() => stats.totalRecordings > 0 && setStressChartExpanded(!stressChartExpanded)}
               >
-                <h3 className="text-lg font-semibold mb-4">Stress & Fatigue (7 days)</h3>
-                {stats.totalRecordings === 0 ? (
-                  <div className="h-[350px] flex items-center justify-center">
-                    <div className="text-center">
-                      <Mic className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
-                      <p className="text-muted-foreground">No recordings yet</p>
-                      <p className="text-sm text-muted-foreground/70 mt-1">Start recording to see your trends</p>
-                    </div>
-                  </div>
-                ) : (
-                  <ChartContainer config={chartConfig} className="h-[350px]">
-                    <AreaChart data={trendData}>
-                      <defs>
-                        <linearGradient id="colorStress" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                        </linearGradient>
-                        <linearGradient id="colorFatigue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#d4a574" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#d4a574" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                      <XAxis dataKey="day" stroke="#999" style={{ fontSize: "12px" }} />
-                      <YAxis stroke="#999" style={{ fontSize: "12px" }} domain={[0, 100]} />
-                      <ChartTooltip content={<ChartTooltipContent />} />
-                      <Area
-                        type="monotone"
-                        dataKey="stress"
-                        stroke="#ef4444"
-                        fill="url(#colorStress)"
-                        strokeWidth={2}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="fatigue"
-                        stroke="#d4a574"
-                        fill="url(#colorFatigue)"
-                        strokeWidth={2}
-                      />
-                    </AreaChart>
-                  </ChartContainer>
-                )}
-                {stats.totalRecordings > 0 && (
-                  <div className="mt-4 flex items-center justify-center gap-6 text-sm">
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Stress:</span>
-                      <span
-                        className={cn(
-                          "font-medium px-2 py-0.5 rounded-full",
-                          stressThreshold.color,
-                          stressThreshold.bgColor
-                        )}
-                      >
-                        {stressThreshold.label}
-                      </span>
-                      <span className="text-muted-foreground tabular-nums">({stats.avgStress})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Fatigue:</span>
-                      <span
-                        className={cn(
-                          "font-medium px-2 py-0.5 rounded-full",
-                          fatigueThreshold.color,
-                          fatigueThreshold.bgColor
-                        )}
-                      >
-                        {fatigueThreshold.label}
-                      </span>
-                      <span className="text-muted-foreground tabular-nums">({stats.avgFatigue})</span>
-                    </div>
-                  </div>
-                )}
+                <h3 className="text-lg font-semibold mb-2">Stress & Fatigue (7 days)</h3>
+                <StressFatigueChart
+                  data={stats.totalRecordings > 0 ? trendData : []}
+                  height={350}
+                  showLegend={true}
+                  showTrendIndicator={true}
+                  expanded={stressChartExpanded}
+                  onExpandChange={setStressChartExpanded}
+                  aggregatedFeatures={aggregatedFeatures}
+                />
               </div>
 
               {/* Chart 2: Wellness Score Gauge */}
@@ -525,30 +485,32 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ) : (
-                  <ChartContainer config={chartConfig} className="h-[350px]">
-                    <RadialBarChart
-                      data={wellnessData}
-                      innerRadius="70%"
-                      outerRadius="100%"
-                      startAngle={90}
-                      endAngle={-270}
-                    >
-                      <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
-                      <RadialBar dataKey="value" cornerRadius={10} fill={wellnessColor} background={{ fill: "hsl(var(--muted))" }} />
-                      <text
-                        x="50%"
-                        y="50%"
-                        textAnchor="middle"
-                        dominantBaseline="central"
-                        fontSize={32}
-                        fontFamily="serif"
-                        fontWeight="600"
-                        fill={wellnessColor}
+                  <div className="h-[350px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <RadialBarChart
+                        data={wellnessData}
+                        innerRadius="70%"
+                        outerRadius="100%"
+                        startAngle={90}
+                        endAngle={-270}
                       >
-                        {wellnessScore}%
-                      </text>
-                    </RadialBarChart>
-                  </ChartContainer>
+                        <PolarAngleAxis type="number" domain={[0, 100]} tick={false} />
+                        <RadialBar dataKey="value" cornerRadius={10} fill={wellnessColor} background={{ fill: "hsl(var(--muted))" }} />
+                        <text
+                          x="50%"
+                          y="50%"
+                          textAnchor="middle"
+                          dominantBaseline="central"
+                          fontSize={32}
+                          fontFamily="serif"
+                          fontWeight="600"
+                          fill={wellnessColor}
+                        >
+                          {wellnessScore}%
+                        </text>
+                      </RadialBarChart>
+                    </ResponsiveContainer>
+                  </div>
                 )}
                 <p className="text-center text-xs text-muted-foreground mt-4">
                   {stats.totalRecordings === 0
