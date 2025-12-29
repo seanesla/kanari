@@ -1,6 +1,7 @@
 "use client"
 
-import { Clock, Calendar, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X, CalendarPlus } from "lucide-react"
+import { useState } from "react"
+import { Clock, Calendar, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X, CalendarPlus, ChevronDown, Info, AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   Dialog,
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import type { Suggestion, SuggestionCategory } from "@/lib/types"
 
 const categoryIcons: Record<SuggestionCategory, typeof Coffee> = {
@@ -51,6 +53,8 @@ export function SuggestionDetailDialog({
   onComplete,
   isCalendarConnected = false,
 }: SuggestionDetailDialogProps) {
+  const [showAdvanced, setShowAdvanced] = useState(false)
+
   if (!suggestion) return null
 
   const Icon = categoryIcons[suggestion.category]
@@ -84,6 +88,85 @@ export function SuggestionDetailDialog({
             {suggestion.rationale}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Why this suggestion? */}
+        <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+          <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full">
+            <Info className="h-4 w-4" />
+            Why this suggestion?
+            <ChevronDown className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-180")} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-3 space-y-3 text-sm">
+            {/* TODO: Voice patterns detected - needs AudioFeatures from recording */}
+            <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+              <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Voice patterns detected</p>
+              <p className="text-muted-foreground">
+                {/* TODO: Extract patterns from recording.features (e.g., "Fast speech rate, elevated energy, frequent pauses") */}
+                Analysis based on your voice biomarkers
+              </p>
+            </div>
+
+            {/* TODO: Historical comparison - needs trend data from parent */}
+            {/*
+            {history && history.recordingCount > 1 && (
+              <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Compared to your baseline</p>
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="flex items-center gap-1">
+                    <span>Stress</span>
+                    {history.stressChange > 0 ? (
+                      <TrendingUp className="h-3 w-3 text-destructive" />
+                    ) : history.stressChange < 0 ? (
+                      <TrendingDown className="h-3 w-3 text-success" />
+                    ) : (
+                      <Minus className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </div>
+                  <span className="text-muted-foreground">•</span>
+                  <div className="flex items-center gap-1">
+                    <span>Fatigue</span>
+                    {history.fatigueChange > 0 ? (
+                      <TrendingUp className="h-3 w-3 text-destructive" />
+                    ) : history.fatigueChange < 0 ? (
+                      <TrendingDown className="h-3 w-3 text-success" />
+                    ) : (
+                      <Minus className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            */}
+
+            {/* TODO: Burnout warning - needs burnoutPrediction from parent */}
+            {/*
+            {burnoutPrediction && (burnoutPrediction.riskLevel === "moderate" || burnoutPrediction.riskLevel === "high" || burnoutPrediction.riskLevel === "critical") && (
+              <div className="rounded-lg bg-destructive/10 border border-destructive/30 p-3 space-y-1">
+                <p className="font-medium text-xs uppercase tracking-wide text-destructive flex items-center gap-1">
+                  <AlertTriangle className="h-3 w-3" /> Burnout risk: {burnoutPrediction.riskLevel}
+                </p>
+                <p className="text-sm">Predicted in {burnoutPrediction.predictedDays} days if patterns continue</p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {burnoutPrediction.factors.map((factor, idx) => (
+                    <Badge key={idx} variant="outline" className="text-xs border-destructive/50 text-destructive">
+                      {factor}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            */}
+
+            {/* Advanced toggle for raw values */}
+            <button
+              onClick={() => setShowAdvanced(!showAdvanced)}
+              className="text-xs text-muted-foreground hover:text-foreground underline"
+            >
+              {/* TODO: Toggle to show recording.features raw values */}
+              Show raw values (coming soon)
+            </button>
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Meta info */}
         <div className="flex flex-wrap items-center gap-4 py-4 border-y border-border/50">

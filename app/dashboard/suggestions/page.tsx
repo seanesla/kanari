@@ -12,6 +12,7 @@ import { Spinner } from "@/components/ui/spinner"
 import { useCalendar } from "@/hooks/use-calendar"
 import { useSuggestions } from "@/hooks/use-suggestions"
 import { useRecordings } from "@/hooks/use-storage"
+import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
 import {
   KanbanBoard,
   CategoryFilterTabs,
@@ -95,9 +96,19 @@ export default function SuggestionsPage() {
 
   const { isConnected, scheduleEvent } = useCalendar()
 
-  // Get latest recording for metrics
-  const recordings = useRecordings(1)
+  // Get recordings for trend analysis (14 days for better predictions)
+  const recordings = useRecordings(14)
   const latestRecording = recordings[0]
+
+  // Compute actual trend and burnout prediction
+  const { trend, burnoutPrediction } = useMemo(() => {
+    if (recordings.length < 2) {
+      return { trend: "stable" as TrendDirection, burnoutPrediction: null }
+    }
+    const trendData = recordingsToTrendData(recordings)
+    const prediction = predictBurnoutRisk(trendData)
+    return { trend: prediction.trend, burnoutPrediction: prediction }
+  }, [recordings])
 
   // Real suggestions from Gemini API
   const {
@@ -140,10 +151,9 @@ export default function SuggestionsPage() {
       fetchInitiatedRef.current !== latestRecording.id
     ) {
       fetchInitiatedRef.current = latestRecording.id
-      const trend: TrendDirection = "stable"
       fetchSuggestions(latestRecording.metrics, trend)
     }
-  }, [latestRecording?.id, latestRecording?.metrics, loading, suggestionsLoading, forRecordingId, suggestions.length, fetchSuggestions])
+  }, [latestRecording?.id, latestRecording?.metrics, loading, suggestionsLoading, forRecordingId, suggestions.length, fetchSuggestions, trend])
 
   // Deduplicate and prioritize suggestions
   const processedSuggestions = useMemo(() => {
@@ -187,7 +197,6 @@ export default function SuggestionsPage() {
   const handleRegenerate = async () => {
     if (latestRecording?.metrics) {
       fetchInitiatedRef.current = null
-      const trend: TrendDirection = "stable"
       await regenerate(latestRecording.metrics, trend)
     }
   }
