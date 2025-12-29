@@ -117,6 +117,26 @@ export interface EnrichedWellnessContext {
 }
 
 // ============================================
+// Enriched Context Types (for Gemini suggestions)
+// ============================================
+
+export interface VoicePatterns {
+  speechRate: "slow" | "normal" | "fast"
+  energyLevel: "low" | "moderate" | "high"
+  pauseFrequency: "rare" | "normal" | "frequent"
+  voiceTone: "dull" | "neutral" | "bright"
+}
+
+export interface HistoricalContext {
+  recordingCount: number
+  daysOfData: number
+  averageStress: number
+  averageFatigue: number
+  stressChange: string // e.g., "stable", "+15% from baseline"
+  fatigueChange: string
+}
+
+// ============================================
 // Suggestion Types
 // ============================================
 

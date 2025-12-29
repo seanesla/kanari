@@ -15,6 +15,11 @@ export interface WellnessContext {
   trend: TrendDirection
   timeOfDay: "morning" | "afternoon" | "evening" | "night"
   dayOfWeek: "weekday" | "weekend"
+  // Enriched context (optional - only present when historical data available)
+  voicePatterns?: VoicePatterns
+  history?: HistoricalContext
+  burnout?: BurnoutPrediction
+  confidence?: number
 }
 
 /**
@@ -106,20 +111,49 @@ EXAMPLE OUTPUT:
  * Generate user prompt with wellness data (legacy version)
  */
 export function generateUserPrompt(context: WellnessContext): string {
-  const { stressScore, stressLevel, fatigueScore, fatigueLevel, trend, timeOfDay, dayOfWeek } = context
+  const { stressScore, stressLevel, fatigueScore, fatigueLevel, trend, timeOfDay, dayOfWeek, voicePatterns, history, burnout, confidence } = context
 
-  return `Generate 2-3 personalized recovery suggestions based on this wellness data:
+  let prompt = `Generate 2-3 personalized recovery suggestions based on this wellness data:
 
 CURRENT STATE:
 - Stress Score: ${stressScore}/100 (${stressLevel})
 - Fatigue Score: ${fatigueScore}/100 (${fatigueLevel})
-- Trend: ${trend}
+- Trend: ${trend}`
 
-CONTEXT:
+  // Add voice patterns if available
+  if (voicePatterns) {
+    prompt += `\n- Voice Patterns: speech ${voicePatterns.speechRate}, energy ${voicePatterns.energyLevel}, pauses ${voicePatterns.pauseFrequency}, tone ${voicePatterns.voiceTone}`
+  }
+
+  // Add confidence if available
+  if (confidence !== undefined) {
+    prompt += `\n- Analysis Confidence: ${Math.round(confidence * 100)}%`
+  }
+
+  prompt += `\n\nCONTEXT:
 - Time of day: ${timeOfDay}
-- Day: ${dayOfWeek}
+- Day: ${dayOfWeek}`
 
-Provide practical, actionable suggestions that fit this person's current state and schedule. Return ONLY the JSON array, no additional text.`
+  // Add historical context if available
+  if (history) {
+    prompt += `\n\nHISTORICAL DATA (${history.daysOfData} days, ${history.recordingCount} recordings):
+- Average Stress: ${history.averageStress}/100
+- Average Fatigue: ${history.averageFatigue}/100
+- Stress Change: ${history.stressChange}
+- Fatigue Change: ${history.fatigueChange}`
+  }
+
+  // Add burnout prediction if available
+  if (burnout) {
+    prompt += `\n\nBURNOUT PREDICTION:
+- Risk Level: ${burnout.riskLevel} (${burnout.riskScore}/100)
+- Predicted Days: ${burnout.predictedDays} days
+- Contributing Factors: ${burnout.factors.join(", ")}`
+  }
+
+  prompt += `\n\nProvide practical, actionable suggestions that fit this person's current state and schedule. Return ONLY the JSON array, no additional text.`
+
+  return prompt
 }
 
 /**
