@@ -1,4 +1,4 @@
-import type { StressLevel, FatigueLevel, TrendDirection } from "@/lib/types"
+import type { StressLevel, FatigueLevel, TrendDirection, EnrichedWellnessContext } from "@/lib/types"
 
 /**
  * Gemini prompt templates for generating personalized recovery suggestions
@@ -58,10 +58,22 @@ IMPORTANT CONTEXT:
 - You receive ONLY numerical scores and categorical levels—NEVER audio or transcripts
 - Your suggestions help users prevent burnout by scheduling proactive recovery time
 
+ENRICHED CONTEXT YOU RECEIVE:
+- Voice patterns: Qualitative descriptors (speech rate, energy level, pause frequency, voice tone)
+- Historical data: User's baseline trends and changes over time
+- Burnout prediction: Risk level and contributing factors when elevated
+- Data confidence: Quality indicator for the analysis
+
+HOW TO USE ENRICHED CONTEXT:
+- Reference voice patterns in your rationale (e.g., "Your speech was faster than usual...")
+- Compare current state to user's baseline when historical data is available
+- Mention burnout risk when it's moderate or higher, framing it as preventive
+- Be transparent about data confidence (acknowledge limitations when confidence is low)
+
 RESPONSE FORMAT:
 You must respond with a JSON array of 2-3 suggestion objects. Each suggestion must have:
 - "content": A clear, actionable suggestion (30-50 words)
-- "rationale": Brief explanation of why this helps (20-40 words)
+- "rationale": Brief explanation of why this helps, referencing voice patterns and context (20-40 words)
 - "duration": Estimated time in minutes (5-60)
 - "category": One of: "break", "exercise", "mindfulness", "social", "rest"
 
@@ -72,6 +84,7 @@ SUGGESTION GUIDELINES:
 4. Prioritize evidence-based interventions (deep breathing, movement, social connection, rest)
 5. Keep tone supportive but not patronizing
 6. Avoid medical advice or diagnosis
+7. Ground rationale in observed voice patterns and historical trends
 
 EXAMPLE OUTPUT:
 [
@@ -90,7 +103,7 @@ EXAMPLE OUTPUT:
 ]`
 
 /**
- * Generate user prompt with wellness data
+ * Generate user prompt with wellness data (legacy version)
  */
 export function generateUserPrompt(context: WellnessContext): string {
   const { stressScore, stressLevel, fatigueScore, fatigueLevel, trend, timeOfDay, dayOfWeek } = context
@@ -107,6 +120,70 @@ CONTEXT:
 - Day: ${dayOfWeek}
 
 Provide practical, actionable suggestions that fit this person's current state and schedule. Return ONLY the JSON array, no additional text.`
+}
+
+/**
+ * Generate enriched user prompt with comprehensive wellness data
+ */
+export function generateEnrichedUserPrompt(context: EnrichedWellnessContext): string {
+  const {
+    stressScore,
+    stressLevel,
+    fatigueScore,
+    fatigueLevel,
+    trend,
+    timeOfDay,
+    dayOfWeek,
+    voicePatterns,
+    history,
+    burnout,
+    confidence,
+  } = context
+
+  let prompt = `Generate 2-3 personalized recovery suggestions based on this wellness data:
+
+CURRENT STATE:
+- Stress Score: ${stressScore}/100 (${stressLevel})
+- Fatigue Score: ${fatigueScore}/100 (${fatigueLevel})
+- Trend: ${trend}
+
+VOICE PATTERNS:
+- Speech Rate: ${voicePatterns.speechRate}
+- Energy Level: ${voicePatterns.energyLevel}
+- Pause Frequency: ${voicePatterns.pauseFrequency}
+- Voice Tone: ${voicePatterns.voiceTone}
+
+CONTEXT:
+- Time of day: ${timeOfDay}
+- Day: ${dayOfWeek}
+- Data Confidence: ${Math.round(confidence * 100)}%`
+
+  // Add historical context if available
+  if (history.recordingCount > 0) {
+    prompt += `
+
+HISTORICAL BASELINE (${history.daysOfData} days, ${history.recordingCount} recordings):
+- Average Stress: ${history.averageStress}/100
+- Average Fatigue: ${history.averageFatigue}/100
+- Stress Change: ${history.stressChange}
+- Fatigue Change: ${history.fatigueChange}`
+  }
+
+  // Add burnout prediction if risk is elevated
+  if (burnout.riskLevel === "moderate" || burnout.riskLevel === "high" || burnout.riskLevel === "critical") {
+    prompt += `
+
+BURNOUT PREDICTION:
+- Risk Level: ${burnout.riskLevel}
+- Predicted Days: ${burnout.predictedDays}
+- Contributing Factors: ${burnout.factors.join(", ")}`
+  }
+
+  prompt += `
+
+Provide practical, actionable suggestions that fit this person's current state and schedule. Ground your rationale in the voice patterns and historical context provided. Return ONLY the JSON array, no additional text.`
+
+  return prompt
 }
 
 /**

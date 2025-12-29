@@ -64,6 +64,59 @@ export interface BurnoutPrediction {
 }
 
 // ============================================
+// Enriched Wellness Context Types
+// ============================================
+
+// Voice pattern descriptors (qualitative)
+export interface VoicePatterns {
+  speechRate: "fast" | "normal" | "slow"
+  energyLevel: "high" | "moderate" | "low"
+  pauseFrequency: "frequent" | "normal" | "rare"
+  voiceTone: "bright" | "neutral" | "dull"
+}
+
+// Historical context for suggestions
+export interface HistoricalContext {
+  recordingCount: number
+  daysOfData: number
+  averageStress: number
+  averageFatigue: number
+  stressChange: string   // "+15% from baseline" | "stable" | "-10%"
+  fatigueChange: string
+}
+
+// Burnout context for suggestions
+export interface BurnoutContext {
+  riskLevel: "low" | "moderate" | "high" | "critical"
+  predictedDays: number
+  factors: string[]
+}
+
+// Enriched wellness context sent to Gemini
+export interface EnrichedWellnessContext {
+  // Core metrics (existing)
+  stressScore: number
+  stressLevel: StressLevel
+  fatigueScore: number
+  fatigueLevel: FatigueLevel
+  trend: TrendDirection
+  timeOfDay: "morning" | "afternoon" | "evening" | "night"
+  dayOfWeek: "weekday" | "weekend"
+
+  // NEW: Voice patterns
+  voicePatterns: VoicePatterns
+
+  // NEW: Historical context
+  history: HistoricalContext
+
+  // NEW: Burnout prediction
+  burnout: BurnoutContext
+
+  // NEW: Data quality
+  confidence: number
+}
+
+// ============================================
 // Suggestion Types
 // ============================================
 
