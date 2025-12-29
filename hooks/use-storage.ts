@@ -111,6 +111,23 @@ export function useTrendDataActions() {
 // Suggestion operations
 // ===========================================
 
+export function useScheduledSuggestions() {
+  const suggestions = useLiveQuery(async () => {
+    const results = await db.suggestions
+      .where("status")
+      .equals("scheduled")
+      .toArray()
+    return results
+      .map(toSuggestion)
+      .sort((a, b) => {
+        if (!a.scheduledFor || !b.scheduledFor) return 0
+        return new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime()
+      })
+  }, [])
+
+  return suggestions ?? []
+}
+
 export function useSuggestionsByRecording(recordingId: string | null) {
   const result = useLiveQuery(async () => {
     if (!recordingId) return { suggestions: [], forRecordingId: null }

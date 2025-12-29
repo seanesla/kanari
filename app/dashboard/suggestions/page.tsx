@@ -2,15 +2,13 @@
 
 import { useEffect, useState, useRef, useMemo } from "react"
 import { Link } from "next-view-transitions"
-import { Lightbulb, Mic, RefreshCw, Calendar as CalendarIcon, PanelRightClose, PanelRight } from "lucide-react"
+import { Lightbulb, Mic, RefreshCw } from "lucide-react"
 import { useSceneMode } from "@/lib/scene-context"
 import { cn } from "@/lib/utils"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
 import { Empty } from "@/components/ui/empty"
 import { Spinner } from "@/components/ui/spinner"
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { useCalendar } from "@/hooks/use-calendar"
 import { useSuggestions } from "@/hooks/use-suggestions"
 import { useRecordings } from "@/hooks/use-storage"
@@ -18,7 +16,6 @@ import {
   KanbanBoard,
   CategoryFilterTabs,
   SuggestionDetailDialog,
-  WeekCalendar,
   filterSuggestionsByCategory,
   countSuggestionsByCategory,
   type FilterValue,
@@ -30,8 +27,6 @@ export default function SuggestionsPage() {
   const [visible, setVisible] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<FilterValue>("all")
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
 
   const { isConnected, scheduleEvent } = useCalendar()
 
@@ -56,14 +51,6 @@ export default function SuggestionsPage() {
 
   // Track if we've already initiated a fetch for this recording
   const fetchInitiatedRef = useRef<string | null>(null)
-
-  // Check for mobile
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
-    checkMobile()
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [])
 
   // Set scene to dashboard mode
   useEffect(() => {
@@ -97,12 +84,6 @@ export default function SuggestionsPage() {
   const filteredSuggestions = useMemo(
     () => filterSuggestionsByCategory(suggestions, selectedCategory),
     [suggestions, selectedCategory]
-  )
-
-  // Get scheduled suggestions for calendar
-  const scheduledSuggestions = useMemo(
-    () => suggestions.filter((s) => s.status === "scheduled" && s.scheduledFor),
-    [suggestions]
   )
 
   // Category counts
@@ -154,27 +135,6 @@ export default function SuggestionsPage() {
     }
   }
 
-  // Handle time slot click in calendar
-  const handleTimeSlotClick = (date: Date, hour: number) => {
-    // If a suggestion is selected, schedule it at this time
-    if (selectedSuggestion && selectedSuggestion.status === "pending" && isConnected) {
-      const scheduledFor = new Date(date)
-      scheduledFor.setHours(hour, 0, 0, 0)
-      scheduleSuggestion(selectedSuggestion.id, scheduledFor.toISOString())
-      setSelectedSuggestion(null)
-    }
-  }
-
-  // Calendar sidebar content
-  const calendarContent = (
-    <WeekCalendar
-      scheduledSuggestions={scheduledSuggestions}
-      onEventClick={setSelectedSuggestion}
-      onTimeSlotClick={handleTimeSlotClick}
-      className="h-full"
-    />
-  )
-
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-4 md:px-8 lg:px-12 pt-28 pb-12 relative z-10">
@@ -200,8 +160,7 @@ export default function SuggestionsPage() {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
+              <Button
                   variant="outline"
                   size="sm"
                   onClick={handleRegenerate}
@@ -211,21 +170,6 @@ export default function SuggestionsPage() {
                   <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
                   Regenerate
                 </Button>
-
-                {/* Mobile calendar toggle */}
-                {isMobile && (
-                  <Sheet open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                    <SheetTrigger asChild>
-                      <Button variant="outline" size="icon">
-                        <CalendarIcon className="h-4 w-4" />
-                      </Button>
-                    </SheetTrigger>
-                    <SheetContent side="bottom" className="h-[70vh]">
-                      {calendarContent}
-                    </SheetContent>
-                  </Sheet>
-                )}
-              </div>
             </div>
           </div>
         </div>
@@ -287,33 +231,14 @@ export default function SuggestionsPage() {
               </Empty>
             </div>
           ) : (
-            /* Kanban + Calendar layout */
+            /* Kanban board */
             <>
-              {isMobile ? (
-                /* Mobile: Full-width kanban */
-                <KanbanBoard
-                  suggestions={filteredSuggestions}
-                  onCardClick={setSelectedSuggestion}
-                  onMoveCard={handleMoveCard}
-                  onScheduleRequest={handleScheduleRequest}
-                />
-              ) : (
-                /* Desktop: Resizable panels */
-                <ResizablePanelGroup direction="horizontal" className="min-h-[600px] rounded-xl">
-                  <ResizablePanel defaultSize={65} minSize={50}>
-                    <KanbanBoard
-                      suggestions={filteredSuggestions}
-                      onCardClick={setSelectedSuggestion}
-                      onMoveCard={handleMoveCard}
-                      onScheduleRequest={handleScheduleRequest}
-                    />
-                  </ResizablePanel>
-                  <ResizableHandle withHandle className="mx-2" />
-                  <ResizablePanel defaultSize={35} minSize={25}>
-                    {calendarContent}
-                  </ResizablePanel>
-                </ResizablePanelGroup>
-              )}
+              <KanbanBoard
+                suggestions={filteredSuggestions}
+                onCardClick={setSelectedSuggestion}
+                onMoveCard={handleMoveCard}
+                onScheduleRequest={handleScheduleRequest}
+              />
 
               {/* Calendar connection hint */}
               {!isConnected && (

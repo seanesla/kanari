@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from "react"
 import { Link } from "next-view-transitions"
-import { Mic, TrendingUp, Calendar, Lightbulb, AlertTriangle, TrendingDown, Minus } from "lucide-react"
+import { Mic, TrendingUp, Calendar as CalendarIcon, Lightbulb, AlertTriangle, TrendingDown, Minus } from "lucide-react"
 import {
   AreaChart,
   Area,
@@ -25,14 +25,22 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart"
-import { useDashboardStats, useTrendData } from "@/hooks/use-storage"
-import type { BurnoutPrediction } from "@/lib/types"
+import { useDashboardStats, useTrendData, useScheduledSuggestions } from "@/hooks/use-storage"
+import { WeekCalendar } from "@/components/dashboard/calendar"
+import { SuggestionDetailDialog } from "@/components/dashboard/suggestions"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import type { BurnoutPrediction, Suggestion } from "@/lib/types"
 
 export default function DashboardPage() {
   const { setMode } = useSceneMode()
   const [visible, setVisible] = useState(false)
   const [chartsVisible, setChartsVisible] = useState(false)
+  const [calendarVisible, setCalendarVisible] = useState(false)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
+  const [isCalendarSheetOpen, setIsCalendarSheetOpen] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const chartsRef = useRef<HTMLDivElement>(null)
+  const calendarRef = useRef<HTMLDivElement>(null)
 
   // Set scene to dashboard mode
   useEffect(() => {
@@ -61,9 +69,34 @@ export default function DashboardPage() {
     return () => observer.disconnect()
   }, [])
 
+  // Scroll reveal for calendar section
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setCalendarVisible(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -50px 0px" }
+    )
+
+    if (calendarRef.current) observer.observe(calendarRef.current)
+    return () => observer.disconnect()
+  }, [])
+
+  // Mobile detection
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024)
+    checkMobile()
+    window.addEventListener("resize", checkMobile)
+    return () => window.removeEventListener("resize", checkMobile)
+  }, [])
+
   // Real data from IndexedDB
   const dashboardStats = useDashboardStats()
   const storedTrendData = useTrendData(7)
+  const scheduledSuggestions = useScheduledSuggestions()
 
   const stats = {
     totalRecordings: dashboardStats.totalRecordings,
@@ -209,7 +242,7 @@ export default function DashboardPage() {
             <p className="text-xs text-muted-foreground mt-2">Day streak</p>
           </div>
           <div className="text-center p-4 md:p-5 rounded-lg border border-border/70 bg-card/20 backdrop-blur-xl">
-            <Calendar className="h-5 w-5 mx-auto mb-2 text-accent" />
+            <CalendarIcon className="h-5 w-5 mx-auto mb-2 text-accent" />
             <p className="text-3xl md:text-4xl font-serif tabular-nums">{stats.avgStress}</p>
             <p className="text-xs text-muted-foreground mt-2">Avg stress</p>
           </div>
@@ -453,6 +486,98 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* CALENDAR SECTION */}
+        <div ref={calendarRef} className="relative mb-20 md:mb-24">
+          {/* Decorative blur accents */}
+          <div className="pointer-events-none absolute top-0 left-0 h-80 w-80 rounded-full bg-accent/5 blur-3xl" />
+
+          <div className="relative">
+            {/* Section heading */}
+            <div
+              className={cn(
+                "mb-8 transition-all duration-1000 delay-300",
+                calendarVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+              )}
+            >
+              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Schedule</p>
+              <h2 className="text-3xl md:text-4xl font-serif">Your Recovery</h2>
+            </div>
+
+            {/* Calendar */}
+            <div
+              className={cn(
+                "transition-all duration-500",
+                calendarVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+              )}
+              style={{ transitionDelay: calendarVisible ? "400ms" : "0ms" }}
+            >
+              {isMobile ? (
+                <>
+                  {/* Mobile: Show compact message with button to open sheet */}
+                  <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-8">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold mb-2">Scheduled Recovery</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {scheduledSuggestions.length === 0
+                            ? "No recovery blocks scheduled"
+                            : `${scheduledSuggestions.length} recovery block${scheduledSuggestions.length === 1 ? "" : "s"} scheduled`}
+                        </p>
+                      </div>
+                      <Sheet open={isCalendarSheetOpen} onOpenChange={setIsCalendarSheetOpen}>
+                        <SheetTrigger asChild>
+                          <Button variant="outline" size="icon">
+                            <CalendarIcon className="h-5 w-5" />
+                          </Button>
+                        </SheetTrigger>
+                        <SheetContent side="bottom" className="h-[70vh]">
+                          <div className="h-full pt-4">
+                            <WeekCalendar
+                              scheduledSuggestions={scheduledSuggestions}
+                              onEventClick={setSelectedSuggestion}
+                              className="h-full"
+                            />
+                          </div>
+                        </SheetContent>
+                      </Sheet>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Desktop: Full calendar */
+                <WeekCalendar
+                  scheduledSuggestions={scheduledSuggestions}
+                  onEventClick={setSelectedSuggestion}
+                  className="min-h-[500px]"
+                />
+              )}
+
+              {/* Empty state for desktop */}
+              {!isMobile && scheduledSuggestions.length === 0 && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="text-center bg-background/80 backdrop-blur-sm rounded-lg p-8">
+                    <CalendarIcon className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
+                    <p className="text-muted-foreground">No recovery blocks scheduled</p>
+                    <p className="text-sm text-muted-foreground/70 mt-1">
+                      Schedule suggestions from the{" "}
+                      <Link href="/dashboard/suggestions" className="text-accent hover:underline pointer-events-auto">
+                        Suggestions page
+                      </Link>
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Suggestion Detail Dialog */}
+        <SuggestionDetailDialog
+          suggestion={selectedSuggestion}
+          open={!!selectedSuggestion}
+          onOpenChange={(open) => !open && setSelectedSuggestion(null)}
+        />
 
         {/* GETTING STARTED */}
         <div
