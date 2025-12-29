@@ -20,15 +20,15 @@ export default function SuggestionsPage() {
   const { isConnected, isLoading, scheduleEvent } = useCalendar()
   const [schedulingId, setSchedulingId] = useState<string | null>(null)
 
-  // Real suggestions from Gemini API
-  const { suggestions, loading, error, fetchSuggestions, updateSuggestion } = useSuggestions()
-
   // Get latest recording for metrics
   const recordings = useRecordings(1)
   const latestRecording = recordings[0]
 
-  // Track if we've already fetched to prevent duplicate calls
-  const hasFetched = useRef(false)
+  // Real suggestions from Gemini API (persisted to IndexedDB per-recording)
+  const { suggestions, loading, suggestionsLoading, forRecordingId, error, fetchSuggestions, updateSuggestion, regenerate } = useSuggestions(latestRecording?.id ?? null)
+
+  // Track if we've already initiated a fetch for this recording
+  const fetchInitiatedRef = useRef<string | null>(null)
 
   // Set scene to dashboard mode
   useEffect(() => {
@@ -41,15 +41,23 @@ export default function SuggestionsPage() {
     return () => clearTimeout(timer)
   }, [])
 
-  // Fetch suggestions when we have metrics from a recording
+  // Fetch suggestions when we have a new recording with metrics but no suggestions yet
+  // Wait for forRecordingId to match latestRecording.id to ensure we have fresh data
   useEffect(() => {
-    if (latestRecording?.metrics && !hasFetched.current && !loading && suggestions.length === 0) {
-      hasFetched.current = true
-      // Use stable trend for now - could calculate from useTrendData for real trend
+    if (
+      latestRecording?.id &&
+      latestRecording?.metrics &&
+      !loading &&
+      !suggestionsLoading &&
+      forRecordingId === latestRecording.id &&
+      suggestions.length === 0 &&
+      fetchInitiatedRef.current !== latestRecording.id
+    ) {
+      fetchInitiatedRef.current = latestRecording.id
       const trend: TrendDirection = "stable"
       fetchSuggestions(latestRecording.metrics, trend)
     }
-  }, [latestRecording, loading, suggestions.length, fetchSuggestions])
+  }, [latestRecording?.id, latestRecording?.metrics, loading, suggestionsLoading, forRecordingId, suggestions.length, fetchSuggestions])
 
   const handleSchedule = async (suggestion: Suggestion) => {
     setSchedulingId(suggestion.id)
@@ -68,12 +76,12 @@ export default function SuggestionsPage() {
     }
   }
 
-  // Handle retry fetching suggestions
-  const handleRetry = () => {
+  // Handle regenerate suggestions
+  const handleRegenerate = async () => {
     if (latestRecording?.metrics) {
-      hasFetched.current = false
+      fetchInitiatedRef.current = null
       const trend: TrendDirection = "stable"
-      fetchSuggestions(latestRecording.metrics, trend)
+      await regenerate(latestRecording.metrics, trend)
     }
   }
 
@@ -141,7 +149,7 @@ export default function SuggestionsPage() {
             <div className="rounded-2xl border border-destructive/50 bg-destructive/10 backdrop-blur-xl p-12">
               <div className="flex flex-col items-center justify-center gap-4 text-center">
                 <p className="text-destructive">{error}</p>
-                <Button variant="outline" onClick={handleRetry} className="gap-2">
+                <Button variant="outline" onClick={handleRegenerate} className="gap-2">
                   <RefreshCw className="h-4 w-4" />
                   Retry
                 </Button>
@@ -164,7 +172,21 @@ export default function SuggestionsPage() {
               </Empty>
             </div>
           ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <>
+              {/* Regenerate button */}
+              <div className="flex justify-end mb-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRegenerate}
+                  disabled={loading}
+                  className="gap-2"
+                >
+                  <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                  Regenerate
+                </Button>
+              </div>
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {suggestions.map((suggestion, index) => {
                 const Icon = categoryIcons[suggestion.category]
                 const isScheduling = schedulingId === suggestion.id
@@ -253,7 +275,8 @@ export default function SuggestionsPage() {
                   </div>
                 )
               })}
-            </div>
+              </div>
+            </>
           )}
         </div>
 

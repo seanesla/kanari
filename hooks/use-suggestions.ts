@@ -1,41 +1,58 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import type { Suggestion, VoiceMetrics, TrendDirection } from "@/lib/types"
+import { useSuggestionsByRecording, useSuggestionActions } from "./use-storage"
 
 /**
- * React hook for fetching Gemini-powered recovery suggestions
+ * React hook for fetching Gemini-powered recovery suggestions with IndexedDB persistence
  *
  * Usage:
  * ```tsx
- * const { suggestions, loading, error, fetchSuggestions, updateSuggestion } = useSuggestions()
+ * const { suggestions, loading, error, fetchSuggestions, updateSuggestion, regenerate } = useSuggestions(recordingId)
  *
- * // Fetch new suggestions
+ * // Fetch new suggestions (automatically persisted)
  * await fetchSuggestions(metrics, trend)
  *
- * // Update suggestion status
+ * // Update suggestion status (persisted to IndexedDB)
  * updateSuggestion(suggestionId, "accepted")
+ *
+ * // Regenerate suggestions (clears existing and fetches new)
+ * await regenerate(metrics, trend)
  * ```
  */
 
 interface UseSuggestionsResult {
   suggestions: Suggestion[]
   loading: boolean
+  suggestionsLoading: boolean
+  forRecordingId: string | null
   error: string | null
   fetchSuggestions: (metrics: VoiceMetrics, trend: TrendDirection) => Promise<void>
   updateSuggestion: (id: string, status: Suggestion["status"]) => void
-  clearSuggestions: () => void
+  regenerate: (metrics: VoiceMetrics, trend: TrendDirection) => Promise<void>
 }
 
-export function useSuggestions(): UseSuggestionsResult {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
+export function useSuggestions(recordingId: string | null): UseSuggestionsResult {
+  // Get persisted suggestions from IndexedDB
+  const { suggestions: persistedSuggestions, isLoading: suggestionsLoading, forRecordingId } = useSuggestionsByRecording(recordingId)
+  const { addSuggestions, updateSuggestion: updateSuggestionInDB, deleteSuggestionsByRecording } = useSuggestionActions()
+
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Track if we've already initiated a fetch for this recording
+  const fetchInitiatedRef = useRef<string | null>(null)
+
   /**
-   * Fetch suggestions from Gemini API
+   * Fetch suggestions from Gemini API and persist to IndexedDB
    */
   const fetchSuggestions = useCallback(async (metrics: VoiceMetrics, trend: TrendDirection) => {
+    if (!recordingId) {
+      setError("No recording ID provided")
+      return
+    }
+
     setLoading(true)
     setError(null)
 
@@ -65,7 +82,13 @@ export function useSuggestions(): UseSuggestionsResult {
         throw new Error("Invalid response format from API")
       }
 
-      setSuggestions(data.suggestions)
+      // Add recordingId to each suggestion and persist to IndexedDB
+      const suggestionsWithRecordingId: Suggestion[] = data.suggestions.map((s: Suggestion) => ({
+        ...s,
+        recordingId,
+      }))
+
+      await addSuggestions(suggestionsWithRecordingId)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch suggestions"
       setError(errorMessage)
@@ -73,156 +96,44 @@ export function useSuggestions(): UseSuggestionsResult {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [recordingId, addSuggestions])
 
   /**
-   * Update suggestion status (accept/dismiss/schedule)
+   * Update suggestion status (persisted to IndexedDB)
    */
   const updateSuggestion = useCallback((id: string, status: Suggestion["status"]) => {
-    setSuggestions((prev) =>
-      prev.map((suggestion) =>
-        suggestion.id === id ? { ...suggestion, status } : suggestion
-      )
-    )
-  }, [])
+    updateSuggestionInDB(id, { status }).catch((err) => {
+      console.error("Error updating suggestion:", err)
+    })
+  }, [updateSuggestionInDB])
 
   /**
-   * Clear all suggestions
+   * Regenerate suggestions - clear existing and fetch new ones
    */
-  const clearSuggestions = useCallback(() => {
-    setSuggestions([])
-    setError(null)
-  }, [])
-
-  return {
-    suggestions,
-    loading,
-    error,
-    fetchSuggestions,
-    updateSuggestion,
-    clearSuggestions,
-  }
-}
-
-/**
- * Hook for managing suggestions with persistence to localStorage
- *
- * This version saves suggestions to localStorage and loads them on mount.
- * Useful for maintaining suggestion history across sessions.
- */
-export function usePersistentSuggestions(storageKey = "kanari-suggestions"): UseSuggestionsResult {
-  const [suggestions, setSuggestions] = useState<Suggestion[]>(() => {
-    // Load from localStorage on mount
-    if (typeof window === "undefined") return []
-
-    try {
-      const stored = localStorage.getItem(storageKey)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        return Array.isArray(parsed) ? parsed : []
-      }
-    } catch (err) {
-      console.error("Failed to load suggestions from localStorage:", err)
+  const regenerate = useCallback(async (metrics: VoiceMetrics, trend: TrendDirection) => {
+    if (!recordingId) {
+      setError("No recording ID provided")
+      return
     }
 
-    return []
-  })
+    // Reset fetch tracking so we can fetch again
+    fetchInitiatedRef.current = null
 
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+    // Delete existing suggestions for this recording
+    await deleteSuggestionsByRecording(recordingId)
 
-  /**
-   * Save suggestions to localStorage whenever they change
-   */
-  const saveSuggestions = useCallback(
-    (newSuggestions: Suggestion[]) => {
-      setSuggestions(newSuggestions)
-
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem(storageKey, JSON.stringify(newSuggestions))
-        } catch (err) {
-          console.error("Failed to save suggestions to localStorage:", err)
-        }
-      }
-    },
-    [storageKey]
-  )
-
-  /**
-   * Fetch new suggestions and append to existing ones
-   */
-  const fetchSuggestions = useCallback(
-    async (metrics: VoiceMetrics, trend: TrendDirection) => {
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch("/api/gemini", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            stressScore: metrics.stressScore,
-            stressLevel: metrics.stressLevel,
-            fatigueScore: metrics.fatigueScore,
-            fatigueLevel: metrics.fatigueLevel,
-            trend,
-          }),
-        })
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.error || `API error: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        if (!data.suggestions || !Array.isArray(data.suggestions)) {
-          throw new Error("Invalid response format from API")
-        }
-
-        // Append new suggestions to existing ones
-        saveSuggestions([...suggestions, ...data.suggestions])
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : "Failed to fetch suggestions"
-        setError(errorMessage)
-        console.error("Error fetching suggestions:", err)
-      } finally {
-        setLoading(false)
-      }
-    },
-    [suggestions, saveSuggestions]
-  )
-
-  /**
-   * Update suggestion status and persist
-   */
-  const updateSuggestion = useCallback(
-    (id: string, status: Suggestion["status"]) => {
-      const updated = suggestions.map((suggestion) =>
-        suggestion.id === id ? { ...suggestion, status } : suggestion
-      )
-      saveSuggestions(updated)
-    },
-    [suggestions, saveSuggestions]
-  )
-
-  /**
-   * Clear all suggestions from state and localStorage
-   */
-  const clearSuggestions = useCallback(() => {
-    saveSuggestions([])
-    setError(null)
-  }, [saveSuggestions])
+    // Fetch new suggestions
+    await fetchSuggestions(metrics, trend)
+  }, [recordingId, deleteSuggestionsByRecording, fetchSuggestions])
 
   return {
-    suggestions,
+    suggestions: persistedSuggestions,
     loading,
+    suggestionsLoading,
+    forRecordingId,
     error,
     fetchSuggestions,
     updateSuggestion,
-    clearSuggestions,
+    regenerate,
   }
 }

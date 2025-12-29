@@ -71,6 +71,7 @@ export type SuggestionStatus = "pending" | "accepted" | "dismissed" | "scheduled
 
 export interface Suggestion {
   id: string
+  recordingId: string // Links to the recording that generated this suggestion
   content: string
   rationale: string
   duration: number // minutes

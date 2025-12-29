@@ -44,7 +44,7 @@ class KanariDB extends Dexie {
 
     this.version(1).stores({
       recordings: "id, createdAt, status",
-      suggestions: "id, createdAt, status, category",
+      suggestions: "id, createdAt, status, category, recordingId",
       recoveryBlocks: "id, suggestionId, scheduledAt, completed",
       trendData: "id, date",
       settings: "id",

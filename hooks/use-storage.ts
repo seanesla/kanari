@@ -6,13 +6,16 @@ import {
   db,
   toRecording,
   toTrendData,
+  toSuggestion,
   fromRecording,
   fromTrendData,
+  fromSuggestion,
 } from "@/lib/storage/db"
 import type {
   Recording,
   TrendData,
   DashboardStats,
+  Suggestion,
 } from "@/lib/types"
 
 // ===========================================
@@ -102,6 +105,59 @@ export function useTrendDataActions() {
   }, [])
 
   return { addTrendData, updateTrendData }
+}
+
+// ===========================================
+// Suggestion operations
+// ===========================================
+
+export function useSuggestionsByRecording(recordingId: string | null) {
+  const result = useLiveQuery(async () => {
+    if (!recordingId) return { suggestions: [], forRecordingId: null }
+    const results = await db.suggestions
+      .where("recordingId")
+      .equals(recordingId)
+      .sortBy("createdAt")
+    return { suggestions: results.map(toSuggestion), forRecordingId: recordingId }
+  }, [recordingId])
+
+  // Return suggestions, the recordingId they were loaded for, and loading state
+  // forRecordingId lets callers verify they have fresh data for the current recording
+  return {
+    suggestions: result?.suggestions ?? [],
+    forRecordingId: result?.forRecordingId ?? null,
+    isLoading: result === undefined
+  }
+}
+
+export function useSuggestionActions() {
+  const addSuggestions = useCallback(async (suggestions: Suggestion[]) => {
+    await db.suggestions.bulkAdd(suggestions.map(fromSuggestion))
+  }, [])
+
+  const updateSuggestion = useCallback(
+    async (id: string, updates: Partial<Suggestion>) => {
+      const existing = await db.suggestions.get(id)
+      if (!existing) throw new Error(`Suggestion ${id} not found`)
+
+      await db.suggestions.update(id, {
+        ...updates,
+        createdAt: updates.createdAt
+          ? new Date(updates.createdAt)
+          : existing.createdAt,
+        scheduledFor: updates.scheduledFor
+          ? new Date(updates.scheduledFor)
+          : existing.scheduledFor,
+      })
+    },
+    []
+  )
+
+  const deleteSuggestionsByRecording = useCallback(async (recordingId: string) => {
+    await db.suggestions.where("recordingId").equals(recordingId).delete()
+  }, [])
+
+  return { addSuggestions, updateSuggestion, deleteSuggestionsByRecording }
 }
 
 // ===========================================
