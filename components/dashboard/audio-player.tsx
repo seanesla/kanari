@@ -41,6 +41,12 @@ export function AudioPlayer({
   const startTimeRef = useRef<number>(0)
   const pauseOffsetRef = useRef<number>(0)
   const animationFrameRef = useRef<number>()
+  const isPlayingRef = useRef(false) // Track isPlaying for closures
+
+  // Keep ref in sync with state for closures
+  useEffect(() => {
+    isPlayingRef.current = isPlaying
+  }, [isPlaying])
 
   // Initialize audio context and buffer
   useEffect(() => {
@@ -117,14 +123,14 @@ export function AudioPlayer({
     }
   }, [isPlaying, updateTime])
 
-  const play = useCallback(() => {
+  const play = useCallback(async () => {
     if (!audioContextRef.current || !audioBufferRef.current || !isReady) return
 
     const ctx = audioContextRef.current
 
-    // Resume context if suspended
+    // Resume context if suspended (must await for audio to work)
     if (ctx.state === "suspended") {
-      ctx.resume()
+      await ctx.resume()
     }
 
     // Stop any existing source
@@ -141,9 +147,9 @@ export function AudioPlayer({
     source.buffer = audioBufferRef.current
     source.connect(ctx.destination)
 
-    // Handle playback end
+    // Handle playback end (use ref to avoid stale closure)
     source.onended = () => {
-      if (isPlaying) {
+      if (isPlayingRef.current) {
         setIsPlaying(false)
         onPlayStateChange?.(false)
         pauseOffsetRef.current = 0
@@ -160,7 +166,7 @@ export function AudioPlayer({
     source.start(0, offset)
     setIsPlaying(true)
     onPlayStateChange?.(true)
-  }, [isReady, isPlaying, duration, onPlayStateChange, onTimeUpdate])
+  }, [isReady, duration, onPlayStateChange, onTimeUpdate])
 
   const pause = useCallback(() => {
     if (!audioContextRef.current || !sourceNodeRef.current) return

@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Link } from "next-view-transitions"
 import { Mic, Clock, TrendingUp, TrendingDown, Minus, Trash2, ChevronDown, ChevronUp } from "lucide-react"
 import { useSceneMode } from "@/lib/scene-context"
@@ -39,17 +39,9 @@ function getStressIcon(level?: string) {
 function RecordingCard({ recording, onDelete }: { recording: Recording; onDelete: () => void }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [playheadPosition, setPlayheadPosition] = useState(0)
-  // Track seek position separately to pass to AudioPlayer
-  const [seekPosition, setSeekPosition] = useState<number | undefined>(undefined)
   const StressIcon = getStressIcon(recording.metrics?.stressLevel)
 
   const hasAudioData = recording.audioData && recording.audioData.length > 0
-
-  // Memoize Float32Array to prevent AudioPlayer re-initialization on every render
-  const audioDataArray = useMemo(() => {
-    if (!hasAudioData) return null
-    return new Float32Array(recording.audioData!)
-  }, [hasAudioData, recording.audioData])
 
   const handleTimeUpdate = useCallback((currentTime: number) => {
     if (recording.duration > 0) {
@@ -59,8 +51,6 @@ function RecordingCard({ recording, onDelete }: { recording: Recording; onDelete
 
   const handleSeek = useCallback((position: number) => {
     setPlayheadPosition(position)
-    // Update seekPosition to trigger AudioPlayer seek
-    setSeekPosition(position)
   }, [])
 
   const toggleExpand = () => {
@@ -136,12 +126,12 @@ function RecordingCard({ recording, onDelete }: { recording: Recording; onDelete
       </div>
 
       {/* Expandable audio player section */}
-      {isExpanded && audioDataArray && (
+      {isExpanded && hasAudioData && (
         <div className="px-6 pb-6 pt-2 border-t border-border/50 space-y-4">
           <div className="flex justify-center">
             <RecordingWaveform
               mode="static"
-              audioData={audioDataArray}
+              audioData={new Float32Array(recording.audioData!)}
               width={400}
               height={60}
               playheadPosition={playheadPosition}
@@ -151,11 +141,10 @@ function RecordingCard({ recording, onDelete }: { recording: Recording; onDelete
           </div>
           <div className="max-w-md mx-auto">
             <AudioPlayer
-              audioData={audioDataArray}
+              audioData={new Float32Array(recording.audioData!)}
               sampleRate={recording.sampleRate || 16000}
               duration={recording.duration}
               onTimeUpdate={handleTimeUpdate}
-              seekPosition={seekPosition}
             />
           </div>
         </div>
