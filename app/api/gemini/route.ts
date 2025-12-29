@@ -14,7 +14,11 @@ import type { Suggestion, StressLevel, FatigueLevel, TrendDirection } from "@/li
  *   stressLevel: StressLevel,
  *   fatigueScore: number,
  *   fatigueLevel: FatigueLevel,
- *   trend: TrendDirection
+ *   trend: TrendDirection,
+ *   voicePatterns?: { speechRate, energyLevel, pauseFrequency, voiceTone },
+ *   history?: { recordingCount, daysOfData, averageStress, averageFatigue, stressChange, fatigueChange },
+ *   burnout?: { riskLevel, predictedDays, factors },
+ *   confidence?: number
  * }
  *
  * Response:
@@ -26,7 +30,17 @@ export async function POST(request: NextRequest) {
   try {
     // Parse request body
     const body = await request.json()
-    const { stressScore, stressLevel, fatigueScore, fatigueLevel, trend } = body
+    const {
+      stressScore,
+      stressLevel,
+      fatigueScore,
+      fatigueLevel,
+      trend,
+      voicePatterns,
+      history,
+      burnout,
+      confidence
+    } = body
 
     // Validate required fields
     if (
@@ -76,6 +90,151 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate optional enriched fields
+    if (voicePatterns !== undefined) {
+      if (typeof voicePatterns !== "object" || voicePatterns === null) {
+        return NextResponse.json(
+          { error: "voicePatterns must be an object" },
+          { status: 400 }
+        )
+      }
+
+      const validSpeechRates = ["fast", "normal", "slow"]
+      const validEnergyLevels = ["high", "moderate", "low"]
+      const validPauseFrequencies = ["frequent", "normal", "rare"]
+      const validVoiceTones = ["bright", "neutral", "dull"]
+
+      if (!validSpeechRates.includes(voicePatterns.speechRate)) {
+        return NextResponse.json(
+          { error: "Invalid speech rate. Must be: fast, normal, or slow" },
+          { status: 400 }
+        )
+      }
+
+      if (!validEnergyLevels.includes(voicePatterns.energyLevel)) {
+        return NextResponse.json(
+          { error: "Invalid energy level. Must be: high, moderate, or low" },
+          { status: 400 }
+        )
+      }
+
+      if (!validPauseFrequencies.includes(voicePatterns.pauseFrequency)) {
+        return NextResponse.json(
+          { error: "Invalid pause frequency. Must be: frequent, normal, or rare" },
+          { status: 400 }
+        )
+      }
+
+      if (!validVoiceTones.includes(voicePatterns.voiceTone)) {
+        return NextResponse.json(
+          { error: "Invalid voice tone. Must be: bright, neutral, or dull" },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (history !== undefined) {
+      if (typeof history !== "object" || history === null) {
+        return NextResponse.json(
+          { error: "history must be an object" },
+          { status: 400 }
+        )
+      }
+
+      if (typeof history.recordingCount !== "number" || history.recordingCount < 0) {
+        return NextResponse.json(
+          { error: "history.recordingCount must be a non-negative number" },
+          { status: 400 }
+        )
+      }
+
+      if (typeof history.daysOfData !== "number" || history.daysOfData < 0) {
+        return NextResponse.json(
+          { error: "history.daysOfData must be a non-negative number" },
+          { status: 400 }
+        )
+      }
+
+      if (typeof history.averageStress !== "number" || history.averageStress < 0 || history.averageStress > 100) {
+        return NextResponse.json(
+          { error: "history.averageStress must be between 0 and 100" },
+          { status: 400 }
+        )
+      }
+
+      if (typeof history.averageFatigue !== "number" || history.averageFatigue < 0 || history.averageFatigue > 100) {
+        return NextResponse.json(
+          { error: "history.averageFatigue must be between 0 and 100" },
+          { status: 400 }
+        )
+      }
+
+      if (typeof history.stressChange !== "number") {
+        return NextResponse.json(
+          { error: "history.stressChange must be a number" },
+          { status: 400 }
+        )
+      }
+
+      if (typeof history.fatigueChange !== "number") {
+        return NextResponse.json(
+          { error: "history.fatigueChange must be a number" },
+          { status: 400 }
+        )
+      }
+    }
+
+    if (burnout !== undefined) {
+      if (typeof burnout !== "object" || burnout === null) {
+        return NextResponse.json(
+          { error: "burnout must be an object" },
+          { status: 400 }
+        )
+      }
+
+      const validRiskLevels = ["low", "moderate", "high", "critical"]
+
+      if (!validRiskLevels.includes(burnout.riskLevel)) {
+        return NextResponse.json(
+          { error: "Invalid burnout risk level. Must be: low, moderate, high, or critical" },
+          { status: 400 }
+        )
+      }
+
+      if (typeof burnout.predictedDays !== "number" || burnout.predictedDays < 0) {
+        return NextResponse.json(
+          { error: "burnout.predictedDays must be a non-negative number" },
+          { status: 400 }
+        )
+      }
+
+      if (!Array.isArray(burnout.factors)) {
+        return NextResponse.json(
+          { error: "burnout.factors must be an array" },
+          { status: 400 }
+        )
+      }
+
+      // Validate each factor is a string
+      for (const factor of burnout.factors) {
+        if (typeof factor !== "string") {
+          return NextResponse.json(
+            { error: "All burnout.factors must be strings" },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
+    if (confidence !== undefined) {
+      if (typeof confidence !== "number" || confidence < 0 || confidence > 1) {
+        return NextResponse.json(
+          { error: "confidence must be a number between 0 and 1" },
+          { status: 400 }
+        )
+      }
+    }
+
     // Get and validate API key
     const apiKey = validateAPIKey(process.env.GEMINI_API_KEY)
 
@@ -88,7 +247,18 @@ export async function POST(request: NextRequest) {
       trend as TrendDirection
     )
 
-    // Generate user prompt
+    // Build enriched context object for future prompt enhancement
+    // Currently validated but not yet used in prompts (see lib/gemini/prompts.ts)
+    const enrichedContext = {
+      ...context,
+      ...(voicePatterns && { voicePatterns }),
+      ...(history && { history }),
+      ...(burnout && { burnout }),
+      ...(confidence !== undefined && { confidence })
+    }
+
+    // Generate user prompt (currently uses basic context only)
+    // Future enhancement: pass enrichedContext when prompts.ts is updated
     const userPrompt = generateUserPrompt(context)
 
     // Call Gemini API
