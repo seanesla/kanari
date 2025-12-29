@@ -14,7 +14,7 @@ const instrumentSerif = Instrument_Serif({
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" })
 
 export const metadata: Metadata = {
-  title: "/dev/truth",
+  title: "kanari",
   description: "Your metrics are lying to you.",
   generator: "v0.app",
 }

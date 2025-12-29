@@ -1,6 +1,6 @@
 "use client"
 
-import { MicVAD } from "@ricky0123/vad-web"
+import { NonRealTimeVAD } from "@ricky0123/vad-web"
 
 export interface VADOptions {
   /**
@@ -97,88 +97,45 @@ export class VoiceActivityDetector {
   }
 
   /**
-   * Process audio with Silero VAD
+   * Process audio with Silero VAD using NonRealTimeVAD for offline processing
    */
   private async processWithVAD(audioData: Float32Array): Promise<SpeechSegment[]> {
-    return new Promise((resolve, reject) => {
-      const segments: SpeechSegment[] = []
-      let currentSegmentStart: number | null = null
-      let currentSegmentAudio: Float32Array[] = []
+    const segments: SpeechSegment[] = []
 
-      try {
-        // Create VAD instance
-        const vad = MicVAD.new({
-          ortConfig: (ort) => {
-            // Configure ONNX Runtime for browser
-            ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/"
-          },
-          // Non-real-time mode configuration
-          stream: undefined,
-          // VAD parameters
-          positiveSpeechThreshold: this.options.positiveSpeechThreshold,
-          negativeSpeechThreshold: this.options.negativeSpeechThreshold,
-          minSpeechFrames: Math.floor(
-            (this.options.minSpeechDuration / 1000) * (16000 / 512)
-          ),
-          redemptionFrames: Math.floor(
-            (this.options.minSilenceDuration / 1000) * (16000 / 512)
-          ),
-          // Callbacks
-          onSpeechStart: () => {
-            currentSegmentStart = segments.length > 0
-              ? segments[segments.length - 1].end
-              : 0
-            currentSegmentAudio = []
-          },
-          onSpeechEnd: (audio) => {
-            if (currentSegmentStart !== null && audio.length > 0) {
-              const start = currentSegmentStart
-              const end = start + audio.length / 16000
-
-              segments.push({
-                audio: new Float32Array(audio),
-                start,
-                end,
-              })
-
-              currentSegmentStart = null
-              currentSegmentAudio = []
-            }
-          },
-          onFrameProcessed: () => {
-            // Frame processed callback (optional)
-          },
-        })
-
-        // Process audio in chunks (VAD expects chunks of ~512 samples)
-        const chunkSize = 512
-        const numChunks = Math.ceil(audioData.length / chunkSize)
-
-        // Process all chunks
-        for (let i = 0; i < numChunks; i++) {
-          const start = i * chunkSize
-          const end = Math.min(start + chunkSize, audioData.length)
-          const chunk = audioData.slice(start, end)
-
-          // Note: MicVAD is designed for real-time processing
-          // For offline processing, we simulate real-time chunks
-          // This is a workaround - ideally use NonRealTimeVAD when available
-        }
-
-        // If no segments detected, return entire audio
-        if (segments.length === 0) {
-          segments.push({
-            audio: audioData,
-            start: 0,
-            end: audioData.length / 16000,
-          })
-        }
-
-        resolve(segments)
-      } catch (error) {
-        reject(error)
-      }
+    // Create NonRealTimeVAD instance for offline audio processing
+    const vad = await NonRealTimeVAD.new({
+      positiveSpeechThreshold: this.options.positiveSpeechThreshold,
+      negativeSpeechThreshold: this.options.negativeSpeechThreshold,
+      minSpeechMs: this.options.minSpeechDuration,
+      redemptionMs: this.options.minSilenceDuration,
+      // Load ONNX model from CDN (not bundled with Next.js)
+      modelURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/silero_vad_legacy.onnx",
+      // Configure ONNX Runtime WASM paths to use CDN
+      ortConfig: (ort) => {
+        ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/"
+      },
     })
+
+    // NonRealTimeVAD.run() is an async generator for pre-recorded audio
+    for await (const { audio, start, end } of vad.run(audioData, 16000)) {
+      segments.push({
+        audio: new Float32Array(audio),
+        start: start / 1000, // Convert ms to seconds
+        end: end / 1000,
+      })
+    }
+
+    // If no segments detected, return entire audio as single segment
+    if (segments.length === 0) {
+      segments.push({
+        audio: audioData,
+        start: 0,
+        end: audioData.length / 16000,
+      })
+    }
+
+    console.log(`VAD detected ${segments.length} speech segments`)
+    return segments
   }
 
   /**

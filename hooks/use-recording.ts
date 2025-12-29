@@ -89,6 +89,11 @@ export interface UseRecordingOptions {
   autoProcess?: boolean
 
   /**
+   * Maximum recording duration in seconds (default: 600 = 10 minutes)
+   */
+  maxDuration?: number
+
+  /**
    * Callback when recording starts
    */
   onStart?: () => void
@@ -110,6 +115,7 @@ export interface UseRecordingOptions {
 }
 
 const DEFAULT_SAMPLE_RATE = 16000
+const DEFAULT_MAX_DURATION = 600 // 10 minutes
 
 /**
  * React hook for managing audio recording workflow
@@ -127,6 +133,7 @@ export function useRecording(options: UseRecordingOptions = {}): [RecordingData,
     sampleRate = DEFAULT_SAMPLE_RATE,
     enableVAD = true,
     autoProcess = true,
+    maxDuration = DEFAULT_MAX_DURATION,
     onStart,
     onStop,
     onComplete,
@@ -146,6 +153,10 @@ export function useRecording(options: UseRecordingOptions = {}): [RecordingData,
   const recorderRef = useRef<AudioRecorder | null>(null)
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const startTimeRef = useRef<number>(0)
+
+  // Refs for auto-stop
+  const maxDurationRef = useRef(maxDuration)
+  maxDurationRef.current = maxDuration
 
   // Cleanup on unmount
   useEffect(() => {
@@ -310,6 +321,13 @@ export function useRecording(options: UseRecordingOptions = {}): [RecordingData,
     setError(null)
     setAudioLevel(0)
   }, [])
+
+  // Auto-stop when max duration is reached
+  useEffect(() => {
+    if (state === "recording" && duration >= maxDurationRef.current) {
+      stopRecording()
+    }
+  }, [state, duration, stopRecording])
 
   const data: RecordingData = {
     state,

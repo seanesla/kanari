@@ -1,17 +1,76 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Mic, Square, CheckCircle, AlertCircle, Loader2 } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Link } from "next-view-transitions"
+import { Mic, Square, CheckCircle, AlertCircle, Loader2, History, Lightbulb, RotateCcw } from "lucide-react"
 import { useSceneMode } from "@/lib/scene-context"
 import { cn } from "@/lib/utils"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
 import { useRecording } from "@/hooks/use-recording"
+import { useRecordingActions, useTrendDataActions } from "@/hooks/use-storage"
+import { analyzeVoiceMetrics } from "@/lib/ml/inference"
 import { RecordingWaveform, AudioLevelMeter } from "@/components/dashboard/recording-waveform"
+import { AudioPlayer } from "@/components/dashboard/audio-player"
+import type { Recording, AudioFeatures } from "@/lib/types"
 
 export default function RecordPage() {
   const { setMode } = useSceneMode()
   const [visible, setVisible] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [playheadPosition, setPlayheadPosition] = useState(0)
+  const savedRecordingRef = useRef<Recording | null>(null)
+
+  // Storage hooks
+  const { addRecording } = useRecordingActions()
+  const { addTrendData } = useTrendDataActions()
+
+  // Save recording to IndexedDB
+  const saveRecording = useCallback(async (
+    audioData: Float32Array,
+    processingDuration: number,
+    extractedFeatures: AudioFeatures
+  ) => {
+    setIsSaving(true)
+    setSaveError(null)
+    try {
+      // Compute metrics using ML inference
+      const metrics = analyzeVoiceMetrics(extractedFeatures)
+
+      // Create recording object
+      const recording: Recording = {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        duration: processingDuration,
+        status: "complete",
+        features: extractedFeatures,
+        metrics,
+        audioData: Array.from(audioData),
+        sampleRate: 16000,
+      }
+
+      // Save to IndexedDB
+      await addRecording(recording)
+
+      // Update trend data for dashboard
+      await addTrendData({
+        date: new Date().toISOString().split("T")[0],
+        stressScore: metrics.stressScore,
+        fatigueScore: metrics.fatigueScore,
+      })
+
+      savedRecordingRef.current = recording
+      setIsSaved(true)
+      console.log("Recording saved successfully:", recording.id)
+    } catch (err) {
+      console.error("Failed to save recording:", err)
+      setSaveError(err instanceof Error ? err.message : "Failed to save recording")
+    } finally {
+      setIsSaving(false)
+    }
+  }, [addRecording, addTrendData])
 
   // Use recording hook
   const [recordingData, recordingControls] = useRecording({
@@ -19,20 +78,71 @@ export default function RecordPage() {
     autoProcess: true,
     onComplete: (result) => {
       console.log("Recording complete:", result)
-      // TODO: Save to IndexedDB/Dexie when data layer is integrated
     },
     onError: (error) => {
       console.error("Recording error:", error)
     },
   })
 
-  const { state, duration, audioLevel, features, processingResult, error } = recordingData
-  const { startRecording, stopRecording, cancelRecording, reset } = recordingControls
+  const { state, duration, audioLevel, features, processingResult, error, audioData } = recordingData
+  const { startRecording, stopRecording, cancelRecording, reset: resetRecording } = recordingControls
 
   const isRecording = state === "recording"
   const isProcessing = state === "processing"
   const isComplete = state === "complete"
   const hasError = state === "error"
+
+  // Track if we've attempted to save this recording
+  const saveAttemptedRef = useRef(false)
+
+  // Auto-save when recording completes - using useEffect to avoid stale closure
+  useEffect(() => {
+    if (isComplete && audioData && features && !isSaved && !isSaving && !saveAttemptedRef.current) {
+      saveAttemptedRef.current = true
+      saveRecording(audioData, duration, features)
+    }
+  }, [isComplete, audioData, features, duration, isSaved, isSaving, saveRecording])
+
+  // Reset save attempted flag when starting a new recording
+  useEffect(() => {
+    if (state === "idle" || state === "recording") {
+      saveAttemptedRef.current = false
+    }
+  }, [state])
+
+  // Navigation guard for unsaved recordings
+  useEffect(() => {
+    // Browser close/refresh
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if ((isRecording || isProcessing || (isComplete && !isSaved)) && !isSaving) {
+        e.preventDefault()
+        e.returnValue = "You have an unsaved recording. Leave anyway?"
+      }
+    }
+
+    // Back/forward button
+    const handlePopState = () => {
+      if ((isRecording || isProcessing || (isComplete && !isSaved)) && !isSaving) {
+        const shouldLeave = window.confirm("You have an unsaved recording. Leave anyway?")
+        if (!shouldLeave) {
+          // Push state back to prevent navigation
+          window.history.pushState(null, "", window.location.href)
+        }
+      }
+    }
+
+    // Push initial state for popstate to work
+    if (isRecording || isProcessing || (isComplete && !isSaved)) {
+      window.history.pushState(null, "", window.location.href)
+    }
+
+    window.addEventListener("beforeunload", handleBeforeUnload)
+    window.addEventListener("popstate", handlePopState)
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload)
+      window.removeEventListener("popstate", handlePopState)
+    }
+  }, [isRecording, isProcessing, isComplete, isSaved, isSaving])
 
   // Set scene to dashboard mode
   useEffect(() => {
@@ -60,8 +170,32 @@ export default function RecordPage() {
   }
 
   const handleReset = () => {
-    reset()
+    resetRecording()
+    setIsSaved(false)
+    setIsSaving(false)
+    setSaveError(null)
+    setPlayheadPosition(0)
+    savedRecordingRef.current = null
   }
+
+  // Retry save if it failed
+  const handleRetrySave = useCallback(() => {
+    if (audioData && features) {
+      saveAttemptedRef.current = false
+      setSaveError(null)
+      saveRecording(audioData, duration, features)
+    }
+  }, [audioData, features, duration, saveRecording])
+
+  const handleTimeUpdate = useCallback((currentTime: number) => {
+    if (duration > 0) {
+      setPlayheadPosition(currentTime / duration)
+    }
+  }, [duration])
+
+  const handleSeek = useCallback((position: number) => {
+    setPlayheadPosition(position)
+  }, [])
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
@@ -147,18 +281,33 @@ export default function RecordPage() {
 
             {/* Waveform visualization */}
             {(isRecording || isComplete) && (
-              <div className="mb-8 flex justify-center">
-                {isRecording ? (
-                  <AudioLevelMeter level={audioLevel} barCount={30} />
-                ) : isComplete && recordingData.audioData ? (
-                  <RecordingWaveform
-                    mode="static"
-                    audioData={recordingData.audioData}
-                    width={400}
-                    height={80}
-                    className="border border-border/30 bg-background/50"
-                  />
-                ) : null}
+              <div className="mb-8 space-y-4">
+                <div className="flex justify-center">
+                  {isRecording ? (
+                    <AudioLevelMeter level={audioLevel} barCount={30} />
+                  ) : isComplete && recordingData.audioData ? (
+                    <RecordingWaveform
+                      mode="static"
+                      audioData={recordingData.audioData}
+                      width={400}
+                      height={80}
+                      playheadPosition={playheadPosition}
+                      onSeek={handleSeek}
+                      className="border border-border/30 bg-background/50"
+                    />
+                  ) : null}
+                </div>
+                {/* Audio Player */}
+                {isComplete && recordingData.audioData && (
+                  <div className="max-w-md mx-auto">
+                    <AudioPlayer
+                      audioData={recordingData.audioData}
+                      sampleRate={16000}
+                      duration={duration}
+                      onTimeUpdate={handleTimeUpdate}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -196,27 +345,90 @@ export default function RecordPage() {
               </div>
             )}
 
+            {/* Saving indicator */}
+            {isSaving && (
+              <div className="mb-4 text-center">
+                <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving recording...
+                </div>
+              </div>
+            )}
+
+            {/* Saved confirmation */}
+            {isSaved && !isSaving && (
+              <div className="mb-4 text-center">
+                <div className="inline-flex items-center gap-2 text-sm text-success">
+                  <CheckCircle className="h-4 w-4" />
+                  Recording saved successfully
+                </div>
+              </div>
+            )}
+
+            {/* Save error */}
+            {saveError && !isSaving && (
+              <div className="mb-4 text-center space-y-2">
+                <div className="inline-flex items-center gap-2 text-sm text-destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  {saveError}
+                </div>
+                <div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRetrySave}
+                    className="gap-2"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    Retry Save
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Recording button */}
-            <div className="flex justify-center gap-4">
+            <div className="flex flex-wrap justify-center gap-4">
               {!isRecording && !isProcessing ? (
                 <>
-                  <Button
-                    size="lg"
-                    className="bg-accent text-accent-foreground hover:bg-accent/90 h-16 w-16 rounded-full p-0"
-                    onClick={handleStartRecording}
-                    disabled={isComplete}
-                  >
-                    <Mic className="h-8 w-8" />
-                  </Button>
-                  {isComplete && (
+                  {!isComplete && (
                     <Button
                       size="lg"
-                      variant="outline"
-                      onClick={handleReset}
-                      className="rounded-full"
+                      className="bg-accent text-accent-foreground hover:bg-accent/90 h-16 w-16 rounded-full p-0"
+                      onClick={handleStartRecording}
                     >
-                      Record Again
+                      <Mic className="h-8 w-8" />
                     </Button>
+                  )}
+                  {isComplete && isSaved && (
+                    <>
+                      <Button
+                        asChild
+                        variant="outline"
+                        className="gap-2"
+                      >
+                        <Link href="/dashboard/history">
+                          <History className="h-4 w-4" />
+                          View History
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleReset}
+                        className="gap-2"
+                      >
+                        <Mic className="h-4 w-4" />
+                        Record Again
+                      </Button>
+                      <Button
+                        asChild
+                        className="bg-accent text-accent-foreground hover:bg-accent/90 gap-2"
+                      >
+                        <Link href="/dashboard/suggestions">
+                          <Lightbulb className="h-4 w-4" />
+                          Get Suggestions
+                        </Link>
+                      </Button>
+                    </>
                   )}
                 </>
               ) : isRecording ? (

@@ -14,12 +14,13 @@ const DEFAULT_CHANNEL_COUNT = 1 // Mono
 
 /**
  * AudioRecorder - Web Audio API wrapper for capturing microphone audio
+ * Uses AudioWorkletNode (modern API) instead of deprecated ScriptProcessorNode
  */
 export class AudioRecorder {
   private audioContext: AudioContext | null = null
   private mediaStream: MediaStream | null = null
   private sourceNode: MediaStreamAudioSourceNode | null = null
-  private processorNode: ScriptProcessorNode | null = null
+  private workletNode: AudioWorkletNode | null = null
   private audioChunks: Float32Array[] = []
 
   private state: RecorderState = "idle"
@@ -71,26 +72,24 @@ export class AudioRecorder {
       // Create source from stream
       this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream)
 
-      // Create script processor for capturing audio data
-      // Using 4096 buffer size for balance between latency and performance
-      const bufferSize = 4096
-      this.processorNode = this.audioContext.createScriptProcessor(
-        bufferSize,
-        this.options.channelCount,
-        this.options.channelCount
-      )
+      // Load AudioWorklet module (modern replacement for deprecated ScriptProcessorNode)
+      await this.audioContext.audioWorklet.addModule("/audio-processor.worklet.js")
 
-      // Process audio data
-      this.processorNode.onaudioprocess = (event) => {
-        const inputData = event.inputBuffer.getChannelData(0)
-        const chunk = new Float32Array(inputData)
+      // Create AudioWorkletNode
+      this.workletNode = new AudioWorkletNode(this.audioContext, "audio-processor", {
+        channelCount: this.options.channelCount,
+        channelCountMode: "explicit",
+      })
+
+      // Handle audio data from worklet
+      this.workletNode.port.onmessage = (event) => {
+        const chunk = event.data as Float32Array
         this.audioChunks.push(chunk)
         this.options.onDataAvailable(chunk)
       }
 
-      // Connect nodes
-      this.sourceNode.connect(this.processorNode)
-      this.processorNode.connect(this.audioContext.destination)
+      // Connect nodes (worklet doesn't need to connect to destination for input-only processing)
+      this.sourceNode.connect(this.workletNode)
 
       this.state = "recording"
       this.startTime = Date.now()
@@ -111,10 +110,11 @@ export class AudioRecorder {
     this.state = "stopping"
 
     try {
-      // Disconnect and clean up
-      if (this.processorNode) {
-        this.processorNode.disconnect()
-        this.processorNode = null
+      // Signal worklet to stop processing
+      if (this.workletNode) {
+        this.workletNode.port.postMessage("stop")
+        this.workletNode.disconnect()
+        this.workletNode = null
       }
 
       if (this.sourceNode) {
@@ -161,10 +161,11 @@ export class AudioRecorder {
       this.mediaStream = null
     }
 
-    // Disconnect nodes
-    if (this.processorNode) {
-      this.processorNode.disconnect()
-      this.processorNode = null
+    // Signal worklet to stop and disconnect nodes
+    if (this.workletNode) {
+      this.workletNode.port.postMessage("stop")
+      this.workletNode.disconnect()
+      this.workletNode = null
     }
 
     if (this.sourceNode) {

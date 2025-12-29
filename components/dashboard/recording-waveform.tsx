@@ -40,6 +40,16 @@ export interface RecordingWaveformProps {
   mode?: "realtime" | "static"
 
   /**
+   * Playhead position (0-1 normalized) for static mode
+   */
+  playheadPosition?: number
+
+  /**
+   * Callback when user clicks to seek (position 0-1)
+   */
+  onSeek?: (position: number) => void
+
+  /**
    * Additional CSS classes
    */
   className?: string
@@ -60,11 +70,14 @@ export function RecordingWaveform({
   color = "#d4a574", // accent color
   backgroundColor = "transparent",
   mode = "realtime",
+  playheadPosition,
+  onSeek,
   className,
 }: RecordingWaveformProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const barsRef = useRef<number[]>([])
   const animationFrameRef = useRef<number>()
+  const waveformDataRef = useRef<number[]>([])
 
   // Initialize bars for real-time mode
   useEffect(() => {
@@ -226,15 +239,109 @@ export function RecordingWaveform({
 
     ctx.closePath()
     ctx.fill()
+
+    // Store normalized data for playhead redraw
+    waveformDataRef.current = normalizedData
   }, [mode, audioData, width, height, color, backgroundColor])
+
+  // Draw playhead overlay
+  useEffect(() => {
+    if (mode !== "static" || playheadPosition === undefined || !canvasRef.current) return
+
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    // Redraw waveform first (to clear previous playhead)
+    const normalizedData = waveformDataRef.current
+    if (normalizedData.length === 0) return
+
+    // Clear canvas
+    ctx.fillStyle = backgroundColor
+    ctx.fillRect(0, 0, width, height)
+
+    // Redraw waveform
+    ctx.strokeStyle = color
+    ctx.lineWidth = 2
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round"
+
+    ctx.beginPath()
+    for (let i = 0; i < normalizedData.length; i++) {
+      const amplitude = normalizedData[i] * (height / 2) * 0.8
+      const x = i
+      const y = height / 2
+      if (i === 0) {
+        ctx.moveTo(x, y - amplitude)
+      } else {
+        ctx.lineTo(x, y - amplitude)
+      }
+    }
+    ctx.stroke()
+
+    ctx.beginPath()
+    for (let i = 0; i < normalizedData.length; i++) {
+      const amplitude = normalizedData[i] * (height / 2) * 0.8
+      const x = i
+      const y = height / 2
+      if (i === 0) {
+        ctx.moveTo(x, y + amplitude)
+      } else {
+        ctx.lineTo(x, y + amplitude)
+      }
+    }
+    ctx.stroke()
+
+    const gradient = ctx.createLinearGradient(0, 0, 0, height)
+    gradient.addColorStop(0, `${color}40`)
+    gradient.addColorStop(0.5, `${color}10`)
+    gradient.addColorStop(1, `${color}40`)
+    ctx.fillStyle = gradient
+
+    ctx.beginPath()
+    ctx.moveTo(0, height / 2)
+    for (let i = 0; i < normalizedData.length; i++) {
+      const amplitude = normalizedData[i] * (height / 2) * 0.8
+      ctx.lineTo(i, height / 2 - amplitude)
+    }
+    for (let i = normalizedData.length - 1; i >= 0; i--) {
+      const amplitude = normalizedData[i] * (height / 2) * 0.8
+      ctx.lineTo(i, height / 2 + amplitude)
+    }
+    ctx.closePath()
+    ctx.fill()
+
+    // Draw playhead line
+    const playheadX = Math.round(playheadPosition * width)
+    ctx.strokeStyle = "#ef4444" // Red color for playhead
+    ctx.lineWidth = 2
+    ctx.beginPath()
+    ctx.moveTo(playheadX, 0)
+    ctx.lineTo(playheadX, height)
+    ctx.stroke()
+
+    // Draw playhead circle at top
+    ctx.fillStyle = "#ef4444"
+    ctx.beginPath()
+    ctx.arc(playheadX, 4, 4, 0, Math.PI * 2)
+    ctx.fill()
+  }, [mode, playheadPosition, width, height, color, backgroundColor])
+
+  const handleClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (mode !== "static" || !onSeek) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const position = (e.clientX - rect.left) / rect.width
+    onSeek(Math.max(0, Math.min(1, position)))
+  }
 
   return (
     <canvas
       ref={canvasRef}
       width={width}
       height={height}
-      className={cn("rounded-lg", className)}
+      className={cn("rounded-lg", onSeek && mode === "static" ? "cursor-pointer" : "", className)}
       style={{ backgroundColor }}
+      onClick={handleClick}
     />
   )
 }

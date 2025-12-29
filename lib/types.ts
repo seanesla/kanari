@@ -11,6 +11,8 @@ export interface Recording {
   status: RecordingStatus
   features?: AudioFeatures
   metrics?: VoiceMetrics
+  audioData?: number[] // Float32Array serialized for IndexedDB storage
+  sampleRate?: number // For playback (default 16000)
 }
 
 export interface AudioFeatures {

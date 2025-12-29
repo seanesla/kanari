@@ -25,6 +25,11 @@ export class FeatureExtractor {
     this.sampleRate = options.sampleRate ?? DEFAULT_SAMPLE_RATE
     this.bufferSize = options.bufferSize ?? DEFAULT_BUFFER_SIZE
     this.hopSize = options.hopSize ?? DEFAULT_HOP_SIZE
+
+    // Configure Meyda globals for offline processing
+    // Required for spectralFlux and other features that depend on buffer/sample rate
+    Meyda.bufferSize = this.bufferSize
+    Meyda.sampleRate = this.sampleRate
   }
 
   /**
@@ -57,6 +62,23 @@ export class FeatureExtractor {
   }
 
   /**
+   * Calculate spectral flux manually (L2 norm of spectrum difference)
+   * This avoids Meyda 5.6.3 bug with spectralFlux calculation
+   */
+  private calculateSpectralFlux(
+    currentSpectrum: number[],
+    previousSpectrum: number[]
+  ): number {
+    let sum = 0
+    const len = Math.min(currentSpectrum.length, previousSpectrum.length)
+    for (let i = 0; i < len; i++) {
+      const diff = currentSpectrum[i] - previousSpectrum[i]
+      sum += diff * diff
+    }
+    return Math.sqrt(sum)
+  }
+
+  /**
    * Extract features frame-by-frame using sliding window
    */
   private extractFrameFeatures(audioData: Float32Array) {
@@ -70,6 +92,10 @@ export class FeatureExtractor {
     // Process audio in overlapping windows
     const numFrames = Math.floor((audioData.length - this.bufferSize) / this.hopSize) + 1
 
+    // Track previous amplitude spectrum for manual spectralFlux calculation
+    // (Meyda 5.6.3 has a bug with spectralFlux when using Meyda.extract())
+    let previousSpectrum: number[] | null = null
+
     for (let i = 0; i < numFrames; i++) {
       const start = i * this.hopSize
       const end = start + this.bufferSize
@@ -77,29 +103,45 @@ export class FeatureExtractor {
       // Extract frame
       const frame = audioData.slice(start, end)
 
-      // Use Meyda to extract features for this frame
-      const features = Meyda.extract(
-        [
-          "mfcc",
-          "spectralCentroid",
-          "spectralFlux",
-          "spectralRolloff",
-          "rms",
-          "zcr",
-        ],
-        frame
-      )
+      try {
+        // Use Meyda to extract features for this frame
+        // Note: spectralFlux is computed manually to avoid Meyda bug
+        const features = Meyda.extract(
+          [
+            "mfcc",
+            "spectralCentroid",
+            "amplitudeSpectrum",
+            "spectralRolloff",
+            "rms",
+            "zcr",
+          ],
+          frame
+        )
 
-      if (features) {
-        if (features.mfcc) mfccFrames.push(features.mfcc as number[])
-        if (typeof features.spectralCentroid === "number")
-          spectralCentroid.push(features.spectralCentroid)
-        if (typeof features.spectralFlux === "number")
-          spectralFlux.push(features.spectralFlux)
-        if (typeof features.spectralRolloff === "number")
-          spectralRolloff.push(features.spectralRolloff)
-        if (typeof features.rms === "number") rms.push(features.rms)
-        if (typeof features.zcr === "number") zcr.push(features.zcr)
+        if (features) {
+          if (features.mfcc) mfccFrames.push(features.mfcc as number[])
+          if (typeof features.spectralCentroid === "number")
+            spectralCentroid.push(features.spectralCentroid)
+          if (typeof features.spectralRolloff === "number")
+            spectralRolloff.push(features.spectralRolloff)
+          if (typeof features.rms === "number") rms.push(features.rms)
+          if (typeof features.zcr === "number") zcr.push(features.zcr)
+
+          // Calculate spectralFlux manually using amplitude spectrum
+          const currentSpectrum = features.amplitudeSpectrum as number[] | undefined
+          if (currentSpectrum && previousSpectrum) {
+            const flux = this.calculateSpectralFlux(currentSpectrum, previousSpectrum)
+            spectralFlux.push(flux)
+          }
+
+          // Store current spectrum for next iteration
+          if (currentSpectrum) {
+            previousSpectrum = [...currentSpectrum]
+          }
+        }
+      } catch (error) {
+        // Skip frame on extraction error
+        console.warn("Feature extraction failed for frame, skipping:", error)
       }
     }
 

@@ -40,6 +40,7 @@
     "@react-three/drei": "latest",
     "@react-three/fiber": "latest",
     "@ricky0123/vad-web": "^0.0.30",
+    "onnxruntime-web": "1.19.2",
     "@vercel/analytics": "latest",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
