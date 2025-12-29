@@ -444,7 +444,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Charts Grid */}
-            <div className="grid md:grid-cols-2 gap-8">
+            <div className="grid md:grid-cols-2 gap-8 items-start">
               {/* Chart 1: 7-Day Trend */}
               <div
                 className={cn(
