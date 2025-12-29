@@ -5,18 +5,12 @@ import { useLiveQuery } from "dexie-react-hooks"
 import {
   db,
   toRecording,
-  toSuggestion,
-  toRecoveryBlock,
   toTrendData,
   fromRecording,
-  fromSuggestion,
-  fromRecoveryBlock,
   fromTrendData,
 } from "@/lib/storage/db"
 import type {
   Recording,
-  Suggestion,
-  RecoveryBlock,
   TrendData,
   DashboardStats,
 } from "@/lib/types"
@@ -76,102 +70,6 @@ export function useRecordingActions() {
   }, [])
 
   return { addRecording, updateRecording, deleteRecording, clearAllRecordings }
-}
-
-// ===========================================
-// Suggestion operations
-// ===========================================
-
-export function useSuggestions(limit?: number) {
-  const suggestions = useLiveQuery(async () => {
-    let query = db.suggestions.orderBy("createdAt").reverse()
-    if (limit) {
-      query = query.limit(limit)
-    }
-    const results = await query.toArray()
-    return results.map(toSuggestion)
-  }, [limit])
-
-  return suggestions ?? []
-}
-
-export function useSuggestionActions() {
-  const addSuggestion = useCallback(async (suggestion: Suggestion) => {
-    await db.suggestions.add(fromSuggestion(suggestion))
-    return suggestion.id
-  }, [])
-
-  const updateSuggestion = useCallback(
-    async (id: string, updates: Partial<Suggestion>) => {
-      const existing = await db.suggestions.get(id)
-      if (!existing) throw new Error(`Suggestion ${id} not found`)
-
-      await db.suggestions.update(id, {
-        ...updates,
-        createdAt: updates.createdAt
-          ? new Date(updates.createdAt)
-          : existing.createdAt,
-        scheduledFor: updates.scheduledFor
-          ? new Date(updates.scheduledFor)
-          : existing.scheduledFor,
-      })
-    },
-    []
-  )
-
-  const deleteSuggestion = useCallback(async (id: string) => {
-    await db.suggestions.delete(id)
-  }, [])
-
-  const acceptSuggestion = useCallback(async (id: string) => {
-    await db.suggestions.update(id, { status: "accepted" })
-  }, [])
-
-  const dismissSuggestion = useCallback(async (id: string) => {
-    await db.suggestions.update(id, { status: "dismissed" })
-  }, [])
-
-  return {
-    addSuggestion,
-    updateSuggestion,
-    deleteSuggestion,
-    acceptSuggestion,
-    dismissSuggestion,
-  }
-}
-
-// ===========================================
-// Recovery block operations
-// ===========================================
-
-export function useRecoveryBlocks(limit?: number) {
-  const blocks = useLiveQuery(async () => {
-    let query = db.recoveryBlocks.orderBy("scheduledAt").reverse()
-    if (limit) {
-      query = query.limit(limit)
-    }
-    const results = await query.toArray()
-    return results.map(toRecoveryBlock)
-  }, [limit])
-
-  return blocks ?? []
-}
-
-export function useRecoveryBlockActions() {
-  const addRecoveryBlock = useCallback(async (block: RecoveryBlock) => {
-    await db.recoveryBlocks.add(fromRecoveryBlock(block))
-    return block.id
-  }, [])
-
-  const markCompleted = useCallback(async (id: string) => {
-    await db.recoveryBlocks.update(id, { completed: true })
-  }, [])
-
-  const deleteRecoveryBlock = useCallback(async (id: string) => {
-    await db.recoveryBlocks.delete(id)
-  }, [])
-
-  return { addRecoveryBlock, markCompleted, deleteRecoveryBlock }
 }
 
 // ===========================================
@@ -305,7 +203,6 @@ export function useClearAllData() {
       db.suggestions.clear(),
       db.recoveryBlocks.clear(),
       db.trendData.clear(),
-      db.encryptedData.clear(),
     ])
   }, [])
 }

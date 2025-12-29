@@ -3,14 +3,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
 import { db, type DBSettings } from "@/lib/storage/db"
-import {
-  generateKey,
-  exportKey,
-  importKey,
-  setCachedKey,
-  clearCachedKey,
-  isEncryptionAvailable,
-} from "@/lib/storage/encryption"
 import type { UserSettings } from "@/lib/types"
 
 const DEFAULT_SETTINGS_ID = "default"
@@ -28,11 +20,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   preferredRecoveryTimes: [],
   // Privacy
   localStorageOnly: true,
-  encryptionEnabled: false,
 }
-
-// Key storage in localStorage (separate from IndexedDB)
-const ENCRYPTION_KEY_STORAGE_KEY = "kanari_encryption_key"
 
 export function useSettings() {
   const [isInitialized, setIsInitialized] = useState(false)
@@ -93,85 +81,6 @@ export function useSettingsActions() {
   }, [])
 
   return { updateSettings, resetSettings }
-}
-
-// ===========================================
-// Encryption key management
-// ===========================================
-
-export function useEncryption() {
-  const [isEncryptionReady, setIsEncryptionReady] = useState(false)
-  const [hasEncryptionKey, setHasEncryptionKey] = useState(false)
-
-  // Check for existing encryption key on mount
-  useEffect(() => {
-    async function checkEncryptionKey() {
-      if (!isEncryptionAvailable()) {
-        setIsEncryptionReady(false)
-        return
-      }
-
-      const storedKey = localStorage.getItem(ENCRYPTION_KEY_STORAGE_KEY)
-      if (storedKey) {
-        try {
-          const key = await importKey(storedKey)
-          setCachedKey(key)
-          setHasEncryptionKey(true)
-        } catch {
-          // Invalid key, remove it
-          localStorage.removeItem(ENCRYPTION_KEY_STORAGE_KEY)
-          setHasEncryptionKey(false)
-        }
-      }
-      setIsEncryptionReady(true)
-    }
-    checkEncryptionKey()
-  }, [])
-
-  const enableEncryption = useCallback(async () => {
-    if (!isEncryptionAvailable()) {
-      throw new Error("Web Crypto API not available")
-    }
-
-    // Generate a new key
-    const key = await generateKey()
-    const exportedKey = await exportKey(key)
-
-    // Store the key in localStorage
-    localStorage.setItem(ENCRYPTION_KEY_STORAGE_KEY, exportedKey)
-
-    // Cache the key for immediate use
-    setCachedKey(key)
-    setHasEncryptionKey(true)
-
-    // Update settings
-    await db.settings.update(DEFAULT_SETTINGS_ID, {
-      encryptionEnabled: true,
-    })
-  }, [])
-
-  const disableEncryption = useCallback(async () => {
-    // Clear the encryption key
-    localStorage.removeItem(ENCRYPTION_KEY_STORAGE_KEY)
-    clearCachedKey()
-    setHasEncryptionKey(false)
-
-    // Update settings
-    await db.settings.update(DEFAULT_SETTINGS_ID, {
-      encryptionEnabled: false,
-    })
-
-    // Note: This does not decrypt existing encrypted data
-    // A full implementation would need to decrypt all data first
-  }, [])
-
-  return {
-    isEncryptionAvailable: isEncryptionAvailable(),
-    isEncryptionReady,
-    hasEncryptionKey,
-    enableEncryption,
-    disableEncryption,
-  }
 }
 
 // ===========================================

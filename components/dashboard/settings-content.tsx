@@ -14,7 +14,6 @@ export function SettingsContent() {
     enableVAD: true,
     autoScheduleRecovery: false,
     localStorageOnly: true,
-    encryptionEnabled: true,
   })
 
   const { isConnected, isLoading, error, connect, disconnect, clearError } = useCalendar()
@@ -266,22 +265,6 @@ export function SettingsContent() {
               id="local-storage"
               checked={settings.localStorageOnly}
               onCheckedChange={(checked) => setSettings({ ...settings, localStorageOnly: checked })}
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="encryption" className="text-base">
-                Encrypt Stored Data
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Use AES-GCM encryption for all data stored in IndexedDB
-              </p>
-            </div>
-            <Switch
-              id="encryption"
-              checked={settings.encryptionEnabled}
-              onCheckedChange={(checked) => setSettings({ ...settings, encryptionEnabled: checked })}
             />
           </div>
 

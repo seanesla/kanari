@@ -120,7 +120,6 @@ export interface UserSettings {
   preferredRecoveryTimes: string[] // Array of HH:mm
   // Privacy
   localStorageOnly: boolean
-  encryptionEnabled: boolean
 }
 
 // ============================================
@@ -135,95 +134,6 @@ export interface DashboardStats {
   averageFatigue: number
   suggestionsAccepted: number
   recoveryBlocksScheduled: number
-}
-
-// ============================================
-// Hybrid Analysis Types (Local Acoustic + Gemini Semantic)
-// ============================================
-
-// === LOCAL ACOUSTIC ANALYSIS (from Meyda) ===
-
-export type FeatureStatus = "low" | "normal" | "elevated" | "high"
-
-export interface FeatureContribution {
-  featureName: string // e.g., "speechRate", "rms"
-  displayName: string // e.g., "Speech Rate", "Voice Energy"
-  rawValue: number // Actual extracted value
-  normalizedValue: number // 0-1 scale
-  status: FeatureStatus
-  contribution: number // Points contributed to score
-  maxContribution: number // Max possible points for this feature
-  description: string // "Speech rate is elevated at 5.8 syllables/sec"
-}
-
-export interface AcousticBreakdown {
-  // Each feature shows: value, status, contribution to score
-  speechRate: FeatureContribution
-  rmsEnergy: FeatureContribution
-  spectralFlux: FeatureContribution
-  spectralCentroid: FeatureContribution
-  pauseRatio: FeatureContribution
-  zcr: FeatureContribution
-}
-
-// === GEMINI SEMANTIC ANALYSIS ===
-
-export type EmotionType = "happy" | "sad" | "angry" | "neutral"
-export type ObservationType = "stress_cue" | "fatigue_cue" | "positive_cue"
-export type ObservationRelevance = "high" | "medium" | "low"
-
-export interface TranscriptSegment {
-  timestamp: string // "MM:SS" format
-  content: string // Transcribed text
-  emotion: EmotionType
-}
-
-export interface SemanticObservation {
-  type: ObservationType
-  observation: string // "Speaker frequently restarts sentences"
-  relevance: ObservationRelevance
-}
-
-export interface GeminiSemanticAnalysis {
-  // Transcription with emotions
-  segments: TranscriptSegment[]
-  overallEmotion: EmotionType
-  emotionConfidence: number // 0-1
-
-  // Semantic observations (NOT acoustic measurements)
-  observations: SemanticObservation[]
-
-  // Gemini's interpretation of stress/fatigue
-  stressInterpretation: string // "Speaker sounds pressured and rushed"
-  fatigueInterpretation: string // "Voice lacks energy, monotone delivery"
-
-  // Overall narrative
-  summary: string
-}
-
-// === COMBINED HYBRID RESULT ===
-
-export interface HybridAnalysis {
-  // From local processing
-  acousticBreakdown: AcousticBreakdown
-  acousticStressScore: number // 0-100 from local features
-  acousticFatigueScore: number // 0-100 from local features
-
-  // From Gemini
-  semanticAnalysis: GeminiSemanticAnalysis | null // null if Gemini failed
-
-  // Combined final scores (weighted blend: 70% acoustic, 30% semantic)
-  finalStressScore: number
-  finalFatigueScore: number
-
-  // For UI
-  stressLevel: StressLevel
-  fatigueLevel: FatigueLevel
-  confidence: number // 0-1
-
-  // Analysis metadata
-  analysisTimestamp: string
-  analysisMethod: "acoustic_only" | "hybrid" // acoustic_only if Gemini failed
 }
 
 // Re-export SceneMode for convenience

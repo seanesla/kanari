@@ -31,14 +31,6 @@ export interface DBSettings extends UserSettings {
   id: string // Always "default"
 }
 
-// Encrypted data wrapper
-export interface EncryptedData {
-  id: string
-  iv: string // Base64 encoded IV
-  data: string // Base64 encoded encrypted data
-  type: "recording" | "suggestion" | "recoveryBlock" | "trendData"
-}
-
 // Database class
 class KanariDB extends Dexie {
   recordings!: EntityTable<DBRecording, "id">
@@ -46,7 +38,6 @@ class KanariDB extends Dexie {
   recoveryBlocks!: EntityTable<DBRecoveryBlock, "id">
   trendData!: EntityTable<DBTrendData & { id: string }, "id">
   settings!: EntityTable<DBSettings, "id">
-  encryptedData!: EntityTable<EncryptedData, "id">
 
   constructor() {
     super("kanari")
@@ -57,7 +48,6 @@ class KanariDB extends Dexie {
       recoveryBlocks: "id, suggestionId, scheduledAt, completed",
       trendData: "id, date",
       settings: "id",
-      encryptedData: "id, type",
     })
   }
 }
