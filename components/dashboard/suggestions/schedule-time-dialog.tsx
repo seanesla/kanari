@@ -130,7 +130,7 @@ export function ScheduleTimeDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="border-border/70 bg-card/95 backdrop-blur-xl max-w-md">
+      <DialogContent className="border-border/70 bg-card/95 backdrop-blur-xl max-w-md !left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2">
         <DialogHeader>
           {/* Category badge */}
           <div className="flex items-center gap-3 mb-2">
@@ -141,7 +141,7 @@ export function ScheduleTimeDialog({
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-1">
                 Schedule
               </p>
-              <DialogTitle className="text-base leading-snug truncate">
+              <DialogTitle className="text-base leading-snug line-clamp-2 w-full">
                 {suggestion.content}
               </DialogTitle>
             </div>
