@@ -3,17 +3,10 @@
 // React hook for calendar operations
 // Manages OAuth flow, token refresh, and calendar event creation
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import type { Suggestion, RecoveryBlock, UserSettings } from "@/lib/types"
 import type { OAuthTokens } from "@/lib/calendar/oauth"
-import {
-  getStoredTokens,
-  storeTokens,
-  clearStoredTokens,
-  isTokenExpired,
-  refreshAccessToken,
-  revokeToken,
-} from "@/lib/calendar/oauth"
+import { revokeToken } from "@/lib/calendar/oauth"
 import { scheduleRecoveryBlock } from "@/lib/calendar/scheduler"
 import { deleteCalendarEvent } from "@/lib/calendar/api"
 
@@ -34,84 +27,95 @@ export interface UseCalendarReturn {
   refreshTokens: () => Promise<boolean>
 }
 
+interface SessionResponse {
+  authenticated: boolean
+  accessToken: string | null
+  expiresAt?: number
+  error?: string
+}
+
 export function useCalendar(): UseCalendarReturn {
   const [isConnected, setIsConnected] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [isLoading, setIsLoading] = useState(true) // Start loading until session check completes
   const [error, setError] = useState<string | null>(null)
   const [tokens, setTokens] = useState<OAuthTokens | null>(null)
+  const sessionCheckRef = useRef(false)
 
-  // Check for stored tokens on mount
+  // Check session status on mount
   useEffect(() => {
-    const storedTokens = getStoredTokens()
-    if (storedTokens) {
-      setTokens(storedTokens)
-      setIsConnected(true)
-    }
+    // Prevent double-checking in StrictMode
+    if (sessionCheckRef.current) return
+    sessionCheckRef.current = true
 
-    // Listen for tokens from OAuth callback (passed via URL fragment)
-    const handleHashChange = () => {
-      const hash = window.location.hash
-      if (hash.includes("tokens=")) {
-        try {
-          const tokenParam = hash.split("tokens=")[1]
-          const newTokens = JSON.parse(decodeURIComponent(tokenParam)) as OAuthTokens
+    const checkSession = async () => {
+      try {
+        const response = await fetch("/api/auth/session")
+        const data: SessionResponse = await response.json()
 
-          storeTokens(newTokens)
-          setTokens(newTokens)
+        if (data.authenticated && data.accessToken) {
+          // Build tokens object from session response
+          setTokens({
+            access_token: data.accessToken,
+            expires_at: data.expiresAt || Date.now() + 3600000,
+            token_type: "Bearer",
+            scope: "",
+          })
           setIsConnected(true)
-
-          // Clear the hash
-          window.location.hash = ""
-        } catch (err) {
-          console.error("Failed to parse tokens from URL:", err)
-          setError("Failed to complete calendar connection")
+        } else {
+          setIsConnected(false)
+          setTokens(null)
         }
+      } catch (err) {
+        console.error("Failed to check session:", err)
+        setIsConnected(false)
+        setTokens(null)
+      } finally {
+        setIsLoading(false)
       }
     }
 
-    // Check on mount
-    handleHashChange()
+    checkSession()
 
-    // Listen for hash changes
-    window.addEventListener("hashchange", handleHashChange)
-    return () => window.removeEventListener("hashchange", handleHashChange)
-  }, [])
-
-  // Get OAuth config from environment
-  const getOAuthConfig = useCallback(() => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-    const clientSecret = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_SECRET
-    const redirectUri = process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI
-
-    if (!clientId || !clientSecret || !redirectUri) {
-      throw new Error("OAuth configuration missing in environment variables")
+    // Also check for successful OAuth redirect (calendar_connected query param)
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get("calendar_connected") === "true") {
+      // Clear the query param
+      const newUrl = new URL(window.location.href)
+      newUrl.searchParams.delete("calendar_connected")
+      window.history.replaceState({}, "", newUrl.toString())
+      // Trigger re-check of session
+      checkSession()
     }
-
-    return { clientId, clientSecret, redirectUri }
   }, [])
 
-  // Refresh expired tokens
+  // Refresh tokens via session API
   const refreshTokens = useCallback(async (): Promise<boolean> => {
-    if (!tokens?.refresh_token) {
-      setError("No refresh token available")
-      return false
-    }
-
     try {
-      const config = getOAuthConfig()
-      const newTokens = await refreshAccessToken(tokens.refresh_token, config)
+      const response = await fetch("/api/auth/session")
+      const data: SessionResponse = await response.json()
 
-      storeTokens(newTokens)
-      setTokens(newTokens)
-      setError(null)
-      return true
+      if (data.authenticated && data.accessToken) {
+        setTokens({
+          access_token: data.accessToken,
+          expires_at: data.expiresAt || Date.now() + 3600000,
+          token_type: "Bearer",
+          scope: "",
+        })
+        setError(null)
+        return true
+      } else {
+        setError(data.error || "Failed to refresh token")
+        setIsConnected(false)
+        setTokens(null)
+        return false
+      }
     } catch (err) {
       setError("Failed to refresh access token")
       setIsConnected(false)
-      clearStoredTokens()
+      setTokens(null)
       return false
     }
-  }, [tokens, getOAuthConfig])
+  }, [])
 
   // Ensure we have valid tokens before making API calls
   const ensureValidTokens = useCallback(async (): Promise<OAuthTokens | null> => {
@@ -120,11 +124,13 @@ export function useCalendar(): UseCalendarReturn {
       return null
     }
 
-    if (isTokenExpired(tokens)) {
+    // Check if token might be expired (with 5 min buffer)
+    const fiveMinutes = 5 * 60 * 1000
+    if (tokens.expires_at && tokens.expires_at - Date.now() < fiveMinutes) {
       const refreshed = await refreshTokens()
       if (!refreshed) return null
-
-      return getStoredTokens()
+      // Return updated tokens after refresh
+      return tokens
     }
 
     return tokens
@@ -160,12 +166,13 @@ export function useCalendar(): UseCalendarReturn {
 
     try {
       if (tokens?.access_token) {
-        // Revoke the access token
+        // Revoke the access token with Google
         await revokeToken(tokens.access_token)
       }
 
-      // Clear stored tokens
-      clearStoredTokens()
+      // Clear session cookies via API
+      await fetch("/api/auth/session", { method: "DELETE" })
+
       setTokens(null)
       setIsConnected(false)
     } catch (err) {

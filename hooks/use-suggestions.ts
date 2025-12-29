@@ -29,14 +29,16 @@ interface UseSuggestionsResult {
   suggestionsLoading: boolean
   forRecordingId: string | null
   error: string | null
+  updateError: string | null
+  clearUpdateError: () => void
   fetchSuggestions: (metrics: VoiceMetrics, trend: TrendDirection, allRecordings?: Recording[]) => Promise<void>
-  updateSuggestion: (id: string, status: SuggestionStatus) => void
+  updateSuggestion: (id: string, status: SuggestionStatus) => Promise<boolean>
   regenerate: (metrics: VoiceMetrics, trend: TrendDirection, allRecordings?: Recording[]) => Promise<void>
   // Kanban-specific actions
-  moveSuggestion: (id: string, newStatus: SuggestionStatus, scheduledFor?: string) => void
-  scheduleSuggestion: (id: string, scheduledFor: string) => void
-  dismissSuggestion: (id: string) => void
-  completeSuggestion: (id: string) => void
+  moveSuggestion: (id: string, newStatus: SuggestionStatus, scheduledFor?: string) => Promise<boolean>
+  scheduleSuggestion: (id: string, scheduledFor: string) => Promise<boolean>
+  dismissSuggestion: (id: string) => Promise<boolean>
+  completeSuggestion: (id: string) => Promise<boolean>
 }
 
 /**
@@ -99,9 +101,12 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [updateError, setUpdateError] = useState<string | null>(null)
 
   // Track if we've already initiated a fetch for this recording
   const fetchInitiatedRef = useRef<string | null>(null)
+
+  const clearUpdateError = useCallback(() => setUpdateError(null), [])
 
   /**
    * Fetch suggestions from Gemini API and persist to IndexedDB
@@ -190,52 +195,92 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
 
   /**
    * Update suggestion status (persisted to IndexedDB)
+   * Returns true on success, false on failure
    */
-  const updateSuggestion = useCallback((id: string, status: SuggestionStatus) => {
-    updateSuggestionInDB(id, { status }).catch((err) => {
+  const updateSuggestion = useCallback(async (id: string, status: SuggestionStatus): Promise<boolean> => {
+    try {
+      setUpdateError(null)
+      await updateSuggestionInDB(id, { status })
+      return true
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to update suggestion"
+      setUpdateError(errorMessage)
       console.error("Error updating suggestion:", err)
-    })
+      return false
+    }
   }, [updateSuggestionInDB])
 
   /**
    * Move suggestion to a new status (for kanban drag-drop)
    * Optionally set scheduledFor when moving to "scheduled"
+   * Returns true on success, false on failure
    */
-  const moveSuggestion = useCallback((id: string, newStatus: SuggestionStatus, scheduledFor?: string) => {
-    const updates: Partial<Suggestion> = { status: newStatus }
-    if (scheduledFor) {
-      updates.scheduledFor = scheduledFor
-    }
-    updateSuggestionInDB(id, updates).catch((err) => {
+  const moveSuggestion = useCallback(async (id: string, newStatus: SuggestionStatus, scheduledFor?: string): Promise<boolean> => {
+    try {
+      setUpdateError(null)
+      const updates: Partial<Suggestion> = { status: newStatus }
+      if (scheduledFor) {
+        updates.scheduledFor = scheduledFor
+      }
+      await updateSuggestionInDB(id, updates)
+      return true
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to move suggestion"
+      setUpdateError(errorMessage)
       console.error("Error moving suggestion:", err)
-    })
+      return false
+    }
   }, [updateSuggestionInDB])
 
   /**
    * Schedule a suggestion for a specific time
+   * Returns true on success, false on failure
    */
-  const scheduleSuggestion = useCallback((id: string, scheduledFor: string) => {
-    updateSuggestionInDB(id, { status: "scheduled", scheduledFor }).catch((err) => {
+  const scheduleSuggestion = useCallback(async (id: string, scheduledFor: string): Promise<boolean> => {
+    try {
+      setUpdateError(null)
+      await updateSuggestionInDB(id, { status: "scheduled", scheduledFor })
+      return true
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to schedule suggestion"
+      setUpdateError(errorMessage)
       console.error("Error scheduling suggestion:", err)
-    })
+      return false
+    }
   }, [updateSuggestionInDB])
 
   /**
    * Dismiss a suggestion (marks as dismissed)
+   * Returns true on success, false on failure
    */
-  const dismissSuggestion = useCallback((id: string) => {
-    updateSuggestionInDB(id, { status: "dismissed" }).catch((err) => {
+  const dismissSuggestion = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      setUpdateError(null)
+      await updateSuggestionInDB(id, { status: "dismissed" })
+      return true
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to dismiss suggestion"
+      setUpdateError(errorMessage)
       console.error("Error dismissing suggestion:", err)
-    })
+      return false
+    }
   }, [updateSuggestionInDB])
 
   /**
    * Mark a scheduled suggestion as completed
+   * Returns true on success, false on failure
    */
-  const completeSuggestion = useCallback((id: string) => {
-    updateSuggestionInDB(id, { status: "completed" }).catch((err) => {
+  const completeSuggestion = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      setUpdateError(null)
+      await updateSuggestionInDB(id, { status: "completed" })
+      return true
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to complete suggestion"
+      setUpdateError(errorMessage)
       console.error("Error completing suggestion:", err)
-    })
+      return false
+    }
   }, [updateSuggestionInDB])
 
   /**
@@ -267,6 +312,8 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
     suggestionsLoading,
     forRecordingId,
     error,
+    updateError,
+    clearUpdateError,
     fetchSuggestions,
     updateSuggestion,
     regenerate,

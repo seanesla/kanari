@@ -248,5 +248,35 @@ export interface DashboardStats {
   recoveryBlocksScheduled: number
 }
 
+// ============================================
+// Gemini Semantic Analysis Types
+// ============================================
+
+export type EmotionType = "happy" | "sad" | "angry" | "neutral"
+export type ObservationType = "stress_cue" | "fatigue_cue" | "positive_cue"
+export type RelevanceLevel = "high" | "medium" | "low"
+
+export interface SemanticSegment {
+  timestamp: string // MM:SS format
+  content: string   // Transcribed text
+  emotion: EmotionType
+}
+
+export interface SemanticObservation {
+  type: ObservationType
+  observation: string
+  relevance: RelevanceLevel
+}
+
+export interface GeminiSemanticAnalysis {
+  segments: SemanticSegment[]
+  overallEmotion: EmotionType
+  emotionConfidence: number // 0-1
+  observations: SemanticObservation[]
+  stressInterpretation: string
+  fatigueInterpretation: string
+  summary: string
+}
+
 // Re-export SceneMode for convenience
 export type { SceneMode } from "./scene-context"

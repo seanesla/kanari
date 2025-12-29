@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Instrument_Sans, Instrument_Serif, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Providers } from "@/components/providers"
+import { ErrorBoundary } from "@/components/error-boundary"
 import "./globals.css"
 
 const instrumentSans = Instrument_Sans({ subsets: ["latin"], variable: "--font-sans" })
@@ -30,7 +31,9 @@ export default function RootLayout({
         <body
           className={`${instrumentSans.variable} ${instrumentSerif.variable} ${geistMono.variable} font-sans antialiased`}
         >
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
           <Analytics />
         </body>
       </html>

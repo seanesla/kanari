@@ -2,9 +2,10 @@
 // Exchanges authorization code for tokens and stores them securely
 
 import { NextRequest, NextResponse } from "next/server"
-import { exchangeCodeForTokens, verifyState } from "@/lib/calendar/oauth"
+import { exchangeCodeForTokens } from "@/lib/calendar/oauth"
+import { setTokenCookies } from "@/lib/auth/session"
 
-export const runtime = "edge" // Optional: use edge runtime for faster response
+// Note: Removed edge runtime to use cookies() which requires Node.js runtime
 
 export async function GET(request: NextRequest) {
   try {
@@ -51,22 +52,10 @@ export async function GET(request: NextRequest) {
       redirectUri,
     })
 
-    // In a production app, you would:
-    // 1. Store tokens in a secure database associated with the user
-    // 2. Set a secure HTTP-only cookie with a session ID
-    // 3. Implement proper CSRF protection
-    //
-    // For this client-side prototype, we'll pass tokens via URL fragment
-    // so they can be stored in localStorage by the client
-    // (Not recommended for production, but acceptable for a hackathon demo)
+    // Store tokens in secure HTTP-only cookies
+    await setTokenCookies(tokens)
 
     const redirectUrl = new URL("/dashboard/settings", request.url)
-
-    // Use URL fragment (hash) to pass tokens - these won't be sent to server
-    const tokenData = encodeURIComponent(JSON.stringify(tokens))
-    redirectUrl.hash = `tokens=${tokenData}`
-
-    // Also set success flag in query params
     redirectUrl.searchParams.set("calendar_connected", "true")
 
     return NextResponse.redirect(redirectUrl)

@@ -169,16 +169,16 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      if (typeof history.stressChange !== "number") {
+      if (typeof history.stressChange !== "string") {
         return NextResponse.json(
-          { error: "history.stressChange must be a number" },
+          { error: "history.stressChange must be a string (e.g., '+15% from baseline' or 'stable')" },
           { status: 400 }
         )
       }
 
-      if (typeof history.fatigueChange !== "number") {
+      if (typeof history.fatigueChange !== "string") {
         return NextResponse.json(
-          { error: "history.fatigueChange must be a number" },
+          { error: "history.fatigueChange must be a string (e.g., '+10% from baseline' or 'stable')" },
           { status: 400 }
         )
       }
