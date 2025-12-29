@@ -67,7 +67,9 @@ export interface BurnoutPrediction {
 // Suggestion Types
 // ============================================
 
-export type SuggestionStatus = "pending" | "accepted" | "dismissed" | "scheduled"
+export type SuggestionStatus = "pending" | "accepted" | "dismissed" | "scheduled" | "completed"
+export type SuggestionCategory = "break" | "exercise" | "mindfulness" | "social" | "rest"
+export type KanbanColumn = "pending" | "scheduled" | "completed"
 
 export interface Suggestion {
   id: string
@@ -75,11 +77,43 @@ export interface Suggestion {
   content: string
   rationale: string
   duration: number // minutes
-  category: "break" | "exercise" | "mindfulness" | "social" | "rest"
+  category: SuggestionCategory
   status: SuggestionStatus
   createdAt: string
   scheduledFor?: string
   calendarEventId?: string
+}
+
+// Map suggestion status to kanban column
+export const statusToColumn: Record<SuggestionStatus, KanbanColumn> = {
+  pending: "pending",
+  scheduled: "scheduled",
+  accepted: "completed",
+  dismissed: "completed",
+  completed: "completed",
+}
+
+// Category display configuration
+export const categoryConfig: Record<SuggestionCategory, { label: string; color: string; bgColor: string }> = {
+  break: { label: "Break", color: "text-amber-500", bgColor: "bg-amber-500/10" },
+  exercise: { label: "Exercise", color: "text-green-500", bgColor: "bg-green-500/10" },
+  mindfulness: { label: "Mindfulness", color: "text-purple-500", bgColor: "bg-purple-500/10" },
+  social: { label: "Social", color: "text-blue-500", bgColor: "bg-blue-500/10" },
+  rest: { label: "Rest", color: "text-indigo-500", bgColor: "bg-indigo-500/10" },
+}
+
+// Extract short title from suggestion content
+export function extractSuggestionTitle(content: string, maxLength = 50): string {
+  // Try to get first sentence
+  const firstSentence = content.split(/[.!?]/)[0]?.trim()
+  if (!firstSentence) return content.slice(0, maxLength)
+
+  if (firstSentence.length <= maxLength) return firstSentence
+
+  // Truncate at word boundary
+  const truncated = firstSentence.slice(0, maxLength)
+  const lastSpace = truncated.lastIndexOf(" ")
+  return (lastSpace > 20 ? truncated.slice(0, lastSpace) : truncated) + "..."
 }
 
 // ============================================

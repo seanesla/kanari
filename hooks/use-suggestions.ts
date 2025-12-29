@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
-import type { Suggestion, VoiceMetrics, TrendDirection } from "@/lib/types"
+import type { Suggestion, VoiceMetrics, TrendDirection, SuggestionStatus } from "@/lib/types"
 import { useSuggestionsByRecording, useSuggestionActions } from "./use-storage"
 
 /**
@@ -29,8 +29,13 @@ interface UseSuggestionsResult {
   forRecordingId: string | null
   error: string | null
   fetchSuggestions: (metrics: VoiceMetrics, trend: TrendDirection) => Promise<void>
-  updateSuggestion: (id: string, status: Suggestion["status"]) => void
+  updateSuggestion: (id: string, status: SuggestionStatus) => void
   regenerate: (metrics: VoiceMetrics, trend: TrendDirection) => Promise<void>
+  // Kanban-specific actions
+  moveSuggestion: (id: string, newStatus: SuggestionStatus, scheduledFor?: string) => void
+  scheduleSuggestion: (id: string, scheduledFor: string) => void
+  dismissSuggestion: (id: string) => void
+  completeSuggestion: (id: string) => void
 }
 
 export function useSuggestions(recordingId: string | null): UseSuggestionsResult {
@@ -101,9 +106,50 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
   /**
    * Update suggestion status (persisted to IndexedDB)
    */
-  const updateSuggestion = useCallback((id: string, status: Suggestion["status"]) => {
+  const updateSuggestion = useCallback((id: string, status: SuggestionStatus) => {
     updateSuggestionInDB(id, { status }).catch((err) => {
       console.error("Error updating suggestion:", err)
+    })
+  }, [updateSuggestionInDB])
+
+  /**
+   * Move suggestion to a new status (for kanban drag-drop)
+   * Optionally set scheduledFor when moving to "scheduled"
+   */
+  const moveSuggestion = useCallback((id: string, newStatus: SuggestionStatus, scheduledFor?: string) => {
+    const updates: Partial<Suggestion> = { status: newStatus }
+    if (scheduledFor) {
+      updates.scheduledFor = scheduledFor
+    }
+    updateSuggestionInDB(id, updates).catch((err) => {
+      console.error("Error moving suggestion:", err)
+    })
+  }, [updateSuggestionInDB])
+
+  /**
+   * Schedule a suggestion for a specific time
+   */
+  const scheduleSuggestion = useCallback((id: string, scheduledFor: string) => {
+    updateSuggestionInDB(id, { status: "scheduled", scheduledFor }).catch((err) => {
+      console.error("Error scheduling suggestion:", err)
+    })
+  }, [updateSuggestionInDB])
+
+  /**
+   * Dismiss a suggestion (marks as dismissed)
+   */
+  const dismissSuggestion = useCallback((id: string) => {
+    updateSuggestionInDB(id, { status: "dismissed" }).catch((err) => {
+      console.error("Error dismissing suggestion:", err)
+    })
+  }, [updateSuggestionInDB])
+
+  /**
+   * Mark a scheduled suggestion as completed
+   */
+  const completeSuggestion = useCallback((id: string) => {
+    updateSuggestionInDB(id, { status: "completed" }).catch((err) => {
+      console.error("Error completing suggestion:", err)
     })
   }, [updateSuggestionInDB])
 
@@ -135,5 +181,10 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
     fetchSuggestions,
     updateSuggestion,
     regenerate,
+    // Kanban-specific actions
+    moveSuggestion,
+    scheduleSuggestion,
+    dismissSuggestion,
+    completeSuggestion,
   }
 }
