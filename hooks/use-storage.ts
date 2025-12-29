@@ -96,8 +96,30 @@ export function useTrendData(days: number = 30) {
 }
 
 export function useTrendDataActions() {
+  /**
+   * Add trend data with daily aggregation.
+   * If data already exists for this date, it averages the scores.
+   */
   const addTrendData = useCallback(async (data: TrendData) => {
-    await db.trendData.put(fromTrendData(data))
+    const existing = await db.trendData.get(data.date)
+
+    if (existing) {
+      // Aggregate: average the scores with existing data
+      const count = (existing.recordingCount || 1) + 1
+      const newStress = ((existing.stressScore * (count - 1)) + data.stressScore) / count
+      const newFatigue = ((existing.fatigueScore * (count - 1)) + data.fatigueScore) / count
+
+      await db.trendData.update(data.date, {
+        stressScore: Math.round(newStress),
+        fatigueScore: Math.round(newFatigue),
+        recordingCount: count,
+      })
+    } else {
+      await db.trendData.put({
+        ...fromTrendData(data),
+        recordingCount: 1,
+      })
+    }
   }, [])
 
   const updateTrendData = useCallback(async (date: string, updates: Partial<TrendData>) => {
@@ -110,6 +132,19 @@ export function useTrendDataActions() {
 // ===========================================
 // Suggestion operations
 // ===========================================
+
+/**
+ * Get ALL suggestions regardless of recording.
+ * Used for diff-aware generation and memory context building.
+ */
+export function useAllSuggestions() {
+  const suggestions = useLiveQuery(async () => {
+    const results = await db.suggestions.orderBy("createdAt").reverse().toArray()
+    return results.map(toSuggestion)
+  }, [])
+
+  return suggestions ?? []
+}
 
 export function useScheduledSuggestions() {
   const suggestions = useLiveQuery(async () => {
@@ -148,6 +183,11 @@ export function useSuggestionsByRecording(recordingId: string | null) {
 }
 
 export function useSuggestionActions() {
+  const addSuggestion = useCallback(async (suggestion: Suggestion) => {
+    await db.suggestions.add(fromSuggestion(suggestion))
+    return suggestion.id
+  }, [])
+
   const addSuggestions = useCallback(async (suggestions: Suggestion[]) => {
     await db.suggestions.bulkAdd(suggestions.map(fromSuggestion))
   }, [])
@@ -165,16 +205,23 @@ export function useSuggestionActions() {
         scheduledFor: updates.scheduledFor
           ? new Date(updates.scheduledFor)
           : existing.scheduledFor,
+        lastUpdatedAt: updates.lastUpdatedAt
+          ? new Date(updates.lastUpdatedAt)
+          : existing.lastUpdatedAt,
       })
     },
     []
   )
 
+  const deleteSuggestion = useCallback(async (id: string) => {
+    await db.suggestions.delete(id)
+  }, [])
+
   const deleteSuggestionsByRecording = useCallback(async (recordingId: string) => {
     await db.suggestions.where("recordingId").equals(recordingId).delete()
   }, [])
 
-  return { addSuggestions, updateSuggestion, deleteSuggestionsByRecording }
+  return { addSuggestion, addSuggestions, updateSuggestion, deleteSuggestion, deleteSuggestionsByRecording }
 }
 
 // ===========================================

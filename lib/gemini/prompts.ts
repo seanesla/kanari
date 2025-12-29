@@ -410,3 +410,279 @@ export const AUDIO_SEMANTIC_SCHEMA = {
     "summary",
   ],
 }
+
+// ============================================
+// Diff-Aware Suggestion Generation
+// ============================================
+
+/**
+ * System prompt for diff-aware suggestion generation.
+ * Gemini reviews existing suggestions and decides to keep, update, or drop each one.
+ */
+export const DIFF_AWARE_SYSTEM_PROMPT = `You are a wellness assistant for kanari, an early warning system for burnout. Your role is to manage and refine recovery suggestions based on voice biomarker analysis.
+
+${GEMINI_CONSTITUTION}
+
+DIFF-AWARE SUGGESTION MANAGEMENT:
+
+You will receive:
+1. CURRENT WELLNESS DATA - Latest voice analysis results
+2. EXISTING SUGGESTIONS - Active suggestions currently shown to the user
+3. USER ACTION HISTORY - What the user has completed, dismissed, or scheduled
+4. HISTORICAL CONTEXT - Trends and patterns over time
+
+YOUR TASK:
+Review each existing suggestion and decide whether to:
+- KEEP: Suggestion is still relevant, no changes needed
+- UPDATE: Suggestion needs modification (explain why in decisionReason)
+- DROP: Suggestion is no longer relevant (explain why in decisionReason)
+
+You may also ADD new suggestions if gaps exist.
+
+DECISION GUIDELINES:
+
+1. KEEP suggestions that:
+   - Remain relevant to current stress/fatigue levels
+   - Haven't been completed or dismissed
+   - Are still practical for current time of day
+
+2. UPDATE suggestions when:
+   - Stress/fatigue levels have changed significantly
+   - Time of day makes original timing impractical
+   - User history suggests a different approach would be better
+   - Duration needs adjustment based on current state
+
+3. DROP suggestions when:
+   - Similar suggestion was recently completed (avoid repetition)
+   - User dismissed similar suggestions repeatedly (learn from dismissals)
+   - Suggestion is outdated (was for morning, now evening)
+   - Stress/fatigue improved significantly (reduce intervention intensity)
+
+4. ADD new suggestions when:
+   - Current state requires interventions not covered by existing suggestions
+   - User history shows gaps in certain categories
+   - Burnout risk requires additional interventions
+
+LEARNING FROM USER ACTIONS:
+- If user frequently completes "mindfulness" suggestions, lean into that category
+- If user dismisses "exercise" suggestions, try lower-intensity alternatives
+- If user schedules but doesn't complete, suggest shorter durations
+- Respect patterns in user preferences
+
+RESPONSE FORMAT:
+Return a JSON object with this structure:
+{
+  "suggestions": [
+    {
+      "id": "existing-id-or-new-uuid",
+      "decision": "keep" | "update" | "drop" | "new",
+      "content": "suggestion text (30-50 words)",
+      "rationale": "why this helps (20-40 words)",
+      "duration": 5-60,
+      "category": "break" | "exercise" | "mindfulness" | "social" | "rest",
+      "decisionReason": "why this decision was made (required for update/drop)",
+      "updateSummary": "what changed (only for update)"
+    }
+  ],
+  "summary": {
+    "kept": 0,
+    "updated": 0,
+    "dropped": 0,
+    "added": 0
+  }
+}
+
+IMPORTANT:
+- Return ALL existing suggestions with a decision (keep/update/drop)
+- Include 1-3 new suggestions if current coverage is insufficient
+- Maximum total of 5 active suggestions to avoid overwhelming the user
+- Ground all decisions in observable data (voice patterns, history, actions)
+- For "new" suggestions, generate a UUID for the id field`
+
+/**
+ * JSON schema for diff-aware suggestion response.
+ * Enforces structured output from Gemini.
+ */
+export const DIFF_AWARE_SCHEMA = {
+  type: "object",
+  properties: {
+    suggestions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: {
+            type: "string",
+            description: "Existing suggestion ID or new UUID",
+          },
+          decision: {
+            type: "string",
+            enum: ["keep", "update", "drop", "new"],
+            description: "Decision for this suggestion",
+          },
+          content: {
+            type: "string",
+            description: "Clear, actionable suggestion (30-50 words)",
+          },
+          rationale: {
+            type: "string",
+            description: "Why this helps (20-40 words)",
+          },
+          duration: {
+            type: "number",
+            description: "Estimated time in minutes (5-60)",
+            minimum: 5,
+            maximum: 60,
+          },
+          category: {
+            type: "string",
+            enum: ["break", "exercise", "mindfulness", "social", "rest"],
+            description: "Suggestion category",
+          },
+          decisionReason: {
+            type: "string",
+            description: "Why this decision was made (required for update/drop)",
+          },
+          updateSummary: {
+            type: "string",
+            description: "What changed (only for update)",
+          },
+        },
+        required: ["id", "decision", "content", "rationale", "duration", "category"],
+      },
+    },
+    summary: {
+      type: "object",
+      properties: {
+        kept: {
+          type: "number",
+          description: "Number of suggestions kept unchanged",
+        },
+        updated: {
+          type: "number",
+          description: "Number of suggestions updated",
+        },
+        dropped: {
+          type: "number",
+          description: "Number of suggestions dropped",
+        },
+        added: {
+          type: "number",
+          description: "Number of new suggestions added",
+        },
+      },
+      required: ["kept", "updated", "dropped", "added"],
+    },
+  },
+  required: ["suggestions", "summary"],
+}
+
+/**
+ * Generate user prompt for diff-aware suggestion generation.
+ * Includes wellness context, existing suggestions, and user action history.
+ */
+export function generateDiffAwareUserPrompt(
+  context: EnrichedWellnessContext,
+  existingSuggestions: Suggestion[],
+  memoryContext: GeminiMemoryContext
+): string {
+  let prompt = `Review and update recovery suggestions based on this wellness data:
+
+CURRENT STATE:
+- Stress Score: ${context.stressScore}/100 (${context.stressLevel})
+- Fatigue Score: ${context.fatigueScore}/100 (${context.fatigueLevel})
+- Trend: ${context.trend}
+- Time: ${context.timeOfDay} on a ${context.dayOfWeek}
+
+VOICE PATTERNS:
+- Speech Rate: ${context.voicePatterns.speechRate}
+- Energy Level: ${context.voicePatterns.energyLevel}
+- Pause Frequency: ${context.voicePatterns.pauseFrequency}
+- Voice Tone: ${context.voicePatterns.voiceTone}
+
+Data Confidence: ${Math.round(context.confidence * 100)}%`
+
+  // Add historical context if available
+  if (context.history.recordingCount > 0) {
+    prompt += `
+
+HISTORICAL BASELINE (${context.history.daysOfData} days, ${context.history.recordingCount} recordings):
+- Average Stress: ${context.history.averageStress}/100
+- Average Fatigue: ${context.history.averageFatigue}/100
+- Stress Change: ${context.history.stressChange}
+- Fatigue Change: ${context.history.fatigueChange}`
+  }
+
+  // Add burnout prediction if risk is elevated
+  if (context.burnout.riskLevel !== "low") {
+    prompt += `
+
+BURNOUT PREDICTION:
+- Risk Level: ${context.burnout.riskLevel}
+- Predicted Days: ${context.burnout.predictedDays}
+- Contributing Factors: ${context.burnout.factors.join(", ")}`
+  }
+
+  // Add existing suggestions to review
+  if (existingSuggestions.length > 0) {
+    prompt += `
+
+EXISTING SUGGESTIONS TO REVIEW:
+${existingSuggestions
+  .map(
+    (s, i) => `
+${i + 1}. ID: ${s.id}
+   Status: ${s.status}
+   Category: ${s.category}
+   Duration: ${s.duration} min
+   Content: ${s.content}
+   Rationale: ${s.rationale}${s.scheduledFor ? `\n   Scheduled for: ${s.scheduledFor}` : ""}`
+  )
+  .join("")}`
+  } else {
+    prompt += `
+
+NO EXISTING SUGGESTIONS - Generate 2-3 new suggestions.`
+  }
+
+  // Add memory context (user action history)
+  if (memoryContext.completed.length > 0 || memoryContext.dismissed.length > 0) {
+    prompt += `
+
+USER ACTION HISTORY:`
+
+    if (memoryContext.completed.length > 0) {
+      prompt += `
+Recently Completed (${memoryContext.stats.totalCompleted} total):
+${memoryContext.completed
+  .slice(0, 5)
+  .map((c) => `- [${c.category}] ${c.content}`)
+  .join("\n")}`
+    }
+
+    if (memoryContext.dismissed.length > 0) {
+      prompt += `
+Recently Dismissed (${memoryContext.stats.totalDismissed} total):
+${memoryContext.dismissed
+  .slice(0, 5)
+  .map((d) => `- [${d.category}] ${d.content}`)
+  .join("\n")}`
+    }
+
+    if (memoryContext.stats.mostUsedCategory) {
+      prompt += `
+Preferred Category: ${memoryContext.stats.mostUsedCategory}`
+    }
+
+    if (memoryContext.stats.averageCompletionRate > 0) {
+      prompt += `
+Completion Rate: ${memoryContext.stats.averageCompletionRate}%`
+    }
+  }
+
+  prompt += `
+
+Provide your diff-aware response with decisions for each existing suggestion and any new suggestions needed.`
+
+  return prompt
+}

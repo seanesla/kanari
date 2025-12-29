@@ -52,6 +52,7 @@ export interface TrendData {
   date: string
   stressScore: number
   fatigueScore: number
+  recordingCount?: number // Track how many recordings were aggregated for this day
 }
 
 export interface BurnoutPrediction {
@@ -144,9 +145,62 @@ export type SuggestionStatus = "pending" | "accepted" | "dismissed" | "scheduled
 export type SuggestionCategory = "break" | "exercise" | "mindfulness" | "social" | "rest"
 export type KanbanColumn = "pending" | "scheduled" | "completed"
 
+// ============================================
+// Diff-Aware Suggestion Types
+// ============================================
+
+export type SuggestionDecision = "keep" | "update" | "drop" | "new"
+
+export interface GeminiDiffSuggestion {
+  id: string
+  decision: SuggestionDecision
+  content: string
+  rationale: string
+  duration: number
+  category: SuggestionCategory
+  decisionReason?: string  // Required for update/drop decisions
+  updateSummary?: string   // What changed (only for update)
+}
+
+export interface GeminiDiffResponse {
+  suggestions: GeminiDiffSuggestion[]
+  summary: {
+    kept: number
+    updated: number
+    dropped: number
+    added: number
+  }
+}
+
+// Memory context sent to Gemini for personalization
+export interface GeminiMemoryContext {
+  completed: Array<{
+    content: string
+    category: SuggestionCategory
+    completedAt: string
+  }>
+  dismissed: Array<{
+    content: string
+    category: SuggestionCategory
+    dismissedAt: string
+  }>
+  scheduled: Array<{
+    content: string
+    category: SuggestionCategory
+    scheduledFor: string
+  }>
+  stats: {
+    totalCompleted: number
+    totalDismissed: number
+    mostUsedCategory: SuggestionCategory | null
+    leastUsedCategory: SuggestionCategory | null
+    averageCompletionRate: number
+  }
+}
+
 export interface Suggestion {
   id: string
-  recordingId: string // Links to the recording that generated this suggestion
+  recordingId?: string // Links to the recording that generated this suggestion (optional for global suggestions)
   content: string
   rationale: string
   duration: number // minutes
@@ -155,6 +209,11 @@ export interface Suggestion {
   createdAt: string
   scheduledFor?: string
   calendarEventId?: string
+  // Diff-aware suggestion tracking
+  version?: number // Track suggestion version for diff-aware generation
+  lastDecision?: SuggestionDecision // Last decision made by Gemini
+  lastDecisionReason?: string // Why this decision was made
+  lastUpdatedAt?: string // When this suggestion was last updated
 }
 
 // Map suggestion status to kanban column

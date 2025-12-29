@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef, useMemo } from "react"
+import { useEffect, useState, useMemo } from "react"
 import { Link } from "next-view-transitions"
 import { Lightbulb, Mic, RefreshCw, ChevronDown, Calendar } from "lucide-react"
 import { useSceneMode } from "@/lib/scene-context"
@@ -123,23 +123,20 @@ export default function SuggestionsPage() {
     return computeHistoricalContext(recordings)
   }, [recordings])
 
-  // Real suggestions from Gemini API
+  // Real suggestions from Gemini API (now global, not recording-bound)
   const {
     suggestions,
+    activeSuggestions,
     loading,
-    suggestionsLoading,
-    forRecordingId,
     error,
-    fetchSuggestions,
+    lastDiffSummary,
+    clearDiffSummary,
     moveSuggestion,
     scheduleSuggestion,
     dismissSuggestion,
     completeSuggestion,
-    regenerate,
-  } = useSuggestions(latestRecording?.id ?? null)
-
-  // Track if we've already initiated a fetch for this recording
-  const fetchInitiatedRef = useRef<string | null>(null)
+    regenerateWithDiff,
+  } = useSuggestions()
 
   // Set scene to dashboard mode
   useEffect(() => {
@@ -151,22 +148,6 @@ export default function SuggestionsPage() {
     const timer = setTimeout(() => setVisible(true), 100)
     return () => clearTimeout(timer)
   }, [])
-
-  // Fetch suggestions when we have a new recording with metrics but no suggestions yet
-  useEffect(() => {
-    if (
-      latestRecording?.id &&
-      latestRecording?.metrics &&
-      !loading &&
-      !suggestionsLoading &&
-      forRecordingId === latestRecording.id &&
-      suggestions.length === 0 &&
-      fetchInitiatedRef.current !== latestRecording.id
-    ) {
-      fetchInitiatedRef.current = latestRecording.id
-      fetchSuggestions(latestRecording.metrics, trend)
-    }
-  }, [latestRecording?.id, latestRecording?.metrics, loading, suggestionsLoading, forRecordingId, suggestions.length, fetchSuggestions, trend])
 
   // Deduplicate and prioritize suggestions
   const processedSuggestions = useMemo(() => {
@@ -206,11 +187,10 @@ export default function SuggestionsPage() {
     [processedSuggestions]
   )
 
-  // Handle regenerate suggestions
+  // Handle regenerate suggestions with diff-aware mode
   const handleRegenerate = async () => {
     if (latestRecording?.metrics) {
-      fetchInitiatedRef.current = null
-      await regenerate(latestRecording.metrics, trend)
+      await regenerateWithDiff(latestRecording.metrics, trend, recordings)
     }
   }
 
@@ -274,11 +254,11 @@ export default function SuggestionsPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleRegenerate}
-                  disabled={loading || suggestions.length === 0}
+                  disabled={loading || !latestRecording?.metrics}
                   className="gap-2"
                 >
                   <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-                  Regenerate
+                  {suggestions.length === 0 ? "Generate" : "Refresh"}
                 </Button>
             </div>
           </div>
@@ -322,6 +302,40 @@ export default function SuggestionsPage() {
             counts={categoryCounts}
           />
         </div>
+
+        {/* DIFF SUMMARY (shown after regeneration) */}
+        {lastDiffSummary && (
+          <div
+            className={cn(
+              "mb-6 transition-all duration-500",
+              visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            )}
+          >
+            <div className="rounded-lg border border-border/50 bg-card/50 backdrop-blur-sm px-4 py-3 flex items-center justify-between">
+              <div className="flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground">Last update:</span>
+                {lastDiffSummary.kept > 0 && (
+                  <span className="text-foreground">{lastDiffSummary.kept} kept</span>
+                )}
+                {lastDiffSummary.updated > 0 && (
+                  <span className="text-blue-400">{lastDiffSummary.updated} updated</span>
+                )}
+                {lastDiffSummary.dropped > 0 && (
+                  <span className="text-muted-foreground line-through">{lastDiffSummary.dropped} removed</span>
+                )}
+                {lastDiffSummary.added > 0 && (
+                  <span className="text-accent">{lastDiffSummary.added} new</span>
+                )}
+              </div>
+              <button
+                onClick={clearDiffSummary}
+                className="text-muted-foreground hover:text-foreground text-xs"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* MAIN CONTENT */}
         <div

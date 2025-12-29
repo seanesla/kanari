@@ -1,39 +1,61 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
-import type { Suggestion, VoiceMetrics, TrendDirection, SuggestionStatus, Recording, AudioFeatures, VoicePatterns, HistoricalContext, BurnoutPrediction } from "@/lib/types"
-import { useSuggestionsByRecording, useSuggestionActions } from "./use-storage"
+import { useState, useCallback, useRef } from "react"
+import type {
+  Suggestion,
+  VoiceMetrics,
+  TrendDirection,
+  SuggestionStatus,
+  Recording,
+  AudioFeatures,
+  VoicePatterns,
+  HistoricalContext,
+  BurnoutPrediction,
+  GeminiDiffSuggestion,
+  SuggestionDecision,
+} from "@/lib/types"
+import { useAllSuggestions, useSuggestionActions } from "./use-storage"
+import { useSuggestionMemory } from "./use-suggestion-memory"
 import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
 
 /**
- * React hook for fetching Gemini-powered recovery suggestions with IndexedDB persistence
+ * React hook for managing Gemini-powered recovery suggestions with diff-aware generation.
+ *
+ * Key changes from recording-bound approach:
+ * - Suggestions are now global (not tied to specific recordings)
+ * - Regeneration uses diff-aware mode (keep/update/drop/new decisions)
+ * - Memory context sent to Gemini includes user action history
  *
  * Usage:
  * ```tsx
- * const { suggestions, loading, error, fetchSuggestions, updateSuggestion, regenerate } = useSuggestions(recordingId)
+ * const { suggestions, loading, error, regenerateWithDiff, updateSuggestion } = useSuggestions()
  *
- * // Fetch new suggestions (automatically persisted)
- * await fetchSuggestions(metrics, trend)
+ * // Regenerate suggestions with diff-aware mode (reviews existing, makes decisions)
+ * await regenerateWithDiff(metrics, trend, allRecordings)
  *
  * // Update suggestion status (persisted to IndexedDB)
- * updateSuggestion(suggestionId, "accepted")
- *
- * // Regenerate suggestions (clears existing and fetches new)
- * await regenerate(metrics, trend)
+ * updateSuggestion(suggestionId, "completed")
  * ```
  */
 
+interface DiffSummary {
+  kept: number
+  updated: number
+  dropped: number
+  added: number
+}
+
 interface UseSuggestionsResult {
   suggestions: Suggestion[]
+  activeSuggestions: Suggestion[]
   loading: boolean
-  suggestionsLoading: boolean
-  forRecordingId: string | null
   error: string | null
   updateError: string | null
+  lastDiffSummary: DiffSummary | null
   clearUpdateError: () => void
-  fetchSuggestions: (metrics: VoiceMetrics, trend: TrendDirection, allRecordings?: Recording[]) => Promise<void>
+  clearDiffSummary: () => void
+  regenerateWithDiff: (metrics: VoiceMetrics, trend: TrendDirection, allRecordings?: Recording[]) => Promise<void>
   updateSuggestion: (id: string, status: SuggestionStatus) => Promise<boolean>
-  regenerate: (metrics: VoiceMetrics, trend: TrendDirection, allRecordings?: Recording[]) => Promise<void>
   // Kanban-specific actions
   moveSuggestion: (id: string, newStatus: SuggestionStatus, scheduledFor?: string) => Promise<boolean>
   scheduleSuggestion: (id: string, scheduledFor: string) => Promise<boolean>
@@ -94,35 +116,37 @@ export function computeHistoricalContext(recordings: Recording[]): HistoricalCon
   }
 }
 
-export function useSuggestions(recordingId: string | null): UseSuggestionsResult {
-  // Get persisted suggestions from IndexedDB
-  const { suggestions: persistedSuggestions, isLoading: suggestionsLoading, forRecordingId } = useSuggestionsByRecording(recordingId)
-  const { addSuggestions, updateSuggestion: updateSuggestionInDB, deleteSuggestionsByRecording } = useSuggestionActions()
+export function useSuggestions(): UseSuggestionsResult {
+  // Get ALL suggestions globally (not recording-bound)
+  const allSuggestions = useAllSuggestions()
+  const { memoryContext, getActiveSuggestions, buildMemoryContext } = useSuggestionMemory()
+  const {
+    addSuggestion,
+    addSuggestions,
+    updateSuggestion: updateSuggestionInDB,
+    deleteSuggestion,
+  } = useSuggestionActions()
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [updateError, setUpdateError] = useState<string | null>(null)
-
-  // Track if we've already initiated a fetch for this recording
-  const fetchInitiatedRef = useRef<string | null>(null)
+  const [lastDiffSummary, setLastDiffSummary] = useState<DiffSummary | null>(null)
 
   const clearUpdateError = useCallback(() => setUpdateError(null), [])
+  const clearDiffSummary = useCallback(() => setLastDiffSummary(null), [])
 
   /**
-   * Fetch suggestions from Gemini API and persist to IndexedDB
+   * Regenerate suggestions using diff-aware mode.
+   * Gemini reviews existing suggestions and decides: keep, update, drop, or add new.
    */
-  const fetchSuggestions = useCallback(async (
+  const regenerateWithDiff = useCallback(async (
     metrics: VoiceMetrics,
     trend: TrendDirection,
     allRecordings?: Recording[]
   ) => {
-    if (!recordingId) {
-      setError("No recording ID provided")
-      return
-    }
-
     setLoading(true)
     setError(null)
+    setLastDiffSummary(null)
 
     try {
       // Build enriched context if historical data provided
@@ -131,8 +155,11 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
       let burnoutPrediction: BurnoutPrediction | undefined
 
       if (allRecordings && allRecordings.length > 0) {
-        // Get the latest recording (should match recordingId)
-        const latestRecording = allRecordings.find(r => r.id === recordingId)
+        // Get the latest recording
+        const sortedRecordings = [...allRecordings].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        )
+        const latestRecording = sortedRecordings[0]
 
         // Extract voice patterns from latest recording
         voicePatterns = featuresToVoicePatterns(latestRecording?.features)
@@ -146,6 +173,12 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
           burnoutPrediction = predictBurnoutRisk(trendData)
         }
       }
+
+      // Get active suggestions for diff review
+      const activeSuggestions = getActiveSuggestions()
+
+      // Build memory context
+      const memory = buildMemoryContext()
 
       const response = await fetch("/api/gemini", {
         method: "POST",
@@ -162,7 +195,11 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
           voicePatterns,
           history,
           burnout: burnoutPrediction,
-          confidence: metrics.confidence
+          confidence: metrics.confidence,
+          // Diff-aware mode
+          diffMode: true,
+          existingSuggestions: activeSuggestions,
+          memoryContext: memory,
         }),
       })
 
@@ -173,25 +210,67 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
 
       const data = await response.json()
 
-      if (!data.suggestions || !Array.isArray(data.suggestions)) {
-        throw new Error("Invalid response format from API")
+      if (!data.diffMode || !data.suggestions || !Array.isArray(data.suggestions)) {
+        throw new Error("Invalid diff response format from API")
       }
 
-      // Add recordingId to each suggestion and persist to IndexedDB
-      const suggestionsWithRecordingId: Suggestion[] = data.suggestions.map((s: Suggestion) => ({
-        ...s,
-        recordingId,
-      }))
+      // Process diff response
+      const now = new Date().toISOString()
 
-      await addSuggestions(suggestionsWithRecordingId)
+      for (const diffSuggestion of data.suggestions as GeminiDiffSuggestion[]) {
+        switch (diffSuggestion.decision) {
+          case "keep":
+            // No action needed - suggestion stays as-is
+            break
+
+          case "update":
+            // Update the existing suggestion with new content
+            await updateSuggestionInDB(diffSuggestion.id, {
+              content: diffSuggestion.content,
+              rationale: diffSuggestion.rationale,
+              duration: diffSuggestion.duration,
+              category: diffSuggestion.category,
+              lastDecision: "update" as SuggestionDecision,
+              lastDecisionReason: diffSuggestion.decisionReason,
+              lastUpdatedAt: now,
+              version: (activeSuggestions.find(s => s.id === diffSuggestion.id)?.version || 1) + 1,
+            })
+            break
+
+          case "drop":
+            // Delete the suggestion (or mark as dismissed based on reason)
+            await deleteSuggestion(diffSuggestion.id)
+            break
+
+          case "new":
+            // Add new suggestion
+            const newSuggestion: Suggestion = {
+              id: diffSuggestion.id,
+              content: diffSuggestion.content,
+              rationale: diffSuggestion.rationale,
+              duration: diffSuggestion.duration,
+              category: diffSuggestion.category,
+              status: "pending",
+              createdAt: now,
+              version: 1,
+              lastDecision: "new",
+            }
+            await addSuggestion(newSuggestion)
+            break
+        }
+      }
+
+      // Store diff summary for UI display
+      setLastDiffSummary(data.summary)
+
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to fetch suggestions"
+      const errorMessage = err instanceof Error ? err.message : "Failed to regenerate suggestions"
       setError(errorMessage)
-      console.error("Error fetching suggestions:", err)
+      console.error("Error regenerating suggestions:", err)
     } finally {
       setLoading(false)
     }
-  }, [recordingId, addSuggestions])
+  }, [getActiveSuggestions, buildMemoryContext, updateSuggestionInDB, deleteSuggestion, addSuggestion])
 
   /**
    * Update suggestion status (persisted to IndexedDB)
@@ -200,7 +279,10 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
   const updateSuggestion = useCallback(async (id: string, status: SuggestionStatus): Promise<boolean> => {
     try {
       setUpdateError(null)
-      await updateSuggestionInDB(id, { status })
+      await updateSuggestionInDB(id, {
+        status,
+        lastUpdatedAt: new Date().toISOString(),
+      })
       return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to update suggestion"
@@ -218,7 +300,10 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
   const moveSuggestion = useCallback(async (id: string, newStatus: SuggestionStatus, scheduledFor?: string): Promise<boolean> => {
     try {
       setUpdateError(null)
-      const updates: Partial<Suggestion> = { status: newStatus }
+      const updates: Partial<Suggestion> = {
+        status: newStatus,
+        lastUpdatedAt: new Date().toISOString(),
+      }
       if (scheduledFor) {
         updates.scheduledFor = scheduledFor
       }
@@ -239,7 +324,11 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
   const scheduleSuggestion = useCallback(async (id: string, scheduledFor: string): Promise<boolean> => {
     try {
       setUpdateError(null)
-      await updateSuggestionInDB(id, { status: "scheduled", scheduledFor })
+      await updateSuggestionInDB(id, {
+        status: "scheduled",
+        scheduledFor,
+        lastUpdatedAt: new Date().toISOString(),
+      })
       return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to schedule suggestion"
@@ -256,7 +345,10 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
   const dismissSuggestion = useCallback(async (id: string): Promise<boolean> => {
     try {
       setUpdateError(null)
-      await updateSuggestionInDB(id, { status: "dismissed" })
+      await updateSuggestionInDB(id, {
+        status: "dismissed",
+        lastUpdatedAt: new Date().toISOString(),
+      })
       return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to dismiss suggestion"
@@ -273,7 +365,10 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
   const completeSuggestion = useCallback(async (id: string): Promise<boolean> => {
     try {
       setUpdateError(null)
-      await updateSuggestionInDB(id, { status: "completed" })
+      await updateSuggestionInDB(id, {
+        status: "completed",
+        lastUpdatedAt: new Date().toISOString(),
+      })
       return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to complete suggestion"
@@ -283,40 +378,20 @@ export function useSuggestions(recordingId: string | null): UseSuggestionsResult
     }
   }, [updateSuggestionInDB])
 
-  /**
-   * Regenerate suggestions - clear existing and fetch new ones
-   */
-  const regenerate = useCallback(async (
-    metrics: VoiceMetrics,
-    trend: TrendDirection,
-    allRecordings?: Recording[]
-  ) => {
-    if (!recordingId) {
-      setError("No recording ID provided")
-      return
-    }
-
-    // Reset fetch tracking so we can fetch again
-    fetchInitiatedRef.current = null
-
-    // Delete existing suggestions for this recording
-    await deleteSuggestionsByRecording(recordingId)
-
-    // Fetch new suggestions
-    await fetchSuggestions(metrics, trend, allRecordings)
-  }, [recordingId, deleteSuggestionsByRecording, fetchSuggestions])
+  // Get active suggestions (pending + scheduled) for display
+  const activeSuggestions = getActiveSuggestions()
 
   return {
-    suggestions: persistedSuggestions,
+    suggestions: allSuggestions,
+    activeSuggestions,
     loading,
-    suggestionsLoading,
-    forRecordingId,
     error,
     updateError,
+    lastDiffSummary,
     clearUpdateError,
-    fetchSuggestions,
+    clearDiffSummary,
+    regenerateWithDiff,
     updateSuggestion,
-    regenerate,
     // Kanban-specific actions
     moveSuggestion,
     scheduleSuggestion,

@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Calendar, Key, Mic, Shield, AlertCircle, CheckCircle2 } from "lucide-react"
 import { useCalendar } from "@/hooks/use-calendar"
+import { GeminiMemorySection } from "./settings-gemini-memory"
 
 export function SettingsContent() {
   const [settings, setSettings] = useState({
@@ -243,6 +244,9 @@ export function SettingsContent() {
           </div>
         </div>
       </div>
+
+      {/* Gemini Memory */}
+      <GeminiMemorySection />
 
       {/* Privacy */}
       <div className="rounded-lg border border-border bg-card p-6">

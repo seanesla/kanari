@@ -235,8 +235,136 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Validate diff-mode fields
+    if (diffMode !== undefined && typeof diffMode !== "boolean") {
+      return NextResponse.json(
+        { error: "diffMode must be a boolean" },
+        { status: 400 }
+      )
+    }
+
+    if (existingSuggestions !== undefined) {
+      if (!Array.isArray(existingSuggestions)) {
+        return NextResponse.json(
+          { error: "existingSuggestions must be an array" },
+          { status: 400 }
+        )
+      }
+      // Validate each suggestion has required fields
+      for (const suggestion of existingSuggestions) {
+        if (
+          typeof suggestion.id !== "string" ||
+          typeof suggestion.content !== "string" ||
+          typeof suggestion.status !== "string"
+        ) {
+          return NextResponse.json(
+            { error: "Each existingSuggestion must have id, content, and status" },
+            { status: 400 }
+          )
+        }
+      }
+    }
+
+    if (memoryContext !== undefined) {
+      if (typeof memoryContext !== "object" || memoryContext === null) {
+        return NextResponse.json(
+          { error: "memoryContext must be an object" },
+          { status: 400 }
+        )
+      }
+      // Basic validation of memoryContext structure
+      if (
+        !Array.isArray(memoryContext.completed) ||
+        !Array.isArray(memoryContext.dismissed) ||
+        !Array.isArray(memoryContext.scheduled) ||
+        typeof memoryContext.stats !== "object"
+      ) {
+        return NextResponse.json(
+          { error: "memoryContext must have completed, dismissed, scheduled arrays and stats object" },
+          { status: 400 }
+        )
+      }
+    }
+
     // Get and validate API key
     const apiKey = validateAPIKey(process.env.GEMINI_API_KEY)
+
+    // ============================================
+    // Diff-Aware Mode
+    // ============================================
+    if (diffMode) {
+      // Build enriched wellness context for diff-aware generation
+      const now = new Date()
+      const enrichedContext: EnrichedWellnessContext = {
+        stressScore,
+        stressLevel: stressLevel as StressLevel,
+        fatigueScore,
+        fatigueLevel: fatigueLevel as FatigueLevel,
+        trend: trend as TrendDirection,
+        timeOfDay: getTimeOfDay(now.getHours()),
+        dayOfWeek: getDayType(now.getDay()),
+        voicePatterns: voicePatterns || {
+          speechRate: "normal",
+          energyLevel: "moderate",
+          pauseFrequency: "normal",
+          voiceTone: "neutral",
+        },
+        history: history || {
+          recordingCount: 0,
+          daysOfData: 0,
+          averageStress: stressScore,
+          averageFatigue: fatigueScore,
+          stressChange: "stable",
+          fatigueChange: "stable",
+        },
+        burnout: burnout || {
+          riskLevel: "low",
+          riskScore: 0,
+          predictedDays: 0,
+          factors: [],
+          confidence: 0,
+        },
+        confidence: confidence ?? 0.8,
+      }
+
+      // Build default memory context if not provided
+      const memory: GeminiMemoryContext = memoryContext || {
+        completed: [],
+        dismissed: [],
+        scheduled: [],
+        stats: {
+          totalCompleted: 0,
+          totalDismissed: 0,
+          mostUsedCategory: null,
+          leastUsedCategory: null,
+          averageCompletionRate: 0,
+        },
+      }
+
+      // Generate diff-aware prompt
+      const userPrompt = generateDiffAwareUserPrompt(
+        enrichedContext,
+        existingSuggestions || [],
+        memory
+      )
+
+      // Call Gemini API with diff-aware mode
+      const diffResponse = await generateDiffAwareSuggestions(
+        apiKey,
+        DIFF_AWARE_SYSTEM_PROMPT,
+        userPrompt
+      )
+
+      return NextResponse.json({
+        diffMode: true,
+        suggestions: diffResponse.suggestions,
+        summary: diffResponse.summary,
+      })
+    }
+
+    // ============================================
+    // Legacy Mode (non-diff)
+    // ============================================
 
     // Build wellness context
     const context = buildWellnessContext(

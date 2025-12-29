@@ -7,6 +7,7 @@ import type {
   RecoveryBlock,
   UserSettings,
   TrendData,
+  SuggestionDecision,
 } from "@/lib/types"
 
 // Database record types with IndexedDB-friendly structure
@@ -14,9 +15,10 @@ export interface DBRecording extends Omit<Recording, "createdAt"> {
   createdAt: Date
 }
 
-export interface DBSuggestion extends Omit<Suggestion, "createdAt" | "scheduledFor"> {
+export interface DBSuggestion extends Omit<Suggestion, "createdAt" | "scheduledFor" | "lastUpdatedAt"> {
   createdAt: Date
   scheduledFor?: Date
+  lastUpdatedAt?: Date
 }
 
 export interface DBRecoveryBlock extends Omit<RecoveryBlock, "scheduledAt"> {
@@ -25,6 +27,7 @@ export interface DBRecoveryBlock extends Omit<RecoveryBlock, "scheduledAt"> {
 
 export interface DBTrendData extends Omit<TrendData, "date"> {
   date: Date
+  recordingCount?: number
 }
 
 export interface DBSettings extends UserSettings {
@@ -42,12 +45,29 @@ class KanariDB extends Dexie {
   constructor() {
     super("kanari")
 
+    // Version 1: Initial schema
     this.version(1).stores({
       recordings: "id, createdAt, status",
       suggestions: "id, createdAt, status, category, recordingId",
       recoveryBlocks: "id, suggestionId, scheduledAt, completed",
       trendData: "id, date",
       settings: "id",
+    })
+
+    // Version 2: Add version tracking for diff-aware suggestions
+    this.version(2).stores({
+      recordings: "id, createdAt, status",
+      suggestions: "id, createdAt, status, category, recordingId, version",
+      recoveryBlocks: "id, suggestionId, scheduledAt, completed",
+      trendData: "id, date",
+      settings: "id",
+    }).upgrade(tx => {
+      // Add version field to existing suggestions
+      return tx.table("suggestions").toCollection().modify(suggestion => {
+        if (suggestion.version === undefined) {
+          suggestion.version = 1
+        }
+      })
     })
   }
 }
@@ -68,6 +88,7 @@ export function toSuggestion(dbRecord: DBSuggestion): Suggestion {
     ...dbRecord,
     createdAt: dbRecord.createdAt.toISOString(),
     scheduledFor: dbRecord.scheduledFor?.toISOString(),
+    lastUpdatedAt: dbRecord.lastUpdatedAt?.toISOString(),
   }
 }
 
@@ -83,6 +104,7 @@ export function toTrendData(dbRecord: DBTrendData & { id: string }): TrendData {
     date: dbRecord.date.toISOString().split("T")[0],
     stressScore: dbRecord.stressScore,
     fatigueScore: dbRecord.fatigueScore,
+    recordingCount: dbRecord.recordingCount,
   }
 }
 
@@ -99,6 +121,7 @@ export function fromSuggestion(record: Suggestion): DBSuggestion {
     ...record,
     createdAt: new Date(record.createdAt),
     scheduledFor: record.scheduledFor ? new Date(record.scheduledFor) : undefined,
+    lastUpdatedAt: record.lastUpdatedAt ? new Date(record.lastUpdatedAt) : undefined,
   }
 }
 
@@ -115,5 +138,6 @@ export function fromTrendData(record: TrendData): DBTrendData & { id: string } {
     date: new Date(record.date),
     stressScore: record.stressScore,
     fatigueScore: record.fatigueScore,
+    recordingCount: record.recordingCount,
   }
 }
