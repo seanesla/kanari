@@ -58,19 +58,24 @@ export function KanbanColumn({ column, suggestions, onCardClick }: KanbanColumnP
         "transition-colors duration-200",
         isOver ? "border-accent/50 bg-card/30" : "border-border/50"
       )}
+      role="region"
+      aria-label={`${config.title} column with ${suggestions.length} ${suggestions.length === 1 ? "suggestion" : "suggestions"}`}
     >
       {/* Column Header */}
       <div className="flex items-center justify-between p-4 border-b border-border/50">
         <div className="flex items-center gap-2">
-          <Icon className={cn(
-            "h-4 w-4",
-            column === "pending" && "text-amber-500",
-            column === "scheduled" && "text-blue-500",
-            column === "completed" && "text-green-500"
-          )} />
-          <h3 className="font-medium text-sm">{config.title}</h3>
+          <Icon
+            className={cn(
+              "h-4 w-4",
+              column === "pending" && "text-amber-500",
+              column === "scheduled" && "text-blue-500",
+              column === "completed" && "text-green-500"
+            )}
+            aria-hidden="true"
+          />
+          <h3 className="font-medium text-sm" id={`column-heading-${column}`}>{config.title}</h3>
         </div>
-        <Badge variant="secondary" className="text-xs">
+        <Badge variant="secondary" className="text-xs" aria-label={`${suggestions.length} items`}>
           {suggestions.length}
         </Badge>
       </div>
@@ -83,6 +88,8 @@ export function KanbanColumn({ column, suggestions, onCardClick }: KanbanColumnP
             "p-3 min-h-[200px]",
             isOver && "bg-accent/5"
           )}
+          role="list"
+          aria-labelledby={`column-heading-${column}`}
         >
           <SortableContext items={suggestionIds} strategy={verticalListSortingStrategy}>
             {suggestions.length > 0 ? (

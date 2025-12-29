@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useReducer, useRef, useCallback, useEffect } from "react"
 import { AudioRecorder } from "@/lib/audio/recorder"
 import { processAudio, validateAudioData, type ProcessingResult } from "@/lib/audio/processor"
 import type { AudioFeatures } from "@/lib/types"
@@ -48,6 +48,87 @@ export interface RecordingData {
    * Real-time audio level (0-1) for visualization
    */
   audioLevel: number
+}
+
+// Reducer action types
+type RecordingAction =
+  | { type: "START_REQUESTING" }
+  | { type: "START_RECORDING" }
+  | { type: "SET_DURATION"; duration: number }
+  | { type: "SET_AUDIO_LEVEL"; level: number }
+  | { type: "STOP_RECORDING"; audioData: Float32Array }
+  | { type: "START_PROCESSING" }
+  | { type: "COMPLETE"; features: AudioFeatures; processingResult: ProcessingResult }
+  | { type: "COMPLETE_NO_PROCESS" }
+  | { type: "ERROR"; error: string }
+  | { type: "RESET" }
+
+const initialState: RecordingData = {
+  state: "idle",
+  duration: 0,
+  audioData: null,
+  features: null,
+  processingResult: null,
+  error: null,
+  audioLevel: 0,
+}
+
+function recordingReducer(state: RecordingData, action: RecordingAction): RecordingData {
+  switch (action.type) {
+    case "START_REQUESTING":
+      return {
+        ...initialState,
+        state: "requesting",
+      }
+    case "START_RECORDING":
+      return {
+        ...state,
+        state: "recording",
+      }
+    case "SET_DURATION":
+      return {
+        ...state,
+        duration: action.duration,
+      }
+    case "SET_AUDIO_LEVEL":
+      return {
+        ...state,
+        audioLevel: action.level,
+      }
+    case "STOP_RECORDING":
+      return {
+        ...state,
+        audioData: action.audioData,
+        audioLevel: 0,
+      }
+    case "START_PROCESSING":
+      return {
+        ...state,
+        state: "processing",
+      }
+    case "COMPLETE":
+      return {
+        ...state,
+        state: "complete",
+        features: action.features,
+        processingResult: action.processingResult,
+      }
+    case "COMPLETE_NO_PROCESS":
+      return {
+        ...state,
+        state: "complete",
+      }
+    case "ERROR":
+      return {
+        ...state,
+        state: "error",
+        error: action.error,
+      }
+    case "RESET":
+      return initialState
+    default:
+      return state
+  }
 }
 
 export interface RecordingControls {
@@ -140,14 +221,8 @@ export function useRecording(options: UseRecordingOptions = {}): [RecordingData,
     onError,
   } = options
 
-  // State
-  const [state, setState] = useState<RecordingState>("idle")
-  const [duration, setDuration] = useState(0)
-  const [audioData, setAudioData] = useState<Float32Array | null>(null)
-  const [features, setFeatures] = useState<AudioFeatures | null>(null)
-  const [processingResult, setProcessingResult] = useState<ProcessingResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [audioLevel, setAudioLevel] = useState(0)
+  // Consolidated state with useReducer for better performance
+  const [data, dispatch] = useReducer(recordingReducer, initialState)
 
   // Refs
   const recorderRef = useRef<AudioRecorder | null>(null)
@@ -190,13 +265,7 @@ export function useRecording(options: UseRecordingOptions = {}): [RecordingData,
    */
   const startRecording = useCallback(async () => {
     try {
-      setState("requesting")
-      setError(null)
-      setDuration(0)
-      setAudioData(null)
-      setFeatures(null)
-      setProcessingResult(null)
-      setAudioLevel(0)
+      dispatch({ type: "START_REQUESTING" })
 
       // Create recorder
       recorderRef.current = new AudioRecorder({
@@ -205,11 +274,10 @@ export function useRecording(options: UseRecordingOptions = {}): [RecordingData,
         onDataAvailable: (chunk) => {
           // Update audio level for visualization
           const level = calculateAudioLevel(chunk)
-          setAudioLevel(level)
+          dispatch({ type: "SET_AUDIO_LEVEL", level })
         },
         onError: (err) => {
-          setState("error")
-          setError(err.message)
+          dispatch({ type: "ERROR", error: err.message })
           onError?.(err)
         },
       })
@@ -217,19 +285,18 @@ export function useRecording(options: UseRecordingOptions = {}): [RecordingData,
       // Start recording
       await recorderRef.current.start()
 
-      setState("recording")
+      dispatch({ type: "START_RECORDING" })
       startTimeRef.current = Date.now()
 
       // Start duration timer
       durationIntervalRef.current = setInterval(() => {
-        setDuration((Date.now() - startTimeRef.current) / 1000)
+        dispatch({ type: "SET_DURATION", duration: (Date.now() - startTimeRef.current) / 1000 })
       }, 100) // Update every 100ms for smooth UI
 
       onStart?.()
     } catch (err) {
       const error = err instanceof Error ? err : new Error("Failed to start recording")
-      setState("error")
-      setError(error.message)
+      dispatch({ type: "ERROR", error: error.message })
       onError?.(error)
     }
   }, [sampleRate, calculateAudioLevel, onStart, onError])
@@ -251,8 +318,7 @@ export function useRecording(options: UseRecordingOptions = {}): [RecordingData,
 
       // Stop recording
       const rawAudio = await recorderRef.current.stop()
-      setAudioData(rawAudio)
-      setAudioLevel(0)
+      dispatch({ type: "STOP_RECORDING", audioData: rawAudio })
 
       onStop?.()
 
@@ -263,25 +329,21 @@ export function useRecording(options: UseRecordingOptions = {}): [RecordingData,
 
       // Process if auto-process is enabled
       if (autoProcess) {
-        setState("processing")
+        dispatch({ type: "START_PROCESSING" })
 
         const result = await processAudio(rawAudio, {
           sampleRate,
           enableVAD,
         })
 
-        setFeatures(result.features)
-        setProcessingResult(result)
-        setState("complete")
-
+        dispatch({ type: "COMPLETE", features: result.features, processingResult: result })
         onComplete?.(result)
       } else {
-        setState("complete")
+        dispatch({ type: "COMPLETE_NO_PROCESS" })
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error("Failed to stop recording")
-      setState("error")
-      setError(error.message)
+      dispatch({ type: "ERROR", error: error.message })
       onError?.(error)
     }
   }, [sampleRate, enableVAD, autoProcess, onStop, onComplete, onError])
@@ -300,44 +362,22 @@ export function useRecording(options: UseRecordingOptions = {}): [RecordingData,
       durationIntervalRef.current = null
     }
 
-    setState("idle")
-    setDuration(0)
-    setAudioData(null)
-    setFeatures(null)
-    setProcessingResult(null)
-    setError(null)
-    setAudioLevel(0)
+    dispatch({ type: "RESET" })
   }, [])
 
   /**
    * Reset to idle state
    */
   const reset = useCallback(() => {
-    setState("idle")
-    setDuration(0)
-    setAudioData(null)
-    setFeatures(null)
-    setProcessingResult(null)
-    setError(null)
-    setAudioLevel(0)
+    dispatch({ type: "RESET" })
   }, [])
 
   // Auto-stop when max duration is reached
   useEffect(() => {
-    if (state === "recording" && duration >= maxDurationRef.current) {
+    if (data.state === "recording" && data.duration >= maxDurationRef.current) {
       stopRecording()
     }
-  }, [state, duration, stopRecording])
-
-  const data: RecordingData = {
-    state,
-    duration,
-    audioData,
-    features,
-    processingResult,
-    error,
-    audioLevel,
-  }
+  }, [data.state, data.duration, stopRecording])
 
   const controls: RecordingControls = {
     startRecording,

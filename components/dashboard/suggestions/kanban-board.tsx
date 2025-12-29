@@ -152,8 +152,41 @@ export function KanbanBoard({
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
+      accessibility={{
+        announcements: {
+          onDragStart({ active }) {
+            const suggestion = suggestions.find((s) => s.id === active.id)
+            return suggestion
+              ? `Picked up suggestion: ${suggestion.category}. Use arrow keys to move between columns.`
+              : "Picked up suggestion."
+          },
+          onDragOver({ active, over }) {
+            if (!over) return
+            const targetColumn = over.data.current?.column as KanbanColumnType | undefined
+            if (targetColumn) {
+              return `Over ${targetColumn} column.`
+            }
+            return undefined
+          },
+          onDragEnd({ active, over }) {
+            if (!over) return "Cancelled."
+            const targetColumn = over.data.current?.column as KanbanColumnType | undefined
+            if (targetColumn) {
+              return `Dropped in ${targetColumn} column.`
+            }
+            return "Dropped."
+          },
+          onDragCancel() {
+            return "Drag cancelled."
+          },
+        },
+      }}
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
+      <div
+        className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full"
+        role="region"
+        aria-label="Suggestion kanban board"
+      >
         <KanbanColumn
           column="pending"
           suggestions={columns.pending}

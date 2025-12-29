@@ -67,24 +67,29 @@ export function SuggestionCard({ suggestion, onClick, isDragging }: SuggestionCa
         isDismissed && "opacity-50"
       )}
       onClick={onClick}
+      role="listitem"
+      aria-label={`${suggestion.category} suggestion: ${title}. Duration: ${suggestion.duration} minutes. Status: ${suggestion.status}`}
     >
       <div className="flex items-start gap-3">
         {/* Drag handle */}
-        <div
+        <button
+          type="button"
           {...attributes}
           {...listeners}
           className={cn(
             "flex-shrink-0 mt-1 cursor-grab active:cursor-grabbing",
             "opacity-0 group-hover:opacity-60 transition-opacity",
+            "focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-accent/50 rounded",
             (isDragging || isSortableDragging) && "opacity-60"
           )}
+          aria-label={`Drag to reorder ${suggestion.category} suggestion`}
         >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-        </div>
+          <GripVertical className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        </button>
 
         {/* Category Icon */}
         <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0", colors.bg)}>
-          <Icon className={cn("h-4 w-4", colors.text)} />
+          <Icon className={cn("h-4 w-4", colors.text)} aria-hidden="true" />
         </div>
 
         {/* Content */}
@@ -93,8 +98,8 @@ export function SuggestionCard({ suggestion, onClick, isDragging }: SuggestionCa
             <span className={cn("text-xs font-medium capitalize", colors.text)}>
               {suggestion.category}
             </span>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">
-              <Clock className="h-2.5 w-2.5 mr-1" />
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5" aria-label={`${suggestion.duration} minutes`}>
+              <Clock className="h-2.5 w-2.5 mr-1" aria-hidden="true" />
               {suggestion.duration}m
             </Badge>
           </div>
@@ -116,22 +121,22 @@ export function SuggestionCard({ suggestion, onClick, isDragging }: SuggestionCa
           {/* Status indicator for scheduled items */}
           {isScheduled && suggestion.scheduledFor && (
             <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
-              <Clock className="h-3 w-3" />
+              <Clock className="h-3 w-3" aria-hidden="true" />
               {formatScheduledTime(suggestion.scheduledFor)}
             </p>
           )}
 
           {/* Completed indicator */}
           {isCompleted && !isDismissed && (
-            <div className="flex items-center gap-1 mt-1.5 text-xs text-success">
-              <CheckCircle2 className="h-3 w-3" />
+            <div className="flex items-center gap-1 mt-1.5 text-xs text-success" aria-label="Completed">
+              <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
               <span>Completed</span>
             </div>
           )}
 
           {isDismissed && (
-            <div className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground">
-              <X className="h-3 w-3" />
+            <div className="flex items-center gap-1 mt-1.5 text-xs text-muted-foreground" aria-label="Dismissed">
+              <X className="h-3 w-3" aria-hidden="true" />
               <span>Dismissed</span>
             </div>
           )}
