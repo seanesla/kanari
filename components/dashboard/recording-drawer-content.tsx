@@ -11,6 +11,8 @@ import { useRecordingActions, useTrendDataActions } from "@/hooks/use-storage"
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
 import { RecordingWaveform, AudioLevelMeter } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
+import { PostRecordingPrompt } from "@/components/check-in"
+import { featuresToPatterns } from "@/lib/gemini/mismatch-detector"
 import type { Recording, AudioFeatures } from "@/lib/types"
 
 interface RecordingDrawerContentProps {
@@ -28,6 +30,7 @@ export function RecordingDrawerContent({
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [playheadPosition, setPlayheadPosition] = useState(0)
+  const [showCheckInPrompt, setShowCheckInPrompt] = useState(false)
   const savedRecordingRef = useRef<Recording | null>(null)
 
   // Storage hooks
@@ -70,6 +73,12 @@ export function RecordingDrawerContent({
 
       savedRecordingRef.current = recording
       setIsSaved(true)
+
+      // Show check-in prompt for elevated stress or fatigue
+      if (metrics.stressScore > 50 || metrics.fatigueScore > 50) {
+        setShowCheckInPrompt(true)
+      }
+
       onRecordingComplete?.(recording)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to save recording"
@@ -145,6 +154,7 @@ export function RecordingDrawerContent({
     setIsSaving(false)
     setSaveError(null)
     setPlayheadPosition(0)
+    setShowCheckInPrompt(false)
     savedRecordingRef.current = null
   }
 
@@ -339,8 +349,28 @@ export function RecordingDrawerContent({
           </div>
         )}
 
-        {/* Contextual guidance after recording is saved */}
-        {isSaved && savedRecordingRef.current?.metrics && (
+        {/* Post-recording check-in prompt */}
+        {showCheckInPrompt &&
+          savedRecordingRef.current?.id &&
+          savedRecordingRef.current?.metrics &&
+          savedRecordingRef.current?.features && (
+          <PostRecordingPrompt
+            recordingId={savedRecordingRef.current.id}
+            stressScore={savedRecordingRef.current.metrics.stressScore}
+            fatigueScore={savedRecordingRef.current.metrics.fatigueScore}
+            patterns={featuresToPatterns(savedRecordingRef.current.features)}
+            onDismiss={() => setShowCheckInPrompt(false)}
+            onSessionComplete={() => {
+              setShowCheckInPrompt(false)
+              toast.success("Check-in complete", {
+                description: "Your conversation has been saved.",
+              })
+            }}
+          />
+        )}
+
+        {/* Contextual guidance after recording is saved (when check-in not shown) */}
+        {isSaved && savedRecordingRef.current?.metrics && !showCheckInPrompt && (
           <div className="p-4 rounded-lg bg-card border">
             {savedRecordingRef.current.metrics.stressLevel === 'high' || savedRecordingRef.current.metrics.stressLevel === 'elevated' ? (
               <div className="text-center">

@@ -8,6 +8,8 @@ import type {
   UserSettings,
   TrendData,
   SuggestionDecision,
+  CheckInSession,
+  CheckInMessage,
 } from "@/lib/types"
 
 // Database record types with IndexedDB-friendly structure
@@ -34,6 +36,11 @@ export interface DBSettings extends UserSettings {
   id: string // Always "default"
 }
 
+export interface DBCheckInSession extends Omit<CheckInSession, "startedAt" | "endedAt"> {
+  startedAt: Date
+  endedAt?: Date
+}
+
 // Database class
 class KanariDB extends Dexie {
   recordings!: EntityTable<DBRecording, "id">
@@ -41,6 +48,7 @@ class KanariDB extends Dexie {
   recoveryBlocks!: EntityTable<DBRecoveryBlock, "id">
   trendData!: EntityTable<DBTrendData & { id: string }, "id">
   settings!: EntityTable<DBSettings, "id">
+  checkInSessions!: EntityTable<DBCheckInSession, "id">
 
   constructor() {
     super("kanari")
@@ -68,6 +76,16 @@ class KanariDB extends Dexie {
           suggestion.version = 1
         }
       })
+    })
+
+    // Version 3: Add check-in sessions for conversational check-in feature
+    this.version(3).stores({
+      recordings: "id, createdAt, status",
+      suggestions: "id, createdAt, status, category, recordingId, version",
+      recoveryBlocks: "id, suggestionId, scheduledAt, completed",
+      trendData: "id, date",
+      settings: "id",
+      checkInSessions: "id, startedAt, recordingId",
     })
   }
 }
@@ -139,5 +157,21 @@ export function fromTrendData(record: TrendData): DBTrendData & { id: string } {
     stressScore: record.stressScore,
     fatigueScore: record.fatigueScore,
     recordingCount: record.recordingCount,
+  }
+}
+
+export function toCheckInSession(dbRecord: DBCheckInSession): CheckInSession {
+  return {
+    ...dbRecord,
+    startedAt: dbRecord.startedAt.toISOString(),
+    endedAt: dbRecord.endedAt?.toISOString(),
+  }
+}
+
+export function fromCheckInSession(record: CheckInSession): DBCheckInSession {
+  return {
+    ...record,
+    startedAt: new Date(record.startedAt),
+    endedAt: record.endedAt ? new Date(record.endedAt) : undefined,
   }
 }

@@ -2,12 +2,13 @@
 
 import { useMemo } from "react"
 import { Link } from "next-view-transitions"
-import { Mic, TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar, Flame } from "lucide-react"
+import { Mic, TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar, Flame, MessageSquare } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useDashboardStats, useTrendData } from "@/hooks/use-storage"
 import { useCalendar } from "@/hooks/use-calendar"
 import { predictBurnoutRisk } from "@/lib/ml/forecasting"
+import { CheckInTrigger } from "@/components/check-in"
 import type { BurnoutPrediction } from "@/lib/types"
 
 export function MetricsHeaderBar() {
@@ -130,6 +131,14 @@ export function MetricsHeaderBar() {
             </Button>
           )
         )}
+
+        {/* Check-in Button */}
+        <CheckInTrigger
+          variant="outline"
+          size="sm"
+          label="Talk"
+          showIcon={true}
+        />
 
         {/* Record Button */}
         <Button asChild size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">

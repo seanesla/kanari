@@ -7,9 +7,11 @@ import {
   toRecording,
   toTrendData,
   toSuggestion,
+  toCheckInSession,
   fromRecording,
   fromTrendData,
   fromSuggestion,
+  fromCheckInSession,
   type DBTrendData,
 } from "@/lib/storage/db"
 import type {
@@ -17,6 +19,7 @@ import type {
   TrendData,
   DashboardStats,
   Suggestion,
+  CheckInSession,
 } from "@/lib/types"
 
 // ===========================================
@@ -323,6 +326,75 @@ export function useDashboardStats(): DashboardStats {
 }
 
 // ===========================================
+// Check-in session operations
+// ===========================================
+
+export function useCheckInSessions(limit?: number) {
+  const sessions = useLiveQuery(async () => {
+    let query = db.checkInSessions.orderBy("startedAt").reverse()
+    if (limit) {
+      query = query.limit(limit)
+    }
+    const results = await query.toArray()
+    return results.map(toCheckInSession)
+  }, [limit])
+
+  return sessions ?? []
+}
+
+export function useCheckInSession(id: string | undefined) {
+  return useLiveQuery(async () => {
+    if (!id) return undefined
+    const record = await db.checkInSessions.get(id)
+    return record ? toCheckInSession(record) : undefined
+  }, [id])
+}
+
+export function useCheckInSessionsByRecording(recordingId: string | undefined) {
+  const sessions = useLiveQuery(async () => {
+    if (!recordingId) return []
+    const results = await db.checkInSessions
+      .where("recordingId")
+      .equals(recordingId)
+      .toArray()
+    return results.map(toCheckInSession)
+  }, [recordingId])
+
+  return sessions ?? []
+}
+
+export function useCheckInSessionActions() {
+  const addCheckInSession = useCallback(async (session: CheckInSession) => {
+    await db.checkInSessions.add(fromCheckInSession(session))
+    return session.id
+  }, [])
+
+  const updateCheckInSession = useCallback(
+    async (id: string, updates: Partial<CheckInSession>) => {
+      const existing = await db.checkInSessions.get(id)
+      if (!existing) throw new Error(`CheckInSession ${id} not found`)
+
+      await db.checkInSessions.update(id, {
+        ...updates,
+        startedAt: updates.startedAt
+          ? new Date(updates.startedAt)
+          : existing.startedAt,
+        endedAt: updates.endedAt
+          ? new Date(updates.endedAt)
+          : existing.endedAt,
+      })
+    },
+    []
+  )
+
+  const deleteCheckInSession = useCallback(async (id: string) => {
+    await db.checkInSessions.delete(id)
+  }, [])
+
+  return { addCheckInSession, updateCheckInSession, deleteCheckInSession }
+}
+
+// ===========================================
 // Clear all data
 // ===========================================
 
@@ -333,6 +405,7 @@ export function useClearAllData() {
       db.suggestions.clear(),
       db.recoveryBlocks.clear(),
       db.trendData.clear(),
+      db.checkInSessions.clear(),
     ])
   }, [])
 }

@@ -392,5 +392,146 @@ export interface GeminiSemanticAnalysis {
   summary: string
 }
 
+// ============================================
+// Conversational Check-In Types
+// ============================================
+
+export type CheckInMessageRole = "user" | "assistant" | "system"
+
+export type CheckInState =
+  | "idle"
+  | "initializing"
+  | "connecting"
+  | "ready"
+  | "listening"
+  | "user_speaking"
+  | "processing"
+  | "assistant_speaking"
+  | "ending"
+  | "complete"
+  | "error"
+
+export interface MismatchResult {
+  detected: boolean
+  semanticSignal: "positive" | "neutral" | "negative"
+  acousticSignal: "stressed" | "fatigued" | "normal" | "energetic"
+  confidence: number // 0-1
+  suggestionForGemini: string | null // Context to inject, e.g., "User said fine but voice shows fatigue"
+}
+
+export interface CheckInMessage {
+  id: string
+  role: CheckInMessageRole
+  content: string
+  timestamp: string
+  // Audio features captured during this message (for user messages)
+  features?: AudioFeatures
+  // Voice metrics computed from features
+  metrics?: VoiceMetrics
+  // Mismatch detection result (for user messages)
+  mismatch?: MismatchResult
+  // Duration of the audio segment in seconds
+  audioDuration?: number
+}
+
+export interface CheckInSummary {
+  stressIndicators: string[]
+  fatigueIndicators: string[]
+  positiveNotes: string[]
+  suggestedActions: string[]
+  overallMood: "positive" | "neutral" | "concerning"
+}
+
+export interface CheckInSession {
+  id: string
+  startedAt: string
+  endedAt?: string
+  messages: CheckInMessage[]
+  // Summary generated at end of conversation
+  summary?: CheckInSummary
+  // Link to recording if triggered post-recording
+  recordingId?: string
+  // Total duration of the conversation in seconds
+  duration?: number
+  // Number of detected mismatches during conversation
+  mismatchCount?: number
+}
+
+// Configuration for Gemini Live API connection
+export interface LiveAPIConfig {
+  model: string // e.g., "gemini-2.5-flash-native-audio-preview-12-2025"
+  systemInstruction: string
+  voiceConfig?: {
+    voiceName?: string // One of 30 HD voices
+    speakingRate?: number // 0.5-2.0
+  }
+  inputAudioConfig: {
+    sampleRate: number // 16000
+    encoding: "PCM_16"
+  }
+  outputAudioConfig: {
+    sampleRate: number // 24000
+    encoding: "PCM_16"
+  }
+}
+
+// WebSocket message types for Gemini Live API
+export interface LiveAPISetupMessage {
+  setup: {
+    model: string
+    systemInstruction: {
+      parts: Array<{ text: string }>
+    }
+    generationConfig: {
+      responseModalities: Array<"AUDIO" | "TEXT">
+    }
+    realtimeInputConfig: {
+      automaticActivityDetection: {
+        disabled: boolean
+      }
+    }
+  }
+}
+
+export interface LiveAPIAudioMessage {
+  realtimeInput: {
+    audio: {
+      mimeType: string // "audio/pcm;rate=16000"
+      data: string // base64-encoded PCM
+    }
+  }
+}
+
+export interface LiveAPITextMessage {
+  realtimeInput: {
+    text: string
+  }
+}
+
+export interface LiveAPIServerContent {
+  serverContent: {
+    modelTurn?: {
+      parts: Array<{
+        text?: string
+        inlineData?: {
+          mimeType: string
+          data: string
+        }
+      }>
+    }
+    turnComplete?: boolean
+    interrupted?: boolean
+  }
+}
+
+export interface LiveAPITranscription {
+  realtimeOutput?: {
+    transcription?: {
+      text: string
+      isFinal: boolean
+    }
+  }
+}
+
 // Re-export SceneMode for convenience
 export type { SceneMode } from "./scene-context"
