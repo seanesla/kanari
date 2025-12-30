@@ -116,6 +116,21 @@
    Recording Event Styles
    ============================================ */
 
+/*
+ * Fix 12: CSS Specificity Documentation
+ *
+ * NOTE: !important is required to override Schedule-X bundled CSS defaults.
+ * Schedule-X injects its own styles with high specificity, so we must use
+ * !important to ensure our customizations take effect.
+ *
+ * If Schedule-X updates cause styling issues, check:
+ * 1. Selector specificity - Schedule-X may have changed their selectors
+ * 2. CSS variable names - they may have renamed or added new variables
+ * 3. This file's load order relative to Schedule-X theme CSS
+ *
+ * This is intentional tech debt for the sake of visual customization.
+ */
+
 /* Recording events - let the custom component handle all styling */
 .sx__event[data-calendar-id="recording"] {
   background: transparent !important;

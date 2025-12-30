@@ -165,6 +165,8 @@ function ScheduleXWeekCalendarInner({
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
   const [tooltipOpen, setTooltipOpen] = useState(false)
 
+  // Note: Scroll dismissal is handled by Floating UI's useDismiss with ancestorScroll: true
+
   // Generate break category colors from accent
   const breakColors = useMemo(() => ({
     main: accentColor,
@@ -287,9 +289,20 @@ function ScheduleXWeekCalendarInner({
 
         // Handle recording events - open tooltip
         if (event._type === 'recording') {
-          const mouseEvent = e as MouseEvent
+          // Fix 10: Stop propagation to prevent Schedule-X internal handling
+          e.stopPropagation()
+          // Find the Schedule-X event wrapper element, not just the clicked child
+          // e.target could be an icon, dot, or internal element with wrong position
+          const target = e.target as HTMLElement | null
+          const eventWrapper = target?.closest('.sx__time-grid-event') as HTMLElement | null
+          const element = eventWrapper ?? target
+          if (!element) return
+          const rect = element.getBoundingClientRect()
           setSelectedRecording(event._recording)
-          setTooltipPosition({ x: mouseEvent.clientX, y: mouseEvent.clientY })
+          setTooltipPosition({
+            x: rect.left,
+            y: rect.top + rect.height / 2
+          })
           setTooltipOpen(true)
           onRecordingClick?.(event._recording)
           return
@@ -425,6 +438,14 @@ function ScheduleXWeekCalendarInner({
     onExternalDrop(suggestionId, dropTime.date, dropTime.hour, dropTime.minute)
   }, [onExternalDrop, calculateDropTime])
 
+  // Fix 4: Handler to open tooltip (used for both click and keyboard)
+  const openRecordingTooltip = useCallback((recording: Recording, position: { x: number; y: number }) => {
+    setSelectedRecording(recording)
+    setTooltipPosition(position)
+    setTooltipOpen(true)
+    onRecordingClick?.(recording)
+  }, [onRecordingClick])
+
   // Custom component renderer for time grid events
   // Source: Context7 - schedule-x/schedule-x docs - "Customize Event Modal Content in React"
   // Note: When using customComponents.timeGridEvent, we must render ALL event types ourselves
@@ -432,9 +453,31 @@ function ScheduleXWeekCalendarInner({
     timeGridEvent: ({ calendarEvent }: { calendarEvent: CalendarEvent }) => {
       const event = calendarEvent as CustomCalendarEvent
 
-      // Render recording as a compact pill event
+      // Render recording as a compact pill event with keyboard support
       if (event._type === 'recording') {
-        return <RecordingMarker recording={event._recording} />
+        return (
+          <div
+            onKeyDown={(e) => {
+              // Fix 4: Keyboard accessibility - Enter/Space opens tooltip
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                e.stopPropagation()
+                // Find the Schedule-X event wrapper for correct positioning
+                const eventWrapper = e.currentTarget.closest('.sx__time-grid-event') as HTMLElement | null
+                const element = eventWrapper ?? e.currentTarget
+                if (!element) return
+                const rect = element.getBoundingClientRect()
+                openRecordingTooltip(event._recording, {
+                  x: rect.left,
+                  y: rect.top + rect.height / 2,
+                })
+              }
+            }}
+            className="h-full w-full"
+          >
+            <RecordingMarker recording={event._recording} />
+          </div>
+        )
       }
 
       // Render suggestion events with default-like styling
@@ -456,7 +499,7 @@ function ScheduleXWeekCalendarInner({
         </div>
       )
     },
-  }), [])
+  }), [openRecordingTooltip])
 
   return (
     <div
