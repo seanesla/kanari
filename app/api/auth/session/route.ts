@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import { getTokensFromCookies, clearTokenCookies, isTokenExpired, updateAccessToken } from "@/lib/auth/session"
-import { refreshAccessToken } from "@/lib/calendar/oauth"
+import { refreshAccessToken, revokeToken } from "@/lib/calendar/oauth"
 
 /**
  * GET /api/auth/session
@@ -13,7 +13,6 @@ export async function GET() {
     if (!tokens) {
       return NextResponse.json({
         authenticated: false,
-        accessToken: null,
       })
     }
 
@@ -22,11 +21,15 @@ export async function GET() {
       // Try to refresh if we have a refresh token
       if (tokens.refresh_token) {
         try {
-          const config = {
-            clientId: process.env.GOOGLE_CLIENT_ID || "",
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
-            redirectUri: process.env.GOOGLE_REDIRECT_URI || "",
+          const clientId = process.env.GOOGLE_CLIENT_ID
+          const clientSecret = process.env.GOOGLE_CLIENT_SECRET
+          const redirectUri = process.env.GOOGLE_REDIRECT_URI
+
+          if (!clientId || !clientSecret || !redirectUri) {
+            throw new Error("OAuth configuration missing")
           }
+
+          const config = { clientId, clientSecret, redirectUri }
           const newTokens = await refreshAccessToken(tokens.refresh_token, config)
 
           // Update the access token cookie
@@ -34,7 +37,6 @@ export async function GET() {
 
           return NextResponse.json({
             authenticated: true,
-            accessToken: newTokens.access_token,
             expiresAt: newTokens.expires_at,
           })
         } catch (refreshError) {
@@ -43,7 +45,6 @@ export async function GET() {
           await clearTokenCookies()
           return NextResponse.json({
             authenticated: false,
-            accessToken: null,
             error: "Token expired and refresh failed",
           })
         }
@@ -52,7 +53,6 @@ export async function GET() {
         await clearTokenCookies()
         return NextResponse.json({
           authenticated: false,
-          accessToken: null,
           error: "Token expired",
         })
       }
@@ -60,7 +60,6 @@ export async function GET() {
 
     return NextResponse.json({
       authenticated: true,
-      accessToken: tokens.access_token,
       expiresAt: tokens.expires_at,
     })
   } catch (error) {
@@ -78,6 +77,16 @@ export async function GET() {
  */
 export async function DELETE() {
   try {
+    try {
+      const tokens = await getTokensFromCookies()
+      if (tokens?.access_token) {
+        await revokeToken(tokens.access_token)
+      }
+    } catch (revokeError) {
+      // Best-effort revoke. Cookie clearing is the source of truth for logout.
+      console.error("Failed to revoke token:", revokeError)
+    }
+
     await clearTokenCookies()
     return NextResponse.json({ success: true })
   } catch (error) {

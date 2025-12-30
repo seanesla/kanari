@@ -123,7 +123,6 @@ function formatServerMessage(msg: ExtendedServerMessage): object {
     // Input transcription (what user is saying)
     // Per SDK types, this is ALSO inside serverContent, not at root level
     if (msg.serverContent.inputTranscription) {
-      console.log("[SSE] Input transcription:", JSON.stringify(msg.serverContent.inputTranscription))
       content.inputTranscription = msg.serverContent.inputTranscription
     }
 
@@ -133,14 +132,12 @@ function formatServerMessage(msg: ExtendedServerMessage): object {
   // Voice activity detection signal (user speech start/end)
   // Source: Context7 - /googleapis/js-genai docs - "voiceActivityDetectionSignal"
   if (msg.voiceActivityDetectionSignal) {
-    console.log("[SSE] VAD signal:", JSON.stringify(msg.voiceActivityDetectionSignal))
     formatted.voiceActivityDetectionSignal = msg.voiceActivityDetectionSignal
   }
 
   // Tool call (function calling) - MUST forward to client
   // Source: Context7 - /googleapis/js-genai docs - "LiveServerToolCall"
   if (msg.toolCall) {
-    console.log("[SSE] Tool call:", JSON.stringify(msg.toolCall))
     formatted.toolCall = msg.toolCall
   }
 
@@ -161,6 +158,14 @@ export async function GET(request: NextRequest) {
   const secret = request.headers.get("x-session-secret")
   if (!secret) {
     return new Response(JSON.stringify({ error: "Missing session secret" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    })
+  }
+
+  // Basic input hardening to avoid allocating huge buffers in timing-safe comparisons.
+  if (sessionId.length > 128 || secret.length > 256) {
+    return new Response(JSON.stringify({ error: "Invalid session credentials" }), {
       status: 400,
       headers: { "Content-Type": "application/json" },
     })

@@ -32,9 +32,10 @@ pnpm test:run     # Vitest single run
 
 ## Environment
 
-Copy `.env.example` to `.env` with:
-- `GEMINI_API_KEY` - Required for semantic audio analysis
+Copy `.env.example` to `.env.local` with:
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` - For Calendar integration
+
+Gemini API keys are user-provided via Settings UI and sent to server routes via `X-Gemini-Api-Key` (no shared env fallback).
 
 ## Architecture
 

@@ -11,6 +11,7 @@ import {
   validateServerMessage,
   SessionInfoSchema,
   AudioInputRequestSchema,
+  ToolResponseRequestSchema,
   ScheduleActivityArgsSchema,
   BreathingExerciseArgsSchema,
   StressGaugeArgsSchema,
@@ -390,7 +391,7 @@ describe("ServerMessageSchema", () => {
       expect(result.success).toBe(false)
     })
 
-    test("should reject toolCall with missing args", () => {
+    test("should accept toolCall with missing args", () => {
       const message = {
         toolCall: {
           functionCalls: [
@@ -402,7 +403,7 @@ describe("ServerMessageSchema", () => {
       }
       const result = ServerMessageSchema.safeParse(message)
 
-      expect(result.success).toBe(false)
+      expect(result.success).toBe(true)
     })
 
     test("should reject toolResponse with missing required fields", () => {
@@ -863,5 +864,45 @@ describe("AudioInputRequestSchema", () => {
     const result = AudioInputRequestSchema.safeParse(request)
 
     expect(result.success).toBe(true)
+  })
+
+  test("should reject overly large audio payloads", () => {
+    const request = {
+      sessionId: "session-123",
+      secret: "secret-abc",
+      audio: "a".repeat(1_000_001),
+    }
+    const result = AudioInputRequestSchema.safeParse(request)
+
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("ToolResponseRequestSchema", () => {
+  test("should validate tool response request", () => {
+    const request = {
+      sessionId: "session-123",
+      secret: "secret-abc",
+      functionResponses: [
+        {
+          id: "call_123",
+          name: "stay_silent",
+          response: { ok: true },
+        },
+      ],
+    }
+
+    const result = ToolResponseRequestSchema.safeParse(request)
+    expect(result.success).toBe(true)
+  })
+
+  test("should reject missing functionResponses", () => {
+    const request = {
+      sessionId: "session-123",
+      secret: "secret-abc",
+    }
+
+    const result = ToolResponseRequestSchema.safeParse(request)
+    expect(result.success).toBe(false)
   })
 })

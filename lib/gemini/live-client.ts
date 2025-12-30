@@ -343,7 +343,12 @@ export class GeminiLiveClient {
       }
 
       const session: SessionInfo = await response.json()
-      logDebug("GeminiLive", "Received session:", JSON.stringify(session))
+      // SECURITY: never log the per-session secret (even in dev logs, it gets copy/pasted).
+      logDebug("GeminiLive", "Received session metadata:", {
+        sessionId: session.sessionId,
+        streamUrl: session.streamUrl,
+        hasSecret: Boolean(session.secret),
+      })
 
       // Validate session response has required fields
       if (!session.sessionId || !session.streamUrl || !session.secret) {

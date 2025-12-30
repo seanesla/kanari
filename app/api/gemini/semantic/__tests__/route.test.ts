@@ -6,7 +6,7 @@
  *
  * These tests verify:
  * - Request validation (audio format, size limits, base64 encoding)
- * - API key handling (header vs environment variable)
+ * - API key handling (header only; no env fallback)
  * - Error handling for various failure scenarios
  * - Response structure matches GeminiSemanticAnalysis type
  */
@@ -23,7 +23,7 @@ vi.mock("@/lib/gemini/client", () => ({
     return key
   }),
   getAPIKeyFromRequest: vi.fn((request: Request) => {
-    return request.headers.get("X-Gemini-Api-Key") || process.env.GEMINI_API_KEY
+    return request.headers.get("X-Gemini-Api-Key") || undefined
   }),
   analyzeAudioSemantic: vi.fn(),
 }))

@@ -234,16 +234,16 @@ export async function generateSuggestions(
 
 /**
  * Get API key from request header or fall back to environment variable
- * Priority: X-Gemini-Api-Key header > GEMINI_API_KEY env var
+ *
+ * SECURITY: Do not fall back to a shared server environment key.
+ * This app intentionally relies on user-provided API keys stored client-side
+ * and forwarded via `X-Gemini-Api-Key`. An env fallback enables unauthenticated
+ * callers to burn quota if these endpoints are reachable publicly.
+ *
+ * See: docs/error-patterns/env-gemini-api-key-fallback.md
  */
 export function getAPIKeyFromRequest(request: Request): string | undefined {
-  // Try header first (user-provided key from settings)
-  const headerKey = request.headers.get("X-Gemini-Api-Key")
-  if (headerKey) {
-    return headerKey
-  }
-  // Fall back to environment variable
-  return process.env.GEMINI_API_KEY
+  return request.headers.get("X-Gemini-Api-Key") || undefined
 }
 
 /**

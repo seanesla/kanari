@@ -70,20 +70,25 @@ function generateState(): string {
 // OAuth Flow Functions
 // ============================================
 
+export interface OAuthAuthUrlResult {
+  url: string
+  state: string
+  codeVerifier: string
+}
+
 /**
  * Generate authorization URL with PKCE
- * Store the verifier and state in sessionStorage for callback verification
+ *
+ * SECURITY: This must be server-compatible (no sessionStorage/localStorage).
+ * The caller is responsible for persisting `state` + `codeVerifier` (e.g. httpOnly cookies)
+ * so the server-side callback can validate CSRF state and complete the token exchange.
+ *
+ * See: docs/error-patterns/oauth-pkce-state-server-storage.md
  */
-export async function generateAuthUrl(config: OAuthConfig): Promise<string> {
+export async function generateAuthUrl(config: OAuthConfig): Promise<OAuthAuthUrlResult> {
   const codeVerifier = generateCodeVerifier()
   const codeChallenge = await generateCodeChallenge(codeVerifier)
   const state = generateState()
-
-  // Store verifier and state for callback
-  if (typeof window !== "undefined") {
-    sessionStorage.setItem("oauth_code_verifier", codeVerifier)
-    sessionStorage.setItem("oauth_state", state)
-  }
 
   const params = new URLSearchParams({
     client_id: config.clientId,
@@ -97,7 +102,11 @@ export async function generateAuthUrl(config: OAuthConfig): Promise<string> {
     prompt: "consent", // Force consent screen to ensure refresh token
   })
 
-  return `${OAUTH_ENDPOINTS.authorize}?${params.toString()}`
+  return {
+    url: `${OAUTH_ENDPOINTS.authorize}?${params.toString()}`,
+    state,
+    codeVerifier,
+  }
 }
 
 /**
@@ -105,12 +114,9 @@ export async function generateAuthUrl(config: OAuthConfig): Promise<string> {
  */
 export async function exchangeCodeForTokens(
   code: string,
-  config: OAuthConfig
+  config: OAuthConfig,
+  codeVerifier: string
 ): Promise<OAuthTokens> {
-  const codeVerifier = typeof window !== "undefined"
-    ? sessionStorage.getItem("oauth_code_verifier")
-    : null
-
   if (!codeVerifier) {
     throw new Error("Code verifier not found. OAuth flow may have been tampered with.")
   }
@@ -138,12 +144,6 @@ export async function exchangeCodeForTokens(
   }
 
   const data = await response.json()
-
-  // Clean up stored verifier
-  if (typeof window !== "undefined") {
-    sessionStorage.removeItem("oauth_code_verifier")
-    sessionStorage.removeItem("oauth_state")
-  }
 
   return {
     access_token: data.access_token,
@@ -216,11 +216,8 @@ export async function revokeToken(token: string): Promise<void> {
 /**
  * Verify state parameter to prevent CSRF attacks
  */
-export function verifyState(receivedState: string): boolean {
-  if (typeof window === "undefined") return false
-
-  const storedState = sessionStorage.getItem("oauth_state")
-  return storedState === receivedState
+export function verifyState(receivedState: string, storedState: string | undefined): boolean {
+  return Boolean(receivedState && storedState && receivedState === storedState)
 }
 
 /**
@@ -384,6 +381,7 @@ function isEncrypted(data: string): boolean {
 /**
  * Store tokens in localStorage with AES-GCM encryption
  */
+/** @deprecated Tokens are stored server-side in httpOnly cookies. Do not store OAuth tokens client-side. */
 export async function storeTokens(tokens: OAuthTokens): Promise<void> {
   if (typeof window === "undefined") return
 
@@ -399,6 +397,7 @@ export async function storeTokens(tokens: OAuthTokens): Promise<void> {
  * Retrieve tokens from localStorage with decryption
  * Handles migration from unencrypted to encrypted storage
  */
+/** @deprecated Tokens are stored server-side in httpOnly cookies. Do not store OAuth tokens client-side. */
 export async function getStoredTokens(): Promise<OAuthTokens | null> {
   if (typeof window === "undefined") return null
 
@@ -424,6 +423,7 @@ export async function getStoredTokens(): Promise<OAuthTokens | null> {
 /**
  * Remove tokens from localStorage
  */
+/** @deprecated Tokens are stored server-side in httpOnly cookies. Do not store OAuth tokens client-side. */
 export function clearStoredTokens(): void {
   if (typeof window === "undefined") return
 

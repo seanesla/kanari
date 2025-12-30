@@ -17,6 +17,7 @@ import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@go
 import { EventEmitter } from "events"
 import { randomBytes, timingSafeEqual } from "crypto"
 import { GEMINI_TOOLS } from "./live-prompts"
+import { logDebug, logError } from "@/lib/logger"
 
 // Session timeout: 30 minutes (matches Gemini session limit)
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000
@@ -103,17 +104,18 @@ class GeminiSessionManager {
       throw new Error(`Session ${sessionId} already exists`)
     }
 
-    // Get API key (param takes precedence over env)
-    const key = apiKey || process.env.GEMINI_API_KEY
-    if (!key) {
+    // SECURITY: Require an explicit user-provided API key.
+    // Avoid env fallbacks so public endpoints can't be used to burn shared quota.
+    // See: docs/error-patterns/env-gemini-api-key-fallback.md
+    if (!apiKey) {
       throw new Error("Gemini API key not configured. Please add your API key in Settings.")
     }
 
-    const ai = this.getClient(key)
+    const ai = this.getClient(apiKey)
     const emitter = new EventEmitter()
     const secret = this.generateSessionSecret()
 
-    console.log(`[SessionManager] Creating session ${sessionId}`)
+    logDebug("SessionManager", `Creating session ${sessionId}`)
 
     // Track ready state before session is stored in map
     // Note: Race condition handled via local isReady variable
@@ -145,7 +147,7 @@ class GeminiSessionManager {
         },
         callbacks: {
           onopen: () => {
-            console.log(`[SessionManager] Session ${sessionId} connected`)
+            logDebug("SessionManager", `Session ${sessionId} connected`)
             isReady = true
             // Also update stored session if it exists (handles race condition)
             const managed = this.sessions.get(sessionId)
@@ -155,32 +157,14 @@ class GeminiSessionManager {
             emitter.emit("ready")
           },
           onmessage: (msg: LiveServerMessage) => {
-            // Debug: Log raw message to see what Gemini actually sends
-            // Cast through unknown to allow accessing fields not in SDK types
-            const msgAny = msg as unknown as Record<string, unknown>
-            // Check for inputTranscription at root level
-            if (msgAny.inputTranscription) {
-              console.log(`[SessionManager] INPUT TRANSCRIPTION (root):`, JSON.stringify(msgAny.inputTranscription))
-            }
-            // Check for voiceActivityDetectionSignal
-            if (msgAny.voiceActivityDetectionSignal) {
-              console.log(`[SessionManager] VAD SIGNAL:`, JSON.stringify(msgAny.voiceActivityDetectionSignal))
-            }
-            // Check inside serverContent
-            if (msgAny.serverContent) {
-              const sc = msgAny.serverContent as Record<string, unknown>
-              if (sc.inputTranscription) {
-                console.log(`[SessionManager] INPUT TRANSCRIPTION (serverContent):`, JSON.stringify(sc.inputTranscription))
-              }
-            }
             emitter.emit("message", msg)
           },
           onerror: (e: ErrorEvent) => {
-            console.error(`[SessionManager] Session ${sessionId} error:`, e.message)
+            logError("SessionManager", `Session ${sessionId} error: ${e.message || "Session error"}`)
             emitter.emit("error", new Error(e.message || "Session error"))
           },
           onclose: (e: CloseEvent) => {
-            console.log(`[SessionManager] Session ${sessionId} closed:`, e.reason)
+            logDebug("SessionManager", `Session ${sessionId} closed: ${e.reason}`)
             emitter.emit("close")
             this.removeSession(sessionId)
           },
@@ -189,7 +173,7 @@ class GeminiSessionManager {
 
       // Set up session timeout
       const timeoutId = setTimeout(() => {
-        console.log(`[SessionManager] Session ${sessionId} timed out`)
+        logDebug("SessionManager", `Session ${sessionId} timed out`)
         this.closeSession(sessionId)
       }, SESSION_TIMEOUT_MS)
 
@@ -203,10 +187,11 @@ class GeminiSessionManager {
         secret,
       })
 
-      console.log(`[SessionManager] Session ${sessionId} created successfully`)
+      logDebug("SessionManager", `Session ${sessionId} created successfully`)
       return { sessionId, secret }
     } catch (error) {
-      console.error(`[SessionManager] Failed to create session ${sessionId}:`, error)
+      const message = error instanceof Error ? error.message : "Unknown error"
+      logError("SessionManager", `Failed to create session ${sessionId}: ${message}`)
       throw error
     }
   }
@@ -232,7 +217,8 @@ class GeminiSessionManager {
         },
       })
     } catch (error) {
-      console.error(`[SessionManager] Failed to send audio to ${sessionId}:`, error)
+      const message = error instanceof Error ? error.message : "Unknown error"
+      logError("SessionManager", `Failed to send audio to ${sessionId}: ${message}`)
       throw error
     }
   }
@@ -253,7 +239,8 @@ class GeminiSessionManager {
         turns: [{ role: "user", parts: [{ text }] }],
       })
     } catch (error) {
-      console.error(`[SessionManager] Failed to send text to ${sessionId}:`, error)
+      const message = error instanceof Error ? error.message : "Unknown error"
+      logError("SessionManager", `Failed to send text to ${sessionId}: ${message}`)
       throw error
     }
   }
@@ -270,7 +257,8 @@ class GeminiSessionManager {
     try {
       await managed.session.sendRealtimeInput({ audioStreamEnd: true })
     } catch (error) {
-      console.error(`[SessionManager] Failed to send audio end to ${sessionId}:`, error)
+      const message = error instanceof Error ? error.message : "Unknown error"
+      logError("SessionManager", `Failed to send audio end to ${sessionId}: ${message}`)
       throw error
     }
   }
@@ -292,7 +280,8 @@ class GeminiSessionManager {
     try {
       managed.session.sendToolResponse({ functionResponses })
     } catch (error) {
-      console.error(`[SessionManager] Failed to send tool response to ${sessionId}:`, error)
+      const message = error instanceof Error ? error.message : "Unknown error"
+      logError("SessionManager", `Failed to send tool response to ${sessionId}: ${message}`)
       throw error
     }
   }
@@ -342,12 +331,13 @@ class GeminiSessionManager {
   closeSession(sessionId: string): void {
     const managed = this.sessions.get(sessionId)
     if (managed) {
-      console.log(`[SessionManager] Closing session ${sessionId}`)
+      logDebug("SessionManager", `Closing session ${sessionId}`)
       clearTimeout(managed.timeoutId)
       try {
         managed.session.close()
       } catch (error) {
-        console.error(`[SessionManager] Error closing session ${sessionId}:`, error)
+        const message = error instanceof Error ? error.message : "Unknown error"
+        logError("SessionManager", `Error closing session ${sessionId}: ${message}`)
       }
       managed.emitter.emit("close")
       this.sessions.delete(sessionId)
@@ -372,7 +362,7 @@ class GeminiSessionManager {
     const now = Date.now()
     for (const [sessionId, managed] of this.sessions) {
       if (now - managed.createdAt > SESSION_TIMEOUT_MS) {
-        console.log(`[SessionManager] Cleaning up stale session ${sessionId}`)
+        logDebug("SessionManager", `Cleaning up stale session ${sessionId}`)
         this.closeSession(sessionId)
       }
     }

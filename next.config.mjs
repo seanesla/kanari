@@ -15,6 +15,20 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "DENY" },
+          // Microphone is required for recording; keep everything else locked down by default.
+          { key: "Permissions-Policy", value: "microphone=(self), camera=(), geolocation=(), payment=(), usb=()" },
+        ],
+      },
+    ]
+  },
   // Mark onnxruntime-web as external for server-side to avoid SSR bundling issues
   serverExternalPackages: ["onnxruntime-web", "@ricky0123/vad-web"],
   // Next.js 16: turbopack config moved from experimental.turbo to top-level turbopack

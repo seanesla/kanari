@@ -59,11 +59,12 @@ kanari helps remote workers and professionals detect early signs of burnout thro
 git clone [REPOSITORY_URL]
 cd kanari
 pnpm install
-cp .env.example .env  # Add your GEMINI_API_KEY
+cp .env.example .env.local  # Optional: Google Calendar OAuth
 pnpm dev
 ```
 
 Open `http://localhost:3000` in Chrome, Safari, or Firefox.
+Add your Gemini API key in Settings (stored locally in IndexedDB).
 
 ---
 

@@ -6,6 +6,17 @@ import { generateAuthUrl } from "@/lib/calendar/oauth"
 
 export const runtime = "edge" // Optional: use edge runtime for faster response
 
+const OAUTH_STATE_COOKIE = "kanari_oauth_state"
+const OAUTH_CODE_VERIFIER_COOKIE = "kanari_oauth_code_verifier"
+
+const OAUTH_COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+  maxAge: 10 * 60, // 10 minutes (short-lived, only for completing the OAuth redirect)
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Get OAuth config from environment variables
@@ -25,16 +36,22 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate authorization URL with PKCE
-    const authUrl = await generateAuthUrl({
+    const { url: authUrl, state, codeVerifier } = await generateAuthUrl({
       clientId,
       clientSecret,
       redirectUri,
     })
 
+    // Store PKCE verifier + CSRF state in short-lived httpOnly cookies for server-side callback.
+    // See: docs/error-patterns/oauth-pkce-state-server-storage.md
+    const response = NextResponse.json({ authUrl })
+    response.cookies.set(OAUTH_STATE_COOKIE, state, OAUTH_COOKIE_OPTIONS)
+    response.cookies.set(OAUTH_CODE_VERIFIER_COOKIE, codeVerifier, OAUTH_COOKIE_OPTIONS)
+
     // Return the URL for client-side redirect
     // Alternatively, could redirect server-side:
     // return NextResponse.redirect(authUrl)
-    return NextResponse.json({ authUrl })
+    return response
   } catch (error) {
     console.error("OAuth initiation error:", error)
 

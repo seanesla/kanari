@@ -137,6 +137,11 @@ function validateUserStats(stats: unknown): stats is UserStatsForAchievements {
 
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = request.headers.get("content-length")
+    if (contentLength && Number(contentLength) > 100_000) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 })
+    }
+
     const body = await request.json()
 
     // Validate input
@@ -163,8 +168,8 @@ export async function POST(request: NextRequest) {
     if (error instanceof Error) {
       if (error.message.includes("API key")) {
         return NextResponse.json(
-          { error: "API key configuration error" },
-          { status: 500 }
+          { error: "API key configuration error. Please add your Gemini API key in Settings." },
+          { status: 401 }
         )
       }
 

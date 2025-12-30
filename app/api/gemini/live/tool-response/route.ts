@@ -8,18 +8,26 @@
  */
 
 import { sessionManager } from "@/lib/gemini/session-manager"
+import { ToolResponseRequestSchema } from "@/lib/gemini/schemas"
 
 export async function POST(request: Request) {
   try {
-    const { sessionId, secret, functionResponses } = await request.json()
+    const contentLength = request.headers.get("content-length")
+    if (contentLength && Number(contentLength) > 256_000) {
+      return Response.json({ error: "Request body too large" }, { status: 413 })
+    }
 
-    // Validate required fields
-    if (!sessionId || !secret || !functionResponses) {
+    const bodyData = await request.json()
+    const result = ToolResponseRequestSchema.safeParse(bodyData)
+
+    if (!result.success) {
       return Response.json(
-        { error: "Missing required fields: sessionId, secret, functionResponses" },
+        { error: "Invalid request body", details: result.error.issues },
         { status: 400 }
       )
     }
+
+    const { sessionId, secret, functionResponses } = result.data
 
     // Validate session ownership
     if (!sessionManager.validateSecret(sessionId, secret)) {

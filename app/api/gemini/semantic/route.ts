@@ -27,6 +27,11 @@ import { validateAPIKey, getAPIKeyFromRequest, analyzeAudioSemantic } from "@/li
  */
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = request.headers.get("content-length")
+    if (contentLength && Number(contentLength) > 11_500_000) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 })
+    }
+
     // Parse request body
     const body = await request.json()
     const { audio, mimeType } = body
@@ -142,12 +147,11 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const hasApiKey = !!getAPIKeyFromRequest(request)
-    const hasEnvKey = !!process.env.GEMINI_API_KEY
 
     return NextResponse.json({
       status: "ok",
       configured: hasApiKey,
-      source: hasApiKey ? (hasEnvKey ? "env" : "header") : "none",
+      source: hasApiKey ? "header" : "none",
       endpoint: "/api/gemini/semantic",
       methods: ["POST"],
       description: "Analyze audio for emotion detection and semantic content",

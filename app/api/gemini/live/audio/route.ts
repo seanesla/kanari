@@ -22,6 +22,11 @@ export const runtime = "nodejs"
 
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = request.headers.get("content-length")
+    if (contentLength && Number(contentLength) > 1_250_000) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 })
+    }
+
     const bodyData = await request.json()
     const result = AudioInputRequestSchema.safeParse(bodyData)
 

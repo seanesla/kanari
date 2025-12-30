@@ -57,6 +57,11 @@ import type {
  */
 export async function POST(request: NextRequest) {
   try {
+    const contentLength = request.headers.get("content-length")
+    if (contentLength && Number(contentLength) > 250_000) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 })
+    }
+
     // Parse request body
     const body = await request.json()
     const {
@@ -451,8 +456,8 @@ export async function POST(request: NextRequest) {
       // Check for API key errors
       if (error.message.includes("API key")) {
         return NextResponse.json(
-          { error: "API key configuration error" },
-          { status: 500 }
+          { error: "API key configuration error. Please add your Gemini API key in Settings." },
+          { status: 401 }
         )
       }
 
@@ -490,12 +495,11 @@ export async function GET(request: NextRequest) {
   try {
     // Check if API key is configured (from header or env, without exposing it)
     const hasApiKey = !!getAPIKeyFromRequest(request)
-    const hasEnvKey = !!process.env.GEMINI_API_KEY
 
     return NextResponse.json({
       status: "ok",
       configured: hasApiKey,
-      source: hasApiKey ? (hasEnvKey ? "env" : "header") : "none",
+      source: hasApiKey ? "header" : "none",
       endpoint: "/api/gemini",
       methods: ["POST"],
     })

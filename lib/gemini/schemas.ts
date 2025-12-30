@@ -64,6 +64,8 @@ const OutputTranscriptionSchema = z.object({
 const InputTranscriptionSchema = z.object({
   text: z.string().optional(),
   finished: z.boolean().optional(), // Per SDK Transcription type
+  // Legacy field used by some clients/SDKs. Keep for backwards compatibility.
+  isFinal: z.boolean().optional(),
 })
 
 /**
@@ -184,15 +186,42 @@ export type SessionInfo = z.infer<typeof SessionInfoSchema>
 /**
  * Audio input request schema
  */
+const MAX_SESSION_ID_LENGTH = 128
+const MAX_SESSION_SECRET_LENGTH = 256
+const MAX_AUDIO_BASE64_LENGTH = 1_000_000 // ~1MB base64 (upper bound for chunked PCM)
+const MAX_TEXT_LENGTH = 10_000
+
 export const AudioInputRequestSchema = z.object({
-  sessionId: z.string(),
-  secret: z.string(),
-  audio: z.string().optional(),
-  text: z.string().optional(),
+  sessionId: z.string().min(1).max(MAX_SESSION_ID_LENGTH),
+  secret: z.string().min(1).max(MAX_SESSION_SECRET_LENGTH),
+  audio: z.string().max(MAX_AUDIO_BASE64_LENGTH).optional(),
+  text: z.string().max(MAX_TEXT_LENGTH).optional(),
   audioEnd: z.boolean().optional(),
 })
 
 export type AudioInputRequest = z.infer<typeof AudioInputRequestSchema>
+
+/**
+ * Tool response request schema (client -> server)
+ *
+ * Used by /api/gemini/live/tool-response to forward function responses to Gemini.
+ */
+export const ToolResponseRequestSchema = z.object({
+  sessionId: z.string().min(1).max(MAX_SESSION_ID_LENGTH),
+  secret: z.string().min(1).max(MAX_SESSION_SECRET_LENGTH),
+  functionResponses: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(200),
+        name: z.string().min(1).max(200),
+        response: z.record(z.unknown()),
+      })
+    )
+    .min(1)
+    .max(20),
+})
+
+export type ToolResponseRequest = z.infer<typeof ToolResponseRequestSchema>
 
 // ============================================
 // Gemini Live Tool Args Schemas (Widget tools)

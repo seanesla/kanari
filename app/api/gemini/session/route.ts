@@ -57,6 +57,14 @@ export async function POST(
   request: NextRequest
 ): Promise<NextResponse<SessionResponse | ErrorResponse>> {
   try {
+    const contentLength = request.headers.get("content-length")
+    if (contentLength && Number(contentLength) > 200_000) {
+      return NextResponse.json(
+        { error: "Request body too large", code: "CONFIG_ERROR" as const },
+        { status: 413 }
+      )
+    }
+
     // Get and validate API key (from header first, then env)
     let apiKey: string
     try {
@@ -64,7 +72,7 @@ export async function POST(
     } catch (error) {
       return NextResponse.json(
         { error: "Gemini API key not configured. Please add your API key in Settings.", code: "CONFIG_ERROR" as const },
-        { status: 500 }
+        { status: 401 }
       )
     }
 
@@ -104,7 +112,6 @@ export async function POST(
     const sessionId = crypto.randomUUID()
 
     // Create session on server and get session secret
-    console.log(`[Gemini Session] Creating session ${sessionId}`)
     const { secret } = await sessionManager.createSession(sessionId, systemInstruction, apiKey)
 
     // Return session info including secret for client authentication
@@ -115,7 +122,8 @@ export async function POST(
       audioUrl: `${baseUrl}/api/gemini/live/audio`,
       secret,
     }
-    console.log(`[Gemini Session] Response data:`, JSON.stringify(responseData))
+    // SECURITY: Never log `secret` (session bearer credential).
+    // See: docs/error-patterns/logging-secrets-and-transcripts.md
     return NextResponse.json(responseData)
   } catch (error) {
     // Log sanitized error
