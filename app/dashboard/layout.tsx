@@ -1,26 +1,44 @@
 "use client"
 
-import { createContext, useContext, useEffect, useRef, useState } from "react"
+import { createContext, useContext, useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
 import { useSceneMode } from "@/lib/scene-context"
 import { useOnboardingGuard } from "@/hooks/use-onboarding"
 
 const DashboardAnimationContext = createContext({ shouldAnimate: false })
 export const useDashboardAnimation = () => useContext(DashboardAnimationContext)
 
+function DashboardAnimationProvider({
+  children,
+  isReady,
+}: {
+  children: React.ReactNode
+  isReady: boolean
+}) {
+  const [shouldAnimate, setShouldAnimate] = useState(true) // fresh mount = animate
+
+  // Turn off animation window after first 150ms
+  useEffect(() => {
+    if (!isReady) return
+    const timer = setTimeout(() => setShouldAnimate(false), 150)
+    return () => clearTimeout(timer)
+  }, [isReady])
+
+  return (
+    <DashboardAnimationContext.Provider value={{ shouldAnimate }}>
+      {children}
+    </DashboardAnimationContext.Provider>
+  )
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { setMode } = useSceneMode()
   const { isReady } = useOnboardingGuard()
-  const hasEnteredRef = useRef(false)
-  const [shouldAnimate, setShouldAnimate] = useState(() => !hasEnteredRef.current)
+  const pathname = usePathname()
 
+  // Ensure scene mode stays in dashboard
   useEffect(() => {
     setMode("dashboard")
-    if (!hasEnteredRef.current) {
-      hasEnteredRef.current = true
-      // Allow animation to trigger, then disable for future navigations
-      const timer = setTimeout(() => setShouldAnimate(false), 150)
-      return () => clearTimeout(timer)
-    }
   }, [setMode])
 
   // Show loading state while checking onboarding status
@@ -33,10 +51,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <DashboardAnimationContext.Provider value={{ shouldAnimate }}>
+    // Keyed by pathname so each dashboard route gets a fresh animation window.
+    // See docs/error-patterns/dashboard-animation.md
+    <DashboardAnimationProvider key={pathname} isReady={isReady}>
       <div className="relative" data-dashboard>
         {children}
       </div>
-    </DashboardAnimationContext.Provider>
+    </DashboardAnimationProvider>
   )
 }
