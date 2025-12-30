@@ -96,4 +96,6 @@ When I find or you report a bug:
    - How to detect it automatically
    - Link this file in relevant comments
 
-Goal: Don't fix one bug. Fix the class of bugs it belongs to.Claude is AI and can make mistakes. Please double-check responses.
+Goal: Don't fix one bug. Fix the class of bugs it belongs to.
+
+Claude is AI and can make mistakes. Please double-check responses.
