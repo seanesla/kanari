@@ -4,7 +4,6 @@ import { useEffect, useState } from "react"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { SettingsContent } from "@/components/dashboard/settings-content"
-import { DecorativeGrid } from "@/components/ui/decorative-grid"
 
 export default function SettingsPage() {
   const { shouldAnimate } = useDashboardAnimation()
@@ -23,9 +22,6 @@ export default function SettingsPage() {
       <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
         {/* Header Section */}
         <div className="relative mb-12">
-          <DecorativeGrid />
-          <div className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
-
           <div
             className={cn(
               "relative transition-all duration-1000 delay-100",
@@ -33,10 +29,10 @@ export default function SettingsPage() {
             )}
           >
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-4">Configuration</p>
-            <h1 className="text-6xl md:text-7xl lg:text-8xl font-serif leading-[0.95] mb-6">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif leading-[0.95] mb-4">
               Settings
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl">
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl">
               Configure recording preferences, notifications, calendar integration, and privacy settings.
             </p>
           </div>

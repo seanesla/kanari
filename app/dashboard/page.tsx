@@ -14,7 +14,6 @@ import { useSceneMode } from "@/lib/scene-context"
 import { useDashboardAnimation } from "./layout"
 import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
 import { cn } from "@/lib/utils"
-import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
 import { StressFatigueChart } from "@/components/dashboard/stress-fatigue-chart"
 import { useDashboardStats, useTrendData, useScheduledSuggestions, useRecordings } from "@/hooks/use-storage"
@@ -233,13 +232,6 @@ export default function DashboardPage() {
       <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
         {/* HERO SECTION */}
         <div className="relative mb-24 md:mb-28">
-          {/* Grid background */}
-          <DecorativeGrid />
-
-          {/* Decorative blur accents */}
-          <div className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-accent/5 blur-3xl" />
-
           {/* Content */}
           <div
             className={cn(
@@ -247,11 +239,11 @@ export default function DashboardPage() {
               visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
             )}
           >
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-6">Overview</p>
-            <h1 className="text-6xl md:text-7xl lg:text-8xl font-serif leading-[0.95] mb-6">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-4">Overview</p>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif leading-[0.95] mb-4">
               Your <span className="text-accent">wellness</span>
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl mb-8">
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl mb-8">
               Track your vocal biomarkers, monitor stress and fatigue trends, and receive personalized recovery suggestions.
             </p>
             <Button asChild size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90">

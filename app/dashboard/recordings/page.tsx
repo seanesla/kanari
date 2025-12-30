@@ -5,7 +5,6 @@ import { useSearchParams } from "next/navigation"
 import { Mic, Clock, TrendingUp, TrendingDown, Minus, Trash2, ChevronDown, ChevronUp, Plus } from "lucide-react"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
-import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
 import { Empty } from "@/components/ui/empty"
 import { useRecordings, useRecordingActions } from "@/hooks/use-storage"
@@ -221,20 +220,17 @@ function RecordingsPageContent() {
       <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
         {/* HERO SECTION */}
         <div className="relative mb-16">
-          <DecorativeGrid />
-          <div className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
-
           <div
             className={cn(
               "relative transition-all duration-1000 delay-100",
               visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
             )}
           >
-            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-6">Recordings</p>
-            <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif leading-[0.95] mb-6">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground mb-4">Recordings</p>
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-serif leading-[0.95] mb-4">
               Your <span className="text-accent">recordings</span>
             </h1>
-            <p className="text-lg md:text-xl text-muted-foreground leading-relaxed max-w-2xl mb-8">
+            <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl mb-8">
               Record voice check-ins and track how your stress and fatigue levels change over time.
             </p>
             <Button

@@ -5,7 +5,6 @@ import { Link } from "next-view-transitions"
 import { Lightbulb, Mic, RefreshCw, ChevronDown, Calendar } from "lucide-react"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
-import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
 import { Empty } from "@/components/ui/empty"
 import { Spinner } from "@/components/ui/spinner"
@@ -231,12 +230,9 @@ export default function SuggestionsPage() {
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-4 md:px-8 lg:px-12 pt-28 pb-12 relative z-10">
+      <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
         {/* HERO SECTION */}
         <div className="relative mb-8">
-          <DecorativeGrid />
-          <div className="pointer-events-none absolute -top-32 -right-32 h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
-
           <div
             className={cn(
               "relative transition-all duration-1000 delay-100",
