@@ -1,19 +1,23 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import { useNextCalendarApp, ScheduleXCalendar } from '@schedule-x/react'
 import { createViewWeek } from '@schedule-x/calendar'
 import { createEventsServicePlugin } from '@schedule-x/events-service'
 import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop'
+import { cn } from '@/lib/utils'
 import type { Suggestion } from '@/lib/types'
 import '@schedule-x/theme-default/dist/index.css'
 import './schedule-x-theme.css'
 
 interface ScheduleXWeekCalendarProps {
   scheduledSuggestions: Suggestion[]
+  completedSuggestions?: Suggestion[]
   onEventClick?: (suggestion: Suggestion) => void
   onTimeSlotClick?: (date: Date, hour: number) => void
   onEventUpdate?: (suggestion: Suggestion, newScheduledFor: string) => void
+  onExternalDrop?: (suggestionId: string, date: Date, hour: number, minute: number) => void
+  pendingDragActive?: boolean
   className?: string
 }
 
@@ -45,13 +49,43 @@ function suggestionToEvent(suggestion: Suggestion) {
   }
 }
 
+// Helper to map completed suggestion to faded event
+function completedToEvent(suggestion: Suggestion) {
+  if (!suggestion.scheduledFor) return null
+
+  const timeZone = Temporal.Now.timeZoneId()
+  const instant = Temporal.Instant.from(suggestion.scheduledFor)
+  const startDateTime = instant.toZonedDateTimeISO(timeZone)
+  const endDateTime = startDateTime.add({ minutes: suggestion.duration })
+
+  const firstSentence = suggestion.content.split(/[.!?]/)[0]?.trim() || suggestion.content
+  const title = firstSentence.length > 30
+    ? firstSentence.slice(0, 27) + '...'
+    : firstSentence
+
+  return {
+    id: `completed-${suggestion.id}`,
+    title: `✓ ${title}`,
+    start: startDateTime,
+    end: endDateTime,
+    calendarId: 'completed',
+    _suggestion: suggestion,
+    _isCompleted: true,
+  }
+}
+
 export function ScheduleXWeekCalendar({
   scheduledSuggestions,
+  completedSuggestions = [],
   onEventClick,
   onTimeSlotClick,
   onEventUpdate,
+  onExternalDrop,
+  pendingDragActive = false,
   className = '',
 }: ScheduleXWeekCalendarProps) {
+  const [isDragOver, setIsDragOver] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   const eventsService = useMemo(() => createEventsServicePlugin(), [])
 
   const calendar = useNextCalendarApp({
@@ -60,10 +94,10 @@ export function ScheduleXWeekCalendar({
     isDark: true,
     dayBoundaries: {
       start: '08:00',
-      end: '20:00',
+      end: '21:00',
     },
     weekOptions: {
-      gridHeight: 1800,
+      gridHeight: 600,
       nDays: 7,
       eventWidth: 95,
     },
@@ -133,6 +167,19 @@ export function ScheduleXWeekCalendar({
           onContainer: '#e0e7ff',
         },
       },
+      completed: {
+        colorName: 'completed',
+        lightColors: {
+          main: '#9ca3af',
+          container: '#f3f4f6',
+          onContainer: '#6b7280',
+        },
+        darkColors: {
+          main: '#6b7280',
+          container: '#374151',
+          onContainer: '#9ca3af',
+        },
+      },
     },
     events: [],
     plugins: [eventsService, createDragAndDropPlugin()],
@@ -170,22 +217,116 @@ export function ScheduleXWeekCalendar({
     // Wait for calendar to be ready before setting events
     if (!calendar) return
 
-    const events = scheduledSuggestions
+    const scheduledEvents = scheduledSuggestions
       .map(suggestionToEvent)
       .filter(Boolean) as any[]
 
+    const completedEvents = completedSuggestions
+      .map(completedToEvent)
+      .filter(Boolean) as any[]
+
+    const allEvents = [...scheduledEvents, ...completedEvents]
+
     // Use try-catch as the plugin may not be fully initialized on first render
     try {
-      eventsService.set(events)
+      eventsService.set(allEvents)
     } catch (e) {
       // Calendar not fully mounted yet, will retry on next render
       console.debug('Schedule-X: Calendar not ready, deferring event sync')
     }
-  }, [scheduledSuggestions, eventsService, calendar])
+  }, [scheduledSuggestions, completedSuggestions, eventsService, calendar])
+
+  // Calculate drop target time from mouse position
+  const calculateDropTime = useCallback((e: React.DragEvent): { date: Date; hour: number; minute: number } | null => {
+    if (!containerRef.current) return null
+
+    const calendarGrid = containerRef.current.querySelector('.sx__week-grid')
+    if (!calendarGrid) return null
+
+    const rect = calendarGrid.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    // Calculate which day column (excluding time column on left)
+    const timeColumnWidth = 60 // Approximate width of time column
+    const gridWidth = rect.width - timeColumnWidth
+    const dayWidth = gridWidth / 7
+    const dayIndex = Math.floor((x - timeColumnWidth) / dayWidth)
+
+    if (dayIndex < 0 || dayIndex > 6) return null
+
+    // Calculate the hour based on y position
+    // Grid covers 08:00-21:00 (13 hours)
+    const gridHeight = rect.height
+    const hourHeight = gridHeight / 13
+    const relativeHour = y / hourHeight
+    const hour = Math.floor(8 + relativeHour)
+    const minute = Math.round((relativeHour % 1) * 60 / 15) * 15 // Snap to 15 min
+
+    if (hour < 8 || hour >= 21) return null
+
+    // Calculate the date for this day column
+    const today = new Date()
+    const startOfWeek = new Date(today)
+    const dayOfWeek = today.getDay()
+    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Start from Monday
+    startOfWeek.setDate(today.getDate() + diff)
+    startOfWeek.setHours(0, 0, 0, 0)
+
+    const targetDate = new Date(startOfWeek)
+    targetDate.setDate(startOfWeek.getDate() + dayIndex)
+    targetDate.setHours(hour, minute % 60, 0, 0)
+
+    return { date: targetDate, hour, minute: minute % 60 }
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setIsDragOver(true)
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    // Only trigger if leaving the container entirely
+    if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false)
+    }
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const suggestionId = e.dataTransfer.getData('application/suggestion-id')
+    if (!suggestionId || !onExternalDrop) return
+
+    const dropTime = calculateDropTime(e)
+    if (!dropTime) return
+
+    onExternalDrop(suggestionId, dropTime.date, dropTime.hour, dropTime.minute)
+  }, [onExternalDrop, calculateDropTime])
 
   return (
-    <div className={className}>
+    <div
+      ref={containerRef}
+      className={cn(
+        className,
+        'relative transition-all duration-200',
+        isDragOver && 'ring-2 ring-accent ring-offset-2 ring-offset-background rounded-lg',
+        pendingDragActive && !isDragOver && 'ring-1 ring-accent/30 ring-offset-1 ring-offset-background rounded-lg'
+      )}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <ScheduleXCalendar calendarApp={calendar} />
+      {isDragOver && (
+        <div className="absolute inset-0 bg-accent/5 rounded-lg pointer-events-none flex items-center justify-center">
+          <div className="bg-background/90 px-4 py-2 rounded-lg text-sm font-medium text-accent">
+            Drop to schedule
+          </div>
+        </div>
+      )}
     </div>
   )
 }

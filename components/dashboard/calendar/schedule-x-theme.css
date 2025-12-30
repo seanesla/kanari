@@ -95,21 +95,18 @@
   border-top: 2px solid hsl(var(--accent));
 }
 
-/* Scrollbar styling for dark theme */
-.sx__calendar-wrapper .sx__scroll-container::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Constrain calendar wrapper to parent container */
+.sx-react-calendar-wrapper {
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.sx__calendar-wrapper .sx__scroll-container::-webkit-scrollbar-track {
-  background: hsl(var(--background));
+/* Enable scrolling in the view container */
+.sx__view-container {
+  overflow-y: auto !important;
+  flex: 1;
+  min-height: 0;
 }
 
-.sx__calendar-wrapper .sx__scroll-container::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted));
-  border-radius: 4px;
-}
-
-.sx__calendar-wrapper .sx__scroll-container::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground));
-}

@@ -68,6 +68,12 @@ interface ScheduleTimeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSchedule: (suggestion: Suggestion, scheduledFor: string) => void
+  /** Pre-fill date when dropping from calendar */
+  defaultDate?: Date
+  /** Pre-fill hour when dropping from calendar */
+  defaultHour?: number
+  /** Pre-fill minute when dropping from calendar */
+  defaultMinute?: number
 }
 
 export function ScheduleTimeDialog({
@@ -75,6 +81,9 @@ export function ScheduleTimeDialog({
   open,
   onOpenChange,
   onSchedule,
+  defaultDate,
+  defaultHour,
+  defaultMinute,
 }: ScheduleTimeDialogProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [selectedHour, setSelectedHour] = useState<string>("9")
@@ -125,20 +134,27 @@ export function ScheduleTimeDialog({
   // Reset state when dialog opens with new suggestion
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && suggestion) {
-      // Default to today or tomorrow if past 7 PM
-      const now = new Date()
-      if (now.getHours() >= 19) {
-        const tomorrow = new Date(now)
-        tomorrow.setDate(tomorrow.getDate() + 1)
-        setSelectedDate(tomorrow)
-        setSelectedHour("9")
+      // Use defaults if provided (from calendar drop), otherwise calculate
+      if (defaultDate !== undefined) {
+        setSelectedDate(defaultDate)
+        setSelectedHour(String(defaultHour ?? 9))
+        setSelectedMinute(String(defaultMinute ?? 0))
       } else {
-        setSelectedDate(now)
-        // Default to next hour, clamped to 8-20
-        const nextHour = Math.min(Math.max(now.getHours() + 1, 8), 20)
-        setSelectedHour(String(nextHour))
+        // Default to today or tomorrow if past 7 PM
+        const now = new Date()
+        if (now.getHours() >= 19) {
+          const tomorrow = new Date(now)
+          tomorrow.setDate(tomorrow.getDate() + 1)
+          setSelectedDate(tomorrow)
+          setSelectedHour("9")
+        } else {
+          setSelectedDate(now)
+          // Default to next hour, clamped to 8-20
+          const nextHour = Math.min(Math.max(now.getHours() + 1, 8), 20)
+          setSelectedHour(String(nextHour))
+        }
+        setSelectedMinute("0")
       }
-      setSelectedMinute("0")
     }
     onOpenChange(newOpen)
   }
