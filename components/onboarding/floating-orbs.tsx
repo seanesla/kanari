@@ -1,88 +1,193 @@
 "use client"
 
 /**
- * Floating Orbs Background
+ * Space Background for Onboarding
  *
- * Animated ambient background with floating orbs that use the accent color.
- * Creates a calming, aesthetic atmosphere for the onboarding experience.
+ * A 3D space-themed background using React Three Fiber + Drei.
+ * Features:
+ * - Starfield: distant white stars slowly rotating
+ * - AccentNebula: Sparkles in the accent color for brand consistency
+ * - FloatingGeometry: distant geometric shapes with Float animation
+ *
+ * Source: Context7 - /pmndrs/drei docs - "Sparkles", "Float"
  */
 
-import { motion } from "framer-motion"
+import { useRef, useMemo } from "react"
+import { Canvas, useFrame } from "@react-three/fiber"
+import { Sparkles, Float } from "@react-three/drei"
+import * as THREE from "three"
 import { useSceneMode } from "@/lib/scene-context"
+import { SCENE_COLORS } from "@/lib/constants"
 
-interface Orb {
-  id: number
-  size: number
-  initialX: number
-  initialY: number
-  duration: number
-  delay: number
+/**
+ * Starfield - distant twinkling stars in a sphere around the camera
+ */
+function Starfield() {
+  const starsRef = useRef<THREE.Points>(null)
+
+  // Generate random star positions distributed in a sphere
+  const positions = useMemo(() => {
+    const count = 800
+    const pos = new Float32Array(count * 3)
+
+    for (let i = 0; i < count; i++) {
+      // Distribute stars in a spherical shell
+      const radius = 25 + Math.random() * 35
+      const theta = Math.random() * Math.PI * 2
+      const phi = Math.acos(2 * Math.random() - 1)
+
+      pos[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
+      pos[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
+      pos[i * 3 + 2] = radius * Math.cos(phi)
+    }
+
+    return pos
+  }, [])
+
+  // Slow rotation for subtle movement
+  useFrame((state) => {
+    if (!starsRef.current) return
+    starsRef.current.rotation.y = state.clock.elapsedTime * 0.008
+  })
+
+  return (
+    <points ref={starsRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          args={[positions, 3]}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.08}
+        color="#ffffff"
+        transparent
+        opacity={0.6}
+        sizeAttenuation
+      />
+    </points>
+  )
 }
 
-// Generate random orbs with varying sizes and positions
-const generateOrbs = (count: number): Orb[] => {
-  return Array.from({ length: count }, (_, i) => ({
-    id: i,
-    size: Math.random() * 200 + 100, // 100-300px
-    initialX: Math.random() * 100, // 0-100%
-    initialY: Math.random() * 100, // 0-100%
-    duration: Math.random() * 20 + 20, // 20-40s
-    delay: Math.random() * -20, // Stagger start times
-  }))
+/**
+ * AccentNebula - floating particles in the accent color
+ * Uses Drei Sparkles for GPU-optimized particle animation
+ */
+function AccentNebula({ accentColor }: { accentColor: string }) {
+  return (
+    <>
+      {/* Primary layer - scattered accent particles */}
+      <Sparkles
+        count={60}
+        speed={0.2}
+        opacity={0.6}
+        color={accentColor}
+        size={2}
+        scale={[18, 18, 12]}
+        noise={[0.4, 0.4, 0.4]}
+      />
+
+      {/* Secondary layer - larger, slower, more diffuse */}
+      <Sparkles
+        count={30}
+        speed={0.08}
+        opacity={0.3}
+        color={accentColor}
+        size={4}
+        scale={[25, 25, 18]}
+        noise={[0.2, 0.2, 0.2]}
+      />
+    </>
+  )
 }
 
-const orbs = generateOrbs(6)
+/**
+ * FloatingGeometry - distant geometric shapes that drift gently
+ * Matches the aesthetic of truth-core and section-accent
+ */
+function FloatingGeometry({ accentColor }: { accentColor: string }) {
+  // Positions for geometric accents - spread out in the background
+  const shapes = useMemo(
+    () => [
+      { pos: [-12, 6, -15] as [number, number, number], scale: 0.4, type: "octahedron" },
+      { pos: [14, -4, -18] as [number, number, number], scale: 0.35, type: "icosahedron" },
+      { pos: [-8, -8, -20] as [number, number, number], scale: 0.3, type: "tetrahedron" },
+      { pos: [10, 8, -22] as [number, number, number], scale: 0.25, type: "dodecahedron" },
+      { pos: [0, -10, -25] as [number, number, number], scale: 0.2, type: "octahedron" },
+    ],
+    []
+  )
 
-export function FloatingOrbs() {
+  return (
+    <>
+      {shapes.map((shape, i) => (
+        <Float
+          key={i}
+          speed={0.5 + i * 0.1}
+          rotationIntensity={0.3}
+          floatIntensity={0.4}
+        >
+          <mesh position={shape.pos} scale={shape.scale}>
+            {shape.type === "octahedron" && <octahedronGeometry args={[1, 0]} />}
+            {shape.type === "icosahedron" && <icosahedronGeometry args={[1, 0]} />}
+            {shape.type === "tetrahedron" && <tetrahedronGeometry args={[1, 0]} />}
+            {shape.type === "dodecahedron" && <dodecahedronGeometry args={[1, 0]} />}
+            <meshStandardMaterial
+              color={accentColor}
+              emissive={accentColor}
+              emissiveIntensity={0.4}
+              metalness={0.8}
+              roughness={0.2}
+              transparent
+              opacity={0.5}
+              wireframe={i % 2 === 0}
+            />
+          </mesh>
+        </Float>
+      ))}
+    </>
+  )
+}
+
+/**
+ * OnboardingScene - combines all background elements
+ */
+function OnboardingScene() {
   const { accentColor } = useSceneMode()
 
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-      {orbs.map((orb) => (
-        <motion.div
-          key={orb.id}
-          className="absolute rounded-full"
-          style={{
-            width: orb.size,
-            height: orb.size,
-            left: `${orb.initialX}%`,
-            top: `${orb.initialY}%`,
-            background: `radial-gradient(circle, ${accentColor}15 0%, ${accentColor}05 50%, transparent 70%)`,
-            filter: "blur(40px)",
-          }}
-          animate={{
-            x: [0, 50, -30, 20, 0],
-            y: [0, -40, 30, -20, 0],
-            scale: [1, 1.1, 0.9, 1.05, 1],
-          }}
-          transition={{
-            duration: orb.duration,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: orb.delay,
-          }}
-        />
-      ))}
+    <>
+      {/* Lighting for geometric shapes */}
+      <ambientLight intensity={0.15} />
+      <pointLight position={[10, 10, 10]} intensity={0.3} color={accentColor} />
 
-      {/* Central glow that follows accent color */}
-      <motion.div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-        style={{
-          width: 600,
-          height: 600,
-          background: `radial-gradient(circle, ${accentColor}10 0%, transparent 60%)`,
-          filter: "blur(60px)",
-        }}
-        animate={{
-          scale: [1, 1.1, 1],
-          opacity: [0.5, 0.7, 0.5],
-        }}
-        transition={{
-          duration: 8,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      />
+      {/* Layer 1: Distant starfield */}
+      <Starfield />
+
+      {/* Layer 2: Accent-colored nebula particles */}
+      <AccentNebula accentColor={accentColor} />
+
+      {/* Layer 3: Floating geometric accents */}
+      <FloatingGeometry accentColor={accentColor} />
+    </>
+  )
+}
+
+/**
+ * FloatingOrbs - main exported component
+ * Wraps the 3D scene in a Canvas with appropriate settings
+ */
+export function FloatingOrbs() {
+  return (
+    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+      <Canvas
+        camera={{ position: [0, 0, 8], fov: 60 }}
+        dpr={[1, 1.5]}
+        gl={{ antialias: true, alpha: true }}
+      >
+        <color attach="background" args={[SCENE_COLORS.background]} />
+        <OnboardingScene />
+      </Canvas>
     </div>
   )
 }

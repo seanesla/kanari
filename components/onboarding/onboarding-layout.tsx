@@ -8,8 +8,9 @@
  */
 
 import { motion, AnimatePresence } from "framer-motion"
+import { Link } from "next-view-transitions"
 import { cn } from "@/lib/utils"
-import { KanariTextLogo } from "@/components/kanari-text-logo"
+import { Logo } from "@/components/logo"
 import { FloatingOrbs } from "@/components/onboarding/floating-orbs"
 
 interface OnboardingLayoutProps {
@@ -30,14 +31,20 @@ export function OnboardingLayout({
   className,
 }: OnboardingLayoutProps) {
   return (
-    <div className={cn("min-h-screen bg-background flex flex-col relative overflow-hidden", className)}>
+    <div className={cn("min-h-screen flex flex-col relative overflow-hidden", className)}>
       {/* Animated background */}
       <FloatingOrbs />
 
       {/* Header with logo and progress */}
       <header className="relative z-10 px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
-          <KanariTextLogo className="text-2xl text-accent" />
+          <Link
+            href="/"
+            className="text-accent hover:text-accent/80 transition-all duration-300 hover:scale-105"
+            title="Back to home"
+          >
+            <Logo className="h-10 w-auto" />
+          </Link>
 
           {/* Step indicator */}
           <div className="flex items-center gap-2">
