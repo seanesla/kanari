@@ -261,6 +261,61 @@ function countDaysActive(recordings: Recording[], sessions: CheckInSession[]): n
 }
 
 /**
+ * Calculate data quality indicators for Gemini to assess
+ * whether there's enough meaningful data for achievements
+ */
+function calculateDataQuality(
+  recordings: Recording[],
+  suggestions: Suggestion[],
+  daysActive: number,
+  firstRecordingDate: string | null
+): UserStatsForAchievements["dataQuality"] {
+  // Calculate journey duration
+  let journeyDurationDays = 0
+  if (firstRecordingDate) {
+    const firstDate = new Date(firstRecordingDate)
+    const now = new Date()
+    journeyDurationDays = Math.floor((now.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24))
+  }
+
+  // Has enough history (14+ days since first recording)
+  const hasEnoughHistory = journeyDurationDays >= 14
+
+  // Has consistent usage (active on 50%+ of days since start)
+  const hasConsistentUsage = journeyDurationDays > 0
+    ? (daysActive / journeyDurationDays) >= 0.5
+    : false
+
+  // Has measurable trends (enough variance in stress/fatigue scores)
+  const withMetrics = recordings.filter(r => r.metrics)
+  let hasMeasurableTrends = false
+  if (withMetrics.length >= 5) {
+    const stressScores = withMetrics.map(r => r.metrics?.stressScore || 0)
+    const minStress = Math.min(...stressScores)
+    const maxStress = Math.max(...stressScores)
+    // Need at least 15 point variance to detect meaningful trends
+    hasMeasurableTrends = (maxStress - minStress) >= 15
+  }
+
+  // Suggestion engagement rate (what % of suggestions user interacted with)
+  const totalSuggestions = suggestions.length
+  const interactedSuggestions = suggestions.filter(
+    s => s.status !== "pending"
+  ).length
+  const suggestionEngagementRate = totalSuggestions > 0
+    ? interactedSuggestions / totalSuggestions
+    : 0
+
+  return {
+    journeyDurationDays,
+    hasEnoughHistory,
+    hasConsistentUsage,
+    hasMeasurableTrends,
+    suggestionEngagementRate,
+  }
+}
+
+/**
  * Collect all user stats for achievement generation
  *
  * @param recordings - All user recordings
@@ -282,6 +337,16 @@ export function collectUserStats(
   const averages = calculateAverages(sortedRecordings)
   const suggestionStats = getSuggestionStats(suggestions)
   const sessionStats = getSessionStats(sessions)
+  const daysActive = countDaysActive(sortedRecordings, sessions)
+  const firstRecordingDate = sortedRecordings.length > 0
+    ? sortedRecordings[sortedRecordings.length - 1].createdAt.split("T")[0]
+    : null
+  const dataQuality = calculateDataQuality(
+    sortedRecordings,
+    suggestions,
+    daysActive,
+    firstRecordingDate
+  )
 
   return {
     // Recording stats
@@ -319,12 +384,13 @@ export function collectUserStats(
     averageSessionDuration: sessionStats.avgDuration,
 
     // Milestones
-    daysActive: countDaysActive(sortedRecordings, sessions),
-    firstRecordingDate: sortedRecordings.length > 0
-      ? sortedRecordings[sortedRecordings.length - 1].createdAt.split("T")[0]
-      : null,
+    daysActive,
+    firstRecordingDate,
 
     // Recent achievements (to avoid duplicates)
     recentAchievementTitles: recentAchievements.map(a => a.title),
+
+    // Data quality indicators
+    dataQuality,
   }
 }

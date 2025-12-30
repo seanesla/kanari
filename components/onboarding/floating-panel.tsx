@@ -32,9 +32,9 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
 
   return (
     <Float
-      speed={isActive ? 0.8 : 0.3}
-      rotationIntensity={isActive ? 0.05 : 0.02}
-      floatIntensity={isActive ? 0.4 : 0.2}
+      speed={isActive ? 0.6 : 0.3}
+      rotationIntensity={isActive ? 0.03 : 0.01}
+      floatIntensity={isActive ? 0.25 : 0.1}
     >
       <group position={position}>
         {/* React content floats freely - no solid background planes */}

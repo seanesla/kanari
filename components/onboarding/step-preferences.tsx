@@ -86,8 +86,8 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
         {/* Recording duration */}
         <motion.div
           className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm space-y-3 transition-colors hover:border-accent/30"
-          initial={{ opacity: 0, x: -20, boxShadow: "0 0 0px transparent" }}
-          animate={{ opacity: 1, x: 0, boxShadow: "0 0 0px transparent" }}
+          initial={{ opacity: 0, y: 20, boxShadow: "0 0 0px transparent" }}
+          animate={{ opacity: 1, y: 0, boxShadow: "0 0 0px transparent" }}
           transition={{ delay: 0.35, type: "spring", stiffness: 300, damping: 25 }}
           whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
         >
@@ -121,8 +121,8 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
         {/* Voice Activity Detection */}
         <motion.div
           className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm transition-colors hover:border-accent/30"
-          initial={{ opacity: 0, x: -20, boxShadow: "0 0 0px transparent" }}
-          animate={{ opacity: 1, x: 0, boxShadow: "0 0 0px transparent" }}
+          initial={{ opacity: 0, y: 20, boxShadow: "0 0 0px transparent" }}
+          animate={{ opacity: 1, y: 0, boxShadow: "0 0 0px transparent" }}
           transition={{ delay: 0.45, type: "spring", stiffness: 300, damping: 25 }}
           whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
         >
@@ -153,8 +153,8 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
         {/* Notifications */}
         <motion.div
           className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm transition-colors hover:border-accent/30"
-          initial={{ opacity: 0, x: -20, boxShadow: "0 0 0px transparent" }}
-          animate={{ opacity: 1, x: 0, boxShadow: "0 0 0px transparent" }}
+          initial={{ opacity: 0, y: 20, boxShadow: "0 0 0px transparent" }}
+          animate={{ opacity: 1, y: 0, boxShadow: "0 0 0px transparent" }}
           transition={{ delay: 0.55, type: "spring", stiffness: 300, damping: 25 }}
           whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
         >

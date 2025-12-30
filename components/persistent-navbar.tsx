@@ -6,7 +6,7 @@ import { Link } from "next-view-transitions"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X } from "lucide-react"
 import { useSceneMode } from "@/lib/scene-context"
-import { useNavbar } from "@/lib/navbar-context"
+import { useNavbar, ONBOARDING_STEPS } from "@/lib/navbar-context"
 import { LiquidGlassNavbar } from "@/components/liquid-glass-navbar"
 import { Logo } from "@/components/logo"
 import { EnterButton } from "@/components/enter-button"
@@ -64,6 +64,50 @@ function MobileNavLink({
       >
         {label}
       </Link>
+    </motion.div>
+  )
+}
+
+// Mobile onboarding step link with disabled future steps
+function MobileOnboardingLink({
+  label,
+  index,
+  stepIndex,
+  currentStep,
+  highestStepReached,
+  onClick,
+}: {
+  label: string
+  index: number
+  stepIndex: number
+  currentStep: number
+  highestStepReached: number
+  onClick: () => void
+}) {
+  const isActive = stepIndex === currentStep
+  // Use highestStepReached so visited steps stay accessible when going back
+  const isVisited = stepIndex <= highestStepReached
+  const isFuture = stepIndex > highestStepReached
+  const isClickable = isVisited
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2, delay: 0.1 + index * 0.05 }}
+    >
+      <button
+        onClick={() => isClickable && onClick()}
+        disabled={isFuture}
+        className={cn(
+          "block w-full text-left text-sm px-3 py-2.5 rounded-lg transition-colors",
+          isActive && "text-foreground bg-white/5",
+          isVisited && !isActive && "text-muted-foreground hover:text-foreground hover:bg-white/5 cursor-pointer",
+          isFuture && "text-muted-foreground/40 cursor-not-allowed"
+        )}
+      >
+        {label}
+      </button>
     </motion.div>
   )
 }
@@ -152,17 +196,61 @@ function DashboardNavLinks() {
   )
 }
 
+function OnboardingNavLinks() {
+  const { onboardingStep, setOnboardingStep, highestStepReached } = useNavbar()
+
+  return (
+    <motion.nav
+      className="flex items-center gap-1"
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      transition={{ duration: 0.3 }}
+    >
+      {ONBOARDING_STEPS.map((step, index) => {
+        const isActive = index === onboardingStep
+        // Use highestStepReached so visited steps stay accessible when going back
+        const isVisited = index <= highestStepReached
+        const isFuture = index > highestStepReached
+        const isClickable = isVisited
+
+        return (
+          <button
+            key={step.id}
+            onClick={() => isClickable && setOnboardingStep(index)}
+            disabled={isFuture}
+            className={cn(
+              "relative text-sm transition-colors px-2.5 py-1",
+              isActive && "text-foreground",
+              isVisited && !isActive && "text-muted-foreground hover:text-foreground cursor-pointer",
+              isFuture && "text-muted-foreground/40 cursor-not-allowed"
+            )}
+          >
+            {step.label}
+            {isActive && (
+              <motion.div
+                layoutId="nav-indicator"
+                className="absolute -bottom-1 left-0 right-0 h-0.5 bg-accent rounded-full"
+                initial={false}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            )}
+          </button>
+        )
+      })}
+    </motion.nav>
+  )
+}
+
 export function PersistentNavbar() {
   const pathname = usePathname()
   const { isLoading } = useSceneMode()
-  const { navbarMode } = useNavbar()
+  const { navbarMode, onboardingStep, setOnboardingStep, highestStepReached } = useNavbar()
   const [visible, setVisible] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const hasAppeared = useRef(false)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
   const hamburgerRef = useRef<HTMLButtonElement>(null)
-
-  const isOnboarding = pathname === "/onboarding"
 
   // Trigger visibility after loading completes (with delay matching landing page)
   useEffect(() => {
@@ -222,9 +310,6 @@ export function PersistentNavbar() {
     setMobileMenuOpen(false)
   }, [])
 
-  // Hide navbar on onboarding page (it has its own header)
-  if (isOnboarding) return null
-
   return (
     <>
       {/* Desktop: Glass navbar pill - crossfades with mobile */}
@@ -251,8 +336,10 @@ export function PersistentNavbar() {
             <AnimatePresence mode="wait">
               {navbarMode === "landing" ? (
                 <LandingNavLinks key="landing" />
-              ) : (
+              ) : navbarMode === "dashboard" ? (
                 <DashboardNavLinks key="dashboard" />
+              ) : (
+                <OnboardingNavLinks key="onboarding" />
               )}
             </AnimatePresence>
           </div>
@@ -350,7 +437,7 @@ export function PersistentNavbar() {
                       <EnterButton variant="nav" />
                     </motion.div>
                   </>
-                ) : (
+                ) : navbarMode === "dashboard" ? (
                   dashboardLinks.map((link, index) => (
                     <MobileNavLink
                       key={link.id}
@@ -358,6 +445,21 @@ export function PersistentNavbar() {
                       label={link.label}
                       index={index}
                       onClick={handleMobileNavClick}
+                    />
+                  ))
+                ) : (
+                  ONBOARDING_STEPS.map((step, index) => (
+                    <MobileOnboardingLink
+                      key={step.id}
+                      label={step.label}
+                      index={index}
+                      stepIndex={index}
+                      currentStep={onboardingStep}
+                      highestStepReached={highestStepReached}
+                      onClick={() => {
+                        setOnboardingStep(index)
+                        handleMobileNavClick()
+                      }}
                     />
                   ))
                 )}

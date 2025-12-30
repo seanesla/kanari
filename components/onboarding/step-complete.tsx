@@ -98,8 +98,8 @@ export function StepComplete({ onComplete, onNavigate }: StepCompleteProps) {
             <motion.li
               key={i}
               className="flex items-start gap-2"
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.65 + i * 0.1 }}
             >
               <span className="text-accent mt-0.5">{i + 1}.</span>
@@ -117,8 +117,8 @@ export function StepComplete({ onComplete, onNavigate }: StepCompleteProps) {
         transition={{ delay: 0.9 }}
       >
         <motion.div
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
         >
           <Button
             onClick={handleEnterDashboard}

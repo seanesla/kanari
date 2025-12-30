@@ -8,9 +8,10 @@
  * All panels exist in 3D space - you physically travel to each one.
  */
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { useOnboarding } from "@/hooks/use-onboarding"
+import { useNavbar, TOTAL_ONBOARDING_STEPS } from "@/lib/navbar-context"
 import { Onboarding3DScene } from "@/components/onboarding/onboarding-3d-scene"
 import {
   StepWelcome,
@@ -21,14 +22,12 @@ import {
 } from "@/components/onboarding"
 import type { UserSettings } from "@/lib/types"
 
-const TOTAL_STEPS = 5
-
 export default function OnboardingPage() {
   const router = useRouter()
   const { isLoading, hasCompletedOnboarding, settings, updateSettings, completeOnboarding } =
     useOnboarding()
+  const { onboardingStep, setOnboardingStep } = useNavbar()
 
-  const [currentStep, setCurrentStep] = useState(0)
   const [pendingSettings, setPendingSettings] = useState<Partial<UserSettings>>({})
 
   // Redirect to dashboard if already onboarded
@@ -37,6 +36,32 @@ export default function OnboardingPage() {
       router.replace("/dashboard")
     }
   }, [isLoading, hasCompletedOnboarding, router])
+
+  // Memoized navigation functions - MUST be before early returns
+  // to satisfy React's Rules of Hooks (same order every render)
+  const goNext = useCallback(() => {
+    setOnboardingStep(Math.min(onboardingStep + 1, TOTAL_ONBOARDING_STEPS - 1))
+  }, [onboardingStep, setOnboardingStep])
+
+  const goBack = useCallback(() => {
+    setOnboardingStep(Math.max(onboardingStep - 1, 0))
+  }, [onboardingStep, setOnboardingStep])
+
+  const handleApiKeySubmit = useCallback(async (apiKey: string) => {
+    setPendingSettings((prev) => ({ ...prev, geminiApiKey: apiKey }))
+    await updateSettings({ geminiApiKey: apiKey })
+    setOnboardingStep(Math.min(onboardingStep + 1, TOTAL_ONBOARDING_STEPS - 1))
+  }, [updateSettings, onboardingStep, setOnboardingStep])
+
+  const handlePreferencesSubmit = useCallback(async (prefs: Partial<UserSettings>) => {
+    setPendingSettings((prev) => ({ ...prev, ...prefs }))
+    await updateSettings(prefs)
+    setOnboardingStep(Math.min(onboardingStep + 1, TOTAL_ONBOARDING_STEPS - 1))
+  }, [updateSettings, onboardingStep, setOnboardingStep])
+
+  const handleComplete = useCallback(async () => {
+    await completeOnboarding()
+  }, [completeOnboarding])
 
   // Show loading state
   if (isLoading) {
@@ -52,28 +77,9 @@ export default function OnboardingPage() {
     return null
   }
 
-  const goNext = () => setCurrentStep((s) => Math.min(s + 1, TOTAL_STEPS - 1))
-  const goBack = () => setCurrentStep((s) => Math.max(s - 1, 0))
-
-  const handleApiKeySubmit = async (apiKey: string) => {
-    setPendingSettings((prev) => ({ ...prev, geminiApiKey: apiKey }))
-    await updateSettings({ geminiApiKey: apiKey })
-    goNext()
-  }
-
-  const handlePreferencesSubmit = async (prefs: Partial<UserSettings>) => {
-    setPendingSettings((prev) => ({ ...prev, ...prefs }))
-    await updateSettings(prefs)
-    goNext()
-  }
-
-  const handleComplete = async () => {
-    await completeOnboarding()
-  }
-
   // All step components are passed as children - they'll be placed in 3D panels
   return (
-    <Onboarding3DScene currentStep={currentStep} totalSteps={TOTAL_STEPS}>
+    <Onboarding3DScene currentStep={onboardingStep} totalSteps={TOTAL_ONBOARDING_STEPS}>
       {/* Panel 0: Welcome */}
       <StepWelcome onNext={goNext} />
 
@@ -85,6 +91,7 @@ export default function OnboardingPage() {
         initialApiKey={settings?.geminiApiKey || pendingSettings.geminiApiKey || ""}
         onNext={handleApiKeySubmit}
         onBack={goBack}
+        isActive={onboardingStep === 2}
       />
 
       {/* Panel 3: Preferences */}

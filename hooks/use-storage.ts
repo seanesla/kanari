@@ -425,6 +425,7 @@ export function useClearAllData() {
       db.recoveryBlocks.clear(),
       db.trendData.clear(),
       db.checkInSessions.clear(),
+      db.achievements.clear(),
     ])
   }, [])
 }

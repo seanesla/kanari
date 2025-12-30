@@ -12,48 +12,43 @@
  * Source: Context7 - /pmndrs/drei docs - "Sparkles", "Float"
  */
 
-import { useRef, useMemo } from "react"
-import { Canvas, useFrame } from "@react-three/fiber"
+import { useMemo } from "react"
+import { Canvas } from "@react-three/fiber"
 import { Sparkles, Float } from "@react-three/drei"
 import * as THREE from "three"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
 
 /**
- * Starfield - distant twinkling stars in a sphere around the camera
+ * Starfield - distant twinkling stars spanning the entire onboarding journey
  * Exported for reuse in onboarding 3D scene
+ *
+ * Camera travels from Z=0 to Z=-56, so stars span Z=+10 to Z=-70
  */
 export function Starfield() {
-  const starsRef = useRef<THREE.Points>(null)
-
-  // Generate random star positions distributed in a sphere
+  // Generate random star positions in an elongated volume along the journey path
   const positions = useMemo(() => {
-    const count = 800
+    const count = 1200 // More stars to fill the larger volume
     const pos = new Float32Array(count * 3)
 
     for (let i = 0; i < count; i++) {
-      // Distribute stars in a spherical shell
-      const radius = 25 + Math.random() * 35
-      const theta = Math.random() * Math.PI * 2
-      const phi = Math.acos(2 * Math.random() - 1)
+      // Distribute stars in a cylinder/tube around the camera path
+      // X and Y spread out to create surrounding starfield
+      const angle = Math.random() * Math.PI * 2
+      const radius = 15 + Math.random() * 40 // Distance from center axis
 
-      pos[i * 3] = radius * Math.sin(phi) * Math.cos(theta)
-      pos[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
-      pos[i * 3 + 2] = radius * Math.cos(phi)
+      pos[i * 3] = Math.cos(angle) * radius     // X: circular spread
+      pos[i * 3 + 1] = Math.sin(angle) * radius // Y: circular spread
+      pos[i * 3 + 2] = 10 - Math.random() * 80  // Z: from +10 to -70
     }
 
     return pos
   }, [])
 
-  // Very slow rotation - stars are distant, move slower than foreground (parallax)
-  // Source: Context7 - /pmndrs/react-three-fiber docs - "useFrame & depth"
-  useFrame((state) => {
-    if (!starsRef.current) return
-    starsRef.current.rotation.y = state.clock.elapsedTime * 0.003
-  })
+  // Stars remain static - camera movement provides all needed parallax
 
   return (
-    <points ref={starsRef}>
+    <points>
       <bufferGeometry>
         <bufferAttribute
           attach="attributes-position"
@@ -75,38 +70,33 @@ export function Starfield() {
  * AccentNebula - floating particles in the accent color
  * Uses Drei Sparkles for GPU-optimized particle animation
  * Exported for reuse in onboarding 3D scene
+ *
+ * Extended to span the entire onboarding journey (Z=+10 to Z=-70)
+ * No group rotation - relies on Sparkles' built-in gentle drift for natural motion
  */
 export function AccentNebula({ accentColor }: { accentColor: string }) {
-  const nebulaRef = useRef<THREE.Group>(null)
-
-  // Faster rotation than stars - particles are closer (parallax depth cue)
-  // Source: Context7 - /pmndrs/react-three-fiber docs - "useFrame & depth"
-  useFrame((state) => {
-    if (!nebulaRef.current) return
-    nebulaRef.current.rotation.y = state.clock.elapsedTime * 0.01
-  })
-
   return (
-    <group ref={nebulaRef}>
-      {/* Primary layer - scattered accent particles */}
+    // Position at center of journey (Z=-28) so particles span equally in both directions
+    <group position={[0, 0, -28]}>
+      {/* Primary layer - scattered accent particles spanning the journey */}
       <Sparkles
-        count={60}
-        speed={0.2}
+        count={100}
+        speed={0.15}
         opacity={0.6}
         color={accentColor}
         size={2}
-        scale={[18, 18, 12]}
-        noise={[0.4, 0.4, 0.4]}
+        scale={[20, 20, 75]} // Extended Z to cover Z=+10 to Z=-66
+        noise={[0.4, 0.4, 0.3]}
       />
 
       {/* Secondary layer - larger, slower, more diffuse */}
       <Sparkles
-        count={30}
+        count={50}
         speed={0.08}
         opacity={0.3}
         color={accentColor}
         size={4}
-        scale={[25, 25, 18]}
+        scale={[28, 28, 85]} // Wider and longer for ambient glow
         noise={[0.2, 0.2, 0.2]}
       />
     </group>
@@ -117,16 +107,28 @@ export function AccentNebula({ accentColor }: { accentColor: string }) {
  * FloatingGeometry - distant geometric shapes that drift gently
  * Matches the aesthetic of truth-core and section-accent
  * Exported for reuse in onboarding 3D scene
+ *
+ * Shapes spread across the entire journey path (Z=0 to Z=-60)
  */
 export function FloatingGeometry({ accentColor }: { accentColor: string }) {
-  // Positions for geometric accents - spread out in the background
+  // Positions for geometric accents - spread along the entire journey path
   const shapes = useMemo(
     () => [
-      { pos: [-12, 6, -15] as [number, number, number], scale: 0.4, type: "octahedron" },
-      { pos: [14, -4, -18] as [number, number, number], scale: 0.35, type: "icosahedron" },
-      { pos: [-8, -8, -20] as [number, number, number], scale: 0.3, type: "tetrahedron" },
-      { pos: [10, 8, -22] as [number, number, number], scale: 0.25, type: "dodecahedron" },
-      { pos: [0, -10, -25] as [number, number, number], scale: 0.2, type: "octahedron" },
+      // Near welcome (Z=0)
+      { pos: [-10, 5, -5] as [number, number, number], scale: 0.35, type: "octahedron" },
+      { pos: [12, -3, -8] as [number, number, number], scale: 0.3, type: "icosahedron" },
+      // Near theme (Z=-14)
+      { pos: [-8, -6, -18] as [number, number, number], scale: 0.4, type: "tetrahedron" },
+      { pos: [10, 7, -22] as [number, number, number], scale: 0.25, type: "dodecahedron" },
+      // Near API key (Z=-28)
+      { pos: [-12, 4, -32] as [number, number, number], scale: 0.35, type: "octahedron" },
+      { pos: [14, -5, -35] as [number, number, number], scale: 0.3, type: "icosahedron" },
+      // Near preferences (Z=-42)
+      { pos: [-9, -7, -46] as [number, number, number], scale: 0.4, type: "tetrahedron" },
+      { pos: [11, 6, -50] as [number, number, number], scale: 0.25, type: "dodecahedron" },
+      // Near complete (Z=-56)
+      { pos: [-10, 5, -60] as [number, number, number], scale: 0.35, type: "octahedron" },
+      { pos: [8, -8, -64] as [number, number, number], scale: 0.3, type: "icosahedron" },
     ],
     []
   )
@@ -136,9 +138,9 @@ export function FloatingGeometry({ accentColor }: { accentColor: string }) {
       {shapes.map((shape, i) => (
         <Float
           key={i}
-          speed={0.5 + i * 0.1}
-          rotationIntensity={0.3}
-          floatIntensity={0.4}
+          speed={0.4} // Consistent slow speed for all shapes
+          rotationIntensity={0.15}
+          floatIntensity={0.3}
         >
           <mesh position={shape.pos} scale={shape.scale}>
             {shape.type === "octahedron" && <octahedronGeometry args={[1, 0]} />}

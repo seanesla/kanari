@@ -1,17 +1,33 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Calendar, Key, Mic, Shield, AlertCircle, CheckCircle2, Paintbrush, Eye, EyeOff, Loader2 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Calendar, Key, Mic, Shield, AlertCircle, CheckCircle2, Paintbrush, Eye, EyeOff, Loader2, RefreshCw, Trash2, User } from "lucide-react"
 import { useCalendar } from "@/hooks/use-calendar"
+import { useClearAllData } from "@/hooks/use-storage"
 import { GeminiMemorySection } from "./settings-gemini-memory"
 import { ColorPicker } from "./color-picker"
 import { FontPicker } from "./font-picker"
 import { db } from "@/lib/storage/db"
+import { verifyGeminiApiKey } from "@/lib/gemini/client"
 
 export function SettingsContent() {
+  const router = useRouter()
+  const clearAllData = useClearAllData()
+
   const [settings, setSettings] = useState({
     enableNotifications: true,
     dailyReminder: false,
@@ -22,8 +38,13 @@ export function SettingsContent() {
 
   // Gemini API key state
   const [geminiApiKey, setGeminiApiKey] = useState("")
+
+  // Reset dialog state
+  const [showResetDialog, setShowResetDialog] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
   const [showApiKey, setShowApiKey] = useState(false)
   const [apiKeyStatus, setApiKeyStatus] = useState<"idle" | "valid" | "invalid" | "checking">("idle")
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
@@ -34,12 +55,8 @@ export function SettingsContent() {
         const savedSettings = await db.settings.get("default")
         if (savedSettings?.geminiApiKey) {
           setGeminiApiKey(savedSettings.geminiApiKey)
-          // Validate the existing key format
-          if (savedSettings.geminiApiKey.startsWith("AIza")) {
-            setApiKeyStatus("valid")
-          } else {
-            setApiKeyStatus("invalid")
-          }
+          // Don't auto-validate on load - user needs to verify
+          setApiKeyStatus("idle")
         }
       } catch (error) {
         console.error("Failed to load settings:", error)
@@ -48,18 +65,33 @@ export function SettingsContent() {
     loadSettings()
   }, [])
 
-  // Validate API key format when it changes
+  // Reset status when API key changes
   const handleApiKeyChange = useCallback((value: string) => {
     setGeminiApiKey(value)
     setSaveMessage(null)
-    if (!value) {
-      setApiKeyStatus("idle")
-    } else if (value.startsWith("AIza") && value.length > 20) {
+    setApiKeyError(null)
+    setApiKeyStatus("idle")
+  }, [])
+
+  // Verify API key with Google
+  const handleVerifyApiKey = useCallback(async () => {
+    if (!geminiApiKey.trim()) {
+      setApiKeyError("API key is required")
+      return
+    }
+
+    setApiKeyStatus("checking")
+    setApiKeyError(null)
+
+    const result = await verifyGeminiApiKey(geminiApiKey)
+
+    if (result.valid) {
       setApiKeyStatus("valid")
     } else {
       setApiKeyStatus("invalid")
+      setApiKeyError(result.error || "Invalid API key")
     }
-  }, [])
+  }, [geminiApiKey])
 
   // Save settings to IndexedDB
   const handleSaveSettings = useCallback(async () => {
@@ -101,6 +133,43 @@ export function SettingsContent() {
       setIsSaving(false)
     }
   }, [settings, geminiApiKey])
+
+  // Modify onboarding - restart onboarding flow while keeping data
+  const handleModifyOnboarding = useCallback(async () => {
+    try {
+      const existingSettings = await db.settings.get("default")
+      if (existingSettings) {
+        await db.settings.update("default", {
+          hasCompletedOnboarding: false,
+          onboardingCompletedAt: undefined,
+        })
+      }
+      router.push("/onboarding")
+    } catch (error) {
+      console.error("Failed to modify onboarding:", error)
+    }
+  }, [router])
+
+  // Reset all data - clear everything and restart onboarding
+  const handleResetAllData = useCallback(async () => {
+    setIsResetting(true)
+    try {
+      // Clear all user data
+      await clearAllData()
+
+      // Delete settings entirely (will be recreated during onboarding)
+      await db.settings.delete("default")
+
+      // Clear sessionStorage (OAuth tokens, dedup hashes)
+      sessionStorage.clear()
+
+      // Redirect to onboarding
+      router.push("/onboarding")
+    } catch (error) {
+      console.error("Failed to reset data:", error)
+      setIsResetting(false)
+    }
+  }, [clearAllData, router])
 
   const { isConnected, isLoading, error, connect, disconnect, clearError } = useCalendar()
   const [showSuccess, setShowSuccess] = useState(false)
@@ -237,6 +306,65 @@ export function SettingsContent() {
           </div>
         </div>
 
+        {/* Account */}
+        <div className="rounded-lg border border-border bg-card p-6">
+          <div className="flex items-center gap-2 mb-6">
+            <User className="h-5 w-5 text-accent" />
+            <h2 className="text-lg font-semibold font-serif">Account</h2>
+          </div>
+
+          <div className="space-y-6">
+            {/* Modify Onboarding */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-base font-sans">Modify Onboarding</Label>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3 font-sans">
+                Go through the onboarding steps again without losing your recordings or data.
+              </p>
+              <Button
+                variant="outline"
+                onClick={handleModifyOnboarding}
+                disabled={isSaving || isResetting}
+                className="w-full"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Restart Onboarding
+              </Button>
+            </div>
+
+            {/* Reset All Data */}
+            <div className="pt-4 border-t border-border">
+              <div className="flex items-center gap-2 mb-2">
+                <Trash2 className="h-4 w-4 text-destructive" />
+                <Label className="text-base font-sans text-destructive">Reset All Data</Label>
+              </div>
+              <p className="text-sm text-muted-foreground mb-3 font-sans">
+                Permanently delete all your recordings, suggestions, and settings. This cannot be undone.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => setShowResetDialog(true)}
+                disabled={isSaving || isResetting}
+                className="w-full bg-transparent text-destructive hover:bg-destructive/10 border-destructive/50"
+              >
+                {isResetting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Resetting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Reset All Data
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+
         {/* Calendar Integration */}
         <div className="md:col-span-2 rounded-lg border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-6">
@@ -366,40 +494,61 @@ export function SettingsContent() {
                   Google AI Studio
                 </a>
               </p>
-              <div className="relative">
-                <input
-                  type={showApiKey ? "text" : "password"}
-                  value={geminiApiKey}
-                  onChange={(e) => handleApiKeyChange(e.target.value)}
-                  placeholder="Enter your Gemini API key (starts with AIza...)"
-                  className={`h-10 w-full rounded-md border bg-background px-3 pr-10 text-sm focus:outline-none focus:ring-1 font-sans ${
-                    apiKeyStatus === "valid"
-                      ? "border-green-500 focus:border-green-500 focus:ring-green-500"
-                      : apiKeyStatus === "invalid"
-                      ? "border-destructive focus:border-destructive focus:ring-destructive"
-                      : "border-border focus:border-accent focus:ring-accent"
-                  }`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label={showApiKey ? "Hide API key" : "Show API key"}
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <input
+                    type={showApiKey ? "text" : "password"}
+                    value={geminiApiKey}
+                    onChange={(e) => handleApiKeyChange(e.target.value)}
+                    placeholder="Enter your Gemini API key (starts with AIza...)"
+                    className={`h-10 w-full rounded-md border bg-background px-3 pr-10 text-sm focus:outline-none focus:ring-1 font-sans ${
+                      apiKeyStatus === "valid"
+                        ? "border-green-500 focus:border-green-500 focus:ring-green-500"
+                        : apiKeyStatus === "invalid"
+                        ? "border-destructive focus:border-destructive focus:ring-destructive"
+                        : "border-border focus:border-accent focus:ring-accent"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                  >
+                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleVerifyApiKey}
+                  disabled={!geminiApiKey.trim() || apiKeyStatus === "checking" || apiKeyStatus === "valid"}
                 >
-                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+                  {apiKeyStatus === "checking" ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : apiKeyStatus === "valid" ? (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Verified
+                    </>
+                  ) : (
+                    "Verify"
+                  )}
+                </Button>
               </div>
               {/* Validation feedback */}
               {apiKeyStatus === "valid" && (
                 <p className="mt-2 text-sm text-green-500 flex items-center gap-1">
                   <CheckCircle2 className="h-4 w-4" />
-                  Valid API key format
+                  API key verified successfully!
                 </p>
               )}
-              {apiKeyStatus === "invalid" && geminiApiKey && (
+              {apiKeyError && (
                 <p className="mt-2 text-sm text-destructive flex items-center gap-1">
                   <AlertCircle className="h-4 w-4" />
-                  API key should start with "AIza"
+                  {apiKeyError}
                 </p>
               )}
               <p className="mt-2 text-xs text-muted-foreground font-sans">
@@ -451,6 +600,37 @@ export function SettingsContent() {
           )}
         </Button>
       </div>
+
+      {/* Reset All Data Confirmation Dialog */}
+      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset All Data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all your recordings, suggestions, trends, and settings.
+              You&apos;ll be taken through the onboarding process again as a new user.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isResetting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetAllData}
+              disabled={isResetting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isResetting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                "Reset Everything"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

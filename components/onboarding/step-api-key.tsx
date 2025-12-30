@@ -6,62 +6,81 @@
  * Collects the user's Gemini API key for AI-powered features.
  */
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { motion } from "framer-motion"
 import { Key, ExternalLink, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useSceneMode } from "@/lib/scene-context"
+import { verifyGeminiApiKey } from "@/lib/gemini/client"
 
 interface StepApiKeyProps {
   initialApiKey?: string
   onNext: (apiKey: string) => void
   onBack: () => void
+  isActive?: boolean
 }
 
-export function StepApiKey({ initialApiKey = "", onNext, onBack }: StepApiKeyProps) {
+export function StepApiKey({ initialApiKey = "", onNext, onBack, isActive = true }: StepApiKeyProps) {
   const { accentColor } = useSceneMode()
   const [apiKey, setApiKey] = useState(initialApiKey)
   const [isValidating, setIsValidating] = useState(false)
   const [validationResult, setValidationResult] = useState<"valid" | "invalid" | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isAutoAdvancing, setIsAutoAdvancing] = useState(false)
 
-  const validateApiKey = useCallback(async (key: string) => {
-    if (!key.trim()) {
+  // Track if we've already auto-advanced to prevent re-triggering
+  const hasAutoAdvanced = useRef(false)
+
+  // Reset auto-advance state when step becomes inactive
+  // This prevents the step from auto-advancing again when navigating back
+  useEffect(() => {
+    if (!isActive) {
+      hasAutoAdvanced.current = false
+      setIsAutoAdvancing(false)
+      // Keep validationResult so the green checkmark persists
+    }
+  }, [isActive])
+
+  // Auto-advance after successful verification with 1.5s delay
+  // Uses ref guard to ensure this only fires once per verification
+  useEffect(() => {
+    if (validationResult === "valid" && isAutoAdvancing && isActive && !hasAutoAdvanced.current) {
+      hasAutoAdvanced.current = true
+      const timer = setTimeout(() => {
+        onNext(apiKey)
+      }, 1500)
+      return () => clearTimeout(timer)
+    }
+  }, [validationResult, isAutoAdvancing, apiKey, onNext, isActive])
+
+  const handleVerify = useCallback(async () => {
+    if (!apiKey.trim()) {
       setError("API key is required")
-      return false
+      return
     }
 
     setIsValidating(true)
     setError(null)
     setValidationResult(null)
 
-    try {
-      // Test the API key with a simple request
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`
-      )
+    const result = await verifyGeminiApiKey(apiKey)
 
-      if (response.ok) {
-        setValidationResult("valid")
-        return true
-      } else {
-        setValidationResult("invalid")
-        setError("Invalid API key. Please check and try again.")
-        return false
-      }
-    } catch {
-      setError("Failed to validate API key. Please check your connection.")
-      return false
-    } finally {
-      setIsValidating(false)
+    setIsValidating(false)
+
+    if (result.valid) {
+      setValidationResult("valid")
+      setIsAutoAdvancing(true)
+    } else {
+      setValidationResult("invalid")
+      setError(result.error || "Invalid API key")
     }
-  }, [])
+  }, [apiKey])
 
-  const handleNext = async () => {
-    const isValid = await validateApiKey(apiKey)
-    if (isValid) {
+  const handleContinue = () => {
+    // If already verified, just advance immediately
+    if (validationResult === "valid") {
       onNext(apiKey)
     }
   }
@@ -70,6 +89,7 @@ export function StepApiKey({ initialApiKey = "", onNext, onBack }: StepApiKeyPro
     setApiKey(e.target.value)
     setValidationResult(null)
     setError(null)
+    setIsAutoAdvancing(false)
   }
 
   return (
@@ -112,31 +132,59 @@ export function StepApiKey({ initialApiKey = "", onNext, onBack }: StepApiKeyPro
       >
         <div className="space-y-2">
           <Label htmlFor="api-key">Gemini API Key</Label>
-          <div className="relative">
-            <Input
-              id="api-key"
-              type="password"
-              placeholder="AIza..."
-              value={apiKey}
-              onChange={handleKeyChange}
-              className={
-                validationResult === "valid"
-                  ? "border-green-500 pr-10"
-                  : validationResult === "invalid"
-                    ? "border-destructive pr-10"
-                    : ""
-              }
-            />
-            {validationResult === "valid" && (
-              <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-500" />
-            )}
-            {validationResult === "invalid" && (
-              <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-destructive" />
-            )}
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Input
+                id="api-key"
+                type="password"
+                placeholder="AIza..."
+                value={apiKey}
+                onChange={handleKeyChange}
+                className={
+                  validationResult === "valid"
+                    ? "border-green-500 pr-10"
+                    : validationResult === "invalid"
+                      ? "border-destructive pr-10"
+                      : ""
+                }
+              />
+              {validationResult === "valid" && (
+                <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-green-500" />
+              )}
+              {validationResult === "invalid" && (
+                <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-destructive" />
+              )}
+            </div>
+            <Button
+              variant="outline"
+              onClick={handleVerify}
+              disabled={!apiKey.trim() || isValidating || validationResult === "valid"}
+            >
+              {isValidating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Verifying...
+                </>
+              ) : validationResult === "valid" ? (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Verified
+                </>
+              ) : (
+                "Verify"
+              )}
+            </Button>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           {validationResult === "valid" && (
-            <p className="text-sm text-green-600">API key verified successfully!</p>
+            <motion.p
+              className="text-sm text-green-600 flex items-center gap-1"
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              API key verified successfully! Continuing...
+            </motion.p>
           )}
         </div>
 
@@ -187,11 +235,14 @@ export function StepApiKey({ initialApiKey = "", onNext, onBack }: StepApiKeyPro
           </Button>
         </motion.div>
         <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <Button onClick={handleNext} disabled={!apiKey.trim() || isValidating}>
-            {isValidating ? (
+          <Button
+            onClick={handleContinue}
+            disabled={validationResult !== "valid" || isAutoAdvancing}
+          >
+            {isAutoAdvancing ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Validating...
+                Continuing...
               </>
             ) : (
               "Continue"

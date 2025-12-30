@@ -262,6 +262,35 @@ export function validateAPIKey(apiKey: string | undefined): string {
 }
 
 /**
+ * Verify a Gemini API key by making a test request to the models endpoint.
+ * This function is designed to be used client-side for key validation.
+ *
+ * @param apiKey - The API key to verify
+ * @returns Object with valid boolean and optional error message
+ */
+export async function verifyGeminiApiKey(
+  apiKey: string
+): Promise<{ valid: boolean; error?: string }> {
+  if (!apiKey.trim()) {
+    return { valid: false, error: "API key is required" }
+  }
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+    )
+
+    if (response.ok) {
+      return { valid: true }
+    } else {
+      return { valid: false, error: "Invalid API key. Please check and try again." }
+    }
+  } catch {
+    return { valid: false, error: "Failed to validate API key. Check your connection." }
+  }
+}
+
+/**
  * Analyze audio for semantic content and emotion
  *
  * @param apiKey - Gemini API key

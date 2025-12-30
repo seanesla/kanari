@@ -3,14 +3,29 @@
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
 
-export type NavbarMode = "landing" | "dashboard"
+export type NavbarMode = "landing" | "dashboard" | "onboarding"
 export type ActiveSection = "hero" | "features" | "how-it-works" | null
+
+// Onboarding step configuration
+export const ONBOARDING_STEPS = [
+  { id: "welcome", label: "Welcome" },
+  { id: "theme", label: "Theme" },
+  { id: "api", label: "API" },
+  { id: "prefs", label: "Prefs" },
+  { id: "done", label: "Done" },
+] as const
+
+export const TOTAL_ONBOARDING_STEPS = ONBOARDING_STEPS.length
 
 interface NavbarContextValue {
   navbarMode: NavbarMode
   activeSection: ActiveSection
   setActiveSection: (section: ActiveSection) => void
   activeDashboardRoute: string | null
+  // Onboarding navigation
+  onboardingStep: number
+  setOnboardingStep: (step: number) => void
+  highestStepReached: number // Track furthest step visited (for back navigation)
 }
 
 const NavbarContext = createContext<NavbarContextValue | null>(null)
@@ -18,9 +33,15 @@ const NavbarContext = createContext<NavbarContextValue | null>(null)
 export function NavbarProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const [activeSection, setActiveSection] = useState<ActiveSection>(null)
+  const [onboardingStep, setOnboardingStep] = useState(0)
+  const [highestStepReached, setHighestStepReached] = useState(0)
 
   // Derive navbar mode from pathname
-  const navbarMode: NavbarMode = pathname.startsWith("/dashboard") ? "dashboard" : "landing"
+  const navbarMode: NavbarMode = pathname.startsWith("/dashboard")
+    ? "dashboard"
+    : pathname === "/onboarding"
+      ? "onboarding"
+      : "landing"
 
   // Derive active dashboard route
   const activeDashboardRoute = navbarMode === "dashboard" ? pathname : null
@@ -32,14 +53,32 @@ export function NavbarProvider({ children }: { children: ReactNode }) {
     }
   }, [navbarMode])
 
+  // Reset onboarding step when leaving onboarding
+  useEffect(() => {
+    if (navbarMode !== "onboarding") {
+      setOnboardingStep(0)
+      setHighestStepReached(0)
+    }
+  }, [navbarMode])
+
+  // Track highest step reached (so visited steps stay accessible when going back)
+  useEffect(() => {
+    if (onboardingStep > highestStepReached) {
+      setHighestStepReached(onboardingStep)
+    }
+  }, [onboardingStep, highestStepReached])
+
   const value = useMemo(
     () => ({
       navbarMode,
       activeSection,
       setActiveSection,
       activeDashboardRoute,
+      onboardingStep,
+      setOnboardingStep,
+      highestStepReached,
     }),
-    [navbarMode, activeSection, activeDashboardRoute]
+    [navbarMode, activeSection, activeDashboardRoute, onboardingStep, highestStepReached]
   )
 
   return <NavbarContext.Provider value={value}>{children}</NavbarContext.Provider>

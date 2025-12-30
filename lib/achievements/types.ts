@@ -89,6 +89,20 @@ export interface UserStatsForAchievements {
 
   // Recent achievements (to avoid duplicates)
   recentAchievementTitles: string[]
+
+  // Data quality indicators (help Gemini assess if there's enough data for meaningful achievements)
+  dataQuality: {
+    /** Days since first recording */
+    journeyDurationDays: number
+    /** True if user has 14+ days of history */
+    hasEnoughHistory: boolean
+    /** True if user was active on 50%+ of days since starting */
+    hasConsistentUsage: boolean
+    /** True if there's enough variance in metrics to detect real trends */
+    hasMeasurableTrends: boolean
+    /** Percentage of suggestions user interacted with (not left pending) */
+    suggestionEngagementRate: number
+  }
 }
 
 /**
