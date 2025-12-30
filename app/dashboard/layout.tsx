@@ -24,7 +24,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <DashboardAnimationContext.Provider value={{ shouldAnimate }}>
-      <div className="relative">
+      <div className="relative" data-dashboard>
         {/* Background grid - scrolls with content */}
         <div className="absolute top-0 left-0 right-0 h-[420px] pointer-events-none z-0 overflow-hidden">
           {/* Offset for navbar + page padding */}

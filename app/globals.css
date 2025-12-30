@@ -126,6 +126,14 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/* Dashboard-scoped font variables for font picker */
+/* Landing page uses global --font-* variables, dashboard uses --dashboard-font-* */
+[data-dashboard] {
+  --font-sans: var(--dashboard-font-sans, "Instrument Sans", system-ui);
+  --font-serif: var(--dashboard-font-serif, "Instrument Serif", Georgia);
+  --font-mono: var(--dashboard-font-mono, "Geist Mono", monospace);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

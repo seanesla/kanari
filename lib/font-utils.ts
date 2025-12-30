@@ -62,10 +62,16 @@ export const DEFAULT_MONO = "Geist Mono"
 
 /**
  * Update a CSS custom property (CSS variable) for font switching
+ * Updates dashboard-scoped variables so landing page is unaffected
  */
 export function updateFontVariable(variable: string, fontFamily: string): void {
   if (typeof document !== "undefined") {
-    document.documentElement.style.setProperty(variable, fontFamily)
+    // Map global variables to dashboard-scoped variables
+    const dashboardVariable = variable.replace("--font-", "--dashboard-font-")
+
+    // Update both global and dashboard-scoped variables
+    // Dashboard uses dashboard-scoped, landing uses global defaults
+    document.documentElement.style.setProperty(dashboardVariable, fontFamily)
   }
 }
 

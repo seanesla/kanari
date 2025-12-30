@@ -38,21 +38,21 @@ export function SettingsContent() {
 
   return (
     <div className="w-full space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 auto-rows-max">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 auto-rows-max">
         {/* Recording Preferences */}
         <div className="rounded-lg border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-6">
             <Mic className="h-5 w-5 text-accent" />
-            <h2 className="text-lg font-semibold">Recording Preferences</h2>
+            <h2 className="text-lg font-semibold font-serif">Recording Preferences</h2>
           </div>
 
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="enable-vad" className="text-base">
+                <Label htmlFor="enable-vad" className="text-base font-sans">
                   Voice Activity Detection
                 </Label>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground font-sans">
                   Only analyze speech segments, filtering out silence and noise
                 </p>
               </div>
@@ -64,9 +64,9 @@ export function SettingsContent() {
             </div>
 
             <div>
-              <Label className="text-base">Default Recording Duration</Label>
-              <p className="text-sm text-muted-foreground mb-3">Recommended duration for voice check-ins</p>
-              <select className="h-10 w-32 rounded-md border border-border bg-background px-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent">
+              <Label className="text-base font-sans">Default Recording Duration</Label>
+              <p className="text-sm text-muted-foreground mb-3 font-sans">Recommended duration for voice check-ins</p>
+              <select className="h-10 w-32 rounded-md border border-border bg-background px-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent font-sans">
                 <option value="30">30 seconds</option>
                 <option value="45">45 seconds</option>
                 <option value="60">60 seconds</option>
@@ -77,15 +77,15 @@ export function SettingsContent() {
 
         {/* Notifications */}
         <div className="rounded-lg border border-border bg-card p-6">
-          <h2 className="mb-6 text-lg font-semibold">Notifications</h2>
+          <h2 className="mb-6 text-lg font-semibold font-serif">Notifications</h2>
 
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="enable-notifications" className="text-base">
+                <Label htmlFor="enable-notifications" className="text-base font-sans">
                   Browser Notifications
                 </Label>
-                <p className="text-sm text-muted-foreground">Receive alerts for elevated stress or recovery suggestions</p>
+                <p className="text-sm text-muted-foreground font-sans">Receive alerts for elevated stress or recovery suggestions</p>
               </div>
               <Switch
                 id="enable-notifications"
@@ -96,10 +96,10 @@ export function SettingsContent() {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="daily-reminder" className="text-base">
+                <Label htmlFor="daily-reminder" className="text-base font-sans">
                   Daily Reminder
                 </Label>
-                <p className="text-sm text-muted-foreground">Get a reminder to record your daily check-in</p>
+                <p className="text-sm text-muted-foreground font-sans">Get a reminder to record your daily check-in</p>
               </div>
               <Switch
                 id="daily-reminder"
@@ -114,16 +114,16 @@ export function SettingsContent() {
         <div className="rounded-lg border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-6">
             <Shield className="h-5 w-5 text-accent" />
-            <h2 className="text-lg font-semibold">Privacy</h2>
+            <h2 className="text-lg font-semibold font-serif">Privacy</h2>
           </div>
 
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="local-storage" className="text-base">
+                <Label htmlFor="local-storage" className="text-base font-sans">
                   Local Storage Only
                 </Label>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground font-sans">
                   Store all data locally in your browser. No cloud sync.
                 </p>
               </div>
@@ -144,7 +144,7 @@ export function SettingsContent() {
         <div className="rounded-lg border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-6">
             <Paintbrush className="h-5 w-5 text-accent" />
-            <h2 className="text-lg font-semibold">Appearance</h2>
+            <h2 className="text-lg font-semibold font-serif">Appearance</h2>
           </div>
 
           <ColorPicker />
@@ -155,10 +155,10 @@ export function SettingsContent() {
         </div>
 
         {/* Calendar Integration */}
-        <div className="md:col-span-2 lg:col-span-2 rounded-lg border border-border bg-card p-6">
+        <div className="md:col-span-2 rounded-lg border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-6">
             <Calendar className="h-5 w-5 text-accent" />
-            <h2 className="text-lg font-semibold">Calendar Integration</h2>
+            <h2 className="text-lg font-semibold font-serif">Calendar Integration</h2>
           </div>
 
           <div className="space-y-6">
@@ -195,10 +195,10 @@ export function SettingsContent() {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label htmlFor="auto-schedule" className="text-base">
+                <Label htmlFor="auto-schedule" className="text-base font-sans">
                   Auto-Schedule Recovery
                 </Label>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground font-sans">
                   Automatically add recovery blocks to your calendar when stress is elevated
                 </p>
               </div>
@@ -216,8 +216,8 @@ export function SettingsContent() {
                   <div
                     className={`h-2 w-2 rounded-full ${isConnected ? "bg-success" : "bg-muted"}`}
                   />
-                  <span>Google Calendar</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="font-sans">Google Calendar</span>
+                  <span className="text-xs text-muted-foreground font-sans">
                     {isConnected ? "(Connected)" : "(Not connected)"}
                   </span>
                 </div>
@@ -244,7 +244,7 @@ export function SettingsContent() {
             </div>
 
             {isConnected && (
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm text-muted-foreground font-sans">
                 <p className="mb-2 font-medium">What happens when you schedule recovery blocks:</p>
                 <ul className="space-y-1 ml-4">
                   <li className="list-disc">
@@ -266,13 +266,13 @@ export function SettingsContent() {
         <div className="rounded-lg border border-border bg-card p-6">
           <div className="flex items-center gap-2 mb-6">
             <Key className="h-5 w-5 text-accent" />
-            <h2 className="text-lg font-semibold">Gemini API</h2>
+            <h2 className="text-lg font-semibold font-serif">Gemini API</h2>
           </div>
 
           <div className="space-y-4">
             <div>
-              <Label className="text-base">API Key</Label>
-              <p className="text-sm text-muted-foreground mb-3">
+              <Label className="text-base font-sans">API Key</Label>
+              <p className="text-sm text-muted-foreground mb-3 font-sans">
                 Required for personalized suggestions. Get one from{" "}
                 <a
                   href="https://aistudio.google.com/"
@@ -286,14 +286,14 @@ export function SettingsContent() {
               <input
                 type="password"
                 placeholder="Enter your Gemini API key"
-                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent font-sans"
               />
             </div>
           </div>
         </div>
 
         {/* Gemini Memory */}
-        <div className="md:col-span-2 lg:col-span-3">
+        <div className="md:col-span-2">
           <GeminiMemorySection />
         </div>
       </div>
