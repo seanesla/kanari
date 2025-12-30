@@ -5,6 +5,7 @@ import { Play, Pause, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { formatDuration } from "@/lib/date-utils"
+import { logUnexpectedError } from "@/lib/logger"
 
 export interface AudioPlayerProps {
   audioData: Float32Array | number[]
@@ -83,11 +84,7 @@ export function AudioPlayer({
         try {
           sourceNodeRef.current.stop()
         } catch (error) {
-          // InvalidStateError is expected if already stopped, log unexpected errors
-          if (process.env.NODE_ENV === "development" &&
-              !(error instanceof DOMException && error.name === "InvalidStateError")) {
-            console.warn("[AudioPlayer] Unexpected error stopping source:", error)
-          }
+          logUnexpectedError("AudioPlayer", "Unexpected error stopping source:", error)
         }
       }
       if (audioContextRef.current) {
@@ -143,11 +140,7 @@ export function AudioPlayer({
       try {
         sourceNodeRef.current.stop()
       } catch (error) {
-        // InvalidStateError is expected if already stopped, log unexpected errors
-        if (process.env.NODE_ENV === "development" &&
-            !(error instanceof DOMException && error.name === "InvalidStateError")) {
-          console.warn("[AudioPlayer] Unexpected error stopping source:", error)
-        }
+        logUnexpectedError("AudioPlayer", "Unexpected error stopping source:", error)
       }
     }
 
@@ -188,11 +181,7 @@ export function AudioPlayer({
     try {
       sourceNodeRef.current.stop()
     } catch (error) {
-      // InvalidStateError is expected if already stopped, log unexpected errors
-      if (process.env.NODE_ENV === "development" &&
-          !(error instanceof DOMException && error.name === "InvalidStateError")) {
-        console.warn("[AudioPlayer] Unexpected error stopping source:", error)
-      }
+      logUnexpectedError("AudioPlayer", "Unexpected error stopping source:", error)
     }
 
     setIsPlaying(false)
@@ -228,11 +217,7 @@ export function AudioPlayer({
         try {
           sourceNodeRef.current.stop()
         } catch (error) {
-          // InvalidStateError is expected if already stopped, log unexpected errors
-          if (process.env.NODE_ENV === "development" &&
-              !(error instanceof DOMException && error.name === "InvalidStateError")) {
-            console.warn("[AudioPlayer] Unexpected error stopping source:", error)
-          }
+          logUnexpectedError("AudioPlayer", "Unexpected error stopping source:", error)
         }
       }
       play()

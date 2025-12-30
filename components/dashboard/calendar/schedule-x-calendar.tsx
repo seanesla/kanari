@@ -7,6 +7,7 @@ import { createViewWeek, type CalendarEvent } from '@schedule-x/calendar'
 import { createEventsServicePlugin } from '@schedule-x/events-service'
 import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop'
 import { cn } from '@/lib/utils'
+import { logDebug } from '@/lib/logger'
 import type { Suggestion } from '@/lib/types'
 import '@schedule-x/theme-default/dist/index.css'
 import './schedule-x-theme.css'
@@ -242,9 +243,7 @@ export function ScheduleXWeekCalendar({
       eventsService.set(allEvents)
     } catch (error) {
       // Calendar not fully mounted yet, will retry on next render
-      if (process.env.NODE_ENV === "development") {
-        console.debug("[ScheduleXCalendar] Events service not ready:", error)
-      }
+      logDebug("ScheduleXCalendar", "Events service not ready:", error)
     }
   }, [scheduledSuggestions, completedSuggestions, eventsService, calendar])
 
