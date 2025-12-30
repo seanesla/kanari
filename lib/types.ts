@@ -276,6 +276,50 @@ export interface RecoveryBlock {
 
 export type CoachVoice = 'warm' | 'professional' | 'minimal'
 
+// Font family options
+export type FontFamily =
+  | "Instrument Sans"
+  | "Inter"
+  | "DM Sans"
+  | "Work Sans"
+  | "Public Sans"
+  | "Plus Jakarta Sans"
+  | "Manrope"
+  | "Sora"
+  | "Outfit"
+  | "Quicksand"
+  | "Karla"
+  | "Nunito Sans"
+  | "Poppins"
+  | "Raleway"
+  | "Rubik"
+  | "Source Sans 3"
+  | "Montserrat"
+  | "Lexend"
+
+export type SerifFamily =
+  | "Instrument Serif"
+  | "Merriweather"
+  | "Lora"
+  | "Playfair Display"
+  | "IBM Plex Serif"
+  | "Spectral"
+  | "Crimson Pro"
+  | "Libre Baskerville"
+  | "Cardo"
+  | "Bitter"
+  | "Fraunces"
+  | "EB Garamond"
+
+export type MonoFamily =
+  | "Geist Mono"
+  | "JetBrains Mono"
+  | "Fira Code"
+  | "Roboto Mono"
+  | "IBM Plex Mono"
+  | "Inconsolata"
+  | "Source Code Pro"
+
 export interface UserSettings {
   // Recording preferences
   defaultRecordingDuration: number // seconds (30-60)
@@ -293,6 +337,9 @@ export interface UserSettings {
   coachVoice?: CoachVoice
   // Appearance
   accentColor?: string // Hex color string (e.g., "#d4a574")
+  selectedSansFont?: FontFamily
+  selectedSerifFont?: SerifFamily
+  selectedMonoFont?: MonoFamily
 }
 
 // ============================================

@@ -8,6 +8,7 @@ import { Calendar, Key, Mic, Shield, AlertCircle, CheckCircle2, Paintbrush } fro
 import { useCalendar } from "@/hooks/use-calendar"
 import { GeminiMemorySection } from "./settings-gemini-memory"
 import { ColorPicker } from "./color-picker"
+import { FontPicker } from "./font-picker"
 
 export function SettingsContent() {
   const [settings, setSettings] = useState({
@@ -147,6 +148,10 @@ export function SettingsContent() {
           </div>
 
           <ColorPicker />
+
+          <div className="mt-6 pt-6 border-t border-border">
+            <FontPicker />
+          </div>
         </div>
 
         {/* Calendar Integration */}
