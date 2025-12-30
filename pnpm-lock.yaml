@@ -119,6 +119,24 @@ importers:
       '@ricky0123/vad-web':
         specifier: ^0.0.30
         version: 0.0.30
+      '@schedule-x/calendar':
+        specifier: ^3.5.1
+        version: 3.5.1(@preact/signals@2.5.1(preact@10.28.1))(preact@10.28.1)(temporal-polyfill@0.3.0)
+      '@schedule-x/date-picker':
+        specifier: ^3.5.1
+        version: 3.5.1(@preact/signals@2.5.1(preact@10.28.1))(preact@10.28.1)
+      '@schedule-x/drag-and-drop':
+        specifier: ^3.5.1
+        version: 3.5.1
+      '@schedule-x/events-service':
+        specifier: ^3.5.1
+        version: 3.5.1
+      '@schedule-x/react':
+        specifier: ^3.5.0
+        version: 3.5.0(@schedule-x/calendar@3.5.1(@preact/signals@2.5.1(preact@10.28.1))(preact@10.28.1)(temporal-polyfill@0.3.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@schedule-x/theme-default':
+        specifier: ^3.5.1
+        version: 3.5.1
       '@vercel/analytics':
         specifier: latest
         version: 1.6.1(next@16.0.7(@babel/core@7.28.5)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react@19.2.0)
@@ -209,6 +227,9 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@4.1.17)
+      temporal-polyfill:
+        specifier: ^0.3.0
+        version: 0.3.0
       three:
         specifier: latest
         version: 0.181.2
@@ -1236,6 +1257,14 @@ packages:
     peerDependencies:
       react: ^16.14 || ^17.0 || ^18.0 || ^19.0
 
+  '@preact/signals-core@1.12.1':
+    resolution: {integrity: sha512-BwbTXpj+9QutoZLQvbttRg5x3l5468qaV2kufh+51yha1c53ep5dY4kTuZR35+3pAZxpfQerGJiQqg34ZNZ6uA==}
+
+  '@preact/signals@2.5.1':
+    resolution: {integrity: sha512-VPjk5YFt7i11Fi4UK0tzaEe5xLwfhUxXL3l89ocxQ5aPz7bRo8M5+N73LjBMPklyXKYKz6YsNo4Smp8n6nplng==}
+    peerDependencies:
+      preact: '>= 10.25.0 || >=11.0.0-0'
+
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
 
@@ -2088,6 +2117,35 @@ packages:
     peerDependenciesMeta:
       rollup:
         optional: true
+
+  '@schedule-x/calendar@3.5.1':
+    resolution: {integrity: sha512-JjOAYLKBT+fuoSWRHI/9+wcD9t6vmNxeDAb4quzufbHqc65vNW7dTACw3Y+8U9NUQhr4qIyFuoFnV3vyffpFUQ==}
+    peerDependencies:
+      '@preact/signals': ^2.0.2
+      preact: ^10.19.2
+      temporal-polyfill: 0.3.0
+
+  '@schedule-x/date-picker@3.5.1':
+    resolution: {integrity: sha512-2u0kbT/mUOyna8jCso9FztcdHkrAIJqGuFNVdczB83EuOKn582bGa78VZK8+n1i3ZDU7fV2Kec81HDppSJkQ3w==}
+    peerDependencies:
+      '@preact/signals': ^2.0.2
+      preact: ^10.19.2
+
+  '@schedule-x/drag-and-drop@3.5.1':
+    resolution: {integrity: sha512-8jCOEREj0oBAjdnNX0jvXQw9eQa8DkFXDOTfA1muhmWce918dPahYzzacIfbPjVuX5ooRFT1Xmx5dtG3bTgCxA==}
+
+  '@schedule-x/events-service@3.5.1':
+    resolution: {integrity: sha512-KK8llD+z57Sl4xC/9HJjeS/O5kxP99QvzC1ylB/DbUMrGIx5E4RiGOhupsR6RGyt0rONm+iFdMj2VnjCUFaMsw==}
+
+  '@schedule-x/react@3.5.0':
+    resolution: {integrity: sha512-E40qAuioWWZjjxt54X98eeQzCde+g9cYKcTF0OPqHWpCul/PiL+nPDwql1mpv4xDiqVsMNASqIGhBYU16yDa8g==}
+    peerDependencies:
+      '@schedule-x/calendar': ^3.1.0
+      react: ^16.7.0 || ^17 || ^18 || ^19
+      react-dom: ^16.7.0 || ^17 || ^18 || ^19
+
+  '@schedule-x/theme-default@3.5.1':
+    resolution: {integrity: sha512-zLBiPoRPxMPG1tHWH1fmyR+5IICXx0w9crmBIfxlOBxMGh6ug0/YhuqgV56DaHtkvJdmvuUiZ8FdaKNQ1D7c4w==}
 
   '@sinclair/typebox@0.27.8':
     resolution: {integrity: sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA==}
@@ -4093,6 +4151,9 @@ packages:
   potpack@1.0.2:
     resolution: {integrity: sha512-choctRBIV9EMT9WGAZHn3V7t0Z2pMQyl0EZE6pFc/6ml3ssw7Dlf/oAOvFwjm1HVsqfQN8GfeFyJ+d8tRzqueQ==}
 
+  preact@10.28.1:
+    resolution: {integrity: sha512-u1/ixq/lVQI0CakKNvLDEcW5zfCjUQfZdK9qqWuIJtsezuyG6pk9TWj75GMuI/EzRSZB/VAE43sNWWZfiy8psw==}
+
   pretty-bytes@5.6.0:
     resolution: {integrity: sha512-FFw039TmrBqFK8ma/7OL3sDz/VytdtJr044/QUJtH0wK9lb9jLq9tJyIxUwtQJHwar2BqtiA4iCWSwo9JLkzFg==}
     engines: {node: '>=6'}
@@ -4588,6 +4649,12 @@ packages:
   temp-dir@2.0.0:
     resolution: {integrity: sha512-aoBAniQmmwtcKp/7BzsH8Cxzv8OL736p7v1ihGb5e9DJ9kTwGWHrQrVB5+lfVDzfGrdRzXch+ig7LHaY1JTOrg==}
     engines: {node: '>=8'}
+
+  temporal-polyfill@0.3.0:
+    resolution: {integrity: sha512-qNsTkX9K8hi+FHDfHmf22e/OGuXmfBm9RqNismxBrnSmZVJKegQ+HYYXT+R7Ha8F/YSm2Y34vmzD4cxMu2u95g==}
+
+  temporal-spec@0.3.0:
+    resolution: {integrity: sha512-n+noVpIqz4hYgFSMOSiINNOUOMFtV5cZQNCmmszA6GiVFVRt3G7AqVyhXjhCSmowvQn+NsGn+jMDMKJYHd3bSQ==}
 
   terminal-link@2.1.1:
     resolution: {integrity: sha512-un0FmiRUQNr5PJqy9kP7c40F5BOfpGlYTrxonDChEZB7pzZxRNp/bt+ymiy9/npwXya9KH99nJ/GXFIiUkYGFQ==}
@@ -6418,6 +6485,13 @@ snapshots:
     transitivePeerDependencies:
       - react-dom
 
+  '@preact/signals-core@1.12.1': {}
+
+  '@preact/signals@2.5.1(preact@10.28.1)':
+    dependencies:
+      '@preact/signals-core': 1.12.1
+      preact: 10.28.1
+
   '@protobufjs/aspromise@1.1.2': {}
 
   '@protobufjs/base64@1.1.2': {}
@@ -7415,6 +7489,29 @@ snapshots:
       '@types/estree': 1.0.8
       estree-walker: 2.0.2
       picomatch: 4.0.3
+
+  '@schedule-x/calendar@3.5.1(@preact/signals@2.5.1(preact@10.28.1))(preact@10.28.1)(temporal-polyfill@0.3.0)':
+    dependencies:
+      '@preact/signals': 2.5.1(preact@10.28.1)
+      preact: 10.28.1
+      temporal-polyfill: 0.3.0
+
+  '@schedule-x/date-picker@3.5.1(@preact/signals@2.5.1(preact@10.28.1))(preact@10.28.1)':
+    dependencies:
+      '@preact/signals': 2.5.1(preact@10.28.1)
+      preact: 10.28.1
+
+  '@schedule-x/drag-and-drop@3.5.1': {}
+
+  '@schedule-x/events-service@3.5.1': {}
+
+  '@schedule-x/react@3.5.0(@schedule-x/calendar@3.5.1(@preact/signals@2.5.1(preact@10.28.1))(preact@10.28.1)(temporal-polyfill@0.3.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)':
+    dependencies:
+      '@schedule-x/calendar': 3.5.1(@preact/signals@2.5.1(preact@10.28.1))(preact@10.28.1)(temporal-polyfill@0.3.0)
+      react: 19.2.0
+      react-dom: 19.2.0(react@19.2.0)
+
+  '@schedule-x/theme-default@3.5.1': {}
 
   '@sinclair/typebox@0.27.8':
     optional: true
@@ -9847,6 +9944,8 @@ snapshots:
 
   potpack@1.0.2: {}
 
+  preact@10.28.1: {}
+
   pretty-bytes@5.6.0:
     optional: true
 
@@ -10490,6 +10589,12 @@ snapshots:
 
   temp-dir@2.0.0:
     optional: true
+
+  temporal-polyfill@0.3.0:
+    dependencies:
+      temporal-spec: 0.3.0
+
+  temporal-spec@0.3.0: {}
 
   terminal-link@2.1.1:
     dependencies:
