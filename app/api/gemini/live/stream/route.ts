@@ -42,6 +42,15 @@ interface ExtendedServerMessage extends LiveServerMessage {
   voiceActivityDetectionSignal?: {
     vadSignalType?: string
   }
+  // Tool call (function calling)
+  // Source: Context7 - /googleapis/js-genai docs - "LiveServerToolCall"
+  toolCall?: {
+    functionCalls?: Array<{
+      id?: string
+      name?: string
+      args?: Record<string, unknown>
+    }>
+  }
 }
 
 /**
@@ -111,6 +120,13 @@ function formatServerMessage(msg: ExtendedServerMessage): object {
   if (msg.voiceActivityDetectionSignal) {
     console.log("[SSE] VAD signal:", JSON.stringify(msg.voiceActivityDetectionSignal))
     formatted.voiceActivityDetectionSignal = msg.voiceActivityDetectionSignal
+  }
+
+  // Tool call (function calling) - MUST forward to client
+  // Source: Context7 - /googleapis/js-genai docs - "LiveServerToolCall"
+  if (msg.toolCall) {
+    console.log("[SSE] Tool call:", JSON.stringify(msg.toolCall))
+    formatted.toolCall = msg.toolCall
   }
 
   return formatted

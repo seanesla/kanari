@@ -44,6 +44,9 @@ export interface LiveClientEvents {
   onUserSpeechStart: () => void
   onUserSpeechEnd: () => void
 
+  // Tool/function calling
+  onSilenceChosen: (reason: string) => void
+
   // Send failures
   onSendError: (error: Error, type: "audio" | "text" | "audioEnd") => void
 }
@@ -92,8 +95,25 @@ export class GeminiLiveClient {
   // Connection timeout tracking
   private connectionTimeoutId: ReturnType<typeof setTimeout> | null = null
 
+  // Silence mode - when model calls mute_audio_response, suppress all audio for current turn
+  private silenceMode = false
+
+  // Event deduplication - prevents HMR replay issues
+  // Use persistent storage to survive HMR rebuilds
+  private readonly DEDUP_STORAGE_KEY = "gemini_live_dedup_hashes"
+  private processedEventHashes: Set<string>
+
   constructor(config: LiveClientConfig) {
     this.config = config
+
+    // Load processed hashes from sessionStorage (survives HMR)
+    try {
+      const stored = sessionStorage.getItem(this.DEDUP_STORAGE_KEY)
+      this.processedEventHashes = stored ? new Set(JSON.parse(stored)) : new Set()
+    } catch (error) {
+      console.warn("[LiveClient] Failed to load dedup hashes:", error)
+      this.processedEventHashes = new Set()
+    }
   }
 
   /**
@@ -418,9 +438,77 @@ export class GeminiLiveClient {
   }
 
   /**
+   * Generate a hash for message deduplication
+   * Prevents HMR event replay from processing same message multiple times
+   */
+  private hashMessage(message: Record<string, unknown>): string {
+    // Hash based on message content to detect duplicates
+    // Use JSON.stringify with sorted keys for consistent hashing
+    return JSON.stringify(message, Object.keys(message).sort())
+  }
+
+  /**
+   * Check if a message is a turn signal that CAN be deduplicated
+   * Only deduplicate turnComplete and setupComplete - these cause HMR replay issues
+   * Everything else (audio, transcripts, etc.) must always be processed fresh
+   */
+  private isTurnSignalOnly(message: Record<string, unknown>): boolean {
+    // setupComplete is safe to deduplicate
+    if (message.setupComplete) {
+      return true
+    }
+
+    const serverContent = message.serverContent as Record<string, unknown> | undefined
+    if (!serverContent) return false
+
+    // Only deduplicate if it's JUST a turnComplete signal with nothing else
+    const hasTurnComplete = serverContent.turnComplete === true
+    const hasModelTurn = !!serverContent.modelTurn
+    const hasOutputTranscription = !!serverContent.outputTranscription
+    const hasInputTranscription = !!serverContent.inputTranscription
+    const hasInterrupted = !!serverContent.interrupted
+
+    // Only deduplicate pure turn signals (no content)
+    return hasTurnComplete && !hasModelTurn && !hasOutputTranscription && !hasInputTranscription && !hasInterrupted
+  }
+
+  /**
    * Handle incoming SSE messages
    */
   private handleMessage(message: Record<string, unknown>): void {
+    // ONLY deduplicate pure turn signals (turnComplete/setupComplete with no content)
+    // Everything else (audio, transcripts, tool calls) must always be processed
+    if (this.isTurnSignalOnly(message)) {
+      const hash = this.hashMessage(message)
+      if (this.processedEventHashes.has(hash)) {
+        console.log("[LiveClient] Skipping duplicate event (HMR replay)")
+        return
+      }
+      this.processedEventHashes.add(hash)
+
+      // Persist to sessionStorage to survive HMR rebuilds
+      try {
+        sessionStorage.setItem(
+          this.DEDUP_STORAGE_KEY,
+          JSON.stringify(Array.from(this.processedEventHashes))
+        )
+      } catch (error) {
+        console.warn("[LiveClient] Failed to persist dedup hashes:", error)
+      }
+
+      // Clear old hashes periodically to prevent memory leak (keep last 100)
+      if (this.processedEventHashes.size > 100) {
+        const hashes = Array.from(this.processedEventHashes)
+        this.processedEventHashes = new Set(hashes.slice(-100))
+        // Update sessionStorage with trimmed set
+        try {
+          sessionStorage.setItem(this.DEDUP_STORAGE_KEY, JSON.stringify(hashes.slice(-100)))
+        } catch (error) {
+          console.warn("[LiveClient] Failed to persist trimmed dedup hashes:", error)
+        }
+      }
+    }
+
     // Validate message with Zod schema
     const validatedMessage = validateServerMessage(message)
     if (!validatedMessage) {
@@ -465,8 +553,56 @@ export class GeminiLiveClient {
       return
     }
 
+    // Tool call (function calling)
+    // Source: Context7 - /googleapis/js-genai docs - "LiveServerToolCall"
+    if (validatedMessage.toolCall) {
+      this.handleToolCall(validatedMessage.toolCall as Record<string, unknown>)
+      return
+    }
+
     // Unknown message type
     console.log("[GeminiLive] Unknown message:", validatedMessage)
+  }
+
+  /**
+   * Handle tool call messages (function calling)
+   * Source: Context7 - /googleapis/js-genai docs - "LiveServerToolCall"
+   */
+  private handleToolCall(toolCall: Record<string, unknown>): void {
+    const functionCalls = toolCall.functionCalls as Array<{
+      id: string
+      name: string
+      args?: Record<string, unknown>
+    }> | undefined
+
+    if (!functionCalls || functionCalls.length === 0) {
+      console.warn("[LiveClient] Empty tool call received")
+      return
+    }
+
+    for (const fc of functionCalls) {
+      console.log("[LiveClient] Function call:", fc.name, "args:", fc.args)
+
+      if (fc.name === "mute_audio_response") {
+        // Model chose silence - activate silence mode to suppress audio
+        const reason = (fc.args?.reason as string) || "no reason provided"
+        console.log("[LiveClient] Model chose silence:", reason)
+
+        // CRITICAL: Set silence mode to suppress all audio for this turn
+        this.silenceMode = true
+
+        this.config.events.onSilenceChosen?.(reason)
+
+        // Send tool response to complete the turn
+        this.sendToolResponse([{
+          id: fc.id,
+          name: fc.name,
+          response: { acknowledged: true }
+        }])
+      } else {
+        console.warn("[LiveClient] Unknown function call:", fc.name)
+      }
+    }
   }
 
   /**
@@ -494,9 +630,16 @@ export class GeminiLiveClient {
       return
     }
 
-    // Check for turn complete
+    // Check for turn complete - reset silence mode
     if (content.turnComplete) {
       console.log("[GeminiLive] Turn complete")
+
+      // Reset silence mode for next turn
+      if (this.silenceMode) {
+        console.log("[LiveClient] Resetting silence mode")
+        this.silenceMode = false
+      }
+
       this.config.events.onTurnComplete?.()
       this.config.events.onAudioEnd?.()
       return
@@ -510,6 +653,11 @@ export class GeminiLiveClient {
         const inlineData = part.inlineData as { mimeType?: string; data?: string } | undefined
         if (inlineData?.data) {
           if (inlineData.mimeType?.startsWith("audio/")) {
+            // BUG FIX 3: Suppress audio when in silence mode
+            if (this.silenceMode) {
+              console.log("[LiveClient] Suppressing audio chunk in silence mode")
+              continue // Skip this audio chunk
+            }
             this.config.events.onAudioChunk?.(inlineData.data)
           }
         }
@@ -517,7 +665,11 @@ export class GeminiLiveClient {
         // Text response (chain-of-thought reasoning)
         // Note: This is NOT the actual speech - use outputTranscription for that
         if (part.text) {
-          this.config.events.onModelThinking?.(part.text as string)
+          // BUG FIX 2: Sanitize control characters from text output
+          const sanitizedText = (part.text as string).replace(/<ctrl\d+>/g, "")
+          if (sanitizedText.trim()) {
+            this.config.events.onModelThinking?.(sanitizedText)
+          }
         }
       }
     }
@@ -612,6 +764,34 @@ export class GeminiLiveClient {
   }
 
   /**
+   * Send tool response back to Gemini
+   * Used when model calls a function (e.g., stay_silent)
+   * Source: Context7 - /googleapis/js-genai docs - "sendToolResponse"
+   *
+   * @param functionResponses - Array of function responses
+   */
+  private sendToolResponse(
+    functionResponses: Array<{ id: string; name: string; response: Record<string, unknown> }>
+  ): void {
+    if (!this.isReady() || !this.sessionId || !this.sessionSecret) {
+      console.warn("[GeminiLive] Not ready to send tool response")
+      return
+    }
+
+    fetch("/api/gemini/live/tool-response", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: this.sessionId,
+        secret: this.sessionSecret,
+        functionResponses,
+      }),
+    }).catch((error) => {
+      console.error("[GeminiLive] Failed to send tool response:", error)
+    })
+  }
+
+  /**
    * Signal end of audio stream (user stopped speaking)
    */
   sendAudioEnd(): void {
@@ -662,6 +842,13 @@ export class GeminiLiveClient {
       }).catch((error) => {
         console.error("[GeminiLive] Failed to close session:", error)
       })
+    }
+
+    // Clear deduplication hashes from sessionStorage
+    try {
+      sessionStorage.removeItem(this.DEDUP_STORAGE_KEY)
+    } catch (error) {
+      console.warn("[LiveClient] Failed to clear dedup hashes:", error)
     }
 
     this.sessionId = null

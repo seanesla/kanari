@@ -16,6 +16,7 @@
 import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@google/genai"
 import { EventEmitter } from "events"
 import { randomBytes, timingSafeEqual } from "crypto"
+import { MUTE_RESPONSE_TOOL } from "./live-prompts"
 
 // Session timeout: 30 minutes (matches Gemini session limit)
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000
@@ -128,6 +129,9 @@ class GeminiSessionManager {
           inputAudioTranscription: {},
           // System instruction as simple string
           ...(systemInstruction ? { systemInstruction } : {}),
+          // Tools for function calling (intelligent silence)
+          // Source: Context7 - /googleapis/js-genai docs - "tools config"
+          tools: [MUTE_RESPONSE_TOOL],
         },
         callbacks: {
           onopen: () => {
@@ -256,6 +260,28 @@ class GeminiSessionManager {
       await managed.session.sendRealtimeInput({ audioStreamEnd: true })
     } catch (error) {
       console.error(`[SessionManager] Failed to send audio end to ${sessionId}:`, error)
+      throw error
+    }
+  }
+
+  /**
+   * Send tool response back to Gemini
+   * Used when model calls a function (e.g., stay_silent)
+   * Source: Context7 - /googleapis/js-genai docs - "sendToolResponse"
+   */
+  async sendToolResponse(
+    sessionId: string,
+    functionResponses: Array<{ id: string; name: string; response: Record<string, unknown> }>
+  ): Promise<void> {
+    const managed = this.sessions.get(sessionId)
+    if (!managed) {
+      throw new Error(`Session ${sessionId} not found`)
+    }
+
+    try {
+      managed.session.sendToolResponse({ functionResponses })
+    } catch (error) {
+      console.error(`[SessionManager] Failed to send tool response to ${sessionId}:`, error)
       throw error
     }
   }

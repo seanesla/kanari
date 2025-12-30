@@ -72,13 +72,15 @@ const ServerContentSchema = z.object({
 
 /**
  * Tool call schema
+ * Source: Context7 - /googleapis/js-genai docs - "LiveServerToolCall"
  */
 const ToolCallSchema = z.object({
   functionCalls: z
     .array(
       z.object({
+        id: z.string().optional(), // Required for sending tool response back
         name: z.string(),
-        args: z.record(z.unknown()),
+        args: z.record(z.unknown()).optional(), // Args may be undefined
       })
     )
     .optional(),

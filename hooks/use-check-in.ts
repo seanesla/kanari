@@ -473,6 +473,11 @@ export function useCheckIn(
       playbackControls.clearQueue()
       dispatch({ type: "SET_USER_SPEAKING" })
     },
+    onSilenceChosen: (reason) => {
+      // Model chose to stay silent - don't play audio, transition to listening
+      console.log("[useCheckIn] AI chose silence:", reason)
+      dispatch({ type: "SET_LISTENING" })
+    },
   })
 
   // Sync connection state
