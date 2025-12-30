@@ -557,7 +557,7 @@ export default function DashboardPage() {
                               <p className="font-medium text-foreground mb-2">Score meaning</p>
                               <ul className="text-muted-foreground text-xs space-y-1.5">
                                 <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-green-500" /> 71-100: Healthy range</li>
-                                <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-amber-500" /> 41-70: Monitor closely</li>
+                                <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-accent" /> 41-70: Monitor closely</li>
                                 <li className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-red-500" /> 0-40: Take action</li>
                               </ul>
                             </div>

@@ -25,7 +25,7 @@ const categoryIcons: Record<SuggestionCategory, typeof Coffee> = {
 }
 
 const categoryColors: Record<SuggestionCategory, { text: string; bg: string }> = {
-  break: { text: "text-amber-500", bg: "bg-amber-500/10" },
+  break: { text: "text-accent", bg: "bg-accent/10" },
   exercise: { text: "text-green-500", bg: "bg-green-500/10" },
   mindfulness: { text: "text-purple-500", bg: "bg-purple-500/10" },
   social: { text: "text-blue-500", bg: "bg-blue-500/10" },

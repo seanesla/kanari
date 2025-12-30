@@ -137,7 +137,7 @@ export function PersistentNavbar() {
       {/* Logo - always links to landing */}
       <Link
         href="/"
-        className="flex items-center gap-2 text-accent hover:text-[#e0b080] transition-colors"
+        className="flex items-center gap-2 text-accent hover:text-accent-light transition-colors"
       >
         <Logo className="h-7 w-auto" />
       </Link>

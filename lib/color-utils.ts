@@ -32,16 +32,49 @@ export function generateDarkVariant(hex: string): string {
 }
 
 /**
+ * Generate lighter variant by increasing lightness by 15%
+ * Used for hover states and lighter text
+ */
+export function generateLightVariant(hex: string): string {
+  const color = oklch(hex)
+  if (!color) return "#e0b080" // fallback
+
+  const lightColor = {
+    ...color,
+    l: Math.min(1, color.l * 1.15) // Increase lightness by 15%
+  }
+
+  return formatHex(lightColor) || "#e0b080"
+}
+
+/**
+ * Generate muted variant for secondary text (text-muted-foreground)
+ * Uses accent hue with low chroma for subtle tinting
+ */
+export function generateMutedOklch(hex: string): string {
+  const color = oklch(hex)
+  if (!color) return "oklch(0.78 0.08 70)" // fallback to amber muted
+
+  // Use accent hue with muted chroma (0.08) and standard lightness (0.78)
+  return `oklch(0.78 0.08 ${(color.h || 0).toFixed(0)})`
+}
+
+/**
  * Update CSS custom properties with new accent color
  */
 export function updateCSSVariables(hex: string) {
   if (typeof document === "undefined") return
 
   const oklchValue = hexToOklch(hex)
+  const lightVariant = generateLightVariant(hex)
+  const lightOklchValue = hexToOklch(lightVariant)
+  const mutedValue = generateMutedOklch(hex)
   const root = document.documentElement
 
   // Update all accent-related CSS variables
   root.style.setProperty("--accent", `oklch(${oklchValue})`)
+  root.style.setProperty("--accent-light", `oklch(${lightOklchValue})`)
+  root.style.setProperty("--muted-foreground", mutedValue)
   root.style.setProperty("--ring", `oklch(${oklchValue})`)
   root.style.setProperty("--chart-1", `oklch(${oklchValue})`)
   root.style.setProperty("--sidebar-primary", `oklch(${oklchValue})`)

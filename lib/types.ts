@@ -227,7 +227,7 @@ export const statusToColumn: Record<SuggestionStatus, KanbanColumn> = {
 
 // Category display configuration
 export const categoryConfig: Record<SuggestionCategory, { label: string; color: string; bgColor: string }> = {
-  break: { label: "Break", color: "text-amber-500", bgColor: "bg-amber-500/10" },
+  break: { label: "Break", color: "text-accent", bgColor: "bg-accent/10" },
   exercise: { label: "Exercise", color: "text-green-500", bgColor: "bg-green-500/10" },
   mindfulness: { label: "Mindfulness", color: "text-purple-500", bgColor: "bg-purple-500/10" },
   social: { label: "Social", color: "text-blue-500", bgColor: "bg-blue-500/10" },

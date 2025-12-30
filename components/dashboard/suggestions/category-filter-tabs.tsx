@@ -18,7 +18,7 @@ const filterOptions: { value: FilterValue; label: string; icon: typeof Coffee }[
 
 const categoryColors: Record<FilterValue, string> = {
   all: "text-foreground",
-  break: "text-amber-500",
+  break: "text-accent",
   exercise: "text-green-500",
   mindfulness: "text-purple-500",
   social: "text-blue-500",

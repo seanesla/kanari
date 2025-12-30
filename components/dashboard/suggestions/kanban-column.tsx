@@ -67,7 +67,7 @@ export function KanbanColumn({ column, suggestions, onCardClick }: KanbanColumnP
           <Icon
             className={cn(
               "h-4 w-4",
-              column === "pending" && "text-amber-500",
+              column === "pending" && "text-accent",
               column === "scheduled" && "text-blue-500",
               column === "completed" && "text-green-500"
             )}

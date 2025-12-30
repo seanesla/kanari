@@ -1,8 +1,10 @@
 "use client"
 
 import { motion, useAnimation } from "framer-motion"
-import { useEffect } from "react"
+import { useEffect, useId, useMemo } from "react"
 import { LOGO_PATH } from "./logo"
+import { useSceneMode } from "@/lib/scene-context"
+import { generateLightVariant, generateDarkVariant } from "@/lib/color-utils"
 
 interface AnimatedLogoProps {
   onComplete?: () => void
@@ -11,6 +13,14 @@ interface AnimatedLogoProps {
 
 export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
   const controls = useAnimation()
+  const { accentColor } = useSceneMode()
+  const gradientId = useId()
+
+  const gradientColors = useMemo(() => ({
+    light: generateLightVariant(accentColor),
+    base: accentColor,
+    dark: generateDarkVariant(accentColor),
+  }), [accentColor])
 
   useEffect(() => {
     const sequence = async () => {
@@ -29,10 +39,10 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
     <div className="relative" style={{ width: size, height: size * 1.1 }}>
       <svg viewBox="0 0 185 203" className="w-full h-full">
         <defs>
-          <linearGradient id="logo-fill-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#e0b080" />
-            <stop offset="50%" stopColor="#cd9c60" />
-            <stop offset="100%" stopColor="#b8894d" />
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={gradientColors.light} />
+            <stop offset="50%" stopColor={gradientColors.base} />
+            <stop offset="100%" stopColor={gradientColors.dark} />
           </linearGradient>
         </defs>
 
@@ -40,7 +50,7 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
           {/* Fill layer - fades in after stroke completes */}
           <motion.path
             d={LOGO_PATH}
-            fill="url(#logo-fill-gradient)"
+            fill={`url(#${gradientId})`}
             initial={{ fillOpacity: 0 }}
             animate={controls}
             variants={{
@@ -57,7 +67,7 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
           <motion.path
             d={LOGO_PATH}
             fill="transparent"
-            stroke="#cd9c60"
+            stroke={gradientColors.base}
             strokeWidth={2}
             strokeLinecap="round"
             strokeLinejoin="round"
