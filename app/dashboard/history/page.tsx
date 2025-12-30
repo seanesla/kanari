@@ -28,7 +28,7 @@ import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { VoiceNoteCard, AIChatCard } from "@/components/dashboard/history-cards"
 import { ChatSessionDrawer } from "@/components/dashboard/chat-session-drawer"
-import { RecordingDrawer } from "@/components/dashboard/recording-drawer"
+import { CheckInDrawer } from "@/components/dashboard/check-in-drawer"
 import { getDateKey, getDateLabel } from "@/lib/date-utils"
 import type { Recording, HistoryItem, CheckInSession } from "@/lib/types"
 
@@ -53,7 +53,7 @@ function HistoryPageContent() {
   const [visible, setVisible] = useState(!shouldAnimate)
 
   // Drawer states
-  const [recordingDrawerOpen, setRecordingDrawerOpen] = useState(false)
+  const [checkInDrawerOpen, setCheckInDrawerOpen] = useState(false)
   const [selectedChatSession, setSelectedChatSession] = useState<CheckInSession | null>(null)
 
   // Highlight state for newly created items
@@ -117,10 +117,10 @@ function HistoryPageContent() {
     deleteEmptyCheckInSessions()
   }, [deleteEmptyCheckInSessions])
 
-  // Check for auto-open param in URL
+  // Check for auto-open param in URL (triggered from overview page check-in button)
   useEffect(() => {
-    if (searchParams.get("newRecording") === "true") {
-      setRecordingDrawerOpen(true)
+    if (searchParams.get("newCheckIn") === "true") {
+      setCheckInDrawerOpen(true)
       window.history.replaceState({}, "", "/dashboard/history")
     }
   }, [searchParams])
@@ -167,14 +167,19 @@ function HistoryPageContent() {
     setSelectedChatSession(session)
   }, [])
 
-  // Handle new recording completion
+  // Handle new recording completion (voice note)
   const handleRecordingComplete = useCallback((recording: Recording) => {
     setHighlightedItemId(recording.id)
   }, [])
 
-  // Open recording drawer
-  const handleOpenRecordingDrawer = useCallback(() => {
-    setRecordingDrawerOpen(true)
+  // Handle new AI chat session completion
+  const handleSessionComplete = useCallback((session: CheckInSession) => {
+    setHighlightedItemId(session.id)
+  }, [])
+
+  // Open check-in drawer
+  const handleOpenCheckInDrawer = useCallback(() => {
+    setCheckInDrawerOpen(true)
   }, [])
 
   return (
@@ -197,7 +202,7 @@ function HistoryPageContent() {
               journey and see how your stress and fatigue levels change over time.
             </p>
             <Button
-              onClick={handleOpenRecordingDrawer}
+              onClick={handleOpenCheckInDrawer}
               className="bg-accent text-accent-foreground hover:bg-accent/90 gap-2"
             >
               <Plus className="h-4 w-4" />
@@ -267,7 +272,7 @@ function HistoryPageContent() {
                   </EmptyDescription>
                 </EmptyHeader>
                 <Button
-                  onClick={handleOpenRecordingDrawer}
+                  onClick={handleOpenCheckInDrawer}
                   className="bg-accent text-accent-foreground hover:bg-accent/90 mt-4"
                 >
                   <Plus className="mr-2 h-4 w-4" />
@@ -361,11 +366,12 @@ function HistoryPageContent() {
         </div>
       </main>
 
-      {/* Recording Drawer - for creating new check-ins */}
-      <RecordingDrawer
-        open={recordingDrawerOpen}
-        onOpenChange={setRecordingDrawerOpen}
+      {/* Check-in Drawer - for creating new check-ins (voice note or AI chat) */}
+      <CheckInDrawer
+        open={checkInDrawerOpen}
+        onOpenChange={setCheckInDrawerOpen}
         onRecordingComplete={handleRecordingComplete}
+        onSessionComplete={handleSessionComplete}
       />
 
       {/* Chat Session Detail Drawer - for viewing full conversations */}
