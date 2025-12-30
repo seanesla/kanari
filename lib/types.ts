@@ -423,6 +423,9 @@ export interface CheckInMessage {
   id: string
   role: CheckInMessageRole
   content: string
+  // Chain-of-thought reasoning (for assistant messages)
+  // Shows Gemini's internal reasoning process - displayed in expandable accordion
+  thinking?: string
   timestamp: string
   // Audio features captured during this message (for user messages)
   features?: AudioFeatures

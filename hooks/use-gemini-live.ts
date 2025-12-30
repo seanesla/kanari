@@ -3,12 +3,15 @@
 /**
  * useGeminiLive Hook
  *
- * Manages WebSocket connection to Gemini Live API for real-time
- * voice conversations. Handles connection lifecycle, audio streaming,
- * and event dispatching.
+ * Manages connection to server-side Gemini Live session for real-time
+ * voice conversations. Uses SSE for receiving and POST for sending.
  *
- * Source: Context7 - /websites/ai_google_dev_api docs - "Live API"
- * https://ai.google.dev/gemini-api/docs/live
+ * Architecture:
+ * - Server manages the actual Gemini session (API key stays server-side)
+ * - Client receives audio/transcripts via Server-Sent Events (SSE)
+ * - Client sends audio via POST requests
+ *
+ * Source: Context7 - /googleapis/js-genai docs - "Live.connect"
  */
 
 import { useReducer, useRef, useCallback, useEffect } from "react"
@@ -16,10 +19,8 @@ import {
   GeminiLiveClient,
   createLiveClient,
   type LiveClientConfig,
-  type LiveClientState,
   type LiveClientEvents,
 } from "@/lib/gemini/live-client"
-import { CHECK_IN_SYSTEM_PROMPT } from "@/lib/gemini/live-prompts"
 
 // ============================================
 // Types
@@ -27,7 +28,6 @@ import { CHECK_IN_SYSTEM_PROMPT } from "@/lib/gemini/live-prompts"
 
 export type GeminiConnectionState =
   | "idle"
-  | "fetching_token"
   | "connecting"
   | "connected"
   | "ready"
@@ -49,16 +49,10 @@ export interface GeminiLiveData {
   modelTranscript: string
   /** Error message if state is "error" */
   error: string | null
-  /** Session token info */
-  session: {
-    token: string | null
-    expiresAt: string | null
-    model: string | null
-  }
 }
 
 export interface GeminiLiveControls {
-  /** Initialize connection (get token + connect) */
+  /** Initialize connection */
   connect: () => Promise<void>
   /** Disconnect from Gemini */
   disconnect: () => void
@@ -73,14 +67,13 @@ export interface GeminiLiveControls {
 }
 
 export interface UseGeminiLiveOptions {
-  /** System instruction (defaults to CHECK_IN_SYSTEM_PROMPT) */
-  systemInstruction?: string
   /** Callbacks for audio events */
   onAudioChunk?: (base64Audio: string) => void
   onAudioEnd?: () => void
   /** Callbacks for transcript events */
   onUserTranscript?: (text: string, isFinal: boolean) => void
   onModelTranscript?: (text: string) => void
+  onModelThinking?: (text: string) => void
   /** Callbacks for turn events */
   onTurnComplete?: () => void
   onInterrupted?: () => void
@@ -97,9 +90,7 @@ export interface UseGeminiLiveOptions {
 // Reducer
 // ============================================
 
-type GeminiAction =
-  | { type: "START_FETCHING_TOKEN" }
-  | { type: "TOKEN_RECEIVED"; token: string; expiresAt: string; model: string }
+export type GeminiAction =
   | { type: "START_CONNECTING" }
   | { type: "CONNECTED" }
   | { type: "READY" }
@@ -114,7 +105,7 @@ type GeminiAction =
   | { type: "DISCONNECTED" }
   | { type: "RESET" }
 
-const initialState: GeminiLiveData = {
+export const initialState: GeminiLiveData = {
   state: "idle",
   isReady: false,
   isModelSpeaking: false,
@@ -122,34 +113,13 @@ const initialState: GeminiLiveData = {
   userTranscript: "",
   modelTranscript: "",
   error: null,
-  session: {
-    token: null,
-    expiresAt: null,
-    model: null,
-  },
 }
 
-function geminiReducer(state: GeminiLiveData, action: GeminiAction): GeminiLiveData {
+export function geminiReducer(state: GeminiLiveData, action: GeminiAction): GeminiLiveData {
   switch (action.type) {
-    case "START_FETCHING_TOKEN":
-      return {
-        ...initialState,
-        state: "fetching_token",
-      }
-
-    case "TOKEN_RECEIVED":
-      return {
-        ...state,
-        session: {
-          token: action.token,
-          expiresAt: action.expiresAt,
-          model: action.model,
-        },
-      }
-
     case "START_CONNECTING":
       return {
-        ...state,
+        ...initialState,
         state: "connecting",
       }
 
@@ -191,8 +161,6 @@ function geminiReducer(state: GeminiLiveData, action: GeminiAction): GeminiLiveD
       }
 
     case "USER_TRANSCRIPT":
-      // For non-final transcripts, replace entirely (they represent the current utterance)
-      // For final transcripts, use the final text directly
       return {
         ...state,
         userTranscript: action.text,
@@ -200,13 +168,12 @@ function geminiReducer(state: GeminiLiveData, action: GeminiAction): GeminiLiveD
 
     case "MODEL_TRANSCRIPT":
       // Append to current model transcript with max length check
-      // Max ~10KB to prevent memory bloat in long sessions
       const MAX_TRANSCRIPT_LENGTH = 10000
       const newTranscript = state.modelTranscript + action.text
       return {
         ...state,
         modelTranscript: newTranscript.length > MAX_TRANSCRIPT_LENGTH
-          ? newTranscript.slice(-MAX_TRANSCRIPT_LENGTH)  // Keep most recent
+          ? newTranscript.slice(-MAX_TRANSCRIPT_LENGTH)
           : newTranscript,
       }
 
@@ -247,7 +214,7 @@ function geminiReducer(state: GeminiLiveData, action: GeminiAction): GeminiLiveD
 // ============================================
 
 /**
- * Hook for managing Gemini Live API WebSocket connection
+ * Hook for managing Gemini Live API connection
  *
  * @example
  * const [gemini, controls] = useGeminiLive({
@@ -265,11 +232,11 @@ export function useGeminiLive(
   options: UseGeminiLiveOptions = {}
 ): [GeminiLiveData, GeminiLiveControls] {
   const {
-    systemInstruction = CHECK_IN_SYSTEM_PROMPT,
     onAudioChunk,
     onAudioEnd,
     onUserTranscript,
     onModelTranscript,
+    onModelThinking,
     onTurnComplete,
     onInterrupted,
     onUserSpeechStart,
@@ -281,6 +248,7 @@ export function useGeminiLive(
 
   const [data, dispatch] = useReducer(geminiReducer, initialState)
   const clientRef = useRef<GeminiLiveClient | null>(null)
+  const isConnectingRef = useRef(false)
 
   // Store callbacks in refs to avoid stale closures
   const callbacksRef = useRef({
@@ -288,6 +256,7 @@ export function useGeminiLive(
     onAudioEnd,
     onUserTranscript,
     onModelTranscript,
+    onModelThinking,
     onTurnComplete,
     onInterrupted,
     onUserSpeechStart,
@@ -304,6 +273,7 @@ export function useGeminiLive(
       onAudioEnd,
       onUserTranscript,
       onModelTranscript,
+      onModelThinking,
       onTurnComplete,
       onInterrupted,
       onUserSpeechStart,
@@ -317,6 +287,7 @@ export function useGeminiLive(
     onAudioEnd,
     onUserTranscript,
     onModelTranscript,
+    onModelThinking,
     onTurnComplete,
     onInterrupted,
     onUserSpeechStart,
@@ -337,40 +308,17 @@ export function useGeminiLive(
   }, [])
 
   /**
-   * Fetch ephemeral token from API
-   */
-  const fetchToken = useCallback(async () => {
-    const response = await fetch("/api/gemini/session", {
-      method: "POST",
-    })
-
-    // Parse JSON once - response body can only be consumed once
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new Error(data.error || "Failed to get session token")
-    }
-
-    return data as { token: string; expiresAt: string; wsUrl: string; model: string }
-  }, [])
-
-  /**
    * Connect to Gemini Live API
    */
   const connect = useCallback(async () => {
+    // Prevent concurrent connection attempts
+    if (isConnectingRef.current) {
+      console.warn("[GeminiLive] Connection already in progress")
+      return
+    }
+
     try {
-      // Start connection process
-      dispatch({ type: "START_FETCHING_TOKEN" })
-
-      // Get ephemeral token
-      const session = await fetchToken()
-      dispatch({
-        type: "TOKEN_RECEIVED",
-        token: session.token,
-        expiresAt: session.expiresAt,
-        model: session.model,
-      })
-
+      isConnectingRef.current = true
       dispatch({ type: "START_CONNECTING" })
 
       // Create event handlers that use refs to avoid stale closures
@@ -407,6 +355,9 @@ export function useGeminiLive(
           dispatch({ type: "MODEL_TRANSCRIPT", text })
           callbacksRef.current.onModelTranscript?.(text)
         },
+        onModelThinking: (text) => {
+          callbacksRef.current.onModelThinking?.(text)
+        },
         onTurnComplete: () => {
           dispatch({ type: "MODEL_SPEECH_END" })
           dispatch({ type: "CLEAR_TRANSCRIPTS" })
@@ -426,12 +377,8 @@ export function useGeminiLive(
         },
       }
 
-      // Create client config
+      // Create client config (simplified - server handles session creation)
       const config: LiveClientConfig = {
-        token: session.token,
-        wsUrl: session.wsUrl,
-        model: session.model,
-        systemInstruction,
         events,
       }
 
@@ -445,8 +392,10 @@ export function useGeminiLive(
       const err = error instanceof Error ? error : new Error("Connection failed")
       dispatch({ type: "ERROR", error: err.message })
       callbacksRef.current.onError?.(err)
+    } finally {
+      isConnectingRef.current = false
     }
-  }, [fetchToken, systemInstruction])
+  }, [])
 
   /**
    * Disconnect from Gemini

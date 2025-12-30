@@ -7,9 +7,10 @@
  * role-based styling and optional metadata.
  */
 
-import { motion } from "framer-motion"
+import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { User, Sparkles, AlertTriangle } from "lucide-react"
+import { User, Sparkles, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react"
 import type { CheckInMessage } from "@/lib/types"
 
 interface MessageBubbleProps {
@@ -26,6 +27,10 @@ export function MessageBubble({
   const isUser = message.role === "user"
   const isAssistant = message.role === "assistant"
   const hasMismatch = message.mismatch?.detected
+  const hasThinking = isAssistant && message.thinking
+
+  // State for expandable thinking section
+  const [showThinking, setShowThinking] = useState(false)
 
   // Format timestamp
   const time = new Date(message.timestamp).toLocaleTimeString([], {
@@ -70,6 +75,39 @@ export function MessageBubble({
         >
           <p className="whitespace-pre-wrap">{message.content}</p>
         </div>
+
+        {/* Expandable thinking/COT section (assistant only) */}
+        {hasThinking && (
+          <div className="flex flex-col gap-1 mt-1">
+            <button
+              onClick={() => setShowThinking(!showThinking)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-1 group"
+            >
+              {showThinking ? (
+                <ChevronDown className="w-3 h-3" />
+              ) : (
+                <ChevronRight className="w-3 h-3" />
+              )}
+              <span className="group-hover:underline">
+                {showThinking ? "Hide" : "Show"} thinking
+              </span>
+            </button>
+
+            <AnimatePresence>
+              {showThinking && (
+                <motion.div
+                  className="bg-muted/50 rounded-lg p-2.5 text-xs text-muted-foreground border border-border/50"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <p className="whitespace-pre-wrap">{message.thinking}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
 
         {/* Metadata row */}
         <div

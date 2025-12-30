@@ -53,6 +53,8 @@ export interface CheckInData {
   currentUserTranscript: string
   /** Current assistant transcript (being spoken) */
   currentAssistantTranscript: string
+  /** Current assistant thinking (chain-of-thought) */
+  currentAssistantThinking: string
   /** Latest mismatch detection result */
   latestMismatch: MismatchResult | null
   /** Number of mismatches detected this session */
@@ -106,7 +108,7 @@ export interface UseCheckInOptions {
 // Reducer
 // ============================================
 
-type CheckInAction =
+export type CheckInAction =
   | { type: "START_INITIALIZING" }
   | { type: "SET_CONNECTING" }
   | { type: "SET_READY" }
@@ -127,6 +129,9 @@ type CheckInAction =
     }
   | { type: "SET_USER_TRANSCRIPT"; text: string }
   | { type: "SET_ASSISTANT_TRANSCRIPT"; text: string }
+  | { type: "APPEND_ASSISTANT_TRANSCRIPT"; text: string }
+  | { type: "SET_ASSISTANT_THINKING"; text: string }
+  | { type: "APPEND_ASSISTANT_THINKING"; text: string }
   | { type: "CLEAR_CURRENT_TRANSCRIPTS" }
   | { type: "SET_MISMATCH"; result: MismatchResult }
   | { type: "SET_INPUT_LEVEL"; level: number }
@@ -135,13 +140,14 @@ type CheckInAction =
   | { type: "SET_ERROR"; error: string }
   | { type: "RESET" }
 
-const initialState: CheckInData = {
+export const initialState: CheckInData = {
   state: "idle",
   isActive: false,
   session: null,
   messages: [],
   currentUserTranscript: "",
   currentAssistantTranscript: "",
+  currentAssistantThinking: "",
   latestMismatch: null,
   mismatchCount: 0,
   audioLevels: { input: 0, output: 0 },
@@ -149,7 +155,7 @@ const initialState: CheckInData = {
   error: null,
 }
 
-function checkInReducer(state: CheckInData, action: CheckInAction): CheckInData {
+export function checkInReducer(state: CheckInData, action: CheckInAction): CheckInData {
   switch (action.type) {
     case "START_INITIALIZING":
       return { ...initialState, state: "initializing" }
@@ -183,16 +189,13 @@ function checkInReducer(state: CheckInData, action: CheckInAction): CheckInData 
 
     case "ADD_MESSAGE":
       const newMessages = [...state.messages, action.message]
-      const newMismatchCount =
-        action.message.mismatch?.detected
-          ? state.mismatchCount + 1
-          : state.mismatchCount
+      // Don't increment mismatch count here - it will be incremented in UPDATE_MESSAGE_FEATURES
+      // when the actual mismatch detection runs
       return {
         ...state,
         messages: newMessages,
-        mismatchCount: newMismatchCount,
         session: state.session
-          ? { ...state.session, messages: newMessages, mismatchCount: newMismatchCount }
+          ? { ...state.session, messages: newMessages }
           : null,
       }
 
@@ -230,8 +233,22 @@ function checkInReducer(state: CheckInData, action: CheckInAction): CheckInData 
     case "SET_ASSISTANT_TRANSCRIPT":
       return { ...state, currentAssistantTranscript: action.text }
 
+    case "APPEND_ASSISTANT_TRANSCRIPT":
+      return { ...state, currentAssistantTranscript: state.currentAssistantTranscript + action.text }
+
+    case "SET_ASSISTANT_THINKING":
+      return { ...state, currentAssistantThinking: action.text }
+
+    case "APPEND_ASSISTANT_THINKING":
+      return { ...state, currentAssistantThinking: state.currentAssistantThinking + action.text }
+
     case "CLEAR_CURRENT_TRANSCRIPTS":
-      return { ...state, currentUserTranscript: "", currentAssistantTranscript: "" }
+      return {
+        ...state,
+        currentUserTranscript: "",
+        currentAssistantTranscript: "",
+        currentAssistantThinking: "",
+      }
 
     case "SET_MISMATCH":
       return { ...state, latestMismatch: action.result }
@@ -314,6 +331,19 @@ export function useCheckIn(
   // Track current state for use in callbacks (avoid stale closures)
   const stateRef = useRef<CheckInState>(data.state)
 
+  // Throttle ref for audio level dispatches (60ms interval)
+  const lastAudioLevelDispatchRef = useRef<number>(0)
+  const AUDIO_LEVEL_THROTTLE_MS = 60
+
+  // Max audio chunks to prevent memory leak (roughly 10 seconds at 100ms chunks)
+  const MAX_AUDIO_CHUNKS = 1000
+
+  // Track current transcripts for use in callbacks (avoid stale closures)
+  const transcriptRef = useRef({
+    transcript: data.currentAssistantTranscript,
+    thinking: data.currentAssistantThinking,
+  })
+
   // ========================================
   // Gemini Live Hook
   // ========================================
@@ -375,8 +405,14 @@ export function useCheckIn(
     },
     onModelTranscript: (text) => {
       dispatch({
-        type: "SET_ASSISTANT_TRANSCRIPT",
-        text: data.currentAssistantTranscript + text,
+        type: "APPEND_ASSISTANT_TRANSCRIPT",
+        text,
+      })
+    },
+    onModelThinking: (text) => {
+      dispatch({
+        type: "APPEND_ASSISTANT_THINKING",
+        text,
       })
     },
     onAudioChunk: (base64Audio) => {
@@ -385,8 +421,12 @@ export function useCheckIn(
     },
     onTurnComplete: () => {
       // Add assistant message when turn completes
-      if (data.currentAssistantTranscript.trim()) {
-        addAssistantMessage(data.currentAssistantTranscript)
+      // Use ref to avoid stale closure
+      if (transcriptRef.current.transcript.trim()) {
+        addAssistantMessage(
+          transcriptRef.current.transcript,
+          transcriptRef.current.thinking || undefined
+        )
       }
       dispatch({ type: "CLEAR_CURRENT_TRANSCRIPTS" })
       dispatch({ type: "SET_LISTENING" })
@@ -407,6 +447,14 @@ export function useCheckIn(
   useEffect(() => {
     stateRef.current = data.state
   }, [data.state])
+
+  // Sync transcriptRef with current transcripts (for use in callbacks)
+  useEffect(() => {
+    transcriptRef.current = {
+      transcript: data.currentAssistantTranscript,
+      thinking: data.currentAssistantThinking,
+    }
+  }, [data.currentAssistantTranscript, data.currentAssistantThinking])
 
   // ========================================
   // Audio Playback Hook
@@ -450,11 +498,12 @@ export function useCheckIn(
   )
 
   const addAssistantMessage = useCallback(
-    (content: string) => {
+    (content: string, thinking?: string) => {
       const message: CheckInMessage = {
         id: generateId(),
         role: "assistant",
         content,
+        thinking,
         timestamp: new Date().toISOString(),
       }
 
@@ -587,15 +636,23 @@ export function useCheckIn(
           for (let i = 0; i < int16Data.length; i++) {
             float32Data[i] = int16Data[i] / (int16Data[i] < 0 ? 0x8000 : 0x7fff)
           }
+          // Prevent memory leak by dropping oldest chunks if at limit
+          if (audioChunksRef.current.length >= MAX_AUDIO_CHUNKS) {
+            audioChunksRef.current.shift()
+          }
           audioChunksRef.current.push(float32Data)
 
-          // Calculate input level for visualization
-          let sum = 0
-          for (let i = 0; i < float32Data.length; i++) {
-            sum += float32Data[i] * float32Data[i]
+          // Calculate input level for visualization (throttled to reduce re-renders)
+          const now = Date.now()
+          if (now - lastAudioLevelDispatchRef.current >= AUDIO_LEVEL_THROTTLE_MS) {
+            let sum = 0
+            for (let i = 0; i < float32Data.length; i++) {
+              sum += float32Data[i] * float32Data[i]
+            }
+            const rms = Math.sqrt(sum / float32Data.length)
+            dispatch({ type: "SET_INPUT_LEVEL", level: Math.min(rms * 5, 1) })
+            lastAudioLevelDispatchRef.current = now
           }
-          const rms = Math.sqrt(sum / float32Data.length)
-          dispatch({ type: "SET_INPUT_LEVEL", level: Math.min(rms * 5, 1) })
         }
       }
 

@@ -1,26 +1,25 @@
 /**
- * Gemini Live API WebSocket Client
+ * Gemini Live API Client
  *
- * Manages bidirectional WebSocket connection to Gemini Live API
- * for real-time voice conversations.
+ * Manages connection to server-side Gemini Live session for real-time
+ * voice conversations. Uses SSE for receiving and POST for sending.
+ *
+ * Architecture:
+ * - Server manages the actual Gemini session (API key stays server-side)
+ * - Client receives audio/transcripts via Server-Sent Events (SSE)
+ * - Client sends audio via POST requests
  *
  * Features:
- * - Ephemeral token authentication
  * - Audio streaming (16kHz PCM input, 24kHz PCM output)
  * - Real-time transcription
  * - Turn management (user speaking, model speaking)
  * - Barge-in support (user can interrupt model)
- * - Automatic activity detection (VAD)
+ * - Automatic reconnection with exponential backoff
  *
- * Source: Context7 - /websites/ai_google_dev_api docs - "Live API"
- * https://ai.google.dev/gemini-api/docs/live
+ * Source: Context7 - /googleapis/js-genai docs - "Live.connect"
  */
 
-import type {
-  LiveAPISetupMessage,
-  LiveAPIAudioMessage,
-  LiveAPIServerContent,
-} from "@/lib/types"
+import { validateServerMessage } from "./schemas"
 
 // Event types emitted by the client
 export interface LiveClientEvents {
@@ -37,23 +36,19 @@ export interface LiveClientEvents {
   // Transcription events
   onUserTranscript: (text: string, isFinal: boolean) => void
   onModelTranscript: (text: string) => void
+  onModelThinking: (text: string) => void
 
   // Turn events
   onTurnComplete: () => void
   onInterrupted: () => void
   onUserSpeechStart: () => void
   onUserSpeechEnd: () => void
+
+  // Send failures
+  onSendError: (error: Error, type: "audio" | "text" | "audioEnd") => void
 }
 
 export interface LiveClientConfig {
-  // Ephemeral token for authentication
-  token: string
-  // WebSocket URL
-  wsUrl: string
-  // Model identifier
-  model: string
-  // System instruction for the conversation
-  systemInstruction: string
   // Event handlers
   events: Partial<LiveClientEvents>
 }
@@ -61,45 +56,53 @@ export interface LiveClientConfig {
 export type LiveClientState =
   | "disconnected"
   | "connecting"
-  | "setup_sent"
   | "ready"
   | "error"
 
+// Session info returned from /api/gemini/session
+interface SessionInfo {
+  sessionId: string
+  streamUrl: string
+  audioUrl: string
+  secret: string
+}
+
 /**
- * Gemini Live API WebSocket Client
+ * Gemini Live API Client
+ *
+ * Connects to server-managed Gemini session via SSE + POST.
  */
 export class GeminiLiveClient {
-  private ws: WebSocket | null = null
+  private eventSource: EventSource | null = null
   private config: LiveClientConfig
   private state: LiveClientState = "disconnected"
   private reconnectAttempts = 0
   private maxReconnectAttempts = 3
-  private setupTimeoutId: ReturnType<typeof setTimeout> | null = null
-  private static readonly SETUP_TIMEOUT_MS = 10000 // 10 seconds
+
+  // Session info from server
+  private sessionId: string | null = null
+  private streamUrl: string | null = null
+  private audioUrl: string | null = null
+  private sessionSecret: string | null = null
+
+  // Audio failure tracking
+  private consecutiveAudioFailures = 0
+  private readonly MAX_AUDIO_FAILURES = 3
+
+  // Connection timeout tracking
+  private connectionTimeoutId: ReturnType<typeof setTimeout> | null = null
 
   constructor(config: LiveClientConfig) {
     this.config = config
   }
 
   /**
-   * Clear any pending setup timeout
-   */
-  private clearSetupTimeout(): void {
-    if (this.setupTimeoutId) {
-      clearTimeout(this.setupTimeoutId)
-      this.setupTimeoutId = null
-    }
-  }
-
-  /**
    * Calculate reconnection delay with exponential backoff and jitter
    */
   private getReconnectDelay(): number {
-    // Base delay: 1s, doubles each attempt up to 30s max
     const baseDelay = 1000
     const maxDelay = 30000
     const exponentialDelay = Math.min(baseDelay * Math.pow(2, this.reconnectAttempts), maxDelay)
-    // Add jitter: ±25% to prevent thundering herd
     const jitter = exponentialDelay * 0.25 * (Math.random() * 2 - 1)
     return exponentialDelay + jitter
   }
@@ -123,12 +126,10 @@ export class GeminiLiveClient {
 
     await new Promise((resolve) => setTimeout(resolve, delay))
 
-    // Only reconnect if we're still in a reconnectable state
     if (this.state === "error" || this.state === "disconnected") {
       try {
         await this.connect()
       } catch (error) {
-        // Connection failed, will trigger another reconnect attempt via onerror
         console.error("[GeminiLive] Reconnection attempt failed:", error)
       }
     }
@@ -149,170 +150,320 @@ export class GeminiLiveClient {
   }
 
   /**
-   * Connect to Gemini Live API
+   * Connect to Gemini Live API via server
    */
   async connect(): Promise<void> {
-    if (this.ws) {
+    if (this.eventSource) {
       this.disconnect()
     }
 
     this.state = "connecting"
     this.config.events.onConnecting?.()
 
-    return new Promise((resolve, reject) => {
+    try {
+      // 1. Create session on server
+      console.log("[GeminiLive] Creating session...")
+      const response = await fetch("/api/gemini/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      if (!response.ok) {
+        let errorMessage = "Failed to create session"
+        try {
+          const error = await response.json()
+          errorMessage = error.error || errorMessage
+        } catch (parseError) {
+          console.error("[GeminiLive] Failed to parse error response:", parseError)
+        }
+        throw new Error(errorMessage)
+      }
+
+      const session: SessionInfo = await response.json()
+      this.sessionId = session.sessionId
+      this.streamUrl = session.streamUrl
+      this.audioUrl = session.audioUrl
+      this.sessionSecret = session.secret
+
+      console.log("[GeminiLive] Session created:", this.sessionId)
+
+      // 2. Connect to SSE stream
+      await this.connectSSE()
+    } catch (error) {
+      console.error("[GeminiLive] Connection failed:", error)
+      this.state = "error"
+      const err = error instanceof Error ? error : new Error("Connection failed")
+      this.config.events.onError?.(err)
+      throw err
+    }
+  }
+
+  /**
+   * Create an SSE reader from a ReadableStream
+   * Implements EventSource-like API for compatibility
+   */
+  private createSSEReader(
+    body: ReadableStream<Uint8Array>,
+    resolve: () => void,
+    reject: (error: Error) => void
+  ): EventSource {
+    const decoder = new TextDecoder()
+    const reader = body.getReader()
+    let buffer = ""
+    const eventListeners: Map<string, Array<(event: MessageEvent) => void>> = new Map()
+    let isOpen = true
+
+    const dispatch = (eventType: string, data: string) => {
+      const listeners = eventListeners.get(eventType)
+      if (listeners) {
+        const event = new MessageEvent(eventType, { data })
+        listeners.forEach((listener) => listener(event))
+      }
+    }
+
+    const processLine = (line: string, currentEvent: { type: string; data: string }) => {
+      if (line.startsWith("event:")) {
+        currentEvent.type = line.slice(6).trim()
+      } else if (line.startsWith("data:")) {
+        currentEvent.data += line.slice(5).trim()
+      }
+    }
+
+    const readStream = async () => {
+      const currentEvent = { type: "message", data: "" }
+
       try {
-        // Connect with ephemeral token as query parameter
-        // Source: https://ai.google.dev/gemini-api/docs/ephemeral-tokens
-        const wsUrl = `${this.config.wsUrl}?access_token=${encodeURIComponent(this.config.token)}`
-        this.ws = new WebSocket(wsUrl)
+        while (isOpen) {
+          const { done, value } = await reader.read()
+          if (done) break
 
-        this.ws.onopen = () => {
-          console.log("[GeminiLive] WebSocket connected")
-          this.sendSetupMessage()
-          resolve()
-        }
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split("\n")
+          buffer = lines.pop() || ""
 
-        this.ws.onmessage = (event) => {
-          this.handleMessage(event.data)
-        }
-
-        this.ws.onerror = (event) => {
-          console.error("[GeminiLive] WebSocket error:", event)
-          this.state = "error"
-          const error = new Error("WebSocket connection error")
-          this.config.events.onError?.(error)
-          reject(error)
-          // Attempt reconnection
-          this.attemptReconnect()
-        }
-
-        this.ws.onclose = (event) => {
-          console.log("[GeminiLive] WebSocket closed:", event.code, event.reason)
-          const wasReady = this.state === "ready"
-          this.state = "disconnected"
-          this.config.events.onDisconnected?.(event.reason || "Connection closed")
-
-          // Attempt reconnection for unexpected closures (not normal close code 1000)
-          // Only if we were previously ready (not during initial connection)
-          if (wasReady && event.code !== 1000) {
-            this.attemptReconnect()
+          for (const line of lines) {
+            if (line.trim() === "") {
+              if (currentEvent.data) {
+                dispatch(currentEvent.type, currentEvent.data)
+                currentEvent.type = "message"
+                currentEvent.data = ""
+              }
+            } else {
+              processLine(line, currentEvent)
+            }
           }
         }
       } catch (error) {
-        this.state = "error"
-        reject(error)
+        console.error("[GeminiLive] SSE stream error:", error)
+        reject(error instanceof Error ? error : new Error("Stream read error"))
       }
+    }
+
+    readStream()
+
+    // Return EventSource-like object
+    return {
+      addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => {
+        const fn = typeof listener === "function" ? listener : listener.handleEvent
+        if (!eventListeners.has(type)) {
+          eventListeners.set(type, [])
+        }
+        eventListeners.get(type)!.push(fn as (event: MessageEvent) => void)
+      },
+      removeEventListener: () => {},
+      close: () => {
+        isOpen = false
+        reader.cancel()
+      },
+      onopen: null,
+      onerror: null,
+      onmessage: null,
+      readyState: 1,
+      url: "",
+      withCredentials: false,
+      CONNECTING: 0,
+      OPEN: 1,
+      CLOSED: 2,
+      dispatchEvent: () => false,
+    } as EventSource
+  }
+
+  /**
+   * Connect to the SSE stream for receiving messages
+   * Uses fetch with custom headers instead of EventSource for security
+   */
+  private connectSSE(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (!this.streamUrl || !this.sessionSecret) {
+        reject(new Error("No stream URL or session secret"))
+        return
+      }
+
+      console.log("[GeminiLive] Connecting to SSE stream...")
+
+      // Use fetch with custom headers for better security
+      fetch(this.streamUrl, {
+        method: "GET",
+        headers: {
+          "x-session-secret": this.sessionSecret,
+          Accept: "text/event-stream",
+        },
+      })
+        .then(async (response) => {
+          if (!response.ok) {
+            throw new Error(`SSE connection failed: ${response.statusText}`)
+          }
+
+          if (!response.body) {
+            throw new Error("SSE response has no body")
+          }
+
+          // Create a custom EventSource-like object for compatibility
+          this.eventSource = this.createSSEReader(response.body, resolve, reject)
+
+          // Handle ready event (session is ready)
+          this.eventSource.addEventListener("ready", () => {
+            console.log("[GeminiLive] Session ready")
+            this.state = "ready"
+            this.reconnectAttempts = 0
+            this.consecutiveAudioFailures = 0 // Reset audio failure counter
+
+            // Clear connection timeout
+            if (this.connectionTimeoutId) {
+              clearTimeout(this.connectionTimeoutId)
+              this.connectionTimeoutId = null
+            }
+
+            this.config.events.onConnected?.()
+            resolve()
+          })
+
+          // Handle connected event (initial connection)
+          this.eventSource.addEventListener("connected", (event) => {
+            try {
+              const data = JSON.parse(event.data)
+              console.log("[GeminiLive] Connected to session:", data.sessionId)
+            } catch (error) {
+              console.error("[GeminiLive] Failed to parse connected event:", error)
+            }
+          })
+
+          // Handle Gemini messages
+          this.eventSource.addEventListener("message", (event) => {
+            try {
+              this.handleMessage(JSON.parse(event.data))
+            } catch (error) {
+              console.error("[GeminiLive] Failed to parse message event:", error)
+            }
+          })
+
+          // Handle errors from server
+          this.eventSource.addEventListener("error", (event) => {
+            // Verify it's a MessageEvent with data (server-sent error)
+            if (!(event instanceof MessageEvent) || !event.data) {
+              console.error("[GeminiLive] SSE error event without data")
+              this.config.events.onError?.(new Error("Unknown SSE error"))
+              return
+            }
+            try {
+              const data = JSON.parse(event.data)
+              this.config.events.onError?.(new Error(data.message || "SSE error"))
+            } catch {
+              this.config.events.onError?.(new Error("Invalid SSE error format"))
+            }
+          })
+
+          // Handle close
+          this.eventSource.addEventListener("close", (event) => {
+            let reason = "Session closed"
+            if (event instanceof MessageEvent && event.data) {
+              try {
+                const data = JSON.parse(event.data)
+                reason = data.reason || reason
+              } catch {
+                // Use default reason if parsing fails
+              }
+            }
+            console.log("[GeminiLive] Session closed:", reason)
+            this.state = "disconnected"
+            this.config.events.onDisconnected?.(reason)
+          })
+
+          // Set a timeout for initial connection
+          this.connectionTimeoutId = setTimeout(() => {
+            if (this.state === "connecting") {
+              reject(new Error("Connection timeout"))
+              this.disconnect()
+            }
+          }, 30000)
+        })
+        .catch((error) => {
+          console.error("[GeminiLive] SSE connection error:", error)
+          this.state = "error"
+          this.config.events.onError?.(error instanceof Error ? error : new Error("SSE connection failed"))
+          reject(error instanceof Error ? error : new Error("SSE connection failed"))
+        })
     })
   }
 
   /**
-   * Send setup message to configure the session
+   * Handle incoming SSE messages
    */
-  private sendSetupMessage(): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error("[GeminiLive] Cannot send setup - WebSocket not open")
+  private handleMessage(message: Record<string, unknown>): void {
+    // Validate message with Zod schema
+    const validatedMessage = validateServerMessage(message)
+    if (!validatedMessage) {
+      console.warn("[GeminiLive] Invalid message received, skipping")
       return
     }
 
-    this.state = "setup_sent"
-
-    // Set up timeout for setup completion
-    this.clearSetupTimeout()
-    this.setupTimeoutId = setTimeout(() => {
-      if (this.state === "setup_sent") {
-        console.error("[GeminiLive] Setup timeout - no response from server")
-        this.state = "error"
-        const error = new Error("Connection setup timed out. Please try again.")
-        this.config.events.onError?.(error)
-        this.disconnect()
-      }
-    }, GeminiLiveClient.SETUP_TIMEOUT_MS)
-
-    // Setup message structure per Gemini Live API spec
-    const setupMessage: LiveAPISetupMessage = {
-      setup: {
-        model: `models/${this.config.model}`,
-        systemInstruction: {
-          parts: [{ text: this.config.systemInstruction }],
-        },
-        generationConfig: {
-          responseModalities: ["AUDIO", "TEXT"],
-        },
-        realtimeInputConfig: {
-          automaticActivityDetection: {
-            disabled: false, // Enable server-side VAD
-          },
-        },
-      },
+    // Setup complete
+    if (validatedMessage.setupComplete) {
+      console.log("[GeminiLive] Setup complete")
+      this.state = "ready"
+      this.config.events.onConnected?.()
+      return
     }
 
-    this.ws.send(JSON.stringify(setupMessage))
-    console.log("[GeminiLive] Setup message sent")
-  }
-
-  /**
-   * Handle incoming WebSocket messages
-   */
-  private handleMessage(data: string): void {
-    try {
-      const message = JSON.parse(data)
-
-      // Setup complete
-      if (message.setupComplete) {
-        console.log("[GeminiLive] Setup complete")
-        this.clearSetupTimeout()
-        this.state = "ready"
-        this.reconnectAttempts = 0 // Reset reconnect counter on successful connection
-        this.config.events.onConnected?.()
-        return
-      }
-
-      // Server content (audio, text, turn signals)
-      if (message.serverContent) {
-        this.handleServerContent(message as LiveAPIServerContent)
-        return
-      }
-
-      // User activity detection
-      if (message.realtimeInput?.activityStart) {
-        this.config.events.onUserSpeechStart?.()
-        return
-      }
-
-      if (message.realtimeInput?.activityEnd) {
-        this.config.events.onUserSpeechEnd?.()
-        return
-      }
-
-      // Transcription
-      if (message.inputTranscription) {
-        const { text, isFinal } = message.inputTranscription
-        this.config.events.onUserTranscript?.(text, isFinal ?? false)
-        return
-      }
-
-      // Unknown message type
-      console.log("[GeminiLive] Unknown message:", message)
-    } catch (error) {
-      console.error("[GeminiLive] Failed to parse message:", error)
+    // Server content (audio, text, turn signals)
+    if (validatedMessage.serverContent) {
+      this.handleServerContent(validatedMessage.serverContent as Record<string, unknown>)
+      return
     }
+
+    // Input transcription
+    if (validatedMessage.inputTranscription) {
+      const transcription = validatedMessage.inputTranscription
+      if (transcription.text) {
+        this.config.events.onUserTranscript?.(transcription.text, transcription.isFinal ?? false)
+      }
+      return
+    }
+
+    // Unknown message type
+    console.log("[GeminiLive] Unknown message:", validatedMessage)
   }
 
   /**
    * Handle server content messages
    */
-  private handleServerContent(message: LiveAPIServerContent): void {
-    const { serverContent } = message
+  private handleServerContent(content: Record<string, unknown>): void {
+    // Handle output transcription (what model is ACTUALLY saying)
+    // Source: Context7 - /googleapis/js-genai docs - "outputAudioTranscription"
+    const outputTranscription = content.outputTranscription as { text?: string; finished?: boolean } | undefined
+    if (outputTranscription?.text) {
+      this.config.events.onModelTranscript?.(outputTranscription.text)
+    }
 
     // Check for interruption (barge-in)
-    if (serverContent.interrupted) {
+    if (content.interrupted) {
       console.log("[GeminiLive] Interrupted by user")
       this.config.events.onInterrupted?.()
       return
     }
 
     // Check for turn complete
-    if (serverContent.turnComplete) {
+    if (content.turnComplete) {
       console.log("[GeminiLive] Turn complete")
       this.config.events.onTurnComplete?.()
       this.config.events.onAudioEnd?.()
@@ -320,19 +471,21 @@ export class GeminiLiveClient {
     }
 
     // Process model turn content
-    if (serverContent.modelTurn?.parts) {
-      for (const part of serverContent.modelTurn.parts) {
+    const modelTurn = content.modelTurn as { parts?: Array<Record<string, unknown>> } | undefined
+    if (modelTurn?.parts) {
+      for (const part of modelTurn.parts) {
         // Audio response
-        if (part.inlineData) {
-          const { mimeType, data } = part.inlineData
-          if (mimeType.startsWith("audio/")) {
-            this.config.events.onAudioChunk?.(data)
+        const inlineData = part.inlineData as { mimeType?: string; data?: string } | undefined
+        if (inlineData?.data) {
+          if (inlineData.mimeType?.startsWith("audio/")) {
+            this.config.events.onAudioChunk?.(inlineData.data)
           }
         }
 
-        // Text response (transcript of what model is saying)
+        // Text response (chain-of-thought reasoning)
+        // Note: This is NOT the actual speech - use outputTranscription for that
         if (part.text) {
-          this.config.events.onModelTranscript?.(part.text)
+          this.config.events.onModelThinking?.(part.text as string)
         }
       }
     }
@@ -344,21 +497,57 @@ export class GeminiLiveClient {
    * @param base64Audio - Base64 encoded PCM audio (16kHz, 16-bit, mono)
    */
   sendAudio(base64Audio: string): void {
-    if (!this.isReady()) {
-      console.warn("[GeminiLive] Not ready to send audio")
+    if (!this.isReady() || !this.sessionId || !this.audioUrl || !this.sessionSecret) {
       return
     }
 
-    const audioMessage: LiveAPIAudioMessage = {
-      realtimeInput: {
-        audio: {
-          mimeType: "audio/pcm;rate=16000",
-          data: base64Audio,
-        },
-      },
-    }
+    // Fire and forget - don't await to avoid blocking audio stream
+    // But track failures to detect session death
+    fetch(this.audioUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: this.sessionId,
+        secret: this.sessionSecret,
+        audio: base64Audio,
+      }),
+    })
+      .then((response) => {
+        if (response.ok) {
+          this.consecutiveAudioFailures = 0
+        } else {
+          this.handleAudioFailure(new Error(`HTTP ${response.status}`))
+        }
+      })
+      .catch((error) => {
+        this.handleAudioFailure(error)
+      })
+  }
 
-    this.ws?.send(JSON.stringify(audioMessage))
+  /**
+   * Handle audio send failure
+   * Tracks consecutive failures and disconnects if threshold exceeded
+   */
+  private handleAudioFailure(error: Error): void {
+    this.consecutiveAudioFailures++
+    console.error(
+      `[GeminiLive] Audio send failed (${this.consecutiveAudioFailures}/${this.MAX_AUDIO_FAILURES}):`,
+      error
+    )
+
+    // Check if we've exceeded threshold and haven't already started disconnecting
+    // This prevents race condition where multiple concurrent failures trigger disconnect multiple times
+    if (
+      this.consecutiveAudioFailures >= this.MAX_AUDIO_FAILURES &&
+      this.state !== "error" &&
+      this.state !== "disconnected"
+    ) {
+      this.state = "error"
+      this.config.events.onError?.(
+        new Error(`Audio streaming failed after ${this.MAX_AUDIO_FAILURES} attempts`)
+      )
+      this.disconnect()
+    }
   }
 
   /**
@@ -368,45 +557,90 @@ export class GeminiLiveClient {
    * @param text - Text message to send
    */
   sendText(text: string): void {
-    if (!this.isReady()) {
+    if (!this.isReady() || !this.sessionId || !this.audioUrl || !this.sessionSecret) {
       console.warn("[GeminiLive] Not ready to send text")
       return
     }
 
-    const textMessage = {
-      realtimeInput: {
+    fetch(this.audioUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: this.sessionId,
+        secret: this.sessionSecret,
         text,
-      },
-    }
-
-    this.ws?.send(JSON.stringify(textMessage))
+      }),
+    }).catch((error) => {
+      console.error("[GeminiLive] Failed to send text:", error)
+      this.config.events.onSendError?.(
+        error instanceof Error ? error : new Error(String(error)),
+        "text"
+      )
+    })
   }
 
   /**
    * Signal end of audio stream (user stopped speaking)
    */
   sendAudioEnd(): void {
-    if (!this.isReady()) return
+    if (!this.isReady() || !this.sessionId || !this.audioUrl || !this.sessionSecret) return
 
-    const endMessage = {
-      realtimeInput: {
-        audioStreamEnd: true,
-      },
-    }
-
-    this.ws?.send(JSON.stringify(endMessage))
+    fetch(this.audioUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId: this.sessionId,
+        secret: this.sessionSecret,
+        audioEnd: true,
+      }),
+    }).catch((error) => {
+      console.error("[GeminiLive] Failed to send audio end:", error)
+      this.config.events.onSendError?.(
+        error instanceof Error ? error : new Error(String(error)),
+        "audioEnd"
+      )
+    })
   }
 
   /**
    * Disconnect from Gemini Live API
    */
   disconnect(): void {
-    this.clearSetupTimeout()
-    if (this.ws) {
-      this.ws.close()
-      this.ws = null
+    // Close SSE connection
+    if (this.eventSource) {
+      this.eventSource.close()
+      this.eventSource = null
     }
-    this.state = "disconnected"
+
+    // Clear connection timeout if it exists
+    if (this.connectionTimeoutId) {
+      clearTimeout(this.connectionTimeoutId)
+      this.connectionTimeoutId = null
+    }
+
+    // Close server session
+    if (this.sessionId && this.sessionSecret) {
+      fetch("/api/gemini/session", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: this.sessionId,
+          secret: this.sessionSecret
+        }),
+      }).catch((error) => {
+        console.error("[GeminiLive] Failed to close session:", error)
+      })
+    }
+
+    this.sessionId = null
+    this.streamUrl = null
+    this.audioUrl = null
+    this.sessionSecret = null
+
+    // Only set to disconnected if not already in error state
+    if (this.state !== "error") {
+      this.state = "disconnected"
+    }
   }
 
   /**
@@ -414,8 +648,6 @@ export class GeminiLiveClient {
    * Useful for injecting mismatch detection context
    */
   injectContext(contextText: string): void {
-    // Send as a system-like text input that Gemini will consider
-    // This is how we inject mismatch detection results
     this.sendText(`[CONTEXT UPDATE]\n${contextText}\n[END CONTEXT]`)
   }
 }
