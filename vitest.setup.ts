@@ -58,9 +58,18 @@ vi.mock("@/lib/ml/inference", () => ({
 }))
 
 // Mock PCM converter
+// Note: To test the actual implementation, use vi.unmock("@/lib/audio/pcm-converter")
+// in your test file (see lib/audio/__tests__/pcm-converter.test.ts for example)
 vi.mock("@/lib/audio/pcm-converter", () => ({
   int16ToBase64: vi.fn((data) => "base64audiodata=="),
   base64ToInt16: vi.fn(() => new Int16Array(1024)),
+  float32ToInt16: vi.fn(() => new Int16Array(1024)),
+  int16ToFloat32: vi.fn(() => new Float32Array(1024)),
+  float32ToBase64Pcm: vi.fn(() => "base64pcmdata=="),
+  float32ToWavBase64: vi.fn(() => "UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGFOYQAAADg="),
+  calculateRMS: vi.fn(() => 0.5),
+  resampleAudio: vi.fn((data) => data),
+  base64PcmToFloat32: vi.fn(() => new Float32Array(1024)),
 }))
 
 // Mock use-gemini-live hook

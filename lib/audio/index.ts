@@ -43,3 +43,12 @@ export {
   type ProcessorOptions,
   type ProcessingResult,
 } from "./processor"
+
+// PCM Converter
+export {
+  float32ToWavBase64,
+  float32ToInt16,
+  int16ToFloat32,
+  float32ToBase64Pcm,
+  calculateRMS,
+} from "./pcm-converter"

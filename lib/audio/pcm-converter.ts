@@ -204,3 +204,69 @@ export function calculateRMS(audioData: Float32Array): number {
 
   return Math.sqrt(sum / audioData.length)
 }
+
+/**
+ * Encode Float32Array audio data as WAV file and return as base64
+ * Used for sending audio to Gemini API for semantic analysis
+ *
+ * @param audioData - Audio samples in Float32 format (-1.0 to 1.0)
+ * @param sampleRate - Sample rate of the audio (default: 16000)
+ * @returns Base64 encoded WAV file
+ */
+export function float32ToWavBase64(audioData: Float32Array, sampleRate: number = 16000): string {
+  // Convert Float32 to Int16
+  const int16Data = float32ToInt16(audioData)
+
+  // WAV file parameters
+  const numChannels = 1
+  const bitsPerSample = 16
+  const byteRate = sampleRate * numChannels * (bitsPerSample / 8)
+  const blockAlign = numChannels * (bitsPerSample / 8)
+  const dataSize = int16Data.length * 2 // 2 bytes per Int16 sample
+  const fileSize = 36 + dataSize // 44 byte header - 8 bytes for RIFF header
+
+  // Create WAV buffer (44 byte header + audio data)
+  const buffer = new ArrayBuffer(44 + dataSize)
+  const view = new DataView(buffer)
+
+  // RIFF header
+  writeString(view, 0, "RIFF")
+  view.setUint32(4, fileSize, true) // File size - 8
+  writeString(view, 8, "WAVE")
+
+  // fmt chunk
+  writeString(view, 12, "fmt ")
+  view.setUint32(16, 16, true) // Chunk size (16 for PCM)
+  view.setUint16(20, 1, true) // Audio format (1 = PCM)
+  view.setUint16(22, numChannels, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, byteRate, true)
+  view.setUint16(32, blockAlign, true)
+  view.setUint16(34, bitsPerSample, true)
+
+  // data chunk
+  writeString(view, 36, "data")
+  view.setUint32(40, dataSize, true)
+
+  // Write audio samples
+  const int16View = new Int16Array(buffer, 44)
+  int16View.set(int16Data)
+
+  // Convert to base64
+  const uint8Array = new Uint8Array(buffer)
+  let binary = ""
+  for (let i = 0; i < uint8Array.length; i++) {
+    binary += String.fromCharCode(uint8Array[i])
+  }
+
+  return btoa(binary)
+}
+
+/**
+ * Helper to write ASCII string to DataView
+ */
+function writeString(view: DataView, offset: number, str: string): void {
+  for (let i = 0; i < str.length; i++) {
+    view.setUint8(offset + i, str.charCodeAt(i))
+  }
+}

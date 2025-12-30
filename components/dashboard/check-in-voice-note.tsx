@@ -27,7 +27,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Link } from "next-view-transitions"
 import { toast } from "sonner"
 import { Mic, Square, CheckCircle, AlertCircle, Loader2, Lightbulb, RotateCcw } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, getGeminiApiKey } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { useRecording } from "@/hooks/use-recording"
 import { useRecordingActions, useTrendDataActions } from "@/hooks/use-storage"
@@ -36,7 +36,8 @@ import { RecordingWaveform, AudioLevelMeter } from "@/components/dashboard/recor
 import { AudioPlayer } from "@/components/dashboard/audio-player"
 import { PostRecordingPrompt } from "@/components/check-in"
 import { featuresToPatterns } from "@/lib/gemini/mismatch-detector"
-import type { Recording, AudioFeatures } from "@/lib/types"
+import { float32ToWavBase64 } from "@/lib/audio"
+import type { Recording, AudioFeatures, GeminiSemanticAnalysis } from "@/lib/types"
 
 interface VoiceNoteContentProps {
   /** Called when a recording is successfully saved to IndexedDB */
@@ -52,6 +53,9 @@ export function VoiceNoteContent({
   onClose,
   onSessionChange,
 }: VoiceNoteContentProps) {
+  // ============================================
+  // Component State
+  // ============================================
   const [isSaved, setIsSaved] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -59,11 +63,120 @@ export function VoiceNoteContent({
   const [showCheckInPrompt, setShowCheckInPrompt] = useState(false)
   const savedRecordingRef = useRef<Recording | null>(null)
 
-  // Storage hooks
-  const { addRecording } = useRecordingActions()
+  // Emotion detection state - tracks background Gemini API call
+  // The emotion analysis runs asynchronously after the recording is saved
+  const [isAnalyzingEmotion, setIsAnalyzingEmotion] = useState(false)
+  const [emotionAnalysis, setEmotionAnalysis] = useState<GeminiSemanticAnalysis | null>(null)
+
+  // Storage hooks for IndexedDB operations
+  const { addRecording, updateRecording } = useRecordingActions()
   const { addTrendData } = useTrendDataActions()
 
-  // Save recording to IndexedDB
+  /**
+   * Analyze audio for emotion detection using Gemini API
+   *
+   * This function runs in the background after a recording is saved.
+   * It converts the audio to WAV format, sends it to the Gemini semantic
+   * analysis API, and updates the recording with the emotion results.
+   *
+   * The analysis is non-blocking - the recording is saved immediately,
+   * and emotion detection results are added when available.
+   *
+   * @param recordingId - The ID of the saved recording to update
+   * @param audioData - Raw audio samples as Float32Array
+   * @param sampleRate - Sample rate of the audio (typically 16000 Hz)
+   */
+  const analyzeEmotionInBackground = useCallback(async (
+    recordingId: string,
+    audioData: Float32Array,
+    sampleRate: number = 16000
+  ) => {
+    setIsAnalyzingEmotion(true)
+
+    try {
+      // Step 1: Get user's Gemini API key from IndexedDB settings
+      // The key is stored locally and never sent to our servers
+      const apiKey = await getGeminiApiKey()
+      if (!apiKey) {
+        // No API key configured - skip emotion analysis silently
+        // User can add their key in Settings to enable this feature
+        console.log("[Emotion] No API key configured, skipping emotion analysis")
+        return
+      }
+
+      // Step 2: Convert Float32Array audio to WAV base64 format
+      // Gemini expects audio in standard formats (WAV, MP3, etc.)
+      // WAV is lossless and preserves audio quality for accurate analysis
+      const wavBase64 = float32ToWavBase64(audioData, sampleRate)
+
+      // Step 3: Call the emotion detection API endpoint
+      // The API sends the audio to Gemini for semantic analysis
+      const response = await fetch("/api/gemini/semantic", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Pass API key in header - used by server to authenticate with Gemini
+          "X-Gemini-Api-Key": apiKey,
+        },
+        body: JSON.stringify({
+          audio: wavBase64,
+          mimeType: "audio/wav",
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || `API error: ${response.status}`)
+      }
+
+      // Step 4: Parse the emotion analysis results
+      // Response includes per-segment emotions, overall emotion, and observations
+      const analysis: GeminiSemanticAnalysis = await response.json()
+      setEmotionAnalysis(analysis)
+
+      // Step 5: Update the recording in IndexedDB with emotion data
+      // This links the semantic analysis to the acoustic features
+      await updateRecording(recordingId, {
+        semanticAnalysis: analysis,
+      })
+
+      // Update the ref so UI components can access the analysis
+      if (savedRecordingRef.current?.id === recordingId) {
+        savedRecordingRef.current = {
+          ...savedRecordingRef.current,
+          semanticAnalysis: analysis,
+        }
+      }
+
+      console.log("[Emotion] Analysis complete:", {
+        overallEmotion: analysis.overallEmotion,
+        confidence: analysis.emotionConfidence,
+        segments: analysis.segments.length,
+      })
+    } catch (err) {
+      // Log error but don't show toast - emotion analysis is optional
+      // The core recording functionality works without it
+      console.error("[Emotion] Analysis failed:", err)
+    } finally {
+      setIsAnalyzingEmotion(false)
+    }
+  }, [updateRecording])
+
+  /**
+   * Save recording to IndexedDB and trigger emotion analysis
+   *
+   * This is the main save function called when recording completes.
+   * It performs the following steps:
+   * 1. Compute stress/fatigue metrics from acoustic features (client-side ML)
+   * 2. Save the recording to IndexedDB immediately
+   * 3. Update trend data for the dashboard charts
+   * 4. Trigger background emotion analysis via Gemini API
+   * 5. Show check-in prompt if stress/fatigue is elevated
+   *
+   * @param audioData - Raw audio samples as Float32Array
+   * @param processingDuration - Duration of the processed audio in seconds
+   * @param extractedFeatures - Acoustic features extracted by Meyda
+   */
   const saveRecording = useCallback(async (
     audioData: Float32Array,
     processingDuration: number,
@@ -72,10 +185,11 @@ export function VoiceNoteContent({
     setIsSaving(true)
     setSaveError(null)
     try {
-      // Compute metrics using ML inference
+      // Compute stress/fatigue metrics using client-side ML inference
+      // This uses threshold-based analysis of acoustic features
       const metrics = analyzeVoiceMetrics(extractedFeatures)
 
-      // Create recording object
+      // Create recording object with all metadata
       const recording: Recording = {
         id: crypto.randomUUID(),
         createdAt: new Date().toISOString(),
@@ -83,14 +197,16 @@ export function VoiceNoteContent({
         status: "complete",
         features: extractedFeatures,
         metrics,
+        // Store raw audio for playback and potential re-analysis
         audioData: Array.from(audioData),
         sampleRate: 16000,
+        // semanticAnalysis will be added by background emotion detection
       }
 
-      // Save to IndexedDB
+      // Save to IndexedDB immediately - don't wait for emotion analysis
       await addRecording(recording)
 
-      // Update trend data for dashboard
+      // Update trend data for dashboard stress/fatigue charts
       await addTrendData({
         date: new Date().toISOString().split("T")[0],
         stressScore: metrics.stressScore,
@@ -101,11 +217,17 @@ export function VoiceNoteContent({
       setIsSaved(true)
 
       // Show check-in prompt for elevated stress or fatigue
+      // Threshold of 50 indicates moderate to high levels
       if (metrics.stressScore > 50 || metrics.fatigueScore > 50) {
         setShowCheckInPrompt(true)
       }
 
+      // Notify parent component that recording is complete
       onRecordingComplete?.(recording)
+
+      // Trigger emotion analysis in background (non-blocking)
+      // This calls Gemini API to detect emotions from speech content
+      analyzeEmotionInBackground(recording.id, audioData, 16000)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to save recording"
       setSaveError(errorMessage)
@@ -115,7 +237,7 @@ export function VoiceNoteContent({
     } finally {
       setIsSaving(false)
     }
-  }, [addRecording, addTrendData, onRecordingComplete])
+  }, [addRecording, addTrendData, onRecordingComplete, analyzeEmotionInBackground])
 
   // Use recording hook
   const [recordingData, recordingControls] = useRecording({
@@ -316,6 +438,60 @@ export function VoiceNoteContent({
               <p className="font-medium">{features.pauseCount}</p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Emotion Analysis Section - Shows Gemini semantic analysis results */}
+      {isComplete && isSaved && (isAnalyzingEmotion || emotionAnalysis) && (
+        <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
+            Emotion Analysis
+          </p>
+          {isAnalyzingEmotion ? (
+            // Loading state while Gemini analyzes the audio
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Analyzing emotions with Gemini...</span>
+            </div>
+          ) : emotionAnalysis ? (
+            // Display emotion analysis results
+            <div className="space-y-3">
+              {/* Overall emotion with confidence */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-sm">Overall Emotion</p>
+                  <p className="font-medium text-lg capitalize">
+                    {emotionAnalysis.overallEmotion === "happy" && "😊 "}
+                    {emotionAnalysis.overallEmotion === "sad" && "😢 "}
+                    {emotionAnalysis.overallEmotion === "angry" && "😤 "}
+                    {emotionAnalysis.overallEmotion === "neutral" && "😐 "}
+                    {emotionAnalysis.overallEmotion}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-muted-foreground text-sm">Confidence</p>
+                  <p className="font-medium">
+                    {(emotionAnalysis.emotionConfidence * 100).toFixed(0)}%
+                  </p>
+                </div>
+              </div>
+              {/* Summary from Gemini */}
+              {emotionAnalysis.summary && (
+                <div className="pt-2 border-t border-purple-500/10">
+                  <p className="text-sm text-muted-foreground italic">
+                    "{emotionAnalysis.summary}"
+                  </p>
+                </div>
+              )}
+              {/* Segment count indicator */}
+              {emotionAnalysis.segments.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Analyzed {emotionAnalysis.segments.length} speech segment
+                  {emotionAnalysis.segments.length !== 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+          ) : null}
         </div>
       )}
 
