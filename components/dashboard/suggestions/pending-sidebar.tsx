@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { ChevronDown, ChevronUp, RefreshCw, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X, Filter } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -47,6 +47,12 @@ export function PendingSidebar({
   const [categoryFilter, setCategoryFilter] = useState<SuggestionCategory | "all">("all")
   const [showAllPending, setShowAllPending] = useState(false)
   const [completedOpen, setCompletedOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  // Defer Radix UI rendering until after hydration to prevent ID mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Split suggestions by status
   const { pending, completed } = useMemo(() => {
@@ -76,35 +82,43 @@ export function PendingSidebar({
         <h3 className="text-sm font-medium">Pending</h3>
         <div className="flex items-center gap-2">
           {/* Category Filter */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-                <FilterIcon className={cn("h-3.5 w-3.5 mr-1", categoryConfig[categoryFilter].color)} />
-                {categoryConfig[categoryFilter].label}
-                <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              {(Object.keys(categoryConfig) as (SuggestionCategory | "all")[]).map((cat) => {
-                const config = categoryConfig[cat]
-                const Icon = config.icon
-                const count = cat === "all"
-                  ? pending.length
-                  : pending.filter(s => s.category === cat).length
-                return (
-                  <DropdownMenuItem
-                    key={cat}
-                    onClick={() => setCategoryFilter(cat)}
-                    className={cn(categoryFilter === cat && "bg-accent/10")}
-                  >
-                    <Icon className={cn("h-4 w-4 mr-2", config.color)} />
-                    {config.label}
-                    <span className="ml-auto text-xs text-muted-foreground">{count}</span>
-                  </DropdownMenuItem>
-                )
-              })}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {mounted ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                  <FilterIcon className={cn("h-3.5 w-3.5 mr-1", categoryConfig[categoryFilter].color)} />
+                  {categoryConfig[categoryFilter].label}
+                  <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {(Object.keys(categoryConfig) as (SuggestionCategory | "all")[]).map((cat) => {
+                  const config = categoryConfig[cat]
+                  const Icon = config.icon
+                  const count = cat === "all"
+                    ? pending.length
+                    : pending.filter(s => s.category === cat).length
+                  return (
+                    <DropdownMenuItem
+                      key={cat}
+                      onClick={() => setCategoryFilter(cat)}
+                      className={cn(categoryFilter === cat && "bg-accent/10")}
+                    >
+                      <Icon className={cn("h-4 w-4 mr-2", config.color)} />
+                      {config.label}
+                      <span className="ml-auto text-xs text-muted-foreground">{count}</span>
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+              <FilterIcon className={cn("h-3.5 w-3.5 mr-1", categoryConfig[categoryFilter].color)} />
+              {categoryConfig[categoryFilter].label}
+              <ChevronDown className="h-3 w-3 ml-1 opacity-50" />
+            </Button>
+          )}
 
           {/* Regenerate */}
           {onRegenerate && (
