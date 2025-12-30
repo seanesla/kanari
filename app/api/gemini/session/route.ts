@@ -16,6 +16,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { sessionManager } from "@/lib/gemini/session-manager"
 import { ApiError } from "@google/genai"
 import { getAPIKeyFromRequest, validateAPIKey } from "@/lib/gemini/client"
+import {
+  buildCheckInSystemInstruction,
+  type SystemContextSummary,
+  type SystemTimeContext,
+} from "@/lib/gemini/live-prompts"
 
 interface SessionResponse {
   sessionId: string
@@ -36,7 +41,9 @@ interface ErrorResponse {
  *
  * Request body (optional):
  * {
- *   systemInstruction?: string  // Custom system instruction
+ *   systemInstruction?: string       // Custom system instruction (legacy)
+ *   contextSummary?: SystemContextSummary  // AI-generated context from past sessions
+ *   timeContext?: SystemTimeContext  // Current time context
  * }
  *
  * Response:
@@ -65,7 +72,21 @@ export async function POST(
     let systemInstruction: string | undefined
     try {
       const body = await request.json()
-      systemInstruction = body?.systemInstruction
+
+      // Check if we have AI-initiated context (new flow)
+      if (body?.contextSummary || body?.timeContext) {
+        // Build system instruction with context for AI-initiated conversation
+        systemInstruction = buildCheckInSystemInstruction(
+          body.contextSummary as SystemContextSummary | undefined,
+          body.timeContext as SystemTimeContext | undefined
+        )
+        console.log("[Gemini Session] Built AI-initiated system instruction with context")
+      } else if (body?.systemInstruction) {
+        // Legacy: use provided system instruction directly
+        systemInstruction = body.systemInstruction
+      }
+      // If no body or no relevant fields, systemInstruction stays undefined
+      // and session-manager will use CHECK_IN_SYSTEM_PROMPT as default
     } catch {
       // No body or invalid JSON - use default system instruction
     }

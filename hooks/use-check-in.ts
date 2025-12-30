@@ -25,7 +25,14 @@ import {
   generateMismatchContext,
   generateVoicePatternContext,
   generatePostRecordingContext,
+  type SystemContextSummary,
+  type SystemTimeContext,
 } from "@/lib/gemini/live-prompts"
+import {
+  fetchCheckInContext,
+  formatContextForAPI,
+} from "@/lib/gemini/check-in-context"
+import type { SessionContext } from "@/lib/gemini/live-client"
 import type {
   CheckInState,
   CheckInMessage,
@@ -118,6 +125,7 @@ export type CheckInAction =
   | { type: "START_INITIALIZING" }
   | { type: "SET_CONNECTING" }
   | { type: "SET_READY" }
+  | { type: "SET_AI_GREETING" }
   | { type: "SET_LISTENING" }
   | { type: "SET_USER_SPEAKING" }
   | { type: "SET_PROCESSING" }
@@ -176,6 +184,9 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
 
     case "SET_READY":
       return { ...state, state: "ready", isActive: true }
+
+    case "SET_AI_GREETING":
+      return { ...state, state: "ai_greeting" }
 
     case "SET_LISTENING":
       return { ...state, state: "listening" }
@@ -412,6 +423,9 @@ export function useCheckIn(
   // Post-recording context ref
   const postRecordingContextRef = useRef<string | null>(null)
 
+  // Session context for AI-initiated conversations (passed to Gemini connect)
+  const sessionContextRef = useRef<SessionContext | null>(null)
+
   // Track current state for use in callbacks (avoid stale closures)
   const stateRef = useRef<CheckInState>(data.state)
 
@@ -440,21 +454,31 @@ export function useCheckIn(
   const [gemini, geminiControls] = useGeminiLive({
     onConnected: () => {
       dispatch({ type: "SET_READY" })
-      dispatch({ type: "SET_LISTENING" })
+      dispatch({ type: "SET_AI_GREETING" })
 
-      // If post-recording context was provided, inject it
+      // Trigger AI to speak first by sending the conversation start signal
+      // The system instruction tells the AI to greet the user when it receives this
+      geminiControls.sendText("[START_CONVERSATION]")
+
+      // If post-recording context was provided, inject it after a brief delay
+      // to let the greeting start first
       if (postRecordingContextRef.current) {
-        geminiControls.sendText(postRecordingContextRef.current)
-        postRecordingContextRef.current = null
+        setTimeout(() => {
+          if (postRecordingContextRef.current) {
+            geminiControls.sendText(postRecordingContextRef.current)
+            postRecordingContextRef.current = null
+          }
+        }, 500)
       }
     },
     onDisconnected: (reason) => {
       console.log("[useCheckIn] Disconnected:", reason)
       const currentState = stateRef.current
 
-      // Only auto-complete if we were in an active state (user had chance to speak)
+      // Only auto-complete if we were in an active state (user had chance to interact)
       const activeStates: CheckInState[] = [
         "ready",
+        "ai_greeting",
         "listening",
         "user_speaking",
         "processing",
@@ -554,6 +578,7 @@ export function useCheckIn(
       // Reset refs for next response
       currentTranscriptRef.current = ""
       currentThinkingRef.current = ""
+      // Transition to listening - this handles both AI greeting and regular responses
       dispatch({ type: "SET_LISTENING" })
     },
     onInterrupted: () => {
@@ -917,6 +942,38 @@ export function useCheckIn(
           )
         }
 
+        // Fetch context for AI-initiated conversation (runs in parallel with audio init)
+        let sessionContext: SessionContext | undefined
+        try {
+          const contextData = await fetchCheckInContext()
+          const formattedContext = formatContextForAPI(contextData)
+
+          // Call API to generate context summary using Gemini 3
+          const contextResponse = await fetch("/api/gemini/check-in-context", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(formattedContext),
+          })
+
+          if (contextResponse.ok) {
+            const { summary } = await contextResponse.json()
+            sessionContext = {
+              contextSummary: summary as SystemContextSummary,
+              timeContext: {
+                currentTime: contextData.timeContext.currentTime,
+                dayOfWeek: contextData.timeContext.dayOfWeek,
+                timeOfDay: contextData.timeContext.timeOfDay,
+                daysSinceLastCheckIn: contextData.timeContext.daysSinceLastCheckIn,
+              } as SystemTimeContext,
+            }
+            sessionContextRef.current = sessionContext
+            console.log("[useCheckIn] Context prepared for AI-initiated conversation")
+          }
+        } catch (contextError) {
+          // Context generation failed - proceed without it (AI will use default greeting)
+          console.warn("[useCheckIn] Context generation failed, using default greeting:", contextError)
+        }
+
         // Initialize playback first (needs user gesture context)
         // This loads the playback worklet module
         await playbackControls.initialize()
@@ -929,8 +986,8 @@ export function useCheckIn(
 
         dispatch({ type: "SET_CONNECTING" })
 
-        // Connect to Gemini
-        await geminiControls.connect()
+        // Connect to Gemini with session context for AI-initiated greeting
+        await geminiControls.connect(sessionContext)
 
         callbacksRef.current.onSessionStart?.(session)
       } catch (error) {

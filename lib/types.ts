@@ -465,6 +465,7 @@ export type CheckInState =
   | "initializing"
   | "connecting"
   | "ready"
+  | "ai_greeting"    // AI is speaking first (greeting the user)
   | "listening"
   | "user_speaking"
   | "processing"

@@ -693,3 +693,90 @@ Provide your diff-aware response with decisions for each existing suggestion and
 
   return prompt
 }
+
+// ============================================
+// AI-Initiated Check-In Context
+// ============================================
+
+/**
+ * System prompt for generating personalized check-in context summary.
+ * Used by Gemini 3 to create a warm, natural opening for AI-initiated conversations.
+ */
+export const CHECK_IN_CONTEXT_SUMMARY_PROMPT = `You are helping prepare context for a wellness check-in conversation.
+Your goal is to summarize a user's recent patterns to help the AI start the conversation warmly and naturally.
+
+CONTEXT PROVIDED:
+- Recent check-in session summaries (what was discussed, mood)
+- Voice biomarker trends (stress/fatigue direction over the past week)
+- Time context (current time, days since last check-in)
+
+YOUR TASK:
+Create a brief summary that the conversational AI can use to start the check-in naturally, like a caring friend who remembers past conversations.
+
+OUTPUT FORMAT:
+Return a JSON object with:
+{
+  "patternSummary": "2-3 sentences summarizing recent patterns (stress trends, fatigue trends, recurring topics)",
+  "keyObservations": ["observation 1", "observation 2", "observation 3"],
+  "suggestedOpener": "A warm, natural opening line the AI should use",
+  "contextNotes": "Any specific things the AI should gently explore or be aware of"
+}
+
+GUIDELINES:
+- Be warm and caring, not clinical or robotic
+- Focus on patterns, not individual data points
+- Reference time naturally ("It's been a few days...", "I noticed this week...")
+- Never mention "biomarkers", "data", "analysis", or technical terms
+- Keep the opener to 1-2 sentences max
+- The opener should invite sharing without being pushy
+- If stress/fatigue is rising, acknowledge gently ("How have you been holding up?")
+- If things are improving, celebrate subtly ("You've been sounding a bit lighter lately")
+
+EXAMPLES OF GOOD OPENERS:
+- "Hey! It's been a few days since we last talked. How have you been holding up?"
+- "Good evening! I noticed things have seemed a bit heavy this week. How are you feeling tonight?"
+- "Hey there! You've been sounding a bit more relaxed lately. How's your day going?"
+- "Hi! Welcome back. What's been on your mind?"
+
+EXAMPLES OF BAD OPENERS:
+- "Based on your biomarkers, I've detected elevated stress levels."
+- "Hello! I am Kanari. How may I assist you today?"
+- "Your voice analysis from the past week indicates fatigue."
+- "I'm here to check in on your wellness metrics."`
+
+/**
+ * JSON schema for check-in context summary response
+ */
+export const CHECK_IN_CONTEXT_SUMMARY_SCHEMA = {
+  type: "object",
+  properties: {
+    patternSummary: {
+      type: "string",
+      description: "2-3 sentences summarizing recent patterns",
+    },
+    keyObservations: {
+      type: "array",
+      items: { type: "string" },
+      description: "Key observations to be aware of (max 3)",
+    },
+    suggestedOpener: {
+      type: "string",
+      description: "Warm, natural opening line for the AI",
+    },
+    contextNotes: {
+      type: "string",
+      description: "Things the AI should gently explore or be aware of",
+    },
+  },
+  required: ["patternSummary", "keyObservations", "suggestedOpener", "contextNotes"],
+}
+
+/**
+ * Check-in context summary response type
+ */
+export interface CheckInContextSummaryResponse {
+  patternSummary: string
+  keyObservations: string[]
+  suggestedOpener: string
+  contextNotes: string
+}

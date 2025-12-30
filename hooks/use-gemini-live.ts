@@ -20,6 +20,7 @@ import {
   createLiveClient,
   type LiveClientConfig,
   type LiveClientEvents,
+  type SessionContext,
 } from "@/lib/gemini/live-client"
 
 // ============================================
@@ -52,8 +53,8 @@ export interface GeminiLiveData {
 }
 
 export interface GeminiLiveControls {
-  /** Initialize connection */
-  connect: () => Promise<void>
+  /** Initialize connection with optional context for AI-initiated conversations */
+  connect: (context?: SessionContext) => Promise<void>
   /** Disconnect from Gemini */
   disconnect: () => void
   /** Send audio chunk (base64 PCM) */
@@ -315,8 +316,11 @@ export function useGeminiLive(
 
   /**
    * Connect to Gemini Live API
+   *
+   * @param context - Optional context for AI-initiated conversations
+   *                  Includes contextSummary and timeContext for personalized greeting
    */
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (context?: SessionContext) => {
     // Prevent concurrent connection attempts
     if (isConnectingRef.current) {
       console.warn("[GeminiLive] Connection already in progress")
@@ -393,7 +397,8 @@ export function useGeminiLive(
       const client = createLiveClient(config)
       clientRef.current = client
 
-      await client.connect()
+      // Pass context for AI-initiated conversations (builds personalized system instruction)
+      await client.connect(context)
       dispatch({ type: "CONNECTED" })
     } catch (error) {
       const err = error instanceof Error ? error : new Error("Connection failed")

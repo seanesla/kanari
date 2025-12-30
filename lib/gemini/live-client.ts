@@ -22,6 +22,16 @@
 import { validateServerMessage } from "./schemas"
 import { getGeminiApiKey } from "@/lib/utils"
 import { logDebug, logWarn, logError } from "@/lib/logger"
+import type {
+  SystemContextSummary,
+  SystemTimeContext,
+} from "./live-prompts"
+
+// Context for AI-initiated conversations
+export interface SessionContext {
+  contextSummary?: SystemContextSummary
+  timeContext?: SystemTimeContext
+}
 
 // Event types emitted by the client
 export interface LiveClientEvents {
@@ -173,8 +183,11 @@ export class GeminiLiveClient {
 
   /**
    * Connect to Gemini Live API via server
+   *
+   * @param context - Optional context for AI-initiated conversations
+   *                  Includes contextSummary (from Gemini 3 analysis) and timeContext
    */
-  async connect(): Promise<void> {
+  async connect(context?: SessionContext): Promise<void> {
     if (this.eventSource) {
       this.disconnect()
     }
@@ -191,9 +204,20 @@ export class GeminiLiveClient {
         headers["X-Gemini-Api-Key"] = apiKey
       }
 
+      // Build request body with optional context for AI-initiated conversations
+      const body: Record<string, unknown> = {}
+      if (context?.contextSummary) {
+        body.contextSummary = context.contextSummary
+      }
+      if (context?.timeContext) {
+        body.timeContext = context.timeContext
+      }
+
       const response = await fetch("/api/gemini/session", {
         method: "POST",
         headers,
+        // Only include body if we have context to send
+        ...(Object.keys(body).length > 0 ? { body: JSON.stringify(body) } : {}),
       })
 
       if (!response.ok) {

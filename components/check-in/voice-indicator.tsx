@@ -17,11 +17,12 @@ interface VoiceIndicatorProps {
   className?: string
 }
 
-const stateConfig = {
+const stateConfig: Record<CheckInState, { color: string; pulseDelay: number }> = {
   idle: { color: "bg-muted", pulseDelay: 0 },
   initializing: { color: "bg-accent/50", pulseDelay: 0 },
   connecting: { color: "bg-accent/50", pulseDelay: 0 },
   ready: { color: "bg-accent", pulseDelay: 0 },
+  ai_greeting: { color: "bg-blue-500", pulseDelay: 0 },
   listening: { color: "bg-accent", pulseDelay: 0 },
   user_speaking: { color: "bg-green-500", pulseDelay: 0 },
   processing: { color: "bg-yellow-500", pulseDelay: 0 },
@@ -37,7 +38,7 @@ export function VoiceIndicator({
   className,
 }: VoiceIndicatorProps) {
   const config = stateConfig[state]
-  const isActive = ["listening", "user_speaking", "assistant_speaking"].includes(state)
+  const isActive = ["listening", "user_speaking", "ai_greeting", "assistant_speaking"].includes(state)
   const isPulsing = ["connecting", "processing"].includes(state)
 
   // Scale bars based on audio level
@@ -121,7 +122,7 @@ export function VoiceIndicatorLarge({
   className,
 }: VoiceIndicatorProps) {
   const config = stateConfig[state]
-  const isActive = ["listening", "user_speaking", "assistant_speaking"].includes(state)
+  const isActive = ["listening", "user_speaking", "ai_greeting", "assistant_speaking"].includes(state)
   const isPulsing = ["connecting", "processing"].includes(state)
 
   const stateLabels: Record<CheckInState, string> = {
@@ -129,6 +130,7 @@ export function VoiceIndicatorLarge({
     initializing: "Starting...",
     connecting: "Connecting...",
     ready: "Ready to listen",
+    ai_greeting: "Saying hello...",
     listening: "Listening...",
     user_speaking: "Hearing you...",
     processing: "Thinking...",
