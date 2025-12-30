@@ -1,62 +1,63 @@
 /* Schedule-X Dark Theme Override for Dashboard */
+/* Source: Context7 - schedule-x/schedule-x docs - "Customize Default Schedule-X Theme Colors" */
+/* https://github.com/schedule-x/schedule-x/blob/main/website/app/docs/calendar/theme/page.mdx */
 
-/* Override Schedule-X CSS variables to match dashboard theme */
-.sx__calendar-wrapper {
+/* Override Schedule-X CSS variables - use !important to override bundled defaults */
+.is-dark {
+  /* Accent/highlight colors - these are the key ones that need to follow our accent */
+  --sx-color-primary: var(--accent) !important;
+  --sx-color-primary-container: var(--accent) !important;
+  --sx-color-on-primary: var(--accent-foreground) !important;
+  --sx-color-surface-tint: var(--accent) !important;
+
   /* Background colors */
-  --sx-color-background: hsl(var(--background));
-  --sx-color-surface: hsl(var(--card));
-  --sx-color-surface-container: hsl(var(--card));
-  --sx-color-surface-container-low: hsl(var(--background));
-  --sx-color-surface-container-high: hsl(var(--muted));
+  --sx-color-background: var(--background) !important;
+  --sx-color-surface: var(--card) !important;
+  --sx-color-surface-container: var(--card) !important;
+  --sx-color-surface-container-low: var(--background) !important;
+  --sx-color-surface-container-high: var(--muted) !important;
+  --sx-color-surface-dim: var(--muted) !important;
+  --sx-color-surface-bright: var(--card) !important;
 
   /* Border colors */
-  --sx-color-outline: hsl(var(--border));
-  --sx-color-outline-variant: hsl(var(--border));
+  --sx-color-outline: var(--border) !important;
+  --sx-color-outline-variant: var(--border) !important;
 
   /* Text colors */
-  --sx-color-on-surface: hsl(var(--foreground));
-  --sx-color-on-background: hsl(var(--foreground));
-  --sx-color-on-primary-container: hsl(var(--foreground));
+  --sx-color-on-surface: var(--foreground) !important;
+  --sx-color-on-background: var(--foreground) !important;
+  --sx-color-on-primary-container: var(--foreground) !important;
 
   /* Muted text */
-  --sx-color-neutral: hsl(var(--muted-foreground));
-  --sx-color-neutral-variant: hsl(var(--muted-foreground));
-
-  /* Accent/highlight colors */
-  --sx-color-primary: hsl(var(--accent));
-  --sx-color-primary-container: hsl(var(--accent));
-  --sx-color-on-primary: hsl(var(--accent-foreground));
-
-  /* Surface variations for dark mode */
-  --sx-color-surface-dim: hsl(var(--muted));
-  --sx-color-surface-bright: hsl(var(--card));
+  --sx-color-neutral: var(--muted-foreground) !important;
+  --sx-color-neutral-variant: var(--muted-foreground) !important;
 
   /* Internal colors */
-  --sx-internal-color-gray-ripple-background: hsl(var(--muted));
-  --sx-internal-color-light-gray: hsl(var(--muted));
-  --sx-internal-color-text: hsl(var(--foreground));
+  --sx-internal-color-gray-ripple-background: var(--muted) !important;
+  --sx-internal-color-light-gray: var(--muted) !important;
+  --sx-internal-color-text: var(--foreground) !important;
 
   /* Shadow */
-  --sx-color-shadow: rgba(0, 0, 0, 0.3);
+  --sx-color-shadow: rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Style adjustments for dark theme */
 .sx__calendar-wrapper .sx__time-grid-day {
-  border-right: 1px solid hsl(var(--border));
+  border-right: 1px solid var(--border);
 }
 
 .sx__calendar-wrapper .sx__time-grid-hour {
-  border-bottom: 1px solid hsl(var(--border));
+  border-bottom: 1px solid var(--border);
 }
 
 .sx__calendar-wrapper .sx__week-grid__time-axis {
-  background: hsl(var(--background));
-  border-right: 1px solid hsl(var(--border));
+  background: var(--background);
+  border-right: 1px solid var(--border);
 }
 
 .sx__calendar-wrapper .sx__week-grid__header {
-  background: hsl(var(--card));
-  border-bottom: 1px solid hsl(var(--border));
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
 }
 
 /* Event styling improvements */
@@ -75,24 +76,25 @@
 
 /* Time axis labels */
 .sx__calendar-wrapper .sx__time-axis-time {
-  color: hsl(var(--muted-foreground));
+  color: var(--muted-foreground);
   font-size: 0.75rem;
 }
 
 /* Header date labels */
 .sx__calendar-wrapper .sx__date-grid-day-header {
-  color: hsl(var(--foreground));
+  color: var(--foreground);
   font-weight: 600;
 }
 
-/* Today highlight */
-.sx__calendar-wrapper .sx__is-today {
-  background: hsl(var(--accent) / 0.1);
-}
+/* Today highlight - let Schedule-X handle this with its default styling */
 
 /* Current time indicator */
-.sx__calendar-wrapper .sx__current-time-line {
-  border-top: 2px solid hsl(var(--accent));
+.sx__current-time-indicator {
+  background-color: var(--accent) !important;
+}
+
+.sx__current-time-indicator::before {
+  background-color: var(--accent) !important;
 }
 
 /* Constrain calendar wrapper to parent container */

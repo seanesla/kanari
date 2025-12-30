@@ -8,6 +8,8 @@ import { createEventsServicePlugin } from '@schedule-x/events-service'
 import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop'
 import { cn } from '@/lib/utils'
 import { logDebug } from '@/lib/logger'
+import { useSceneMode } from '@/lib/scene-context'
+import { generateDarkVariant, generateLightVariant } from '@/lib/color-utils'
 import type { Suggestion } from '@/lib/types'
 import '@schedule-x/theme-default/dist/index.css'
 import './schedule-x-theme.css'
@@ -28,6 +30,10 @@ interface ScheduleXWeekCalendarProps {
   onExternalDrop?: (suggestionId: string, date: Date, hour: number, minute: number) => void
   pendingDragActive?: boolean
   className?: string
+}
+
+interface ScheduleXWeekCalendarInnerProps extends ScheduleXWeekCalendarProps {
+  accentColor: string
 }
 
 // Helper to map Suggestion to Schedule-X event format
@@ -83,7 +89,14 @@ function completedToEvent(suggestion: Suggestion): SuggestionEvent | null {
   }
 }
 
-export function ScheduleXWeekCalendar({
+// Wrapper component that keys on accentColor to force calendar recreation
+export function ScheduleXWeekCalendar(props: ScheduleXWeekCalendarProps) {
+  const { accentColor } = useSceneMode()
+  return <ScheduleXWeekCalendarInner key={accentColor} {...props} accentColor={accentColor} />
+}
+
+// Inner component that creates the calendar with the given accent color
+function ScheduleXWeekCalendarInner({
   scheduledSuggestions,
   completedSuggestions = [],
   onEventClick,
@@ -92,10 +105,18 @@ export function ScheduleXWeekCalendar({
   onExternalDrop,
   pendingDragActive = false,
   className = '',
-}: ScheduleXWeekCalendarProps) {
+  accentColor,
+}: ScheduleXWeekCalendarInnerProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const eventsService = useMemo(() => createEventsServicePlugin(), [])
+
+  // Generate break category colors from accent
+  const breakColors = useMemo(() => ({
+    main: accentColor,
+    container: generateDarkVariant(accentColor),
+    onContainer: generateLightVariant(accentColor),
+  }), [accentColor])
 
   const calendar = useNextCalendarApp({
     views: [createViewWeek()],
@@ -114,14 +135,14 @@ export function ScheduleXWeekCalendar({
       break: {
         colorName: 'break',
         lightColors: {
-          main: '#d4a574',
-          container: '#f5e6d3',
-          onContainer: '#5c4a2f',
+          main: breakColors.main,
+          container: breakColors.onContainer,
+          onContainer: breakColors.container,
         },
         darkColors: {
-          main: '#d4a574',
-          container: '#5c4a2f',
-          onContainer: '#f5e6d3',
+          main: breakColors.main,
+          container: breakColors.container,
+          onContainer: breakColors.onContainer,
         },
       },
       exercise: {
