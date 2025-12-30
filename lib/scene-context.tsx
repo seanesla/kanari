@@ -51,21 +51,23 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   const setAccentColor = useCallback((color: string) => {
     setAccentColorState(color)
     // Persist to IndexedDB
-    db.settings.update("default", { accentColor: color }).catch(() => {
-      // If no default settings exist, create them
-      db.settings.put({
-        id: "default",
-        defaultRecordingDuration: 30,
-        enableVAD: true,
-        enableNotifications: true,
-        calendarConnected: false,
-        autoScheduleRecovery: false,
-        preferredRecoveryTimes: [],
-        localStorageOnly: true,
-        accentColor: color,
-      }).catch(() => {
-        // IndexedDB not available
-      })
+    db.settings.update("default", { accentColor: color }).then((updated) => {
+      if (updated === 0) {
+        // No record exists, create it
+        return db.settings.put({
+          id: "default",
+          defaultRecordingDuration: 30,
+          enableVAD: true,
+          enableNotifications: true,
+          calendarConnected: false,
+          autoScheduleRecovery: false,
+          preferredRecoveryTimes: [],
+          localStorageOnly: true,
+          accentColor: color,
+        })
+      }
+    }).catch(() => {
+      // IndexedDB not available
     })
   }, [])
 
