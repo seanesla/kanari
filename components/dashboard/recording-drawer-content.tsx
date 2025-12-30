@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Link } from "next-view-transitions"
+import { toast } from "sonner"
 import { Mic, Square, CheckCircle, AlertCircle, Loader2, Lightbulb, RotateCcw, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -71,8 +72,11 @@ export function RecordingDrawerContent({
       setIsSaved(true)
       onRecordingComplete?.(recording)
     } catch (err) {
-      console.error("Failed to save recording:", err)
-      setSaveError(err instanceof Error ? err.message : "Failed to save recording")
+      const errorMessage = err instanceof Error ? err.message : "Failed to save recording"
+      setSaveError(errorMessage)
+      toast.error("Save failed", {
+        description: errorMessage,
+      })
     } finally {
       setIsSaving(false)
     }
@@ -82,11 +86,10 @@ export function RecordingDrawerContent({
   const [recordingData, recordingControls] = useRecording({
     enableVAD: true,
     autoProcess: true,
-    onComplete: (result) => {
-      console.log("Recording complete:", result)
-    },
     onError: (error) => {
-      console.error("Recording error:", error)
+      toast.error("Recording failed", {
+        description: error.message || "An error occurred during recording",
+      })
     },
   })
 

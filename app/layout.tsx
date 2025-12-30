@@ -38,6 +38,7 @@ import {
 import { Analytics } from "@vercel/analytics/next"
 import { Providers } from "@/components/providers"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { Toaster } from "@/components/ui/sonner"
 import "./globals.css"
 
 // Sans fonts
@@ -127,6 +128,7 @@ export default function RootLayout({
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
+          <Toaster position="bottom-right" />
           <Analytics />
         </body>
       </html>
