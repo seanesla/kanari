@@ -33,6 +33,7 @@ function NavLink({ href, label, isActive }: NavLinkProps) {
   return (
     <Link
       href={href}
+      prefetch={true}
       className={cn(
         "relative text-sm transition-colors px-3 py-1",
         isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"

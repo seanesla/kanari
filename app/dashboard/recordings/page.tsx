@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Mic, Clock, TrendingUp, TrendingDown, Minus, Trash2, ChevronDown, ChevronUp, Plus } from "lucide-react"
-import { useSceneMode } from "@/lib/scene-context"
+import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
@@ -175,8 +175,8 @@ function RecordingCard({ recording, onDelete, isHighlighted }: RecordingCardProp
 // Separate component that uses useSearchParams
 function RecordingsPageContent() {
   const searchParams = useSearchParams()
-  const { setMode } = useSceneMode()
-  const [visible, setVisible] = useState(false)
+  const { shouldAnimate } = useDashboardAnimation()
+  const [visible, setVisible] = useState(!shouldAnimate)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [highlightedRecordingId, setHighlightedRecordingId] = useState<string | null>(null)
 
@@ -189,16 +189,13 @@ function RecordingsPageContent() {
     }
   }, [searchParams])
 
-  // Set scene to dashboard mode
+  // Trigger entry animation only on initial dashboard entry
   useEffect(() => {
-    setMode("dashboard")
-  }, [setMode])
-
-  // Trigger entry animation
-  useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 100)
-    return () => clearTimeout(timer)
-  }, [])
+    if (shouldAnimate) {
+      const timer = setTimeout(() => setVisible(true), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [shouldAnimate])
 
   // Clear highlight after animation
   useEffect(() => {

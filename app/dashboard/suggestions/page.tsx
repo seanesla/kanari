@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from "react"
 import { Link } from "next-view-transitions"
 import { Lightbulb, Mic, RefreshCw, ChevronDown, Calendar } from "lucide-react"
-import { useSceneMode } from "@/lib/scene-context"
+import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { Button } from "@/components/ui/button"
@@ -89,8 +89,8 @@ function prioritizeSuggestions(suggestions: Suggestion[], metrics?: { stressLeve
 }
 
 export default function SuggestionsPage() {
-  const { setMode } = useSceneMode()
-  const [visible, setVisible] = useState(false)
+  const { shouldAnimate } = useDashboardAnimation()
+  const [visible, setVisible] = useState(!shouldAnimate)
   const [selectedCategory, setSelectedCategory] = useState<FilterValue>("all")
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
   const [scheduleDialogSuggestion, setScheduleDialogSuggestion] = useState<Suggestion | null>(null)
@@ -138,16 +138,13 @@ export default function SuggestionsPage() {
     regenerateWithDiff,
   } = useSuggestions()
 
-  // Set scene to dashboard mode
+  // Trigger entry animation only on initial dashboard entry
   useEffect(() => {
-    setMode("dashboard")
-  }, [setMode])
-
-  // Trigger entry animation
-  useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 100)
-    return () => clearTimeout(timer)
-  }, [])
+    if (shouldAnimate) {
+      const timer = setTimeout(() => setVisible(true), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [shouldAnimate])
 
   // Deduplicate and prioritize suggestions
   const processedSuggestions = useMemo(() => {

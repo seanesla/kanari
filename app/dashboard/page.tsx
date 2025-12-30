@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from "recharts"
 import { useSceneMode } from "@/lib/scene-context"
+import { useDashboardAnimation } from "./layout"
 import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
 import { cn } from "@/lib/utils"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
@@ -24,8 +25,9 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import type { BurnoutPrediction, Suggestion } from "@/lib/types"
 
 export default function DashboardPage() {
-  const { setMode, accentColor } = useSceneMode()
-  const [visible, setVisible] = useState(false)
+  const { accentColor } = useSceneMode()
+  const { shouldAnimate } = useDashboardAnimation()
+  const [visible, setVisible] = useState(!shouldAnimate)
   const [chartsVisible, setChartsVisible] = useState(false)
   const [calendarVisible, setCalendarVisible] = useState(false)
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
@@ -36,16 +38,13 @@ export default function DashboardPage() {
   const chartsRef = useRef<HTMLDivElement>(null)
   const calendarRef = useRef<HTMLDivElement>(null)
 
-  // Set scene to dashboard mode
+  // Trigger entry animation only on initial dashboard entry
   useEffect(() => {
-    setMode("dashboard")
-  }, [setMode])
-
-  // Trigger entry animation
-  useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 100)
-    return () => clearTimeout(timer)
-  }, [])
+    if (shouldAnimate) {
+      const timer = setTimeout(() => setVisible(true), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [shouldAnimate])
 
   // Scroll reveal for charts section
   useEffect(() => {

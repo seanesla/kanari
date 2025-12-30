@@ -1,23 +1,22 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useSceneMode } from "@/lib/scene-context"
+import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { SettingsContent } from "@/components/dashboard/settings-content"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 
 export default function SettingsPage() {
-  const { setMode } = useSceneMode()
-  const [visible, setVisible] = useState(false)
+  const { shouldAnimate } = useDashboardAnimation()
+  const [visible, setVisible] = useState(!shouldAnimate)
 
+  // Trigger entry animation only on initial dashboard entry
   useEffect(() => {
-    setMode("dashboard")
-  }, [setMode])
-
-  useEffect(() => {
-    const timer = setTimeout(() => setVisible(true), 100)
-    return () => clearTimeout(timer)
-  }, [])
+    if (shouldAnimate) {
+      const timer = setTimeout(() => setVisible(true), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [shouldAnimate])
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
