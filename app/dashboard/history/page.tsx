@@ -29,6 +29,7 @@ import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { VoiceNoteCard, AIChatCard } from "@/components/dashboard/history-cards"
 import { ChatSessionDrawer } from "@/components/dashboard/chat-session-drawer"
 import { RecordingDrawer } from "@/components/dashboard/recording-drawer"
+import { getDateKey, getDateLabel } from "@/lib/date-utils"
 import type { Recording, HistoryItem, CheckInSession } from "@/lib/types"
 
 /** Filter options for the sessions timeline */
@@ -69,6 +70,34 @@ function HistoryPageContent() {
     if (filter === "all") return historyItems
     return historyItems.filter((item) => item.type === filter)
   }, [historyItems, filter])
+
+  // Group filtered items by date for section dividers
+  const groupedByDate = useMemo(() => {
+    const groups: { dateKey: string; dateLabel: string; items: HistoryItem[] }[] = []
+    let currentDateKey: string | null = null
+
+    for (const item of filteredItems) {
+      const itemDate = item.type === "voice_note"
+        ? item.recording.createdAt
+        : item.session.startedAt
+      const dateKey = getDateKey(itemDate)
+
+      if (dateKey !== currentDateKey) {
+        // Start a new date group
+        groups.push({
+          dateKey,
+          dateLabel: getDateLabel(itemDate),
+          items: [item],
+        })
+        currentDateKey = dateKey
+      } else {
+        // Add to the current group
+        groups[groups.length - 1].items.push(item)
+      }
+    }
+
+    return groups
+  }, [filteredItems])
 
   // Get delete actions for both types
   const { deleteRecording } = useRecordingActions()
@@ -273,46 +302,60 @@ function HistoryPageContent() {
               </Empty>
             </div>
           ) : (
-            // HISTORY TIMELINE - mixed voice notes and AI chats
+            // HISTORY TIMELINE - mixed voice notes and AI chats, grouped by date
             <div className="space-y-4">
-              {filteredItems.map((item) => {
-                // VOICE NOTE card
-                if (item.type === "voice_note") {
-                  return (
-                    <VoiceNoteCard
-                      key={item.id}
-                      item={item}
-                      onDelete={() => handleDeleteRecording(item.recording.id)}
-                      onOpenChat={(sessionId) => {
-                        // Find the session and open its detail drawer
-                        // Note: we could fetch it here, but it's already in the session data
-                        // For now, we'll need to find it from the historyItems
-                        const chatItem = historyItems.find(
-                          (h) => h.type === "ai_chat" && h.session.id === sessionId
+              {groupedByDate.map((group) => (
+                <div key={group.dateKey}>
+                  {/* Date section divider */}
+                  <div className="flex items-center gap-3 py-2 mb-4">
+                    <div className="h-px flex-1 bg-border/50" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {group.dateLabel}
+                    </span>
+                    <div className="h-px flex-1 bg-border/50" />
+                  </div>
+
+                  {/* Items for this date */}
+                  <div className="space-y-4">
+                    {group.items.map((item) => {
+                      // VOICE NOTE card
+                      if (item.type === "voice_note") {
+                        return (
+                          <VoiceNoteCard
+                            key={item.id}
+                            item={item}
+                            onDelete={() => handleDeleteRecording(item.recording.id)}
+                            onOpenChat={(sessionId) => {
+                              // Find the session and open its detail drawer
+                              const chatItem = historyItems.find(
+                                (h) => h.type === "ai_chat" && h.session.id === sessionId
+                              )
+                              if (chatItem && chatItem.type === "ai_chat") {
+                                handleOpenChatDetail(chatItem.session)
+                              }
+                            }}
+                            isHighlighted={item.id === highlightedItemId}
+                          />
                         )
-                        if (chatItem && chatItem.type === "ai_chat") {
-                          handleOpenChatDetail(chatItem.session)
-                        }
-                      }}
-                      isHighlighted={item.id === highlightedItemId}
-                    />
-                  )
-                }
+                      }
 
-                // AI CHAT card
-                if (item.type === "ai_chat") {
-                  return (
-                    <AIChatCard
-                      key={item.id}
-                      item={item}
-                      onDelete={() => handleDeleteSession(item.session.id)}
-                      onOpenDetail={() => handleOpenChatDetail(item.session)}
-                    />
-                  )
-                }
+                      // AI CHAT card
+                      if (item.type === "ai_chat") {
+                        return (
+                          <AIChatCard
+                            key={item.id}
+                            item={item}
+                            onDelete={() => handleDeleteSession(item.session.id)}
+                            onOpenDetail={() => handleOpenChatDetail(item.session)}
+                          />
+                        )
+                      }
 
-                return null
-              })}
+                      return null
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

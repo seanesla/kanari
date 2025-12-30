@@ -35,6 +35,38 @@ export function formatDate(dateStr: string): string {
 }
 
 /**
+ * Get a consistent date key for grouping (YYYY-MM-DD format)
+ */
+export function getDateKey(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toISOString().split("T")[0]
+}
+
+/**
+ * Get human-readable date label for section dividers
+ * Returns "Today", "Yesterday", or "Mon, Dec 25"
+ */
+export function getDateLabel(dateStr: string): string {
+  const date = new Date(dateStr)
+  const now = new Date()
+
+  // Reset times to compare just dates
+  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const yesterdayOnly = new Date(todayOnly)
+  yesterdayOnly.setDate(yesterdayOnly.getDate() - 1)
+
+  if (dateOnly.getTime() === todayOnly.getTime()) return "Today"
+  if (dateOnly.getTime() === yesterdayOnly.getTime()) return "Yesterday"
+
+  return date.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  })
+}
+
+/**
  * Format scheduled time with relative dates
  * Returns "Today at 3:00 PM", "Tomorrow at 10:00 AM", or "Mon, Dec 23 at 3:00 PM"
  */
