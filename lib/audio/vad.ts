@@ -134,7 +134,6 @@ export class VoiceActivityDetector {
       })
     }
 
-    console.log(`VAD detected ${segments.length} speech segments`)
     return segments
   }
 

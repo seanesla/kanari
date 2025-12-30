@@ -148,7 +148,6 @@ export class AudioProcessor {
         ...this.options.vadOptions,
       })
 
-      console.log(`VAD detected ${segments.length} speech segments`)
       return segments
     } catch (error) {
       console.error("VAD failed:", error)
