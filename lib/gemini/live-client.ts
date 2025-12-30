@@ -35,7 +35,7 @@ export interface LiveClientEvents {
 
   // Transcription events
   onUserTranscript: (text: string, finished: boolean) => void // Per SDK Transcription type
-  onModelTranscript: (text: string) => void
+  onModelTranscript: (text: string, finished: boolean) => void // Per SDK Transcription type
   onModelThinking: (text: string) => void
 
   // Turn events
@@ -448,28 +448,14 @@ export class GeminiLiveClient {
   }
 
   /**
-   * Check if a message is a turn signal that CAN be deduplicated
-   * Only deduplicate turnComplete and setupComplete - these cause HMR replay issues
-   * Everything else (audio, transcripts, etc.) must always be processed fresh
+   * Check if a message can be deduplicated
+   * ONLY setupComplete should be deduplicated - it happens once per session
+   * turnComplete MUST NOT be deduplicated - each turn is a new event!
    */
-  private isTurnSignalOnly(message: Record<string, unknown>): boolean {
-    // setupComplete is safe to deduplicate
-    if (message.setupComplete) {
-      return true
-    }
-
-    const serverContent = message.serverContent as Record<string, unknown> | undefined
-    if (!serverContent) return false
-
-    // Only deduplicate if it's JUST a turnComplete signal with nothing else
-    const hasTurnComplete = serverContent.turnComplete === true
-    const hasModelTurn = !!serverContent.modelTurn
-    const hasOutputTranscription = !!serverContent.outputTranscription
-    const hasInputTranscription = !!serverContent.inputTranscription
-    const hasInterrupted = !!serverContent.interrupted
-
-    // Only deduplicate pure turn signals (no content)
-    return hasTurnComplete && !hasModelTurn && !hasOutputTranscription && !hasInputTranscription && !hasInterrupted
+  private shouldDeduplicateMessage(message: Record<string, unknown>): boolean {
+    // ONLY setupComplete is safe to deduplicate (once per session)
+    // turnComplete MUST always be processed - each turn is unique!
+    return !!message.setupComplete
   }
 
   /**
@@ -478,7 +464,7 @@ export class GeminiLiveClient {
   private handleMessage(message: Record<string, unknown>): void {
     // ONLY deduplicate pure turn signals (turnComplete/setupComplete with no content)
     // Everything else (audio, transcripts, tool calls) must always be processed
-    if (this.isTurnSignalOnly(message)) {
+    if (this.shouldDeduplicateMessage(message)) {
       const hash = this.hashMessage(message)
       if (this.processedEventHashes.has(hash)) {
         console.log("[LiveClient] Skipping duplicate event (HMR replay)")
@@ -612,15 +598,19 @@ export class GeminiLiveClient {
     // Handle input transcription (user's speech) - may come in serverContent
     const inputTranscription = content.inputTranscription as { text?: string; finished?: boolean } | undefined
     if (inputTranscription?.text) {
-      console.log("[LiveClient] User transcript:", inputTranscription.text, "finished:", inputTranscription.finished)
       this.config.events.onUserTranscript?.(inputTranscription.text, inputTranscription.finished ?? false)
     }
 
     // Handle output transcription (what model is ACTUALLY saying)
     // Source: Context7 - /googleapis/js-genai docs - "outputAudioTranscription"
+    // Note: outputTranscription.finished indicates when transcription is complete
+    // This is INDEPENDENT of turnComplete - they can arrive in any order
     const outputTranscription = content.outputTranscription as { text?: string; finished?: boolean } | undefined
-    if (outputTranscription?.text) {
-      this.config.events.onModelTranscript?.(outputTranscription.text)
+    if (outputTranscription) {
+      this.config.events.onModelTranscript?.(
+        outputTranscription.text ?? "",
+        outputTranscription.finished ?? false
+      )
     }
 
     // Check for interruption (barge-in)

@@ -435,6 +435,8 @@ export interface CheckInMessage {
   mismatch?: MismatchResult
   // Duration of the audio segment in seconds
   audioDuration?: number
+  // True while message is being streamed (assistant messages only)
+  isStreaming?: boolean
 }
 
 export interface CheckInSummary {

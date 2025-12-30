@@ -72,11 +72,13 @@ export interface UseGeminiLiveOptions {
   onAudioEnd?: () => void
   /** Callbacks for transcript events */
   onUserTranscript?: (text: string, isFinal: boolean) => void
-  onModelTranscript?: (text: string) => void
+  onModelTranscript?: (text: string, finished: boolean) => void
   onModelThinking?: (text: string) => void
   /** Callbacks for turn events */
   onTurnComplete?: () => void
   onInterrupted?: () => void
+  /** Called when AI chooses silence (doesn't respond) */
+  onSilenceChosen?: (reason: string) => void
   /** Callbacks for speech detection */
   onUserSpeechStart?: () => void
   onUserSpeechEnd?: () => void
@@ -239,6 +241,7 @@ export function useGeminiLive(
     onModelThinking,
     onTurnComplete,
     onInterrupted,
+    onSilenceChosen,
     onUserSpeechStart,
     onUserSpeechEnd,
     onConnected,
@@ -259,6 +262,7 @@ export function useGeminiLive(
     onModelThinking,
     onTurnComplete,
     onInterrupted,
+    onSilenceChosen,
     onUserSpeechStart,
     onUserSpeechEnd,
     onConnected,
@@ -276,6 +280,7 @@ export function useGeminiLive(
       onModelThinking,
       onTurnComplete,
       onInterrupted,
+      onSilenceChosen,
       onUserSpeechStart,
       onUserSpeechEnd,
       onConnected,
@@ -290,6 +295,7 @@ export function useGeminiLive(
     onModelThinking,
     onTurnComplete,
     onInterrupted,
+    onSilenceChosen,
     onUserSpeechStart,
     onUserSpeechEnd,
     onConnected,
@@ -351,16 +357,17 @@ export function useGeminiLive(
           dispatch({ type: "USER_TRANSCRIPT", text, isFinal })
           callbacksRef.current.onUserTranscript?.(text, isFinal)
         },
-        onModelTranscript: (text) => {
+        onModelTranscript: (text, finished) => {
           dispatch({ type: "MODEL_TRANSCRIPT", text })
-          callbacksRef.current.onModelTranscript?.(text)
+          callbacksRef.current.onModelTranscript?.(text, finished)
         },
         onModelThinking: (text) => {
           callbacksRef.current.onModelThinking?.(text)
         },
         onTurnComplete: () => {
           dispatch({ type: "MODEL_SPEECH_END" })
-          dispatch({ type: "CLEAR_TRANSCRIPTS" })
+          // Note: Don't clear transcripts here - let useCheckIn manage its own state
+          // Clearing here was causing race conditions with save logic
           callbacksRef.current.onTurnComplete?.()
         },
         onInterrupted: () => {

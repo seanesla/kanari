@@ -16,12 +16,14 @@ import type { CheckInMessage } from "@/lib/types"
 interface MessageBubbleProps {
   message: CheckInMessage
   showMismatchIndicator?: boolean
+  skipAnimation?: boolean
   className?: string
 }
 
 export function MessageBubble({
   message,
   showMismatchIndicator = true,
+  skipAnimation = false,
   className,
 }: MessageBubbleProps) {
   const isUser = message.role === "user"
@@ -45,7 +47,7 @@ export function MessageBubble({
         isUser ? "ml-auto flex-row-reverse" : "mr-auto",
         className
       )}
-      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      initial={skipAnimation ? false : { opacity: 0, y: 10, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ duration: 0.2, ease: "easeOut" }}
     >

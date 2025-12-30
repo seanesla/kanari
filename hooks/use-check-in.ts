@@ -49,6 +49,8 @@ export interface CheckInData {
   session: CheckInSession | null
   /** Messages in current conversation */
   messages: CheckInMessage[]
+  /** ID of currently streaming assistant message (for O(1) lookup) */
+  currentStreamingMessageId: string | null
   /** Current user transcript (partial) */
   currentUserTranscript: string
   /** Current assistant transcript (being spoken) */
@@ -134,6 +136,8 @@ export type CheckInAction =
   | { type: "SET_USER_TRANSCRIPT"; text: string }
   | { type: "SET_ASSISTANT_TRANSCRIPT"; text: string }
   | { type: "APPEND_ASSISTANT_TRANSCRIPT"; text: string }
+  | { type: "UPDATE_STREAMING_MESSAGE"; text: string }
+  | { type: "FINALIZE_STREAMING_MESSAGE" }
   | { type: "SET_ASSISTANT_THINKING"; text: string }
   | { type: "APPEND_ASSISTANT_THINKING"; text: string }
   | { type: "CLEAR_CURRENT_TRANSCRIPTS" }
@@ -150,6 +154,7 @@ export const initialState: CheckInData = {
   isActive: false,
   session: null,
   messages: [],
+  currentStreamingMessageId: null,
   currentUserTranscript: "",
   currentAssistantTranscript: "",
   currentAssistantThinking: "",
@@ -193,17 +198,23 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
     case "SET_SESSION":
       return { ...state, session: action.session }
 
-    case "ADD_MESSAGE":
+    case "ADD_MESSAGE": {
       const newMessages = [...state.messages, action.message]
+      // Track streaming message ID for O(1) lookup during updates
+      const newStreamingId = action.message.isStreaming
+        ? action.message.id
+        : state.currentStreamingMessageId
       // Don't increment mismatch count here - it will be incremented in UPDATE_MESSAGE_FEATURES
       // when the actual mismatch detection runs
       return {
         ...state,
         messages: newMessages,
+        currentStreamingMessageId: newStreamingId,
         session: state.session
           ? { ...state.session, messages: newMessages }
           : null,
       }
+    }
 
     case "UPDATE_MESSAGE_FEATURES":
       // Properly update message with features/metrics/mismatch without mutation
@@ -241,6 +252,61 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
 
     case "APPEND_ASSISTANT_TRANSCRIPT":
       return { ...state, currentAssistantTranscript: state.currentAssistantTranscript + action.text }
+
+    case "UPDATE_STREAMING_MESSAGE": {
+      // O(1) lookup using tracked streaming message ID
+      if (!state.currentStreamingMessageId) {
+        return state
+      }
+
+      const streamingMsgIndex = state.messages.findIndex(
+        (msg) => msg.id === state.currentStreamingMessageId
+      )
+
+      if (streamingMsgIndex === -1) {
+        return state
+      }
+
+      const streamingMsg = state.messages[streamingMsgIndex]
+      const updatedMsgs = [...state.messages]
+      updatedMsgs[streamingMsgIndex] = {
+        ...streamingMsg,
+        content: streamingMsg.content + action.text,
+      }
+      return {
+        ...state,
+        messages: updatedMsgs,
+        session: state.session
+          ? { ...state.session, messages: updatedMsgs }
+          : null,
+      }
+    }
+
+    case "FINALIZE_STREAMING_MESSAGE": {
+      // O(1) lookup using tracked streaming message ID
+      if (!state.currentStreamingMessageId) {
+        return state
+      }
+
+      const streamingIndex = state.messages.findIndex(
+        (msg) => msg.id === state.currentStreamingMessageId
+      )
+
+      if (streamingIndex === -1) {
+        return { ...state, currentStreamingMessageId: null }
+      }
+
+      const msgs = [...state.messages]
+      msgs[streamingIndex] = { ...msgs[streamingIndex], isStreaming: false }
+      return {
+        ...state,
+        messages: msgs,
+        currentStreamingMessageId: null,
+        session: state.session
+          ? { ...state.session, messages: msgs }
+          : null,
+      }
+    }
 
     case "SET_ASSISTANT_THINKING":
       return { ...state, currentAssistantThinking: action.text }
@@ -347,14 +413,16 @@ export function useCheckIn(
   // Max audio chunks to prevent memory leak (roughly 10 seconds at 100ms chunks)
   const MAX_AUDIO_CHUNKS = 1000
 
-  // Track current transcripts for use in callbacks (avoid stale closures)
-  const transcriptRef = useRef({
-    transcript: data.currentAssistantTranscript,
-    thinking: data.currentAssistantThinking,
-  })
+  // Simple transcript accumulation (no complex state tracking needed)
+  // Assistant UI handles rendering, we just need to track current content
+  const currentTranscriptRef = useRef("")
+  const currentThinkingRef = useRef("")
 
   // Track current user transcript for use in callbacks (avoid stale closures)
   const userTranscriptRef = useRef<string>("")
+
+  // Track when user started speaking (for correct message timestamp ordering)
+  const userSpeechStartRef = useRef<string | null>(null)
 
   // ========================================
   // Gemini Live Hook
@@ -402,6 +470,7 @@ export function useCheckIn(
       dispatch({ type: "SET_USER_SPEAKING" })
       audioChunksRef.current = [] // Start collecting audio for this utterance
       userTranscriptRef.current = "" // Reset accumulated transcript for new utterance
+      userSpeechStartRef.current = new Date().toISOString() // Capture timestamp when user STARTS speaking
     },
     onUserSpeechEnd: () => {
       dispatch({ type: "SET_PROCESSING" })
@@ -414,13 +483,17 @@ export function useCheckIn(
       processUserUtterance()
     },
     onUserTranscript: (text, finished) => {
-      console.log("[useCheckIn] onUserTranscript:", text, "finished:", finished)
+      // Capture timestamp on FIRST chunk of user speech
+      // (VAD signals may not fire, so capture here as fallback)
+      if (userTranscriptRef.current === "" && text.trim() && !userSpeechStartRef.current) {
+        userSpeechStartRef.current = new Date().toISOString()
+      }
+
       // Accumulate transcript chunks (Gemini sends word-by-word without finished flag)
       userTranscriptRef.current = userTranscriptRef.current + text
 
       // finished flag is rarely sent by Gemini, but handle it if it comes
       if (finished && userTranscriptRef.current.trim()) {
-        console.log("[useCheckIn] Adding user message (finished=true):", userTranscriptRef.current)
         addUserMessage(userTranscriptRef.current)
         userTranscriptRef.current = ""
         dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
@@ -431,24 +504,34 @@ export function useCheckIn(
         dispatch({ type: "SET_USER_TRANSCRIPT", text: userTranscriptRef.current })
       }
     },
-    onModelTranscript: (text) => {
-      dispatch({
-        type: "APPEND_ASSISTANT_TRANSCRIPT",
-        text,
-      })
+    onModelTranscript: (text, finished) => {
+      if (!text) return
+
+      // On FIRST chunk, add streaming message to array (single element approach)
+      if (currentTranscriptRef.current === "") {
+        const streamingMessage: CheckInMessage = {
+          id: generateId(),
+          role: "assistant",
+          content: text,
+          isStreaming: true,
+          timestamp: new Date().toISOString(),
+        }
+        dispatch({ type: "ADD_MESSAGE", message: streamingMessage })
+        currentTranscriptRef.current = text
+      } else {
+        // Subsequent chunks: update the existing message in place
+        currentTranscriptRef.current += text
+        dispatch({ type: "UPDATE_STREAMING_MESSAGE", text })
+      }
     },
     onModelThinking: (text) => {
-      dispatch({
-        type: "APPEND_ASSISTANT_THINKING",
-        text,
-      })
+      // Simple: just accumulate thinking text
+      currentThinkingRef.current += text
+      dispatch({ type: "APPEND_ASSISTANT_THINKING", text })
     },
     onAudioChunk: (base64Audio) => {
-      // When model starts responding, save accumulated user transcript as a message
-      // Only do this on FIRST audio chunk (before state changes to assistant_speaking)
-      // This handles the case where Gemini doesn't send finished: true with inputTranscription
+      // Save any pending user message on first audio chunk
       if (stateRef.current !== "assistant_speaking" && userTranscriptRef.current.trim()) {
-        console.log("[useCheckIn] Saving user message on model response start:", userTranscriptRef.current)
         addUserMessage(userTranscriptRef.current)
         userTranscriptRef.current = ""
         dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
@@ -457,20 +540,19 @@ export function useCheckIn(
       playbackControls.queueAudio(base64Audio)
     },
     onTurnComplete: () => {
-      // Add assistant message when turn completes
-      // Use ref to avoid stale closure
-      if (transcriptRef.current.transcript.trim()) {
-        addAssistantMessage(
-          transcriptRef.current.transcript,
-          transcriptRef.current.thinking || undefined
-        )
-      }
-      dispatch({ type: "CLEAR_CURRENT_TRANSCRIPTS" })
+      // Finalize the streaming message (just removes isStreaming flag - no DOM change)
+      dispatch({ type: "FINALIZE_STREAMING_MESSAGE" })
+      // Reset refs for next response
+      currentTranscriptRef.current = ""
+      currentThinkingRef.current = ""
       dispatch({ type: "SET_LISTENING" })
     },
     onInterrupted: () => {
-      // User barged in - clear playback
+      // User barged in - clear playback and reset for next response
       playbackControls.clearQueue()
+      currentTranscriptRef.current = ""
+      currentThinkingRef.current = ""
+      dispatch({ type: "CLEAR_CURRENT_TRANSCRIPTS" })
       dispatch({ type: "SET_USER_SPEAKING" })
     },
     onSilenceChosen: (reason) => {
@@ -490,14 +572,6 @@ export function useCheckIn(
     stateRef.current = data.state
   }, [data.state])
 
-  // Sync transcriptRef with current transcripts (for use in callbacks)
-  useEffect(() => {
-    transcriptRef.current = {
-      transcript: data.currentAssistantTranscript,
-      thinking: data.currentAssistantThinking,
-    }
-  }, [data.currentAssistantTranscript, data.currentAssistantThinking])
-
   // Sync userTranscriptRef with current user transcript (for use in callbacks)
   useEffect(() => {
     userTranscriptRef.current = data.currentUserTranscript
@@ -512,7 +586,8 @@ export function useCheckIn(
       dispatch({ type: "SET_ASSISTANT_SPEAKING" })
     },
     onPlaybackEnd: () => {
-      if (data.state === "assistant_speaking") {
+      // Use stateRef.current instead of data.state to avoid stale closure
+      if (stateRef.current === "assistant_speaking") {
         dispatch({ type: "SET_LISTENING" })
       }
     },
@@ -528,31 +603,20 @@ export function useCheckIn(
   const addUserMessage = useCallback(
     (content: string) => {
       const messageId = generateId()
+      // Use timestamp from when user STARTED speaking (not when message is added)
+      // This ensures correct chronological ordering when AI starts responding before user finishes
       const message: CheckInMessage = {
         id: messageId,
         role: "user",
         content,
-        timestamp: new Date().toISOString(),
+        timestamp: userSpeechStartRef.current || new Date().toISOString(),
       }
+
+      // Reset the captured timestamp for the next utterance
+      userSpeechStartRef.current = null
 
       // Save the message ID for later update with features
       lastUserMessageIdRef.current = messageId
-
-      dispatch({ type: "ADD_MESSAGE", message })
-      callbacksRef.current.onMessage?.(message)
-    },
-    []
-  )
-
-  const addAssistantMessage = useCallback(
-    (content: string, thinking?: string) => {
-      const message: CheckInMessage = {
-        id: generateId(),
-        role: "assistant",
-        content,
-        thinking,
-        timestamp: new Date().toISOString(),
-      }
 
       dispatch({ type: "ADD_MESSAGE", message })
       callbacksRef.current.onMessage?.(message)

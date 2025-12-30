@@ -86,13 +86,13 @@ export function CheckInDialog({
     }
   }, [open, checkIn.state, recordingContext, controls])
 
-  // Handle close
+  // Handle close - always reset state to idle so reopening starts fresh
   const handleClose = useCallback(async () => {
     if (checkIn.isActive) {
       await controls.endSession()
-    } else {
-      controls.cancelSession()
     }
+    // Always reset to idle when closing (safe to call even after endSession)
+    controls.cancelSession()
     onOpenChange(false)
   }, [checkIn.isActive, controls, onOpenChange])
 
@@ -222,10 +222,9 @@ export function CheckInDialog({
 
                 {/* Messages */}
                 <ConversationView
-                  messages={checkIn.messages}
                   state={checkIn.state}
+                  messages={checkIn.messages}
                   currentUserTranscript={checkIn.currentUserTranscript}
-                  currentAssistantTranscript={checkIn.currentAssistantTranscript}
                 />
               </motion.div>
             )}
