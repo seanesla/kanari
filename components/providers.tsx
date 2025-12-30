@@ -1,5 +1,7 @@
 "use client"
 
+import 'temporal-polyfill/global'
+
 import type { ReactNode } from "react"
 import { ViewTransitions } from "next-view-transitions"
 import { SceneProvider } from "@/lib/scene-context"

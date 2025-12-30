@@ -5,7 +5,6 @@ import { useNextCalendarApp, ScheduleXCalendar } from '@schedule-x/react'
 import { createViewWeek } from '@schedule-x/calendar'
 import { createEventsServicePlugin } from '@schedule-x/events-service'
 import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop'
-import { Temporal } from 'temporal-polyfill'
 import type { Suggestion } from '@/lib/types'
 import '@schedule-x/theme-default/dist/index.css'
 import './schedule-x-theme.css'
@@ -22,7 +21,12 @@ interface ScheduleXWeekCalendarProps {
 function suggestionToEvent(suggestion: Suggestion) {
   if (!suggestion.scheduledFor) return null
 
-  const startDateTime = Temporal.PlainDateTime.from(suggestion.scheduledFor.replace('Z', ''))
+  // Schedule-X requires ZonedDateTime for timed events (not PlainDateTime)
+  // Source: Context7 - schedule-x/schedule-x docs - "Timed Event Example"
+  // https://github.com/schedule-x/schedule-x/blob/main/website/app/docs/calendar/events/page.mdx
+  const timeZone = Temporal.Now.timeZoneId()
+  const instant = Temporal.Instant.from(suggestion.scheduledFor)
+  const startDateTime = instant.toZonedDateTimeISO(timeZone)
   const endDateTime = startDateTime.add({ minutes: suggestion.duration })
 
   // Extract first sentence as title, max 30 chars
@@ -150,8 +154,9 @@ export function ScheduleXWeekCalendar({
       onEventUpdate(updatedEvent) {
         const suggestion = (updatedEvent as any)._suggestion as Suggestion
         if (suggestion && onEventUpdate) {
-          // Convert Temporal.PlainDateTime to ISO string
-          const newScheduledFor = updatedEvent.start.toString() + 'Z'
+          // Convert Temporal.ZonedDateTime to ISO string (UTC)
+          const zdt = updatedEvent.start as Temporal.ZonedDateTime
+          const newScheduledFor = zdt.toInstant().toString()
           onEventUpdate(suggestion, newScheduledFor)
         }
       },
@@ -159,13 +164,24 @@ export function ScheduleXWeekCalendar({
   })
 
   // Sync events when scheduledSuggestions change
+  // Source: Context7 - schedule-x/schedule-x docs - "EventsService Plugin"
+  // The plugin needs the calendar to be mounted before calling .set()
   useEffect(() => {
+    // Wait for calendar to be ready before setting events
+    if (!calendar) return
+
     const events = scheduledSuggestions
       .map(suggestionToEvent)
       .filter(Boolean) as any[]
 
-    eventsService.set(events)
-  }, [scheduledSuggestions, eventsService])
+    // Use try-catch as the plugin may not be fully initialized on first render
+    try {
+      eventsService.set(events)
+    } catch (e) {
+      // Calendar not fully mounted yet, will retry on next render
+      console.debug('Schedule-X: Calendar not ready, deferring event sync')
+    }
+  }, [scheduledSuggestions, eventsService, calendar])
 
   return (
     <div className={className}>
