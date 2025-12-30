@@ -1,7 +1,5 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
 ## Hackathon Context
 
 **Google DeepMind Gemini 3 Hackathon** (Dec 17, 2025 - Feb 9, 2026)
@@ -10,10 +8,11 @@ Submission: kanari - browser-based burnout prediction using voice biomarkers and
 ## Commands
 
 ```bash
-pnpm dev      # Dev server at localhost:3000
-pnpm build    # Production build
-pnpm lint     # ESLint
-pnpm start    # Run production build
+pnpm dev          # Dev server at localhost:3000
+pnpm build        # Production build
+pnpm lint         # ESLint
+pnpm test         # Vitest watch mode
+pnpm test:run     # Vitest single run
 ```
 
 ## Environment
@@ -27,41 +26,37 @@ Copy `.env.example` to `.env` with:
 **Stack**: Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4
 
 ### Data Flow
-1. `AudioRecorder` captures voice → `AudioProcessor` applies VAD → `FeatureExtractor` (Meyda) extracts acoustic features
-2. Features saved to IndexedDB (Dexie)
-3. Audio sent to Gemini 3 Flash for semantic analysis (emotion, transcription)
-4. `lib/ml/forecasting.ts` predicts 3-7 day burnout risk
-5. Gemini generates personalized recovery suggestions
-6. User schedules suggestions → Google Calendar API
+1. **Voice Note mode**: `AudioRecorder` → VAD → Meyda features → IndexedDB → Gemini Flash analysis
+2. **AI Chat mode**: Real-time voice via `use-gemini-live.ts` → WebSocket → Gemini Live API
+3. `lib/ml/forecasting.ts` predicts 3-7 day burnout risk from acoustic trends
+4. Gemini generates recovery suggestions → user schedules via Google Calendar
 
 ### Key Directories
-- `app/` - Next.js App Router pages (landing, dashboard/*)
-- `components/scene/` - Three.js 3D visualization (landing page)
-- `components/dashboard/` - Dashboard UI (recording, charts, kanban)
-- `hooks/` - Recording, storage, calendar, suggestions state
-- `lib/audio/` - Web Audio recording, VAD, Meyda feature extraction
-- `lib/gemini/` - API client and prompts for Gemini 3 Flash
-- `lib/calendar/` - Google OAuth PKCE flow and Calendar API
-- `lib/storage/db.ts` - Dexie schema (recordings, suggestions, trendData)
-- `lib/ml/` - Client-side forecasting and inference
+- `app/api/gemini/live/` - Gemini Live streaming routes (WebSocket proxy)
+- `components/check-in/` - Check-in dialog, voice indicator, conversation UI
+- `components/dashboard/` - Dashboard UI (recording, charts, kanban, history)
+- `hooks/` - `use-check-in`, `use-gemini-live`, `use-audio-playback`, `use-recording`, `use-storage`
+- `lib/audio/` - Web Audio, VAD, Meyda features, PCM conversion
+- `lib/gemini/` - API client, prompts, `live-client.ts` (WebSocket), mismatch detection
+- `lib/ml/` - Forecasting, inference, `thresholds.ts` (constants)
 
 ### State Management
-- `SceneProvider` - Scene mode (landing/dashboard), accent color, loading
-- `NavbarProvider` - Navigation state, section tracking
-- Custom hooks for domain logic (use-recording, use-storage, use-suggestions, use-calendar)
+- `SceneProvider` - Scene mode, accent color, loading
+- `NavbarProvider` - Navigation state
+- Domain hooks: `use-check-in` (orchestrates Voice Note/AI Chat modes), `use-gemini-live` (WebSocket session)
 
 ### APIs
-- **Gemini 3 Flash**: `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent`
-- **Google Calendar**: OAuth 2.0 PKCE flow, events scope
+- **Gemini Flash**: REST API for async analysis
+- **Gemini Live**: WebSocket at `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent`
+- **Google Calendar**: OAuth 2.0 PKCE flow
 
 ## Key Patterns
 
-- All acoustic analysis runs client-side (privacy-first)
-- Audio only sent to Gemini for semantic analysis
-- IndexedDB for offline-first storage
-- `use-suggestions.ts` implements diff-aware updates (keep/update/drop/new)
-- `lib/gemini/prompts.ts` contains all Gemini system prompts
-- 3D scene uses react-three/fiber with scroll-responsive camera
+- Privacy-first: acoustic analysis client-side, only audio sent to Gemini for semantics
+- IndexedDB (Dexie) for offline-first storage
+- `lib/logger.ts` for dev-only logging (`logDebug`, `logWarn`, `logError`)
+- `lib/gemini/prompts.ts` and `live-prompts.ts` contain all system prompts
+- Tests in `__tests__/` directories alongside source files
 
 ## Config Notes
 
