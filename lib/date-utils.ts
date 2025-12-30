@@ -12,6 +12,15 @@ export function formatDuration(seconds: number): string {
 }
 
 /**
+ * Format duration with unit labels (e.g., "1m 43s")
+ */
+export function formatDurationWithUnits(seconds: number): string {
+  const mins = Math.floor(seconds / 60)
+  const secs = Math.round(seconds % 60)
+  return `${mins}m ${secs}s`
+}
+
+/**
  * Format date for display (e.g., "Mon, Dec 23, 3:45 PM")
  */
 export function formatDate(dateStr: string): string {

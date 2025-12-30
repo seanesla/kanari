@@ -26,6 +26,7 @@ import {
   AlertCircle,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { formatDurationWithUnits } from "@/lib/date-utils"
 import { Button } from "@/components/ui/button"
 import { RecordingWaveform } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
@@ -254,7 +255,7 @@ export function AIChatCard({ item, onDelete, onOpenDetail }: AIChatCardProps) {
 
   // Calculate session duration
   const duration = session.duration
-    ? Math.floor(session.duration / 60) + "m " + (session.duration % 60) + "s"
+    ? formatDurationWithUnits(session.duration)
     : "—"
 
   // Determine if there were voice mismatches detected
