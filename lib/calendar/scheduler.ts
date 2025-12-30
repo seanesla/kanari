@@ -175,30 +175,6 @@ export async function scheduleMultipleRecoveryBlocks(
 }
 
 /**
- * Reschedule a recovery block to a new time
- */
-export async function rescheduleRecoveryBlock(
-  recoveryBlock: RecoveryBlock,
-  newTime: Date,
-  tokens: OAuthTokens
-): Promise<ScheduleResult> {
-  try {
-    // This would require updating the calendar event
-    // Implementation depends on having the suggestion details
-    // For now, return a placeholder
-    return {
-      success: false,
-      error: "Rescheduling not yet implemented",
-    }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error occurred",
-    }
-  }
-}
-
-/**
  * Check if a recovery block is upcoming (within next 2 hours)
  */
 export function isUpcoming(recoveryBlock: RecoveryBlock): boolean {
