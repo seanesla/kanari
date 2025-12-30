@@ -22,6 +22,7 @@ interface SceneContextValue {
   setSerifFont: (font: string) => void
   selectedMonoFont: string
   setMonoFont: (font: string) => void
+  resetFontsToDefault: () => void
 }
 
 const SceneContext = createContext<SceneContextValue | null>(null)
@@ -165,6 +166,12 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const resetFontsToDefault = useCallback(() => {
+    setSansFont(DEFAULT_SANS)
+    setSerifFont(DEFAULT_SERIF)
+    setMonoFont(DEFAULT_MONO)
+  }, [setSansFont, setSerifFont, setMonoFont])
+
   const contextValue = useMemo(() => ({
     mode,
     setMode,
@@ -180,7 +187,8 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     setSerifFont,
     selectedMonoFont,
     setMonoFont,
-  }), [mode, isLoading, accentColor, selectedSansFont, selectedSerifFont, selectedMonoFont, setMode, resetToLanding, setAccentColor, setSansFont, setSerifFont, setMonoFont])
+    resetFontsToDefault,
+  }), [mode, isLoading, accentColor, selectedSansFont, selectedSerifFont, selectedMonoFont, setMode, resetToLanding, setAccentColor, setSansFont, setSerifFont, setMonoFont, resetFontsToDefault])
 
   return (
     <SceneContext.Provider value={contextValue}>

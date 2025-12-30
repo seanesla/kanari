@@ -1,7 +1,7 @@
 "use client"
 
 import { useSceneMode } from "@/lib/scene-context"
-import { SANS_FONTS, SERIF_FONTS, MONO_FONTS } from "@/lib/font-utils"
+import { SANS_FONTS, SERIF_FONTS, MONO_FONTS, DEFAULT_SANS, DEFAULT_SERIF, DEFAULT_MONO } from "@/lib/font-utils"
 import { Label } from "@/components/ui/label"
 
 export function FontPicker() {
@@ -12,6 +12,7 @@ export function FontPicker() {
     setSerifFont,
     selectedMonoFont,
     setMonoFont,
+    resetFontsToDefault,
   } = useSceneMode()
 
   const handleSansChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -83,6 +84,17 @@ export function FontPicker() {
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Reset to Defaults Button */}
+      <div className="mt-6 flex items-center justify-end">
+        <button
+          onClick={resetFontsToDefault}
+          className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 border border-border rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          aria-label="Reset all fonts to their default values"
+        >
+          Reset to Defaults
+        </button>
       </div>
     </div>
   )
