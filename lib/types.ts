@@ -125,26 +125,6 @@ export interface EnrichedWellnessContext {
 }
 
 // ============================================
-// Enriched Context Types (for Gemini suggestions)
-// ============================================
-
-export interface VoicePatterns {
-  speechRate: "slow" | "normal" | "fast"
-  energyLevel: "low" | "moderate" | "high"
-  pauseFrequency: "rare" | "normal" | "frequent"
-  voiceTone: "dull" | "neutral" | "bright"
-}
-
-export interface HistoricalContext {
-  recordingCount: number
-  daysOfData: number
-  averageStress: number
-  averageFatigue: number
-  stressChange: string // e.g., "stable", "+15% from baseline"
-  fatigueChange: string
-}
-
-// ============================================
 // Google Search Grounding Types
 // ============================================
 
@@ -422,6 +402,8 @@ export interface DashboardStats {
   averageFatigue: number
   suggestionsAccepted: number
   recoveryBlocksScheduled: number
+  weeklyRecordings: number // Recordings made this week (Mon-Sun)
+  weeklyGoal: number // Target recordings per week (default: 3)
 }
 
 // ============================================
@@ -523,6 +505,102 @@ export interface CheckInSession {
   duration?: number
   // Number of detected mismatches during conversation
   mismatchCount?: number
+}
+
+// ============================================
+// Conversational Check-In Widgets (Gemini-triggered)
+// ============================================
+
+export interface ScheduleActivityToolArgs {
+  title: string
+  category: SuggestionCategory
+  /** YYYY-MM-DD */
+  date: string
+  /** HH:MM (24h) */
+  time: string
+  /** Minutes */
+  duration: number
+}
+
+export type BreathingExerciseType = "box" | "478" | "relaxing"
+
+export interface BreathingExerciseToolArgs {
+  type: BreathingExerciseType
+  /** Seconds */
+  duration: number
+}
+
+export interface StressGaugeToolArgs {
+  /** 0-100 */
+  stressLevel: number
+  /** 0-100 */
+  fatigueLevel: number
+  message?: string
+}
+
+export interface QuickActionsToolArgs {
+  options: Array<{
+    label: string
+    action: string
+  }>
+}
+
+export interface JournalPromptToolArgs {
+  prompt: string
+  placeholder?: string
+  category?: string
+}
+
+export type WidgetType =
+  | "schedule_activity"
+  | "breathing_exercise"
+  | "stress_gauge"
+  | "quick_actions"
+  | "journal_prompt"
+
+interface WidgetBase<TType extends WidgetType, TArgs> {
+  id: string
+  type: TType
+  createdAt: string
+  args: TArgs
+}
+
+export type ScheduleActivityWidgetStatus = "scheduled" | "failed"
+
+export type ScheduleActivityWidgetState = WidgetBase<"schedule_activity", ScheduleActivityToolArgs> & {
+  status: ScheduleActivityWidgetStatus
+  suggestionId?: string
+  error?: string
+}
+
+export type BreathingExerciseWidgetState = WidgetBase<"breathing_exercise", BreathingExerciseToolArgs>
+
+export type StressGaugeWidgetState = WidgetBase<"stress_gauge", StressGaugeToolArgs>
+
+export type QuickActionsWidgetState = WidgetBase<"quick_actions", QuickActionsToolArgs>
+
+export type JournalPromptWidgetStatus = "draft" | "saved" | "failed"
+
+export type JournalPromptWidgetState = WidgetBase<"journal_prompt", JournalPromptToolArgs> & {
+  status: JournalPromptWidgetStatus
+  entryId?: string
+  error?: string
+}
+
+export type WidgetState =
+  | ScheduleActivityWidgetState
+  | BreathingExerciseWidgetState
+  | StressGaugeWidgetState
+  | QuickActionsWidgetState
+  | JournalPromptWidgetState
+
+export interface JournalEntry {
+  id: string
+  createdAt: string
+  category: string
+  prompt: string
+  content: string
+  checkInSessionId?: string
 }
 
 // Configuration for Gemini Live API connection

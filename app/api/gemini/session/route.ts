@@ -70,25 +70,34 @@ export async function POST(
 
     // Parse optional request body
     let systemInstruction: string | undefined
+    let body: unknown
     try {
-      const body = await request.json()
-
-      // Check if we have AI-initiated context (new flow)
-      if (body?.contextSummary || body?.timeContext) {
-        // Build system instruction with context for AI-initiated conversation
-        systemInstruction = buildCheckInSystemInstruction(
-          body.contextSummary as SystemContextSummary | undefined,
-          body.timeContext as SystemTimeContext | undefined
-        )
-        console.log("[Gemini Session] Built AI-initiated system instruction with context")
-      } else if (body?.systemInstruction) {
-        // Legacy: use provided system instruction directly
-        systemInstruction = body.systemInstruction
-      }
-      // If no body or no relevant fields, systemInstruction stays undefined
-      // and session-manager will use CHECK_IN_SYSTEM_PROMPT as default
+      body = await request.json()
     } catch {
       // No body or invalid JSON - use default system instruction
+      body = undefined
+    }
+
+    // Legacy: use provided system instruction directly (if present)
+    if (
+      body &&
+      typeof body === "object" &&
+      "systemInstruction" in body &&
+      typeof (body as { systemInstruction?: unknown }).systemInstruction === "string"
+    ) {
+      systemInstruction = (body as { systemInstruction: string }).systemInstruction
+    } else {
+      // Default: always build the check-in instruction (with optional context)
+      const contextSummary =
+        body && typeof body === "object" && "contextSummary" in body
+          ? ((body as { contextSummary?: unknown }).contextSummary as SystemContextSummary | undefined)
+          : undefined
+      const timeContext =
+        body && typeof body === "object" && "timeContext" in body
+          ? ((body as { timeContext?: unknown }).timeContext as SystemTimeContext | undefined)
+          : undefined
+
+      systemInstruction = buildCheckInSystemInstruction(contextSummary, timeContext)
     }
 
     // Generate session ID

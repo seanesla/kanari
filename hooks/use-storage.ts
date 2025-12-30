@@ -3,16 +3,19 @@
 import { useCallback } from "react"
 import { logDebug } from "@/lib/logger"
 import { useLiveQuery } from "dexie-react-hooks"
+import { getWeekStart, getWeekEnd } from "@/lib/date-utils"
 import {
   db,
   toRecording,
   toTrendData,
   toSuggestion,
   toCheckInSession,
+  toJournalEntry,
   fromRecording,
   fromTrendData,
   fromSuggestion,
   fromCheckInSession,
+  fromJournalEntry,
   type DBTrendData,
 } from "@/lib/storage/db"
 import type {
@@ -21,6 +24,7 @@ import type {
   DashboardStats,
   Suggestion,
   CheckInSession,
+  JournalEntry,
 } from "@/lib/types"
 
 // ===========================================
@@ -302,6 +306,14 @@ export function useDashboardStats(): DashboardStats {
     ).length
     const recoveryBlocksScheduled = recoveryBlocks.length
 
+    // Calculate weekly recordings (Mon-Sun)
+    const weekStart = getWeekStart()
+    const weekEnd = getWeekEnd()
+    const weeklyRecordings = recordings.filter((r) => {
+      const recordingDate = r.createdAt
+      return recordingDate >= weekStart && recordingDate <= weekEnd
+    }).length
+
     return {
       totalRecordings,
       totalMinutesRecorded: Math.round(totalMinutesRecorded),
@@ -310,6 +322,8 @@ export function useDashboardStats(): DashboardStats {
       averageFatigue: Math.round(averageFatigue),
       suggestionsAccepted,
       recoveryBlocksScheduled,
+      weeklyRecordings,
+      weeklyGoal: 3,
     }
   }, [])
 
@@ -322,6 +336,8 @@ export function useDashboardStats(): DashboardStats {
       averageFatigue: 0,
       suggestionsAccepted: 0,
       recoveryBlocksScheduled: 0,
+      weeklyRecordings: 0,
+      weeklyGoal: 3,
     }
   )
 }
@@ -415,6 +431,53 @@ export function useCheckInSessionActions() {
 }
 
 // ===========================================
+// Journal entry operations
+// ===========================================
+
+export function useJournalEntries(limit?: number) {
+  const entries = useLiveQuery(async () => {
+    let query = db.journalEntries.orderBy("createdAt").reverse()
+    if (limit) {
+      query = query.limit(limit)
+    }
+    const results = await query.toArray()
+    return results.map(toJournalEntry)
+  }, [limit])
+
+  return entries ?? []
+}
+
+export function useJournalEntriesByCheckInSession(checkInSessionId: string | undefined) {
+  const entries = useLiveQuery(async () => {
+    if (!checkInSessionId) return []
+    const results = await db.journalEntries
+      .where("checkInSessionId")
+      .equals(checkInSessionId)
+      .sortBy("createdAt")
+    return results.map(toJournalEntry).reverse()
+  }, [checkInSessionId])
+
+  return entries ?? []
+}
+
+export function useJournalEntryActions() {
+  const addJournalEntry = useCallback(async (entry: JournalEntry) => {
+    await db.journalEntries.add(fromJournalEntry(entry))
+    return entry.id
+  }, [])
+
+  const deleteJournalEntry = useCallback(async (id: string) => {
+    await db.journalEntries.delete(id)
+  }, [])
+
+  const clearJournalEntries = useCallback(async () => {
+    await db.journalEntries.clear()
+  }, [])
+
+  return { addJournalEntry, deleteJournalEntry, clearJournalEntries }
+}
+
+// ===========================================
 // Clear all data
 // ===========================================
 
@@ -427,6 +490,7 @@ export function useClearAllData() {
       db.trendData.clear(),
       db.checkInSessions.clear(),
       db.achievements.clear(),
+      db.journalEntries.clear(),
     ])
   }, [])
 }

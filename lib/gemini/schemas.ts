@@ -6,6 +6,13 @@
  */
 
 import { z } from "zod"
+import type {
+  BreathingExerciseToolArgs,
+  JournalPromptToolArgs,
+  QuickActionsToolArgs,
+  ScheduleActivityToolArgs,
+  StressGaugeToolArgs,
+} from "@/lib/types"
 
 /**
  * Inline data schema (for audio chunks)
@@ -186,3 +193,48 @@ export const AudioInputRequestSchema = z.object({
 })
 
 export type AudioInputRequest = z.infer<typeof AudioInputRequestSchema>
+
+// ============================================
+// Gemini Live Tool Args Schemas (Widget tools)
+// ============================================
+
+// Shared helpers
+const DateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
+const TimeStringSchema = z.string().regex(/^\d{2}:\d{2}$/, "Expected HH:MM (24h)")
+
+export const ScheduleActivityArgsSchema: z.ZodType<ScheduleActivityToolArgs> = z.object({
+  title: z.string().min(1).max(120),
+  category: z.enum(["break", "exercise", "mindfulness", "social", "rest"]),
+  date: DateStringSchema,
+  time: TimeStringSchema,
+  duration: z.number().int().min(1).max(12 * 60), // minutes, cap at 12h
+})
+
+export const BreathingExerciseArgsSchema: z.ZodType<BreathingExerciseToolArgs> = z.object({
+  type: z.enum(["box", "478", "relaxing"]),
+  duration: z.number().int().min(10).max(30 * 60), // seconds, cap at 30m
+})
+
+export const StressGaugeArgsSchema: z.ZodType<StressGaugeToolArgs> = z.object({
+  stressLevel: z.number().min(0).max(100),
+  fatigueLevel: z.number().min(0).max(100),
+  message: z.string().max(500).optional(),
+})
+
+export const QuickActionsArgsSchema: z.ZodType<QuickActionsToolArgs> = z.object({
+  options: z
+    .array(
+      z.object({
+        label: z.string().min(1).max(60),
+        action: z.string().min(1).max(200),
+      })
+    )
+    .min(1)
+    .max(8),
+})
+
+export const JournalPromptArgsSchema: z.ZodType<JournalPromptToolArgs> = z.object({
+  prompt: z.string().min(1).max(500),
+  placeholder: z.string().max(200).optional(),
+  category: z.string().min(1).max(50).optional(),
+})

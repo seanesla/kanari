@@ -10,6 +10,7 @@ import type {
   SuggestionDecision,
   CheckInSession,
   CheckInMessage,
+  JournalEntry,
 } from "@/lib/types"
 import type { StoredAchievement, AchievementCategory, AchievementRarity } from "@/lib/achievements/types"
 
@@ -47,6 +48,10 @@ export interface DBAchievement extends Omit<StoredAchievement, "earnedAt" | "see
   seenAt?: Date
 }
 
+export interface DBJournalEntry extends Omit<JournalEntry, "createdAt"> {
+  createdAt: Date
+}
+
 // Database class
 class KanariDB extends Dexie {
   recordings!: EntityTable<DBRecording, "id">
@@ -56,6 +61,7 @@ class KanariDB extends Dexie {
   settings!: EntityTable<DBSettings, "id">
   checkInSessions!: EntityTable<DBCheckInSession, "id">
   achievements!: EntityTable<DBAchievement, "id">
+  journalEntries!: EntityTable<DBJournalEntry, "id">
 
   constructor() {
     super("kanari")
@@ -115,6 +121,18 @@ class KanariDB extends Dexie {
       settings: "id",
       checkInSessions: "id, startedAt, recordingId",
       achievements: "id, earnedAt, category, rarity, seen",
+    })
+
+    // Version 6: Add journal entries for check-in reflection
+    this.version(6).stores({
+      recordings: "id, createdAt, status",
+      suggestions: "id, createdAt, status, category, recordingId, version",
+      recoveryBlocks: "id, suggestionId, scheduledAt, completed",
+      trendData: "id, date",
+      settings: "id",
+      checkInSessions: "id, startedAt, recordingId",
+      achievements: "id, earnedAt, category, rarity, seen",
+      journalEntries: "id, createdAt, category, checkInSessionId",
     })
   }
 }
@@ -218,5 +236,19 @@ export function fromAchievement(record: StoredAchievement): DBAchievement {
     ...record,
     earnedAt: new Date(record.earnedAt),
     seenAt: record.seenAt ? new Date(record.seenAt) : undefined,
+  }
+}
+
+export function toJournalEntry(dbRecord: DBJournalEntry): JournalEntry {
+  return {
+    ...dbRecord,
+    createdAt: dbRecord.createdAt.toISOString(),
+  }
+}
+
+export function fromJournalEntry(record: JournalEntry): DBJournalEntry {
+  return {
+    ...record,
+    createdAt: new Date(record.createdAt),
   }
 }

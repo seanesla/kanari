@@ -17,7 +17,7 @@ export type TimeOfDay = "morning" | "afternoon" | "evening" | "night"
 export type TrendDirection = "rising" | "stable" | "falling"
 
 export interface TimeContext {
-  currentTime: string // ISO string
+  currentTime: string // User-local time string (include timezone)
   dayOfWeek: string // e.g., "Monday"
   timeOfDay: TimeOfDay
   daysSinceLastCheckIn: number | null
@@ -58,6 +58,28 @@ function getTimeOfDay(hour: number): TimeOfDay {
 function getDayName(dayIndex: number): string {
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
   return days[dayIndex] || "Unknown"
+}
+
+/**
+ * Format a local date/time string for the model prompt.
+ * Avoid UTC-only strings (e.g. `toISOString()`) which can imply the wrong time of day for the user.
+ * Pattern doc: docs/error-patterns/utc-local-time-mismatch-in-prompts.md
+ */
+function formatUserLocalTime(now: Date): string {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+
+  const formatted = new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZoneName: "short",
+  }).format(now)
+
+  return timeZone ? `${formatted} (${timeZone})` : formatted
 }
 
 /**
@@ -131,7 +153,7 @@ export async function fetchCheckInContext(): Promise<CheckInContextData> {
   // Calculate time context
   const lastSession = recentSessions[0] // Most recent
   const timeContext: TimeContext = {
-    currentTime: now.toISOString(),
+    currentTime: formatUserLocalTime(now),
     dayOfWeek: getDayName(now.getDay()),
     timeOfDay: getTimeOfDay(now.getHours()),
     daysSinceLastCheckIn: lastSession

@@ -17,10 +17,12 @@ class PlaybackProcessor extends AudioWorkletProcessor {
     // Audio queue - stores Float32 chunks waiting to be played
     this.queue = []
 
-    // Queue size limits to prevent unbounded memory growth
-    // At 24kHz, each chunk is ~1024 samples = ~43ms
-    // 150 chunks = ~6.4 seconds of buffer
-    this.maxQueueLength = 150
+    // Queue limits to balance smooth playback vs memory.
+    // See docs/error-patterns/playback-chunk-drop.md for rationale.
+    // At 24kHz, 600 chunks ≈ 26s of buffer (enough for long replies without drops)
+    // Hard cap only engages for runaway sessions; it trims oldest audio instead of rejecting new.
+    this.softQueueLimit = 600
+    this.hardQueueLimit = 2000
     this.droppedChunks = 0
 
     // Track sample count incrementally to avoid O(n) calculation
@@ -47,19 +49,14 @@ class PlaybackProcessor extends AudioWorkletProcessor {
           return
         }
 
-        // Check queue size limit
-        if (this.queue.length >= this.maxQueueLength) {
-          // Reject new chunk to maintain playback continuity (don't skip forward)
-          this.droppedChunks++
-
-          // Notify main thread of backpressure
-          this.port.postMessage({
-            type: "queueFull",
-            dropped: this.droppedChunks,
-            queueLength: this.queue.length,
-          })
-
-          return // Don't add to queue - reject to prevent skipping
+        // Prevent runaway memory: if we ever exceed the hard limit,
+        // drop the oldest buffered chunk (never the new one) to stay bounded.
+        while (this.queue.length >= this.hardQueueLimit) {
+          const dropped = this.queue.shift()
+          if (dropped) {
+            this.cachedBufferedSamples -= dropped.length
+            this.droppedChunks++
+          }
         }
 
         // Received audio data - convert Int16 to Float32 and queue
@@ -71,6 +68,15 @@ class PlaybackProcessor extends AudioWorkletProcessor {
         const float32 = this.int16ToFloat32(int16)
         this.queue.push(float32)
         this.cachedBufferedSamples += float32.length
+
+        // Notify main thread when we're buffering more than usual (no dropping here)
+        if (this.queue.length >= this.softQueueLimit) {
+          this.port.postMessage({
+            type: "queuePressure",
+            dropped: this.droppedChunks,
+            queueLength: this.queue.length,
+          })
+        }
 
         // Notify main thread of queue status
         this.port.postMessage({

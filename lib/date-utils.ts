@@ -3,6 +3,40 @@
  */
 
 /**
+ * Get the start of the current week (Monday at 00:00:00)
+ */
+export function getWeekStart(date: Date = new Date()): Date {
+  const d = new Date(date)
+  const day = d.getDay()
+  // Adjust for Monday start (0 = Sunday, so Monday = 1)
+  const diff = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + diff)
+  d.setHours(0, 0, 0, 0)
+  return d
+}
+
+/**
+ * Get the end of the current week (Sunday at 23:59:59.999)
+ */
+export function getWeekEnd(date: Date = new Date()): Date {
+  const weekStart = getWeekStart(date)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekEnd.getDate() + 6)
+  weekEnd.setHours(23, 59, 59, 999)
+  return weekEnd
+}
+
+/**
+ * Check if an ISO date string falls within the current week
+ */
+export function isThisWeek(isoString: string): boolean {
+  const date = new Date(isoString)
+  const weekStart = getWeekStart()
+  const weekEnd = getWeekEnd()
+  return date >= weekStart && date <= weekEnd
+}
+
+/**
  * Format duration in mm:ss format
  */
 export function formatDuration(seconds: number): string {

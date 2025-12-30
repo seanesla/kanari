@@ -37,6 +37,14 @@ import { useCheckIn, type StartSessionOptions } from "@/hooks/use-check-in"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { VoiceIndicatorLarge } from "@/components/check-in/voice-indicator"
 import { ConversationView } from "@/components/check-in/conversation-view"
+import { ChatInput } from "@/components/check-in/chat-input"
+import {
+  BreathingExercise,
+  JournalPrompt,
+  QuickActions,
+  ScheduleConfirmation,
+  StressGauge,
+} from "@/components/check-in/widgets"
 import {
   getPreservedFingerprint,
   clearPreservedSession,
@@ -347,6 +355,69 @@ export function AIChatContent({
               messages={checkIn.messages}
               currentUserTranscript={checkIn.currentUserTranscript}
             />
+
+            {/* Gemini-triggered widgets */}
+            {checkIn.widgets.length > 0 && (
+              <div className="flex-shrink-0 border-t bg-background/60 p-4 space-y-3 overflow-y-auto max-h-[260px]">
+                <AnimatePresence initial={false}>
+                  {checkIn.widgets.map((widget) => {
+                    switch (widget.type) {
+                      case "schedule_activity":
+                        return (
+                          <ScheduleConfirmation
+                            key={widget.id}
+                            widget={widget}
+                            onDismiss={() => controls.dismissWidget(widget.id)}
+                            onUndo={(suggestionId) =>
+                              controls.undoScheduledActivity(widget.id, suggestionId)
+                            }
+                          />
+                        )
+                      case "breathing_exercise":
+                        return (
+                          <BreathingExercise
+                            key={widget.id}
+                            widget={widget}
+                            onDismiss={() => controls.dismissWidget(widget.id)}
+                          />
+                        )
+                      case "stress_gauge":
+                        return (
+                          <StressGauge
+                            key={widget.id}
+                            widget={widget}
+                            onDismiss={() => controls.dismissWidget(widget.id)}
+                          />
+                        )
+                      case "quick_actions":
+                        return (
+                          <QuickActions
+                            key={widget.id}
+                            widget={widget}
+                            onDismiss={() => controls.dismissWidget(widget.id)}
+                            onSelect={(action, label) =>
+                              controls.runQuickAction(widget.id, action, label)
+                            }
+                          />
+                        )
+                      case "journal_prompt":
+                        return (
+                          <JournalPrompt
+                            key={widget.id}
+                            widget={widget}
+                            onDismiss={() => controls.dismissWidget(widget.id)}
+                            onSave={(content) =>
+                              controls.saveJournalEntry(widget.id, content)
+                            }
+                          />
+                        )
+                      default:
+                        return null
+                    }
+                  })}
+                </AnimatePresence>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -409,8 +480,14 @@ export function AIChatContent({
         {/* ===== FOOTER CONTROLS ===== */}
         {/* Only shown during active conversation (not during init/complete/error) */}
         {showConversation && (
-          <div className="flex-shrink-0 px-6 py-4 border-t bg-muted/30">
-            <div className="flex items-center justify-center gap-4">
+          <div className="flex-shrink-0 border-t bg-muted/30">
+            <ChatInput
+              onSendText={(text) => controls.sendTextMessage(text)}
+              onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
+              disabled={!checkIn.isActive}
+            />
+
+            <div className="px-6 py-3 flex items-center justify-center gap-4">
               {/*
                 Mute button - toggles microphone on/off
                 Red background when muted to clearly indicate state

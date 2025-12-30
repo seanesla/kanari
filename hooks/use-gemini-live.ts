@@ -20,6 +20,7 @@ import {
   createLiveClient,
   type LiveClientConfig,
   type LiveClientEvents,
+  type GeminiWidgetEvent,
   type SessionContext,
 } from "@/lib/gemini/live-client"
 
@@ -84,6 +85,8 @@ export interface UseGeminiLiveOptions {
   onInterrupted?: () => void
   /** Called when AI chooses silence (doesn't respond) */
   onSilenceChosen?: (reason: string) => void
+  /** Called when Gemini triggers an interactive widget */
+  onWidget?: (event: GeminiWidgetEvent) => void
   /** Callbacks for speech detection */
   onUserSpeechStart?: () => void
   onUserSpeechEnd?: () => void
@@ -247,6 +250,7 @@ export function useGeminiLive(
     onTurnComplete,
     onInterrupted,
     onSilenceChosen,
+    onWidget,
     onUserSpeechStart,
     onUserSpeechEnd,
     onConnected,
@@ -268,6 +272,7 @@ export function useGeminiLive(
     onTurnComplete,
     onInterrupted,
     onSilenceChosen,
+    onWidget,
     onUserSpeechStart,
     onUserSpeechEnd,
     onConnected,
@@ -286,6 +291,7 @@ export function useGeminiLive(
       onTurnComplete,
       onInterrupted,
       onSilenceChosen,
+      onWidget,
       onUserSpeechStart,
       onUserSpeechEnd,
       onConnected,
@@ -301,6 +307,7 @@ export function useGeminiLive(
     onTurnComplete,
     onInterrupted,
     onSilenceChosen,
+    onWidget,
     onUserSpeechStart,
     onUserSpeechEnd,
     onConnected,
@@ -382,6 +389,10 @@ export function useGeminiLive(
           dispatch({ type: "MODEL_SPEECH_END" })
           callbacksRef.current.onInterrupted?.()
         },
+        onSilenceChosen: (reason) => {
+          dispatch({ type: "MODEL_SPEECH_END" })
+          callbacksRef.current.onSilenceChosen?.(reason)
+        },
         onUserSpeechStart: () => {
           dispatch({ type: "USER_SPEECH_START" })
           callbacksRef.current.onUserSpeechStart?.()
@@ -389,6 +400,9 @@ export function useGeminiLive(
         onUserSpeechEnd: () => {
           dispatch({ type: "USER_SPEECH_END" })
           callbacksRef.current.onUserSpeechEnd?.()
+        },
+        onWidget: (event) => {
+          callbacksRef.current.onWidget?.(event)
         },
       }
 
@@ -520,6 +534,10 @@ export function useGeminiLive(
         dispatch({ type: "MODEL_SPEECH_END" })
         callbacksRef.current.onInterrupted?.()
       },
+      onSilenceChosen: (reason) => {
+        dispatch({ type: "MODEL_SPEECH_END" })
+        callbacksRef.current.onSilenceChosen?.(reason)
+      },
       onUserSpeechStart: () => {
         dispatch({ type: "USER_SPEECH_START" })
         callbacksRef.current.onUserSpeechStart?.()
@@ -527,6 +545,9 @@ export function useGeminiLive(
       onUserSpeechEnd: () => {
         dispatch({ type: "USER_SPEECH_END" })
         callbacksRef.current.onUserSpeechEnd?.()
+      },
+      onWidget: (event) => {
+        callbacksRef.current.onWidget?.(event)
       },
     }
 

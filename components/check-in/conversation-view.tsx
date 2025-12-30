@@ -41,11 +41,18 @@ export function ConversationView({
   const lastMessageContent = messages[messages.length - 1]?.content || ""
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    const el = bottomRef.current
+    if (!el || typeof el.scrollIntoView !== "function") return
+    el.scrollIntoView({ behavior: "smooth" })
   }, [messages.length, state, currentUserTranscript, lastMessageContent])
 
   const isProcessing = state === "processing"
   const isUserSpeaking = state === "user_speaking"
+
+  const hasStreamingUserMessage = useMemo(
+    () => messages.some((m) => m.role === "user" && m.isStreaming),
+    [messages]
+  )
 
   // Sort messages by timestamp for correct chronological order
   // (handles case where AI responds before user finishes speaking)
@@ -92,7 +99,7 @@ export function ConversationView({
 
       {/* Current user transcript preview */}
       <AnimatePresence>
-        {isUserSpeaking && currentUserTranscript && (
+        {isUserSpeaking && currentUserTranscript && !hasStreamingUserMessage && (
           <TranscriptPreview text={currentUserTranscript} />
         )}
       </AnimatePresence>

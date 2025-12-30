@@ -215,6 +215,89 @@ describe("checkInReducer", () => {
       expect(newState.mismatchCount).toBe(0)
     })
 
+    test("ADD_MESSAGE - tracks streaming ID for assistant messages only", () => {
+      const assistantStreaming: CheckInMessage = {
+        id: "asst-1",
+        role: "assistant",
+        content: "Hello",
+        timestamp: new Date().toISOString(),
+        isStreaming: true,
+      }
+
+      const userStreaming: CheckInMessage = {
+        id: "user-1",
+        role: "user",
+        content: "Hi",
+        timestamp: new Date().toISOString(),
+        isStreaming: true,
+      }
+
+      const stateAfterUser = checkInReducer(initialState, {
+        type: "ADD_MESSAGE",
+        message: userStreaming,
+      })
+      expect(stateAfterUser.currentStreamingMessageId).toBeNull()
+
+      const stateAfterAssistant = checkInReducer(initialState, {
+        type: "ADD_MESSAGE",
+        message: assistantStreaming,
+      })
+      expect(stateAfterAssistant.currentStreamingMessageId).toBe("asst-1")
+    })
+
+    test("UPDATE_MESSAGE_CONTENT - updates message content (and session, if present)", () => {
+      const message: CheckInMessage = {
+        id: "msg-1",
+        role: "user",
+        content: "Old",
+        timestamp: new Date().toISOString(),
+      }
+
+      const session: CheckInSession = {
+        id: "session-1",
+        startedAt: new Date().toISOString(),
+        messages: [message],
+      }
+
+      const stateWithSession = { ...initialState, messages: [message], session }
+
+      const newState = checkInReducer(stateWithSession, {
+        type: "UPDATE_MESSAGE_CONTENT",
+        messageId: "msg-1",
+        content: "New",
+      })
+
+      expect(newState.messages[0].content).toBe("New")
+      expect(newState.session?.messages[0].content).toBe("New")
+    })
+
+    test("SET_MESSAGE_STREAMING - toggles isStreaming (and session, if present)", () => {
+      const message: CheckInMessage = {
+        id: "msg-1",
+        role: "user",
+        content: "Hello",
+        timestamp: new Date().toISOString(),
+        isStreaming: true,
+      }
+
+      const session: CheckInSession = {
+        id: "session-1",
+        startedAt: new Date().toISOString(),
+        messages: [message],
+      }
+
+      const stateWithSession = { ...initialState, messages: [message], session }
+
+      const newState = checkInReducer(stateWithSession, {
+        type: "SET_MESSAGE_STREAMING",
+        messageId: "msg-1",
+        isStreaming: false,
+      })
+
+      expect(newState.messages[0].isStreaming).toBe(false)
+      expect(newState.session?.messages[0].isStreaming).toBe(false)
+    })
+
     test("UPDATE_MESSAGE_FEATURES - updates message with features and metrics", () => {
       const message = createMockMessage({ id: "msg-123" })
       const stateWithMessage = { ...initialState, messages: [message] }

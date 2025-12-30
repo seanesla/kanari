@@ -16,7 +16,7 @@
 import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@google/genai"
 import { EventEmitter } from "events"
 import { randomBytes, timingSafeEqual } from "crypto"
-import { MUTE_RESPONSE_TOOL } from "./live-prompts"
+import { GEMINI_TOOLS } from "./live-prompts"
 
 // Session timeout: 30 minutes (matches Gemini session limit)
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000
@@ -141,7 +141,7 @@ class GeminiSessionManager {
           ...(systemInstruction ? { systemInstruction } : {}),
           // Tools for function calling (intelligent silence)
           // Source: Context7 - /googleapis/js-genai docs - "tools config"
-          tools: [MUTE_RESPONSE_TOOL],
+          tools: GEMINI_TOOLS,
         },
         callbacks: {
           onopen: () => {

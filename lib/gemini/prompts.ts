@@ -1,4 +1,14 @@
-import type { StressLevel, FatigueLevel, TrendDirection, EnrichedWellnessContext } from "@/lib/types"
+import type {
+  StressLevel,
+  FatigueLevel,
+  TrendDirection,
+  EnrichedWellnessContext,
+  VoicePatterns,
+  HistoricalContext,
+  BurnoutPrediction,
+  Suggestion,
+  GeminiMemoryContext,
+} from "@/lib/types"
 
 /**
  * Gemini prompt templates for generating personalized recovery suggestions

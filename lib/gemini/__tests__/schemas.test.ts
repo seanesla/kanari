@@ -11,6 +11,11 @@ import {
   validateServerMessage,
   SessionInfoSchema,
   AudioInputRequestSchema,
+  ScheduleActivityArgsSchema,
+  BreathingExerciseArgsSchema,
+  StressGaugeArgsSchema,
+  QuickActionsArgsSchema,
+  JournalPromptArgsSchema,
   type ServerMessage,
   type SessionInfo,
   type AudioInputRequest,
@@ -485,6 +490,104 @@ describe("ServerMessageSchema", () => {
       // Zod treats undefined as optional, so this should succeed
       expect(result.success).toBe(true)
     })
+  })
+})
+
+describe("Gemini widget tool arg schemas", () => {
+  test("ScheduleActivityArgsSchema should validate valid args", () => {
+    const result = ScheduleActivityArgsSchema.safeParse({
+      title: "Take a short walk",
+      category: "exercise",
+      date: "2025-12-31",
+      time: "15:30",
+      duration: 10,
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.category).toBe("exercise")
+      expect(result.data.duration).toBe(10)
+    }
+  })
+
+  test("ScheduleActivityArgsSchema should reject invalid category", () => {
+    const result = ScheduleActivityArgsSchema.safeParse({
+      title: "Break",
+      category: "work",
+      date: "2025-12-31",
+      time: "15:30",
+      duration: 10,
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  test("BreathingExerciseArgsSchema should validate valid args", () => {
+    const result = BreathingExerciseArgsSchema.safeParse({
+      type: "box",
+      duration: 120,
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  test("BreathingExerciseArgsSchema should reject invalid type", () => {
+    const result = BreathingExerciseArgsSchema.safeParse({
+      type: "alternate",
+      duration: 120,
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  test("StressGaugeArgsSchema should validate valid args", () => {
+    const result = StressGaugeArgsSchema.safeParse({
+      stressLevel: 55,
+      fatigueLevel: 40,
+      message: "You're carrying a bit of tension — a short reset could help.",
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  test("StressGaugeArgsSchema should reject out-of-range values", () => {
+    const result = StressGaugeArgsSchema.safeParse({
+      stressLevel: 120,
+      fatigueLevel: -1,
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  test("QuickActionsArgsSchema should validate valid args", () => {
+    const result = QuickActionsArgsSchema.safeParse({
+      options: [
+        { label: "Try a breathing exercise", action: "Let's do a breathing exercise." },
+        { label: "Schedule a 10-minute break", action: "Schedule a 10-minute break today." },
+      ],
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  test("QuickActionsArgsSchema should reject empty options", () => {
+    const result = QuickActionsArgsSchema.safeParse({ options: [] })
+    expect(result.success).toBe(false)
+  })
+
+  test("JournalPromptArgsSchema should validate valid args", () => {
+    const result = JournalPromptArgsSchema.safeParse({
+      prompt: "What feels most important to name right now?",
+      placeholder: "A few sentences is enough...",
+      category: "reflection",
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  test("JournalPromptArgsSchema should reject empty prompt", () => {
+    const result = JournalPromptArgsSchema.safeParse({ prompt: "" })
+    expect(result.success).toBe(false)
   })
 })
 

@@ -50,6 +50,10 @@ import type {
   VoiceMetrics,
   MismatchResult,
   VoicePatterns,
+  Suggestion,
+  WidgetState,
+  JournalEntry,
+  ScheduleActivityToolArgs,
 } from "@/lib/types"
 
 // ============================================
@@ -77,6 +81,8 @@ export interface CheckInData {
   latestMismatch: MismatchResult | null
   /** Number of mismatches detected this session */
   mismatchCount: number
+  /** Active Gemini-triggered widgets */
+  widgets: WidgetState[]
   /** Audio levels for visualization */
   audioLevels: {
     input: number // User microphone
@@ -101,6 +107,18 @@ export interface CheckInControls {
   getSession: () => CheckInSession | null
   /** Toggle microphone mute */
   toggleMute: () => void
+  /** Dismiss an active widget */
+  dismissWidget: (widgetId: string) => void
+  /** Undo a scheduled activity created via widget */
+  undoScheduledActivity: (widgetId: string, suggestionId: string) => Promise<void>
+  /** Run a quick action (sends text to Gemini as user) */
+  runQuickAction: (widgetId: string, action: string, label?: string) => void
+  /** Save a journal entry from a widget */
+  saveJournalEntry: (widgetId: string, content: string) => Promise<void>
+  /** Trigger a manual tool call (shows widget immediately) */
+  triggerManualTool: (toolName: string, args: Record<string, unknown>) => void
+  /** Send a text message to Gemini (from chat input) */
+  sendTextMessage: (text: string) => void
   /** Preserve session for later resumption (keeps Gemini connected) */
   preserveSession: () => void
   /** Check if there's a preserved session that can be resumed */
@@ -151,6 +169,8 @@ export type CheckInAction =
   | { type: "SET_COMPLETE" }
   | { type: "SET_SESSION"; session: CheckInSession }
   | { type: "ADD_MESSAGE"; message: CheckInMessage }
+  | { type: "UPDATE_MESSAGE_CONTENT"; messageId: string; content: string }
+  | { type: "SET_MESSAGE_STREAMING"; messageId: string; isStreaming: boolean }
   | {
       type: "UPDATE_MESSAGE_FEATURES"
       messageId: string
@@ -172,6 +192,9 @@ export type CheckInAction =
   | { type: "SET_CONNECTION_STATE"; state: GeminiLiveData["state"] }
   | { type: "SET_ERROR"; error: string }
   | { type: "SET_MUTED"; muted: boolean }
+  | { type: "ADD_WIDGET"; widget: WidgetState }
+  | { type: "UPDATE_WIDGET"; widgetId: string; updates: Partial<WidgetState> }
+  | { type: "DISMISS_WIDGET"; widgetId: string }
   | { type: "RESET" }
 
 export const initialState: CheckInData = {
@@ -185,6 +208,7 @@ export const initialState: CheckInData = {
   currentAssistantThinking: "",
   latestMismatch: null,
   mismatchCount: 0,
+  widgets: [],
   audioLevels: { input: 0, output: 0 },
   connectionState: "idle",
   error: null,
@@ -229,7 +253,10 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
     case "ADD_MESSAGE": {
       const newMessages = [...state.messages, action.message]
       // Track streaming message ID for O(1) lookup during updates
-      const newStreamingId = action.message.isStreaming
+      // Only assistant messages participate in the streaming-ID fast path.
+      // User messages may be updated during live transcription and should not
+      // interfere with assistant streaming updates.
+      const newStreamingId = action.message.isStreaming && action.message.role === "assistant"
         ? action.message.id
         : state.currentStreamingMessageId
       // Don't increment mismatch count here - it will be incremented in UPDATE_MESSAGE_FEATURES
@@ -240,6 +267,38 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
         currentStreamingMessageId: newStreamingId,
         session: state.session
           ? { ...state.session, messages: newMessages }
+          : null,
+      }
+    }
+
+    case "UPDATE_MESSAGE_CONTENT": {
+      const updatedMessages = state.messages.map((msg) =>
+        msg.id === action.messageId
+          ? { ...msg, content: action.content }
+          : msg
+      )
+
+      return {
+        ...state,
+        messages: updatedMessages,
+        session: state.session
+          ? { ...state.session, messages: updatedMessages }
+          : null,
+      }
+    }
+
+    case "SET_MESSAGE_STREAMING": {
+      const updatedMessages = state.messages.map((msg) =>
+        msg.id === action.messageId
+          ? { ...msg, isStreaming: action.isStreaming }
+          : msg
+      )
+
+      return {
+        ...state,
+        messages: updatedMessages,
+        session: state.session
+          ? { ...state.session, messages: updatedMessages }
           : null,
       }
     }
@@ -368,6 +427,20 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
     case "SET_MUTED":
       return { ...state, isMuted: action.muted }
 
+    case "ADD_WIDGET":
+      return { ...state, widgets: [...state.widgets, action.widget] }
+
+    case "UPDATE_WIDGET":
+      return {
+        ...state,
+        widgets: state.widgets.map((w) =>
+          w.id === action.widgetId ? ({ ...w, ...action.updates } as WidgetState) : w
+        ),
+      }
+
+    case "DISMISS_WIDGET":
+      return { ...state, widgets: state.widgets.filter((w) => w.id !== action.widgetId) }
+
     case "RESET":
       return initialState
 
@@ -382,6 +455,47 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`
+}
+
+function parseLocalDateTime(date: string, time: string): Date | null {
+  const [yearStr, monthStr, dayStr] = date.split("-")
+  const [hourStr, minuteStr] = time.split(":")
+
+  const year = Number(yearStr)
+  const month = Number(monthStr)
+  const day = Number(dayStr)
+  const hour = Number(hourStr)
+  const minute = Number(minuteStr)
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute)
+  ) {
+    return null
+  }
+
+  if (month < 1 || month > 12) return null
+  if (day < 1 || day > 31) return null
+  if (hour < 0 || hour > 23) return null
+  if (minute < 0 || minute > 59) return null
+
+  const dt = new Date(year, month - 1, day, hour, minute, 0, 0)
+
+  // Guard against Date overflow rollovers (e.g., 2025-02-31)
+  if (
+    dt.getFullYear() !== year ||
+    dt.getMonth() !== month - 1 ||
+    dt.getDate() !== day ||
+    dt.getHours() !== hour ||
+    dt.getMinutes() !== minute
+  ) {
+    return null
+  }
+
+  return dt
 }
 
 // ============================================
@@ -437,6 +551,9 @@ export function useCheckIn(
   // Track the last user message ID for updating with features
   const lastUserMessageIdRef = useRef<string | null>(null)
 
+  // Prevent double-handling utterance end (Gemini may emit both "speech end" and a final transcript)
+  const userSpeechEndHandledRef = useRef(false)
+
   // Post-recording context ref
   const postRecordingContextRef = useRef<string | null>(null)
 
@@ -466,6 +583,34 @@ export function useCheckIn(
 
   // Track when user started speaking (for correct message timestamp ordering)
   const userSpeechStartRef = useRef<string | null>(null)
+
+  // ========================================
+  // Storage Helpers (dynamic import)
+  // ========================================
+
+  const addSuggestionToDb = useCallback(async (suggestion: Suggestion) => {
+    if (typeof indexedDB === "undefined") {
+      throw new Error("IndexedDB not available")
+    }
+    const { db, fromSuggestion } = await import("@/lib/storage/db")
+    await db.suggestions.add(fromSuggestion(suggestion))
+  }, [])
+
+  const deleteSuggestionFromDb = useCallback(async (suggestionId: string) => {
+    if (typeof indexedDB === "undefined") {
+      throw new Error("IndexedDB not available")
+    }
+    const { db } = await import("@/lib/storage/db")
+    await db.suggestions.delete(suggestionId)
+  }, [])
+
+  const addJournalEntryToDb = useCallback(async (entry: JournalEntry) => {
+    if (typeof indexedDB === "undefined") {
+      throw new Error("IndexedDB not available")
+    }
+    const { db, fromJournalEntry } = await import("@/lib/storage/db")
+    await db.journalEntries.add(fromJournalEntry(entry))
+  }, [])
 
   // ========================================
   // Gemini Live Hook
@@ -529,15 +674,48 @@ export function useCheckIn(
       dispatch({ type: "SET_USER_SPEAKING" })
       audioChunksRef.current = [] // Start collecting audio for this utterance
       userTranscriptRef.current = "" // Reset accumulated transcript for new utterance
+      dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
+      // Clear the active voice message ID for this new utterance
+      lastUserMessageIdRef.current = null
+      userSpeechEndHandledRef.current = false
       userSpeechStartRef.current = new Date().toISOString() // Capture timestamp when user STARTS speaking
     },
     onUserSpeechEnd: () => {
+      // Guard against double-handling (some SDKs send both a final transcript and a speech-end event)
+      if (userSpeechEndHandledRef.current) return
+      userSpeechEndHandledRef.current = true
+
       dispatch({ type: "SET_PROCESSING" })
-      // Add user message when speech ends (before processing)
-      const transcript = userTranscriptRef.current
-      if (transcript.trim()) {
-        addUserMessage(transcript)
+
+      const transcript = userTranscriptRef.current.trim()
+      const messageId = lastUserMessageIdRef.current
+
+      if (transcript) {
+        if (!messageId) {
+          const newMessageId = generateId()
+          const message: CheckInMessage = {
+            id: newMessageId,
+            role: "user",
+            content: transcript,
+            timestamp: userSpeechStartRef.current || new Date().toISOString(),
+          }
+
+          // Reset the captured timestamp for the next utterance
+          userSpeechStartRef.current = null
+
+          lastUserMessageIdRef.current = newMessageId
+          dispatch({ type: "ADD_MESSAGE", message })
+          callbacksRef.current.onMessage?.(message)
+        } else {
+          // Ensure the in-flight message is finalized and contains the latest transcript
+          dispatch({ type: "UPDATE_MESSAGE_CONTENT", messageId, content: transcript })
+          dispatch({ type: "SET_MESSAGE_STREAMING", messageId, isStreaming: false })
+        }
+      } else if (messageId) {
+        // No transcript text, but finalize any in-flight message so it doesn't look stuck
+        dispatch({ type: "SET_MESSAGE_STREAMING", messageId, isStreaming: false })
       }
+
       // Process collected audio for mismatch detection
       processUserUtterance()
     },
@@ -551,16 +729,43 @@ export function useCheckIn(
       // Accumulate transcript chunks (Gemini sends word-by-word without finished flag)
       userTranscriptRef.current = userTranscriptRef.current + text
 
+      // Update transcript preview with accumulated text (used for mismatch detection and UI fallbacks)
+      dispatch({ type: "SET_USER_TRANSCRIPT", text: userTranscriptRef.current })
+
+      const transcript = userTranscriptRef.current.trim()
+      if (!transcript) return
+
+      // Ensure there's a message bubble immediately (don't wait for model audio).
+      // Pattern doc: docs/error-patterns/voice-transcript-message-commit-late.md
+      // If we already have a voice message for this utterance, update it in-place.
+      const messageId = lastUserMessageIdRef.current
+      if (!messageId) {
+        const newMessageId = generateId()
+        const message: CheckInMessage = {
+          id: newMessageId,
+          role: "user",
+          content: transcript,
+          timestamp: userSpeechStartRef.current || new Date().toISOString(),
+          // Treat as streaming until speech end is observed (prevents animation flicker)
+          isStreaming: !userSpeechEndHandledRef.current,
+        }
+
+        // Reset the captured timestamp for the next utterance
+        userSpeechStartRef.current = null
+
+        lastUserMessageIdRef.current = newMessageId
+        dispatch({ type: "ADD_MESSAGE", message })
+        callbacksRef.current.onMessage?.(message)
+      } else {
+        dispatch({ type: "UPDATE_MESSAGE_CONTENT", messageId, content: transcript })
+      }
+
       // finished flag is rarely sent by Gemini, but handle it if it comes
-      if (finished && userTranscriptRef.current.trim()) {
-        addUserMessage(userTranscriptRef.current)
-        userTranscriptRef.current = ""
-        dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
+      if (finished && !userSpeechEndHandledRef.current) {
+        userSpeechEndHandledRef.current = true
+        dispatch({ type: "SET_MESSAGE_STREAMING", messageId: lastUserMessageIdRef.current!, isStreaming: false })
         dispatch({ type: "SET_PROCESSING" })
         processUserUtterance()
-      } else {
-        // Still speaking - update transcript preview with accumulated text
-        dispatch({ type: "SET_USER_TRANSCRIPT", text: userTranscriptRef.current })
       }
     },
     onModelTranscript: (text, finished) => {
@@ -589,11 +794,11 @@ export function useCheckIn(
       dispatch({ type: "APPEND_ASSISTANT_THINKING", text })
     },
     onAudioChunk: (base64Audio) => {
-      // Save any pending user message on first audio chunk
-      if (stateRef.current !== "assistant_speaking" && userTranscriptRef.current.trim()) {
-        addUserMessage(userTranscriptRef.current)
-        userTranscriptRef.current = ""
-        dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
+      // If the model starts speaking and we still have a streaming user message,
+      // finalize it so it doesn't look "in-progress" throughout the reply.
+      const messageId = lastUserMessageIdRef.current
+      if (messageId) {
+        dispatch({ type: "SET_MESSAGE_STREAMING", messageId, isStreaming: false })
       }
       dispatch({ type: "SET_ASSISTANT_SPEAKING" })
       playbackControls.queueAudio(base64Audio)
@@ -619,6 +824,123 @@ export function useCheckIn(
       // Model chose to stay silent - don't play audio, transition to listening
       console.log("[useCheckIn] AI chose silence:", reason)
       dispatch({ type: "SET_LISTENING" })
+    },
+    onWidget: (event) => {
+      const now = new Date().toISOString()
+
+      if (event.widget === "schedule_activity") {
+        const widgetId = generateId()
+        const suggestionId = generateId()
+
+        const scheduledAt = parseLocalDateTime(event.args.date, event.args.time)
+        if (!scheduledAt) {
+          dispatch({
+            type: "ADD_WIDGET",
+            widget: {
+              id: widgetId,
+              type: "schedule_activity",
+              createdAt: now,
+              args: event.args,
+              status: "failed",
+              error: "Invalid date/time",
+            },
+          })
+          return
+        }
+
+        const suggestion: Suggestion = {
+          id: suggestionId,
+          content: event.args.title,
+          rationale: "Scheduled from AI chat",
+          duration: event.args.duration,
+          category: event.args.category,
+          status: "scheduled",
+          createdAt: now,
+          scheduledFor: scheduledAt.toISOString(),
+        }
+
+        // Optimistically show confirmation, then mark failed if Dexie write fails.
+        dispatch({
+          type: "ADD_WIDGET",
+          widget: {
+            id: widgetId,
+            type: "schedule_activity",
+            createdAt: now,
+            args: event.args,
+            status: "scheduled",
+            suggestionId,
+          },
+        })
+
+        void (async () => {
+          try {
+            await addSuggestionToDb(suggestion)
+          } catch (error) {
+            dispatch({
+              type: "UPDATE_WIDGET",
+              widgetId,
+              updates: {
+                status: "failed",
+                error: error instanceof Error ? error.message : "Failed to save",
+                suggestionId: undefined,
+              },
+            })
+          }
+        })()
+        return
+      }
+
+      if (event.widget === "breathing_exercise") {
+        dispatch({
+          type: "ADD_WIDGET",
+          widget: {
+            id: generateId(),
+            type: "breathing_exercise",
+            createdAt: now,
+            args: event.args,
+          },
+        })
+        return
+      }
+
+      if (event.widget === "stress_gauge") {
+        dispatch({
+          type: "ADD_WIDGET",
+          widget: {
+            id: generateId(),
+            type: "stress_gauge",
+            createdAt: now,
+            args: event.args,
+          },
+        })
+        return
+      }
+
+      if (event.widget === "quick_actions") {
+        dispatch({
+          type: "ADD_WIDGET",
+          widget: {
+            id: generateId(),
+            type: "quick_actions",
+            createdAt: now,
+            args: event.args,
+          },
+        })
+        return
+      }
+
+      if (event.widget === "journal_prompt") {
+        dispatch({
+          type: "ADD_WIDGET",
+          widget: {
+            id: generateId(),
+            type: "journal_prompt",
+            createdAt: now,
+            args: event.args,
+            status: "draft",
+          },
+        })
+      }
     },
   })
 
@@ -660,28 +982,286 @@ export function useCheckIn(
   // Message Handlers
   // ========================================
 
-  const addUserMessage = useCallback(
-    (content: string) => {
-      const messageId = generateId()
-      // Use timestamp from when user STARTED speaking (not when message is added)
-      // This ensures correct chronological ordering when AI starts responding before user finishes
-      const message: CheckInMessage = {
-        id: messageId,
-        role: "user",
-        content,
-        timestamp: userSpeechStartRef.current || new Date().toISOString(),
+  const addUserTextMessage = useCallback((content: string) => {
+    const trimmed = content.trim()
+    if (!trimmed) return
+
+    const message: CheckInMessage = {
+      id: generateId(),
+      role: "user",
+      content: trimmed,
+      timestamp: new Date().toISOString(),
+    }
+
+    dispatch({ type: "ADD_MESSAGE", message })
+    callbacksRef.current.onMessage?.(message)
+  }, [])
+
+  // ========================================
+  // Widget Controls
+  // ========================================
+
+  const dismissWidget = useCallback((widgetId: string) => {
+    dispatch({ type: "DISMISS_WIDGET", widgetId })
+  }, [])
+
+  const undoScheduledActivity = useCallback(
+    async (widgetId: string, suggestionId: string) => {
+      try {
+        await deleteSuggestionFromDb(suggestionId)
+        dispatch({ type: "DISMISS_WIDGET", widgetId })
+      } catch (error) {
+        dispatch({
+          type: "UPDATE_WIDGET",
+          widgetId,
+          updates: {
+            error: error instanceof Error ? error.message : "Failed to undo",
+          },
+        })
+      }
+    },
+    [deleteSuggestionFromDb]
+  )
+
+  const runQuickAction = useCallback(
+    (widgetId: string, action: string, label?: string) => {
+      const textToShow = (label?.trim() || action).trim()
+      if (!textToShow) return
+
+      addUserTextMessage(textToShow)
+      dispatch({ type: "SET_PROCESSING" })
+      geminiControls.sendText(action)
+      dispatch({ type: "DISMISS_WIDGET", widgetId })
+    },
+    [addUserTextMessage, geminiControls]
+  )
+
+  const saveJournalEntry = useCallback(
+    async (widgetId: string, content: string) => {
+      const trimmed = content.trim()
+      if (!trimmed) return
+
+      const widget = data.widgets.find(
+        (w) => w.id === widgetId && w.type === "journal_prompt"
+      )
+
+      if (!widget || widget.type !== "journal_prompt") {
+        console.warn("[useCheckIn] Journal widget not found:", widgetId)
+        return
       }
 
-      // Reset the captured timestamp for the next utterance
-      userSpeechStartRef.current = null
+      const entry: JournalEntry = {
+        id: generateId(),
+        createdAt: new Date().toISOString(),
+        category: widget.args.category || "journal",
+        prompt: widget.args.prompt,
+        content: trimmed,
+        checkInSessionId: data.session?.id,
+      }
 
-      // Save the message ID for later update with features
-      lastUserMessageIdRef.current = messageId
-
-      dispatch({ type: "ADD_MESSAGE", message })
-      callbacksRef.current.onMessage?.(message)
+      try {
+        await addJournalEntryToDb(entry)
+        dispatch({
+          type: "UPDATE_WIDGET",
+          widgetId,
+          updates: {
+            status: "saved",
+            entryId: entry.id,
+            error: undefined,
+          },
+        })
+      } catch (error) {
+        dispatch({
+          type: "UPDATE_WIDGET",
+          widgetId,
+          updates: {
+            status: "failed",
+            error: error instanceof Error ? error.message : "Failed to save",
+          },
+        })
+      }
     },
-    []
+    [addJournalEntryToDb, data.session?.id, data.widgets]
+  )
+
+  // ========================================
+  // Manual Tool Triggering
+  // ========================================
+
+  /**
+   * Trigger a tool manually from the chat input.
+   * Creates the same widget as if Gemini had called the tool.
+   */
+  const triggerManualTool = useCallback(
+    (toolName: string, args: Record<string, unknown>) => {
+      const now = new Date().toISOString()
+
+      switch (toolName) {
+        case "show_breathing_exercise": {
+          dispatch({
+            type: "ADD_WIDGET",
+            widget: {
+              id: generateId(),
+              type: "breathing_exercise",
+              createdAt: now,
+              args: {
+                type: (args.type as "box" | "478" | "relaxing") || "box",
+                duration: (args.duration as number) || 120,
+              },
+            },
+          })
+          break
+        }
+
+        case "schedule_activity": {
+          const widgetId = generateId()
+          const suggestionId = generateId()
+
+          const scheduledAt = parseLocalDateTime(
+            args.date as string,
+            args.time as string
+          )
+
+          if (!scheduledAt) {
+            dispatch({
+              type: "ADD_WIDGET",
+              widget: {
+                id: widgetId,
+                type: "schedule_activity",
+                createdAt: now,
+                args: {
+                  title: args.title,
+                  category: args.category,
+                  date: args.date,
+                  time: args.time,
+                  duration: args.duration,
+                } as ScheduleActivityToolArgs,
+                status: "failed",
+                error: "Invalid date/time",
+              },
+            })
+            return
+          }
+
+          const suggestion: Suggestion = {
+            id: suggestionId,
+            content: args.title as string,
+            rationale: "Manually scheduled from chat",
+            duration: args.duration as number,
+            category: args.category as "break" | "exercise" | "mindfulness" | "social" | "rest",
+            status: "scheduled",
+            createdAt: now,
+            scheduledFor: scheduledAt.toISOString(),
+          }
+
+          dispatch({
+            type: "ADD_WIDGET",
+            widget: {
+              id: widgetId,
+              type: "schedule_activity",
+              createdAt: now,
+              args: {
+                title: args.title,
+                category: args.category,
+                date: args.date,
+                time: args.time,
+                duration: args.duration,
+              } as ScheduleActivityToolArgs,
+              status: "scheduled",
+              suggestionId,
+            },
+          })
+
+          void (async () => {
+            try {
+              await addSuggestionToDb(suggestion)
+            } catch (error) {
+              dispatch({
+                type: "UPDATE_WIDGET",
+                widgetId,
+                updates: {
+                  status: "failed",
+                  error: error instanceof Error ? error.message : "Failed to save",
+                  suggestionId: undefined,
+                },
+              })
+            }
+          })()
+          break
+        }
+
+        case "show_stress_gauge": {
+          // For manual trigger without args, use defaults or latest mismatch data
+          dispatch({
+            type: "ADD_WIDGET",
+            widget: {
+              id: generateId(),
+              type: "stress_gauge",
+              createdAt: now,
+              args: {
+                stressLevel: (args.stressLevel as number) ??
+                  (data.latestMismatch?.acousticSignal === "stressed" ? 70 : 40),
+                fatigueLevel: (args.fatigueLevel as number) ??
+                  (data.latestMismatch?.acousticSignal === "fatigued" ? 70 : 40),
+                message: (args.message as string) || "Manual check-in",
+              },
+            },
+          })
+          break
+        }
+
+        case "show_journal_prompt": {
+          // Generate a default prompt based on category or use provided
+          const category = (args.category as string) || "reflection"
+          const defaultPrompts: Record<string, string> = {
+            reflection: "What's on your mind right now?",
+            gratitude: "What are you grateful for today?",
+            stress: "What's causing you stress, and how can you address it?",
+          }
+
+          dispatch({
+            type: "ADD_WIDGET",
+            widget: {
+              id: generateId(),
+              type: "journal_prompt",
+              createdAt: now,
+              args: {
+                prompt: (args.prompt as string) || defaultPrompts[category] || defaultPrompts.reflection,
+                placeholder: (args.placeholder as string) || "Write your thoughts here...",
+                category,
+              },
+              status: "draft",
+            },
+          })
+          break
+        }
+
+        default:
+          console.warn("[useCheckIn] Unknown manual tool:", toolName)
+      }
+    },
+    [addSuggestionToDb, data.latestMismatch]
+  )
+
+  /**
+   * Send a text message to Gemini from the chat input.
+   * Adds the message to the conversation and sends to the API.
+   */
+  const sendTextMessage = useCallback(
+    (text: string) => {
+      const trimmed = text.trim()
+      if (!trimmed) return
+
+      // Add user message to conversation
+      addUserTextMessage(trimmed)
+
+      // Set state to processing
+      dispatch({ type: "SET_PROCESSING" })
+
+      // Send to Gemini
+      geminiControls.sendText(trimmed)
+    },
+    [addUserTextMessage, geminiControls]
   )
 
   // ========================================
@@ -987,27 +1567,36 @@ export function useCheckIn(
           const contextData = await fetchCheckInContext()
           const formattedContext = formatContextForAPI(contextData)
 
-          // Call API to generate context summary using Gemini 3
-          const contextResponse = await fetch("/api/gemini/check-in-context", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(formattedContext),
-          })
-
-          if (contextResponse.ok) {
-            const { summary } = await contextResponse.json()
-            sessionContext = {
-              contextSummary: summary as SystemContextSummary,
-              timeContext: {
-                currentTime: contextData.timeContext.currentTime,
-                dayOfWeek: contextData.timeContext.dayOfWeek,
-                timeOfDay: contextData.timeContext.timeOfDay,
-                daysSinceLastCheckIn: contextData.timeContext.daysSinceLastCheckIn,
-              } as SystemTimeContext,
-            }
-            sessionContextRef.current = sessionContext
-            console.log("[useCheckIn] Context prepared for AI-initiated conversation")
+          // Always include time context in the system instruction (even if context-summary generation fails).
+          sessionContext = {
+            timeContext: {
+              currentTime: contextData.timeContext.currentTime,
+              dayOfWeek: contextData.timeContext.dayOfWeek,
+              timeOfDay: contextData.timeContext.timeOfDay,
+              daysSinceLastCheckIn: contextData.timeContext.daysSinceLastCheckIn,
+            } as SystemTimeContext,
           }
+
+          // Best-effort: generate a richer context summary using Gemini 3
+          try {
+            const contextResponse = await fetch("/api/gemini/check-in-context", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(formattedContext),
+            })
+
+            if (contextResponse.ok) {
+              const { summary } = await contextResponse.json()
+              sessionContext.contextSummary = summary as SystemContextSummary
+              console.log("[useCheckIn] Context summary prepared for AI-initiated conversation")
+            } else {
+              console.warn("[useCheckIn] Context summary request failed, using time-only context")
+            }
+          } catch (summaryError) {
+            console.warn("[useCheckIn] Context summary request errored, using time-only context:", summaryError)
+          }
+
+          sessionContextRef.current = sessionContext
         } catch (contextError) {
           // Context generation failed - proceed without it (AI will use default greeting)
           console.warn("[useCheckIn] Context generation failed, using default greeting:", contextError)
@@ -1263,6 +1852,11 @@ export function useCheckIn(
         dispatch({ type: "ADD_MESSAGE", message })
       }
 
+      // Restore active widgets
+      for (const widget of preserved.checkInData.widgets) {
+        dispatch({ type: "ADD_WIDGET", widget })
+      }
+
       // Set the appropriate state based on what was preserved
       dispatch({ type: "SET_READY" })
       dispatch({ type: "SET_LISTENING" })
@@ -1298,6 +1892,12 @@ export function useCheckIn(
     cancelSession,
     getSession,
     toggleMute,
+    dismissWidget,
+    undoScheduledActivity,
+    runQuickAction,
+    saveJournalEntry,
+    triggerManualTool,
+    sendTextMessage,
     preserveSession,
     hasPreservedSession,
     resumePreservedSession,

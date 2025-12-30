@@ -77,7 +77,7 @@ function generateUserPrompt(context: CheckInContextRequest): string {
   let prompt = `Generate a personalized check-in context summary based on this user data:
 
 TIME CONTEXT:
-- Current time: ${timeContext.currentTime}
+- Current time (user local): ${timeContext.currentTime}
 - Day of week: ${timeContext.dayOfWeek}
 - Time of day: ${timeContext.timeOfDay}
 - Days since last check-in: ${timeContext.daysSinceLastCheckIn ?? "First check-in"}`

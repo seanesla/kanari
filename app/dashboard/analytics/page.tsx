@@ -12,9 +12,9 @@ import {
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { predictBurnoutRisk } from "@/lib/ml/forecasting"
-import { useDashboardStats, useTrendData, useScheduledSuggestions, useRecordings } from "@/hooks/use-storage"
+import { useDashboardStats, useTrendData, useRecordings } from "@/hooks/use-storage"
 import { StressFatigueChart } from "@/components/dashboard/stress-fatigue-chart"
-import { JourneyProgress } from "@/components/dashboard/journey-progress"
+import { EngagementTracker } from "@/components/dashboard/engagement-tracker"
 import { AnalyticsInsightsSection } from "@/components/dashboard/analytics-insights"
 import { useSceneMode } from "@/lib/scene-context"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
@@ -56,7 +56,6 @@ export default function AnalyticsPage() {
   // Real data from IndexedDB
   const dashboardStats = useDashboardStats()
   const storedTrendData = useTrendData(7)
-  const scheduledSuggestions = useScheduledSuggestions()
   const allRecordings = useRecordings()
 
   const stats = {
@@ -199,19 +198,14 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Journey Progress */}
+        {/* Engagement Tracker */}
         <div
           className={cn(
             "mb-16 transition-all duration-1000 delay-200",
             visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
-          <JourneyProgress
-            hasRecordings={stats.totalRecordings > 0}
-            hasAnalysis={dashboardStats.averageStress > 0 || dashboardStats.averageFatigue > 0}
-            hasSuggestions={stats.suggestionsAccepted > 0}
-            hasScheduledRecovery={scheduledSuggestions.length > 0}
-          />
+          <EngagementTracker />
         </div>
 
         {/* AI Insights Section */}

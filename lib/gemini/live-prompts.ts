@@ -36,6 +36,161 @@ export const MUTE_RESPONSE_TOOL = {
   }]
 }
 
+/**
+ * Tool declaration for scheduling an activity into the in-app calendar.
+ */
+export const SCHEDULE_ACTIVITY_TOOL = {
+  functionDeclarations: [{
+    name: "schedule_activity",
+    description: "Schedule a short self-care activity on the user's in-app calendar. Use this when the user asks to schedule something (e.g. 'schedule a break tomorrow') or when a concrete time-bound plan would help. If the user has not specified a date/time, ask a clarifying question instead of calling the tool.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        title: {
+          type: Type.STRING,
+          description: "Short title for the activity (e.g., '10-minute walk', 'Breathing break')"
+        },
+        category: {
+          type: Type.STRING,
+          enum: ["break", "exercise", "mindfulness", "social", "rest"],
+          description: "Activity category"
+        },
+        date: {
+          type: Type.STRING,
+          description: "Date in YYYY-MM-DD (user's local date)"
+        },
+        time: {
+          type: Type.STRING,
+          description: "Time in HH:MM 24h (user's local time)"
+        },
+        duration: {
+          type: Type.INTEGER,
+          description: "Duration in minutes"
+        }
+      },
+      required: ["title", "category", "date", "time", "duration"]
+    }
+  }]
+}
+
+/**
+ * Tool declaration for showing a guided breathing exercise widget.
+ */
+export const SHOW_BREATHING_EXERCISE_TOOL = {
+  functionDeclarations: [{
+    name: "show_breathing_exercise",
+    description: "Show an on-screen guided breathing exercise (animated). Use when the user asks for calming help or you sense elevated stress. Prefer this over long verbal instructions.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        type: {
+          type: Type.STRING,
+          enum: ["box", "478", "relaxing"],
+          description: "Breathing pattern"
+        },
+        duration: {
+          type: Type.INTEGER,
+          description: "Duration in seconds (e.g., 120)"
+        }
+      },
+      required: ["type", "duration"]
+    }
+  }]
+}
+
+/**
+ * Tool declaration for showing a stress/fatigue gauge widget.
+ */
+export const SHOW_STRESS_GAUGE_TOOL = {
+  functionDeclarations: [{
+    name: "show_stress_gauge",
+    description: "Show a visual stress/fatigue gauge (0-100) with a short supportive message. Use when the user asks 'how stressed do I sound?' or when a quick visual check-in would help.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        stressLevel: {
+          type: Type.INTEGER,
+          description: "Stress level from 0 to 100"
+        },
+        fatigueLevel: {
+          type: Type.INTEGER,
+          description: "Fatigue level from 0 to 100"
+        },
+        message: {
+          type: Type.STRING,
+          description: "Short supportive message to show alongside the gauge"
+        }
+      },
+      required: ["stressLevel", "fatigueLevel"]
+    }
+  }]
+}
+
+/**
+ * Tool declaration for showing quick action buttons.
+ */
+export const SHOW_QUICK_ACTIONS_TOOL = {
+  functionDeclarations: [{
+    name: "show_quick_actions",
+    description: "Show a small set of clickable options the user can tap. Use when the user seems stuck or you want to offer choices without overwhelming them.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        options: {
+          type: Type.ARRAY,
+          description: "List of options to show",
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              label: { type: Type.STRING, description: "Button label shown to the user" },
+              action: { type: Type.STRING, description: "Action text to send when the user taps the option" },
+            },
+            required: ["label", "action"]
+          }
+        }
+      },
+      required: ["options"]
+    }
+  }]
+}
+
+/**
+ * Tool declaration for showing a journaling prompt widget.
+ */
+export const SHOW_JOURNAL_PROMPT_TOOL = {
+  functionDeclarations: [{
+    name: "show_journal_prompt",
+    description: "Show an on-screen journaling prompt with a text box that saves locally. Use when the user asks to journal or reflection would help. Keep the prompt concrete and kind.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        prompt: {
+          type: Type.STRING,
+          description: "The journaling prompt"
+        },
+        placeholder: {
+          type: Type.STRING,
+          description: "Optional placeholder text for the input"
+        },
+        category: {
+          type: Type.STRING,
+          description: "Optional category label (e.g., 'reflection', 'gratitude', 'stress')"
+        }
+      },
+      required: ["prompt"]
+    }
+  }]
+}
+
+export const GEMINI_TOOLS = [
+  MUTE_RESPONSE_TOOL,
+  SCHEDULE_ACTIVITY_TOOL,
+  SHOW_BREATHING_EXERCISE_TOOL,
+  SHOW_STRESS_GAUGE_TOOL,
+  SHOW_QUICK_ACTIONS_TOOL,
+  SHOW_JOURNAL_PROMPT_TOOL,
+]
+
 // Allowed values for validation - prevents prompt injection
 const VALID_ACOUSTIC_SIGNALS = ["stressed", "fatigued", "normal", "energetic"] as const
 const VALID_SEMANTIC_SIGNALS = ["positive", "neutral", "negative"] as const
@@ -142,6 +297,34 @@ NEVER use mute_audio_response for:
 - Normal conversational pauses (under 2 seconds)
 - When user asks a direct question expecting an answer
 - When user is clearly finished speaking and waiting for response
+
+═══════════════════════════════════════════════════════════════════════════════
+INTERACTIVE WIDGET TOOLS (USE WHEN HELPFUL)
+═══════════════════════════════════════════════════════════════════════════════
+
+You can trigger interactive on-screen widgets during the conversation by calling tools.
+Use these tools when the user asks for them OR when a quick visual/interactive aid would help more than a long spoken explanation.
+
+AVAILABLE TOOLS:
+1) schedule_activity({ title, category, date, time, duration })
+   - Use when the user asks to schedule an activity (e.g., "schedule a break tomorrow at 3")
+   - Date must be YYYY-MM-DD and time must be HH:MM (24h), in the user's local time
+   - If date/time is unclear, ask ONE clarifying question before calling
+
+2) show_breathing_exercise({ type, duration })
+   - Use for calming and regulation (type: box | 478 | relaxing)
+   - duration is in seconds (e.g., 120)
+
+3) show_stress_gauge({ stressLevel, fatigueLevel, message })
+   - Use to provide a quick visual check of stress/fatigue (0-100)
+
+4) show_quick_actions({ options: [{ label, action }] })
+   - Use to offer 2-6 simple next-step choices
+   - action should be a short phrase the user would say (so the app can send it when tapped)
+
+5) show_journal_prompt({ prompt, placeholder, category })
+   - Use when the user wants to journal or reflection would help
+   - Keep prompts supportive, concrete, and short
 
 ═══════════════════════════════════════════════════════════════════════════════
 CONVERSATIONAL MODE (Only use when NO silence triggers are present)
@@ -393,7 +576,7 @@ export function buildCheckInSystemInstruction(
 CURRENT TIME CONTEXT
 ═══════════════════════════════════════════════════════════════════════════════
 
-Current time: ${timeContext.currentTime}
+Current time (user local): ${timeContext.currentTime}
 Day: ${timeContext.dayOfWeek}
 Time of day: ${timeContext.timeOfDay}
 ${timeContext.daysSinceLastCheckIn !== null

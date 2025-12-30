@@ -23,6 +23,14 @@ import { useCheckIn, type StartSessionOptions } from "@/hooks/use-check-in"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { VoiceIndicatorLarge } from "./voice-indicator"
 import { ConversationView } from "./conversation-view"
+import {
+  BreathingExercise,
+  JournalPrompt,
+  QuickActions,
+  ScheduleConfirmation,
+  StressGauge,
+} from "./widgets"
+import { ChatInput } from "./chat-input"
 import type { CheckInSession, VoicePatterns } from "@/lib/types"
 
 interface CheckInDialogProps {
@@ -232,6 +240,69 @@ export function CheckInDialog({
                   messages={checkIn.messages}
                   currentUserTranscript={checkIn.currentUserTranscript}
                 />
+
+                {/* Gemini-triggered widgets */}
+                {checkIn.widgets.length > 0 && (
+                  <div className="flex-shrink-0 border-t bg-background/60 p-4 space-y-3 overflow-y-auto max-h-[260px]">
+                    <AnimatePresence initial={false}>
+                      {checkIn.widgets.map((widget) => {
+                        switch (widget.type) {
+                          case "schedule_activity":
+                            return (
+                              <ScheduleConfirmation
+                                key={widget.id}
+                                widget={widget}
+                                onDismiss={() => controls.dismissWidget(widget.id)}
+                                onUndo={(suggestionId) =>
+                                  controls.undoScheduledActivity(widget.id, suggestionId)
+                                }
+                              />
+                            )
+                          case "breathing_exercise":
+                            return (
+                              <BreathingExercise
+                                key={widget.id}
+                                widget={widget}
+                                onDismiss={() => controls.dismissWidget(widget.id)}
+                              />
+                            )
+                          case "stress_gauge":
+                            return (
+                              <StressGauge
+                                key={widget.id}
+                                widget={widget}
+                                onDismiss={() => controls.dismissWidget(widget.id)}
+                              />
+                            )
+                          case "quick_actions":
+                            return (
+                              <QuickActions
+                                key={widget.id}
+                                widget={widget}
+                                onDismiss={() => controls.dismissWidget(widget.id)}
+                                onSelect={(action, label) =>
+                                  controls.runQuickAction(widget.id, action, label)
+                                }
+                              />
+                            )
+                          case "journal_prompt":
+                            return (
+                              <JournalPrompt
+                                key={widget.id}
+                                widget={widget}
+                                onDismiss={() => controls.dismissWidget(widget.id)}
+                                onSave={(content) =>
+                                  controls.saveJournalEntry(widget.id, content)
+                                }
+                              />
+                            )
+                          default:
+                            return null
+                        }
+                      })}
+                    </AnimatePresence>
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -285,10 +356,18 @@ export function CheckInDialog({
           </AnimatePresence>
         </div>
 
-        {/* Footer with controls */}
+        {/* Footer with chat input and controls */}
         {showConversation && (
-          <div className="flex-shrink-0 px-6 py-4 border-t bg-muted/30">
-            <div className="flex items-center justify-center gap-4">
+          <div className="flex-shrink-0 border-t bg-muted/30">
+            {/* Chat input for text messages and tool triggers */}
+            <ChatInput
+              onSendText={(text) => controls.sendTextMessage(text)}
+              onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
+              disabled={!checkIn.isActive}
+            />
+
+            {/* Voice controls */}
+            <div className="px-6 py-3 flex items-center justify-center gap-4">
               {/* Mute button */}
               <Button
                 variant="outline"

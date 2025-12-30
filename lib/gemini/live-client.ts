@@ -19,9 +19,23 @@
  * Source: Context7 - /googleapis/js-genai docs - "Live.connect"
  */
 
-import { validateServerMessage } from "./schemas"
+import {
+  BreathingExerciseArgsSchema,
+  JournalPromptArgsSchema,
+  QuickActionsArgsSchema,
+  ScheduleActivityArgsSchema,
+  StressGaugeArgsSchema,
+  validateServerMessage,
+} from "./schemas"
 import { getGeminiApiKey } from "@/lib/utils"
 import { logDebug, logWarn, logError } from "@/lib/logger"
+import type {
+  BreathingExerciseToolArgs,
+  JournalPromptToolArgs,
+  QuickActionsToolArgs,
+  ScheduleActivityToolArgs,
+  StressGaugeToolArgs,
+} from "@/lib/types"
 import type {
   SystemContextSummary,
   SystemTimeContext,
@@ -32,6 +46,13 @@ export interface SessionContext {
   contextSummary?: SystemContextSummary
   timeContext?: SystemTimeContext
 }
+
+export type GeminiWidgetEvent =
+  | { widget: "schedule_activity"; args: ScheduleActivityToolArgs }
+  | { widget: "breathing_exercise"; args: BreathingExerciseToolArgs }
+  | { widget: "stress_gauge"; args: StressGaugeToolArgs }
+  | { widget: "quick_actions"; args: QuickActionsToolArgs }
+  | { widget: "journal_prompt"; args: JournalPromptToolArgs }
 
 // Event types emitted by the client
 export interface LiveClientEvents {
@@ -58,6 +79,7 @@ export interface LiveClientEvents {
 
   // Tool/function calling
   onSilenceChosen: (reason: string) => void
+  onWidget: (event: GeminiWidgetEvent) => void
 
   // Send failures
   onSendError: (error: Error, type: "audio" | "text" | "audioEnd") => void
@@ -713,6 +735,137 @@ export class GeminiLiveClient {
           name: fc.name,
           response: { acknowledged: true }
         }])
+        continue
+      }
+
+      if (fc.name === "schedule_activity") {
+        const parsed = ScheduleActivityArgsSchema.safeParse(fc.args ?? {})
+        if (!parsed.success) {
+          logWarn("LiveClient", "Invalid schedule_activity args:", parsed.error.issues)
+          if (fc.id) {
+            this.sendToolResponse([{
+              id: fc.id,
+              name: fc.name,
+              response: { acknowledged: false, error: "invalid_args" }
+            }])
+          }
+          continue
+        }
+
+        this.config.events.onWidget?.({ widget: "schedule_activity", args: parsed.data })
+
+        if (fc.id) {
+          this.sendToolResponse([{
+            id: fc.id,
+            name: fc.name,
+            response: { acknowledged: true, shown: true }
+          }])
+        }
+        continue
+      }
+
+      if (fc.name === "show_breathing_exercise") {
+        const parsed = BreathingExerciseArgsSchema.safeParse(fc.args ?? {})
+        if (!parsed.success) {
+          logWarn("LiveClient", "Invalid show_breathing_exercise args:", parsed.error.issues)
+          if (fc.id) {
+            this.sendToolResponse([{
+              id: fc.id,
+              name: fc.name,
+              response: { acknowledged: false, error: "invalid_args" }
+            }])
+          }
+          continue
+        }
+
+        this.config.events.onWidget?.({ widget: "breathing_exercise", args: parsed.data })
+
+        if (fc.id) {
+          this.sendToolResponse([{
+            id: fc.id,
+            name: fc.name,
+            response: { acknowledged: true, shown: true }
+          }])
+        }
+        continue
+      }
+
+      if (fc.name === "show_stress_gauge") {
+        const parsed = StressGaugeArgsSchema.safeParse(fc.args ?? {})
+        if (!parsed.success) {
+          logWarn("LiveClient", "Invalid show_stress_gauge args:", parsed.error.issues)
+          if (fc.id) {
+            this.sendToolResponse([{
+              id: fc.id,
+              name: fc.name,
+              response: { acknowledged: false, error: "invalid_args" }
+            }])
+          }
+          continue
+        }
+
+        this.config.events.onWidget?.({ widget: "stress_gauge", args: parsed.data })
+
+        if (fc.id) {
+          this.sendToolResponse([{
+            id: fc.id,
+            name: fc.name,
+            response: { acknowledged: true, shown: true }
+          }])
+        }
+        continue
+      }
+
+      if (fc.name === "show_quick_actions") {
+        const parsed = QuickActionsArgsSchema.safeParse(fc.args ?? {})
+        if (!parsed.success) {
+          logWarn("LiveClient", "Invalid show_quick_actions args:", parsed.error.issues)
+          if (fc.id) {
+            this.sendToolResponse([{
+              id: fc.id,
+              name: fc.name,
+              response: { acknowledged: false, error: "invalid_args" }
+            }])
+          }
+          continue
+        }
+
+        this.config.events.onWidget?.({ widget: "quick_actions", args: parsed.data })
+
+        if (fc.id) {
+          this.sendToolResponse([{
+            id: fc.id,
+            name: fc.name,
+            response: { acknowledged: true, shown: true }
+          }])
+        }
+        continue
+      }
+
+      if (fc.name === "show_journal_prompt") {
+        const parsed = JournalPromptArgsSchema.safeParse(fc.args ?? {})
+        if (!parsed.success) {
+          logWarn("LiveClient", "Invalid show_journal_prompt args:", parsed.error.issues)
+          if (fc.id) {
+            this.sendToolResponse([{
+              id: fc.id,
+              name: fc.name,
+              response: { acknowledged: false, error: "invalid_args" }
+            }])
+          }
+          continue
+        }
+
+        this.config.events.onWidget?.({ widget: "journal_prompt", args: parsed.data })
+
+        if (fc.id) {
+          this.sendToolResponse([{
+            id: fc.id,
+            name: fc.name,
+            response: { acknowledged: true, shown: true }
+          }])
+        }
+        continue
       } else {
         logWarn("LiveClient", "Unknown function call:", fc.name)
       }
