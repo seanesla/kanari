@@ -128,7 +128,7 @@ export class VoiceActivityDetector {
       // Load ONNX model from CDN (not bundled with Next.js)
       modelURL: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.30/dist/silero_vad_legacy.onnx",
       // Configure ONNX Runtime WASM paths to use CDN
-      ortConfig: (ort) => {
+      ortConfig: (ort: { env: { wasm: { wasmPaths: string } } }) => {
         ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/"
       },
     })

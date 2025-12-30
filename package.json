@@ -79,6 +79,7 @@
     "onnxruntime-web": "1.19.2",
     "react": "19.2.0",
     "react-colorful": "^5.6.1",
+    "react-day-picker": "^9.13.0",
     "react-dom": "19.2.0",
     "react-hook-form": "^7.60.0",
     "react-resizable-panels": "^2.1.7",

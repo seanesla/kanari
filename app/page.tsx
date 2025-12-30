@@ -9,6 +9,7 @@ import { FeaturesSection } from "@/components/features-section"
 import { Footer } from "@/components/footer"
 import { ScrollReveal } from "@/components/scroll-reveal"
 import { KanariTextLogo } from "@/components/kanari-text-logo"
+import { HeroColorPicker } from "@/components/hero-color-picker"
 
 export default function LandingPage() {
   const [heroVisible, setHeroVisible] = useState(false)
@@ -39,13 +40,15 @@ export default function LandingPage() {
       {/* Hero */}
       <section className="relative min-h-screen flex flex-col justify-center px-6 md:px-12">
         <div className="relative z-10 max-w-3xl">
-          {/* Brand name - large and prominent */}
+          {/* Brand name - large and prominent, clickable for color picker */}
           <div
             className={`text-accent mb-4 transition-all duration-1000 delay-200 ${
               heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
-            <KanariTextLogo className="text-6xl md:text-8xl lg:text-9xl" />
+            <HeroColorPicker>
+              <KanariTextLogo className="text-6xl md:text-8xl lg:text-9xl" />
+            </HeroColorPicker>
           </div>
           <h1
             className={`text-5xl md:text-7xl lg:text-8xl font-serif leading-[0.9] tracking-tight mb-8 transition-all duration-1000 delay-400 ${

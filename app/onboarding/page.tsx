@@ -13,13 +13,14 @@ import { useOnboarding } from "@/hooks/use-onboarding"
 import {
   OnboardingLayout,
   StepWelcome,
+  StepTheme,
   StepApiKey,
   StepPreferences,
   StepComplete,
 } from "@/components/onboarding"
 import type { UserSettings } from "@/lib/types"
 
-const TOTAL_STEPS = 4
+const TOTAL_STEPS = 5
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -73,7 +74,9 @@ export default function OnboardingPage() {
     <OnboardingLayout currentStep={currentStep} totalSteps={TOTAL_STEPS}>
       {currentStep === 0 && <StepWelcome onNext={goNext} />}
 
-      {currentStep === 1 && (
+      {currentStep === 1 && <StepTheme onNext={goNext} onBack={goBack} />}
+
+      {currentStep === 2 && (
         <StepApiKey
           initialApiKey={settings?.geminiApiKey || pendingSettings.geminiApiKey || ""}
           onNext={handleApiKeySubmit}
@@ -81,7 +84,7 @@ export default function OnboardingPage() {
         />
       )}
 
-      {currentStep === 2 && (
+      {currentStep === 3 && (
         <StepPreferences
           initialSettings={{ ...settings, ...pendingSettings }}
           onNext={handlePreferencesSubmit}
@@ -89,7 +92,7 @@ export default function OnboardingPage() {
         />
       )}
 
-      {currentStep === 3 && <StepComplete onComplete={handleComplete} />}
+      {currentStep === 4 && <StepComplete onComplete={handleComplete} />}
     </OnboardingLayout>
   )
 }

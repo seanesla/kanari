@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import { useSceneMode } from "@/lib/scene-context"
 import type { UserSettings } from "@/lib/types"
 
 interface StepPreferencesProps {
@@ -28,6 +29,7 @@ interface StepPreferencesProps {
 }
 
 export function StepPreferences({ initialSettings, onNext, onBack }: StepPreferencesProps) {
+  const { accentColor } = useSceneMode()
   const [enableVAD, setEnableVAD] = useState(initialSettings.enableVAD ?? true)
   const [enableNotifications, setEnableNotifications] = useState(
     initialSettings.enableNotifications ?? false
@@ -76,15 +78,27 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
 
       {/* Preferences */}
       <motion.div
-        className="space-y-6"
+        className="space-y-4"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
         {/* Recording duration */}
-        <div className="p-4 rounded-lg border border-border/50 space-y-3">
+        <motion.div
+          className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm space-y-3 transition-colors hover:border-accent/30"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.35, type: "spring", stiffness: 300, damping: 25 }}
+          whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
+        >
           <div className="flex items-center gap-3">
-            <Clock className="h-5 w-5 text-muted-foreground" />
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.4, type: "spring", stiffness: 400, damping: 15 }}
+            >
+              <Clock className="h-5 w-5 text-accent" />
+            </motion.div>
             <div className="flex-1">
               <Label htmlFor="duration">Default Recording Duration</Label>
               <p className="text-sm text-muted-foreground">
@@ -102,13 +116,25 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
               <SelectItem value="60">60 seconds</SelectItem>
             </SelectContent>
           </Select>
-        </div>
+        </motion.div>
 
         {/* Voice Activity Detection */}
-        <div className="p-4 rounded-lg border border-border/50">
+        <motion.div
+          className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm transition-colors hover:border-accent/30"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.45, type: "spring", stiffness: 300, damping: 25 }}
+          whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Mic className="h-5 w-5 text-muted-foreground" />
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.5, type: "spring", stiffness: 400, damping: 15 }}
+              >
+                <Mic className="h-5 w-5 text-accent" />
+              </motion.div>
               <div>
                 <Label htmlFor="vad">Smart Recording</Label>
                 <p className="text-sm text-muted-foreground">
@@ -122,13 +148,25 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
               onCheckedChange={setEnableVAD}
             />
           </div>
-        </div>
+        </motion.div>
 
         {/* Notifications */}
-        <div className="p-4 rounded-lg border border-border/50">
+        <motion.div
+          className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm transition-colors hover:border-accent/30"
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.55, type: "spring", stiffness: 300, damping: 25 }}
+          whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Bell className="h-5 w-5 text-muted-foreground" />
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.6, type: "spring", stiffness: 400, damping: 15 }}
+              >
+                <Bell className="h-5 w-5 text-accent" />
+              </motion.div>
               <div>
                 <Label htmlFor="notifications">Daily Reminders</Label>
                 <p className="text-sm text-muted-foreground">
@@ -142,7 +180,7 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
               onCheckedChange={setEnableNotifications}
             />
           </div>
-        </div>
+        </motion.div>
       </motion.div>
 
       {/* Actions */}
@@ -150,14 +188,18 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
         className="flex justify-between pt-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
+        transition={{ delay: 0.65 }}
       >
-        <Button variant="ghost" onClick={onBack}>
-          Back
-        </Button>
-        <Button onClick={handleNext}>
-          Continue
-        </Button>
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <Button variant="ghost" onClick={onBack}>
+            Back
+          </Button>
+        </motion.div>
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <Button onClick={handleNext}>
+            Continue
+          </Button>
+        </motion.div>
       </motion.div>
     </div>
   )

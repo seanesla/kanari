@@ -63,6 +63,10 @@ Copy `.env.example` to `.env` with:
 - `next.config.mjs`: `ignoreBuildErrors: true` (dev convenience)
 - Path alias: `@/*` maps to project root
 
+## Agent Usage
+
+**Always use Task subagents instead of calling MCP tools directly.** When asked to "use X agent" (e.g., "use context7-docs agent", "use Explore agent"), invoke `Task` with the appropriate `subagent_type` - do NOT call the underlying MCP tools directly, even if you have access to them.
+
 ## Documentation Attribution
 
 When using Context7 to fetch library documentation, add a comment citing the source:

@@ -10,6 +10,7 @@
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { KanariTextLogo } from "@/components/kanari-text-logo"
+import { FloatingOrbs } from "@/components/onboarding/floating-orbs"
 
 interface OnboardingLayoutProps {
   /** Current step (0-indexed) */
@@ -29,9 +30,12 @@ export function OnboardingLayout({
   className,
 }: OnboardingLayoutProps) {
   return (
-    <div className={cn("min-h-screen bg-background flex flex-col", className)}>
+    <div className={cn("min-h-screen bg-background flex flex-col relative overflow-hidden", className)}>
+      {/* Animated background */}
+      <FloatingOrbs />
+
       {/* Header with logo and progress */}
-      <header className="px-6 py-4 border-b border-border/50">
+      <header className="relative z-10 px-6 py-4 border-b border-border/50 bg-background/80 backdrop-blur-sm">
         <div className="max-w-2xl mx-auto flex items-center justify-between">
           <KanariTextLogo className="text-2xl text-accent" />
 
@@ -55,7 +59,7 @@ export function OnboardingLayout({
       </header>
 
       {/* Content area */}
-      <main className="flex-1 px-6 py-12">
+      <main className="relative z-10 flex-1 px-6 py-12">
         <div className="max-w-2xl mx-auto">
           <AnimatePresence mode="wait">
             <motion.div

@@ -1,6 +1,7 @@
 "use client"
 
 import { useRef, useEffect, useState, useCallback } from "react"
+import { usePathname } from "next/navigation"
 import { Link } from "next-view-transitions"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X } from "lucide-react"
@@ -152,6 +153,7 @@ function DashboardNavLinks() {
 }
 
 export function PersistentNavbar() {
+  const pathname = usePathname()
   const { isLoading } = useSceneMode()
   const { navbarMode } = useNavbar()
   const [visible, setVisible] = useState(false)
@@ -159,6 +161,8 @@ export function PersistentNavbar() {
   const hasAppeared = useRef(false)
   const mobileMenuRef = useRef<HTMLDivElement>(null)
   const hamburgerRef = useRef<HTMLButtonElement>(null)
+
+  const isOnboarding = pathname === "/onboarding"
 
   // Trigger visibility after loading completes (with delay matching landing page)
   useEffect(() => {
@@ -217,6 +221,9 @@ export function PersistentNavbar() {
   const handleMobileNavClick = useCallback(() => {
     setMobileMenuOpen(false)
   }, [])
+
+  // Hide navbar on onboarding page (it has its own header)
+  if (isOnboarding) return null
 
   return (
     <>

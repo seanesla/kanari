@@ -12,6 +12,7 @@ import { Key, ExternalLink, CheckCircle2, AlertCircle, Loader2 } from "lucide-re
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useSceneMode } from "@/lib/scene-context"
 
 interface StepApiKeyProps {
   initialApiKey?: string
@@ -20,6 +21,7 @@ interface StepApiKeyProps {
 }
 
 export function StepApiKey({ initialApiKey = "", onNext, onBack }: StepApiKeyProps) {
+  const { accentColor } = useSceneMode()
   const [apiKey, setApiKey] = useState(initialApiKey)
   const [isValidating, setIsValidating] = useState(false)
   const [validationResult, setValidationResult] = useState<"valid" | "invalid" | null>(null)
@@ -139,7 +141,13 @@ export function StepApiKey({ initialApiKey = "", onNext, onBack }: StepApiKeyPro
         </div>
 
         {/* Help text */}
-        <div className="p-4 rounded-lg bg-muted/50 space-y-2">
+        <motion.div
+          className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm space-y-2 transition-colors hover:border-accent/30"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4, type: "spring", stiffness: 300, damping: 25 }}
+          whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
+        >
           <p className="text-sm text-muted-foreground">
             <strong>Don&apos;t have an API key?</strong> Get one for free:
           </p>
@@ -158,7 +166,7 @@ export function StepApiKey({ initialApiKey = "", onNext, onBack }: StepApiKeyPro
             Open Google AI Studio
             <ExternalLink className="h-3 w-3" />
           </a>
-        </div>
+        </motion.div>
 
         {/* Privacy note */}
         <p className="text-xs text-muted-foreground text-center">
@@ -171,21 +179,25 @@ export function StepApiKey({ initialApiKey = "", onNext, onBack }: StepApiKeyPro
         className="flex justify-between pt-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.4 }}
+        transition={{ delay: 0.5 }}
       >
-        <Button variant="ghost" onClick={onBack}>
-          Back
-        </Button>
-        <Button onClick={handleNext} disabled={!apiKey.trim() || isValidating}>
-          {isValidating ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Validating...
-            </>
-          ) : (
-            "Continue"
-          )}
-        </Button>
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <Button variant="ghost" onClick={onBack}>
+            Back
+          </Button>
+        </motion.div>
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <Button onClick={handleNext} disabled={!apiKey.trim() || isValidating}>
+            {isValidating ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Validating...
+              </>
+            ) : (
+              "Continue"
+            )}
+          </Button>
+        </motion.div>
       </motion.div>
     </div>
   )

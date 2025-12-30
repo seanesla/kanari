@@ -9,6 +9,7 @@
 import { motion } from "framer-motion"
 import { Mic, Brain, Calendar, Shield } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useSceneMode } from "@/lib/scene-context"
 
 interface StepWelcomeProps {
   onNext: () => void
@@ -38,6 +39,8 @@ const features = [
 ]
 
 export function StepWelcome({ onNext }: StepWelcomeProps) {
+  const { accentColor } = useSceneMode()
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -71,12 +74,26 @@ export function StepWelcome({ onNext }: StepWelcomeProps) {
         {features.map((feature, i) => (
           <motion.div
             key={feature.title}
-            className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm"
+            className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm transition-all duration-300 hover:border-accent/30"
+            style={{
+              // Subtle accent glow on hover via CSS variable
+              ["--hover-glow" as string]: `0 0 20px ${accentColor}20`,
+            }}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 + i * 0.1 }}
+            transition={{ delay: 0.4 + i * 0.1, type: "spring", stiffness: 300, damping: 25 }}
+            whileHover={{
+              scale: 1.02,
+              boxShadow: `0 0 25px ${accentColor}15, 0 4px 20px rgba(0,0,0,0.1)`,
+            }}
           >
-            <feature.icon className="h-6 w-6 text-accent mb-3" />
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.5 + i * 0.1, type: "spring", stiffness: 400, damping: 15 }}
+            >
+              <feature.icon className="h-6 w-6 text-accent mb-3" />
+            </motion.div>
             <h3 className="font-medium mb-1">{feature.title}</h3>
             <p className="text-sm text-muted-foreground">{feature.description}</p>
           </motion.div>
@@ -90,9 +107,11 @@ export function StepWelcome({ onNext }: StepWelcomeProps) {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8 }}
       >
-        <Button onClick={onNext} size="lg" className="px-8">
-          Get Started
-        </Button>
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <Button onClick={onNext} size="lg" className="px-8">
+            Get Started
+          </Button>
+        </motion.div>
       </motion.div>
     </div>
   )

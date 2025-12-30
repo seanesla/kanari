@@ -6,11 +6,12 @@
  * Final step showing success and redirecting to dashboard.
  */
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { CheckCircle2, Sparkles, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { useSceneMode } from "@/lib/scene-context"
 
 interface StepCompleteProps {
   onComplete: () => Promise<void>
@@ -18,6 +19,7 @@ interface StepCompleteProps {
 
 export function StepComplete({ onComplete }: StepCompleteProps) {
   const router = useRouter()
+  const { accentColor } = useSceneMode()
   const [isCompleting, setIsCompleting] = useState(false)
 
   const handleEnterDashboard = async () => {
@@ -67,28 +69,39 @@ export function StepComplete({ onComplete }: StepCompleteProps) {
 
       {/* Tips */}
       <motion.div
-        className="p-6 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm text-left max-w-md mx-auto"
+        className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-left max-w-md mx-auto transition-colors hover:border-accent/30"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
+        transition={{ delay: 0.5, type: "spring", stiffness: 300, damping: 25 }}
+        whileHover={{ boxShadow: `0 0 25px ${accentColor}15` }}
       >
         <div className="flex items-center gap-2 mb-4">
-          <Sparkles className="h-5 w-5 text-accent" />
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: 0.6, type: "spring", stiffness: 400, damping: 15 }}
+          >
+            <Sparkles className="h-5 w-5 text-accent" />
+          </motion.div>
           <h3 className="font-medium">Quick Tips</h3>
         </div>
         <ul className="space-y-3 text-sm text-muted-foreground">
-          <li className="flex items-start gap-2">
-            <span className="text-accent mt-0.5">1.</span>
-            <span>Record daily check-ins at roughly the same time for best results</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-accent mt-0.5">2.</span>
-            <span>Speak naturally about your day—no need for scripts or prompts</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-accent mt-0.5">3.</span>
-            <span>Review your suggestions and schedule recovery blocks to prevent burnout</span>
-          </li>
+          {[
+            "Record daily check-ins at roughly the same time for best results",
+            "Speak naturally about your day—no need for scripts or prompts",
+            "Review your suggestions and schedule recovery blocks to prevent burnout",
+          ].map((tip, i) => (
+            <motion.li
+              key={i}
+              className="flex items-start gap-2"
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.65 + i * 0.1 }}
+            >
+              <span className="text-accent mt-0.5">{i + 1}.</span>
+              <span>{tip}</span>
+            </motion.li>
+          ))}
         </ul>
       </motion.div>
 
@@ -97,23 +110,28 @@ export function StepComplete({ onComplete }: StepCompleteProps) {
         className="pt-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
+        transition={{ delay: 0.9 }}
       >
-        <Button
-          onClick={handleEnterDashboard}
-          size="lg"
-          className="px-8"
-          disabled={isCompleting}
+        <motion.div
+          whileHover={{ scale: 1.03 }}
+          whileTap={{ scale: 0.97 }}
         >
-          {isCompleting ? (
-            "Loading..."
-          ) : (
-            <>
-              Enter Dashboard
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </>
-          )}
-        </Button>
+          <Button
+            onClick={handleEnterDashboard}
+            size="lg"
+            className="px-8"
+            disabled={isCompleting}
+          >
+            {isCompleting ? (
+              "Loading..."
+            ) : (
+              <>
+                Enter Dashboard
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </>
+            )}
+          </Button>
+        </motion.div>
       </motion.div>
     </div>
   )
