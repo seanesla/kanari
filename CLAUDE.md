@@ -1,5 +1,13 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Deployment
+
+**Production:** https://kanari-three.vercel.app
+**Auto-deploys:** Push to `main` triggers Vercel deployment
+**No env vars required:** Users provide Gemini API key via Settings UI
+
 ## Naming: Dashboard vs Overview
 
 - **Dashboard** = the route group (`app/dashboard/`) containing all app pages
