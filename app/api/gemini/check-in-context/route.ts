@@ -10,7 +10,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { callGeminiAPI, validateAPIKey, getAPIKeyFromRequest } from "@/lib/gemini/client"
+import {
+  callGeminiAPI,
+  validateAPIKey,
+  getAPIKeyFromRequest,
+  type GeminiRequest,
+} from "@/lib/gemini/client"
 import {
   CHECK_IN_CONTEXT_SUMMARY_PROMPT,
   CHECK_IN_CONTEXT_SUMMARY_SCHEMA,
@@ -154,7 +159,7 @@ async function generateContextSummary(
 ): Promise<CheckInContextSummaryResponse> {
   const userPrompt = generateUserPrompt(context)
 
-  const request = {
+  const request: GeminiRequest = {
     systemInstruction: {
       parts: [{ text: CHECK_IN_CONTEXT_SUMMARY_PROMPT }],
     },
