@@ -538,5 +538,33 @@ export interface LiveAPITranscription {
   }
 }
 
+// ============================================
+// Unified History Timeline Types
+// ============================================
+
+// Discriminator type to identify which union type we're dealing with
+export type HistoryItemType = "voice_note" | "ai_chat"
+
+// Represents a voice note recording in the history timeline
+export interface VoiceNoteHistoryItem {
+  id: string // Same as recording.id
+  type: "voice_note"
+  timestamp: string // ISO date string (recording.createdAt) for chronological sorting
+  recording: Recording // The full recording object
+  linkedChatSessionId?: string // If a chat session was triggered from this recording
+}
+
+// Represents an AI chat session in the history timeline
+export interface AIChatHistoryItem {
+  id: string // Same as session.id
+  type: "ai_chat"
+  timestamp: string // ISO date string (session.startedAt) for chronological sorting
+  session: CheckInSession // The full session object
+  linkedRecordingId?: string // If this chat was triggered by a voice note (from session.recordingId)
+}
+
+// Discriminated union type: a history item is either a voice note or an AI chat
+export type HistoryItem = VoiceNoteHistoryItem | AIChatHistoryItem
+
 // Re-export SceneMode for convenience
 export type { SceneMode } from "./scene-context"

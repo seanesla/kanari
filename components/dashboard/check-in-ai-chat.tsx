@@ -30,13 +30,12 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Phone, PhoneOff, Mic, MicOff, History } from "lucide-react"
+import { Phone, PhoneOff, Mic, MicOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCheckIn, type StartSessionOptions } from "@/hooks/use-check-in"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { VoiceIndicatorLarge } from "@/components/check-in/voice-indicator"
 import { ConversationView } from "@/components/check-in/conversation-view"
-import { ConversationHistory } from "@/components/check-in/conversation-history"
 import type { CheckInSession, VoicePatterns } from "@/lib/types"
 
 interface AIChatContentProps {
@@ -74,15 +73,18 @@ export function AIChatContent({
   // or rapid tab switching
   const sessionStartedRef = useRef(false)
 
-  // State for showing/hiding the conversation history sidebar
-  const [showHistory, setShowHistory] = useState(false)
-
   // Main check-in hook that manages the Gemini Live connection
   // This hook handles all the complex WebSocket, audio capture, and playback logic
   const [checkIn, controls] = useCheckIn({
     // Called when user ends the session or AI ends naturally
     onSessionEnd: async (session) => {
       try {
+        // Only save sessions that have at least one message
+        // Empty sessions (0 messages) are not meaningful and should not be stored
+        if (session.messages.length === 0) {
+          console.log("[AIChatContent] Skipping save - session has no messages")
+          return
+        }
         // Persist the conversation to IndexedDB for history
         await addCheckInSession(session)
         onSessionComplete?.(session)
@@ -192,22 +194,7 @@ export function AIChatContent({
 
   return (
     <div className="flex h-full overflow-hidden">
-      {/* History sidebar - slides in from left */}
-      <AnimatePresence>
-        {showHistory && (
-          <motion.div
-            className="flex-shrink-0 w-72 h-full"
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 288, opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-          >
-            <ConversationHistory onClose={() => setShowHistory(false)} />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main chat content area */}
+      {/* Main chat content area (full width - no sidebar) */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Main content area with animated state transitions */}
         <AnimatePresence mode="wait">
@@ -386,21 +373,6 @@ export function AIChatContent({
         {showConversation && (
           <div className="flex-shrink-0 px-6 py-4 border-t bg-muted/30">
             <div className="flex items-center justify-center gap-4">
-              {/*
-                History button - toggles the conversation history sidebar
-              */}
-              <Button
-                variant="outline"
-                size="icon"
-                className={cn(
-                  "h-12 w-12 rounded-full",
-                  showHistory && "bg-accent text-accent-foreground"
-                )}
-                onClick={() => setShowHistory(!showHistory)}
-              >
-                <History className="h-5 w-5" />
-              </Button>
-
               {/*
                 Mute button - toggles microphone on/off
                 Red background when muted to clearly indicate state

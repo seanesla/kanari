@@ -34,7 +34,7 @@ export function DashboardLayout({
         No suggestions yet. Record a voice check-in to get personalized recovery recommendations.
       </p>
       <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-        <Link href="/dashboard/recordings?newRecording=true">
+        <Link href="/dashboard/history?newRecording=true">
           Record Now
           <ArrowRight className="ml-2 h-4 w-4" />
         </Link>

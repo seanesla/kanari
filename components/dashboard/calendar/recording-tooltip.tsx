@@ -113,7 +113,7 @@ export function RecordingTooltip({
 
   const handleViewRecording = () => {
     onOpenChange(false)
-    router.push(`/dashboard/recordings?highlight=${recording.id}`)
+    router.push(`/dashboard/history?highlight=${recording.id}`)
   }
 
   return (
