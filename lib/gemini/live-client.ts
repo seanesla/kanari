@@ -228,6 +228,40 @@ export class GeminiLiveClient {
   }
 
   /**
+   * Check if connection is healthy for session preservation.
+   * Returns true if connected and event source is active.
+   */
+  isConnectionHealthy(): boolean {
+    return this.state === "ready" && this.eventSource !== null
+  }
+
+  /**
+   * Detach event handlers without closing connection.
+   * Used when preserving a session - keeps Gemini connection alive
+   * but stops React component from receiving events.
+   */
+  detachEventHandlers(): void {
+    this.config.events = {}
+    logDebug("GeminiLive", "Event handlers detached for preservation")
+  }
+
+  /**
+   * Reattach event handlers to an existing connection.
+   * Used when resuming a preserved session.
+   */
+  reattachEventHandlers(events: Partial<LiveClientEvents>): void {
+    this.config.events = events
+    logDebug("GeminiLive", "Event handlers reattached")
+  }
+
+  /**
+   * Get current session ID (for debugging/logging)
+   */
+  getSessionId(): string | null {
+    return this.sessionId
+  }
+
+  /**
    * Connect to Gemini Live API via server
    *
    * @param context - Optional context for AI-initiated conversations

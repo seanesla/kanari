@@ -87,7 +87,9 @@ export function AudioPlayer({
           logUnexpectedError("AudioPlayer", "Unexpected error stopping source:", error)
         }
       }
-      if (audioContextRef.current) {
+      // Close audio context if not already closed
+      // See: docs/error-patterns/audiocontext-double-close.md
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
         audioContextRef.current.close()
       }
     }

@@ -101,7 +101,7 @@ function HistoryPageContent() {
 
   // Get delete actions for both types
   const { deleteRecording } = useRecordingActions()
-  const { deleteCheckInSession, deleteEmptyCheckInSessions } = useCheckInSessionActions()
+  const { deleteCheckInSession, deleteIncompleteSessions } = useCheckInSessionActions()
 
   // Trigger entry animation on page load
   useEffect(() => {
@@ -111,11 +111,11 @@ function HistoryPageContent() {
     }
   }, [shouldAnimate])
 
-  // Clean up any legacy empty sessions on first load
-  // These are leftovers from sessions that were started but never used
+  // Clean up any incomplete sessions on first load
+  // With AI-speaks-first, 0-1 messages = no real conversation happened
   useEffect(() => {
-    deleteEmptyCheckInSessions()
-  }, [deleteEmptyCheckInSessions])
+    deleteIncompleteSessions()
+  }, [deleteIncompleteSessions])
 
   // Check for auto-open param in URL (triggered from overview page check-in button)
   useEffect(() => {

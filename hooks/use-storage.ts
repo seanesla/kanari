@@ -393,25 +393,25 @@ export function useCheckInSessionActions() {
   }, [])
 
   /**
-   * Delete all check-in sessions that have 0 messages.
-   * These are leftovers from sessions that were started but never used.
+   * Delete all check-in sessions where user never participated.
+   * With AI-speaks-first, 0-1 messages = no real conversation happened.
    * Returns the number of deleted sessions.
    */
-  const deleteEmptyCheckInSessions = useCallback(async () => {
+  const deleteIncompleteSessions = useCallback(async () => {
     const allSessions = await db.checkInSessions.toArray()
-    const emptySessionIds = allSessions
-      .filter(session => !session.messages || session.messages.length === 0)
+    const incompleteSessionIds = allSessions
+      .filter(session => !session.messages || session.messages.length <= 1)
       .map(session => session.id)
 
-    if (emptySessionIds.length > 0) {
-      await db.checkInSessions.bulkDelete(emptySessionIds)
-      logDebug("Storage", `Deleted ${emptySessionIds.length} empty check-in sessions`)
+    if (incompleteSessionIds.length > 0) {
+      await db.checkInSessions.bulkDelete(incompleteSessionIds)
+      logDebug("Storage", `Deleted ${incompleteSessionIds.length} incomplete check-in sessions`)
     }
 
-    return emptySessionIds.length
+    return incompleteSessionIds.length
   }, [])
 
-  return { addCheckInSession, updateCheckInSession, deleteCheckInSession, deleteEmptyCheckInSessions }
+  return { addCheckInSession, updateCheckInSession, deleteCheckInSession, deleteIncompleteSessions }
 }
 
 // ===========================================

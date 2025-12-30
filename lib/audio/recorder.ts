@@ -129,10 +129,12 @@ export class AudioRecorder {
         this.mediaStream = null
       }
 
-      if (this.audioContext) {
+      // Close audio context if not already closed
+      // See: docs/error-patterns/audiocontext-double-close.md
+      if (this.audioContext && this.audioContext.state !== "closed") {
         await this.audioContext.close()
-        this.audioContext = null
       }
+      this.audioContext = null
 
       // Concatenate all chunks into single buffer
       const totalLength = this.audioChunks.reduce((sum, chunk) => sum + chunk.length, 0)
@@ -175,13 +177,14 @@ export class AudioRecorder {
       this.sourceNode = null
     }
 
-    // Close audio context
-    if (this.audioContext) {
+    // Close audio context if not already closed
+    // See: docs/error-patterns/audiocontext-double-close.md
+    if (this.audioContext && this.audioContext.state !== "closed") {
       this.audioContext.close().catch((error) => {
         logWarn("AudioRecorder", "Failed to close audio context:", error)
       })
-      this.audioContext = null
     }
+    this.audioContext = null
 
     this.audioChunks = []
     this.state = "idle"

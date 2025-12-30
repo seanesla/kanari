@@ -65,6 +65,10 @@ export interface GeminiLiveControls {
   injectContext: (contextText: string) => void
   /** Signal end of audio stream */
   endAudioStream: () => void
+  /** Get the current client instance (for session preservation) */
+  getClient: () => GeminiLiveClient | null
+  /** Reattach to an existing client (for session resumption) */
+  reattachToClient: (client: GeminiLiveClient) => void
 }
 
 export interface UseGeminiLiveOptions {
@@ -456,6 +460,83 @@ export function useGeminiLive(
     }
   }, [])
 
+  /**
+   * Get the current client instance (for session preservation)
+   */
+  const getClient = useCallback(() => {
+    return clientRef.current
+  }, [])
+
+  /**
+   * Reattach to an existing client (for session resumption)
+   * This is used when resuming a preserved session - takes ownership of
+   * an existing GeminiLiveClient and reattaches event handlers.
+   */
+  const reattachToClient = useCallback((client: GeminiLiveClient) => {
+    // Set the client reference
+    clientRef.current = client
+
+    // Create event handlers using refs (same pattern as connect())
+    const events: Partial<LiveClientEvents> = {
+      onConnecting: () => {
+        // Already connected
+      },
+      onConnected: () => {
+        dispatch({ type: "READY" })
+        callbacksRef.current.onConnected?.()
+      },
+      onDisconnected: (reason) => {
+        dispatch({ type: "DISCONNECTED" })
+        callbacksRef.current.onDisconnected?.(reason)
+      },
+      onError: (error) => {
+        dispatch({ type: "ERROR", error: error.message })
+        callbacksRef.current.onError?.(error)
+      },
+      onAudioChunk: (base64Audio) => {
+        dispatch({ type: "MODEL_SPEECH_START" })
+        callbacksRef.current.onAudioChunk?.(base64Audio)
+      },
+      onAudioEnd: () => {
+        dispatch({ type: "MODEL_SPEECH_END" })
+        callbacksRef.current.onAudioEnd?.()
+      },
+      onUserTranscript: (text, isFinal) => {
+        dispatch({ type: "USER_TRANSCRIPT", text, isFinal })
+        callbacksRef.current.onUserTranscript?.(text, isFinal)
+      },
+      onModelTranscript: (text, finished) => {
+        dispatch({ type: "MODEL_TRANSCRIPT", text })
+        callbacksRef.current.onModelTranscript?.(text, finished)
+      },
+      onModelThinking: (text) => {
+        callbacksRef.current.onModelThinking?.(text)
+      },
+      onTurnComplete: () => {
+        dispatch({ type: "MODEL_SPEECH_END" })
+        callbacksRef.current.onTurnComplete?.()
+      },
+      onInterrupted: () => {
+        dispatch({ type: "MODEL_SPEECH_END" })
+        callbacksRef.current.onInterrupted?.()
+      },
+      onUserSpeechStart: () => {
+        dispatch({ type: "USER_SPEECH_START" })
+        callbacksRef.current.onUserSpeechStart?.()
+      },
+      onUserSpeechEnd: () => {
+        dispatch({ type: "USER_SPEECH_END" })
+        callbacksRef.current.onUserSpeechEnd?.()
+      },
+    }
+
+    // Reattach handlers to the existing client
+    client.reattachEventHandlers(events)
+
+    // Set state to ready (client is already connected)
+    dispatch({ type: "READY" })
+  }, [])
+
   const controls: GeminiLiveControls = {
     connect,
     disconnect,
@@ -463,6 +544,8 @@ export function useGeminiLive(
     sendText,
     injectContext,
     endAudioStream,
+    getClient,
+    reattachToClient,
   }
 
   return [data, controls]

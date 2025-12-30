@@ -32,6 +32,15 @@ import {
   fetchCheckInContext,
   formatContextForAPI,
 } from "@/lib/gemini/check-in-context"
+import { computeContextFingerprint } from "@/lib/gemini/context-fingerprint"
+import {
+  hasPreservedSession as checkPreservedSession,
+  getPreservedSession,
+  preserveSession as storePreservedSession,
+  clearPreservedSession,
+  consumePreservedSession,
+  markSessionInvalid,
+} from "@/lib/gemini/preserved-session"
 import type { SessionContext } from "@/lib/gemini/live-client"
 import type {
   CheckInState,
@@ -92,6 +101,14 @@ export interface CheckInControls {
   getSession: () => CheckInSession | null
   /** Toggle microphone mute */
   toggleMute: () => void
+  /** Preserve session for later resumption (keeps Gemini connected) */
+  preserveSession: () => void
+  /** Check if there's a preserved session that can be resumed */
+  hasPreservedSession: () => boolean
+  /** Resume a preserved session */
+  resumePreservedSession: () => Promise<void>
+  /** Get current context fingerprint (for external invalidation checks) */
+  getContextFingerprint: () => Promise<string>
 }
 
 export interface StartSessionOptions {
@@ -425,6 +442,9 @@ export function useCheckIn(
 
   // Session context for AI-initiated conversations (passed to Gemini connect)
   const sessionContextRef = useRef<SessionContext | null>(null)
+
+  // Context fingerprint for session preservation
+  const contextFingerprintRef = useRef<string | null>(null)
 
   // Track current state for use in callbacks (avoid stale closures)
   const stateRef = useRef<CheckInState>(data.state)
@@ -789,7 +809,11 @@ export function useCheckIn(
         console.log(`[useCheckIn] Initialization aborted after audioContext.resume (${abortAfterResume})`)
         stream.getTracks().forEach((track) => track.stop())
         mediaStreamRef.current = null
-        audioContext.close()
+        // Check if context isn't already closed (e.g., by concurrent cleanup)
+        // See: docs/error-patterns/audiocontext-double-close.md
+        if (audioContext.state !== "closed") {
+          audioContext.close()
+        }
         audioContextRef.current = null
         throw new Error(abortAfterResume === "superseded" ? "SESSION_SUPERSEDED" : "INITIALIZATION_ABORTED")
       }
@@ -811,7 +835,11 @@ export function useCheckIn(
         console.log(`[useCheckIn] Initialization aborted after addModule (${abortAfterModule})`)
         stream.getTracks().forEach((track) => track.stop())
         mediaStreamRef.current = null
-        audioContext.close()
+        // Check if context isn't already closed (e.g., by concurrent cleanup)
+        // See: docs/error-patterns/audiocontext-double-close.md
+        if (audioContext.state !== "closed") {
+          audioContext.close()
+        }
         audioContextRef.current = null
         throw new Error(abortAfterModule === "superseded" ? "SESSION_SUPERSEDED" : "INITIALIZATION_ABORTED")
       }
@@ -903,11 +931,12 @@ export function useCheckIn(
       captureWorkletRef.current = null
     }
 
-    // Close audio context
-    if (audioContextRef.current) {
+    // Close audio context if not already closed
+    // See: docs/error-patterns/audiocontext-double-close.md
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
       audioContextRef.current.close()
-      audioContextRef.current = null
     }
+    audioContextRef.current = null
 
     audioChunksRef.current = []
   }, [])
@@ -937,6 +966,10 @@ export function useCheckIn(
         }
         dispatch({ type: "SET_SESSION", session })
         sessionStartRef.current = session.startedAt
+
+        // Compute context fingerprint for session preservation
+        // This allows us to detect if data changed while session was preserved
+        contextFingerprintRef.current = await computeContextFingerprint()
 
         // Generate post-recording context if applicable
         if (startOptions?.recordingContext) {
@@ -1045,6 +1078,9 @@ export function useCheckIn(
   const endSession = useCallback(async () => {
     dispatch({ type: "SET_ENDING" })
 
+    // Clear any preserved session (user explicitly ended, don't preserve)
+    clearPreservedSession(false) // false = don't disconnect, we'll do it below
+
     // Calculate session duration
     const duration = sessionStartRef.current
       ? (Date.now() - new Date(sessionStartRef.current).getTime()) / 1000
@@ -1140,6 +1176,115 @@ export function useCheckIn(
     dispatch({ type: "SET_MUTED", muted: !audioTrack.enabled })
   }, [])
 
+  // ========================================
+  // Session Preservation
+  // ========================================
+
+  /**
+   * Preserve the current session for later resumption.
+   * Keeps the Gemini connection alive but cleans up local audio resources.
+   */
+  const preserveSession = useCallback(() => {
+    const client = geminiControls.getClient()
+    if (!client || !client.isConnectionHealthy()) {
+      console.warn("[useCheckIn] Cannot preserve - no healthy connection")
+      return
+    }
+
+    if (!contextFingerprintRef.current) {
+      console.warn("[useCheckIn] Cannot preserve - no context fingerprint")
+      return
+    }
+
+    // Detach event handlers from the client (stops React from receiving events)
+    client.detachEventHandlers()
+
+    // Store the session in the preservation store
+    storePreservedSession(client, data, contextFingerprintRef.current)
+
+    // Cleanup local audio resources (but keep Gemini connected)
+    cleanupAudioCapture()
+    playbackControls.cleanup()
+
+    // Reset local state (session is now preserved externally)
+    dispatch({ type: "RESET" })
+
+    console.log("[useCheckIn] Session preserved")
+  }, [geminiControls, data, cleanupAudioCapture, playbackControls])
+
+  /**
+   * Check if there's a preserved session that can be resumed.
+   */
+  const hasPreservedSession = useCallback(() => {
+    return checkPreservedSession()
+  }, [])
+
+  /**
+   * Resume a preserved session.
+   * Restores state, reinitializes audio, and reattaches to the existing Gemini connection.
+   */
+  const resumePreservedSession = useCallback(async () => {
+    const preserved = consumePreservedSession()
+    if (!preserved) {
+      console.warn("[useCheckIn] No preserved session to resume")
+      return
+    }
+
+    try {
+      // Check if the connection is still healthy
+      if (!preserved.client.isConnectionHealthy()) {
+        console.warn("[useCheckIn] Preserved connection is no longer healthy")
+        markSessionInvalid()
+        throw new Error("Preserved connection lost")
+      }
+
+      // Restore the reducer state from the preserved snapshot
+      // We need to dispatch actions to restore the state
+      dispatch({ type: "START_INITIALIZING" })
+
+      // Initialize audio resources
+      await playbackControls.initialize()
+      await initializeAudioCapture()
+
+      // Reattach to the existing Gemini client
+      geminiControls.reattachToClient(preserved.client)
+
+      // Restore the context fingerprint
+      contextFingerprintRef.current = preserved.contextFingerprint
+
+      // Restore session data
+      if (preserved.checkInData.session) {
+        dispatch({ type: "SET_SESSION", session: preserved.checkInData.session })
+        sessionStartRef.current = preserved.checkInData.session.startedAt
+      }
+
+      // Restore messages by replaying them
+      for (const message of preserved.checkInData.messages) {
+        dispatch({ type: "ADD_MESSAGE", message })
+      }
+
+      // Set the appropriate state based on what was preserved
+      dispatch({ type: "SET_READY" })
+      dispatch({ type: "SET_LISTENING" })
+
+      console.log("[useCheckIn] Session resumed successfully")
+    } catch (error) {
+      console.error("[useCheckIn] Failed to resume session:", error)
+      // If resume fails, clean up and let caller handle
+      cleanupAudioCapture()
+      playbackControls.cleanup()
+      dispatch({ type: "RESET" })
+      throw error
+    }
+  }, [geminiControls, playbackControls, initializeAudioCapture, cleanupAudioCapture])
+
+  /**
+   * Get the current context fingerprint for external invalidation checks.
+   */
+  const getContextFingerprint = useCallback(async () => {
+    return computeContextFingerprint()
+  }, [])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -1153,6 +1298,10 @@ export function useCheckIn(
     cancelSession,
     getSession,
     toggleMute,
+    preserveSession,
+    hasPreservedSession,
+    resumePreservedSession,
+    getContextFingerprint,
   }
 
   return [data, controls]

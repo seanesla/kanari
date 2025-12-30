@@ -373,11 +373,12 @@ export function useAudioPlayback(
       workletNodeRef.current = null
     }
 
-    // Close audio context
-    if (audioContextRef.current) {
+    // Close audio context if not already closed
+    // See: docs/error-patterns/audiocontext-double-close.md
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
       audioContextRef.current.close()
-      audioContextRef.current = null
     }
+    audioContextRef.current = null
 
     isPlayingRef.current = false
     dispatch({ type: "CLEANUP" })

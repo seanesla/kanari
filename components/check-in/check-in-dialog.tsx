@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef } from "react"
+import { logDebug, logError } from "@/lib/logger"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Dialog,
@@ -51,12 +52,17 @@ export function CheckInDialog({
 
   const [checkIn, controls] = useCheckIn({
     onSessionEnd: async (session) => {
-      // Save to database
       try {
+        // Only save sessions where user actually participated (at least 2 messages)
+        // With AI-speaks-first, 1 message = just the AI greeting, no user response
+        if (session.messages.length <= 1) {
+          logDebug("CheckInDialog", "Skipping save - no user participation")
+          return
+        }
         await addCheckInSession(session)
         onSessionComplete?.(session)
       } catch (error) {
-        console.error("Failed to save check-in session:", error)
+        logError("CheckInDialog", "Failed to save check-in session:", error)
       }
     },
     onMismatch: (result) => {

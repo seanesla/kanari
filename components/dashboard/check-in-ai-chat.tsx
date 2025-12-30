@@ -37,6 +37,10 @@ import { useCheckIn, type StartSessionOptions } from "@/hooks/use-check-in"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { VoiceIndicatorLarge } from "@/components/check-in/voice-indicator"
 import { ConversationView } from "@/components/check-in/conversation-view"
+import {
+  getPreservedFingerprint,
+  clearPreservedSession,
+} from "@/lib/gemini/preserved-session"
 import type { CheckInSession, VoicePatterns } from "@/lib/types"
 
 interface AIChatContentProps {
@@ -80,10 +84,10 @@ export function AIChatContent({
     // Called when user ends the session or AI ends naturally
     onSessionEnd: async (session) => {
       try {
-        // Only save sessions that have at least one message
-        // Empty sessions (0 messages) are not meaningful and should not be stored
-        if (session.messages.length === 0) {
-          logDebug("AIChatContent", "Skipping save - session has no messages")
+        // Only save sessions where user actually participated (at least 2 messages)
+        // With AI-speaks-first, 1 message = just the AI greeting, no user response
+        if (session.messages.length <= 1) {
+          logDebug("AIChatContent", "Skipping save - no user participation")
           return
         }
         // Persist the conversation to IndexedDB for history
@@ -135,31 +139,58 @@ export function AIChatContent({
   }, [checkIn.state])
 
   // Auto-start the session when component mounts (tab is selected)
-  // Only start once per idle→active cycle
+  // Checks for preserved session first, comparing fingerprints to detect data changes
   useEffect(() => {
     if (checkIn.state === "idle" && !sessionStartedRef.current) {
       // Mark as started immediately to prevent duplicate calls
       sessionStartedRef.current = true
 
-      // Build session options with optional recording context
-      // If user just made a voice recording, this context helps AI understand
-      // their current stress/fatigue levels
-      const options: StartSessionOptions | undefined = recordingContext
-        ? { recordingContext }
-        : undefined
+      // Check if we have a preserved session to resume
+      const initSession = async () => {
+        const hasPreserved = controls.hasPreservedSession()
 
-      controls.startSession(options)
+        if (hasPreserved) {
+          // Compare fingerprints to detect if context has changed
+          const preservedFingerprint = getPreservedFingerprint()
+          const currentFingerprint = await controls.getContextFingerprint()
+
+          if (preservedFingerprint === currentFingerprint) {
+            // Context unchanged - resume preserved session
+            logDebug("AIChatContent", "Resuming preserved session")
+            try {
+              await controls.resumePreservedSession()
+              return
+            } catch (error) {
+              logError("AIChatContent", "Failed to resume preserved session:", error)
+              // Fall through to start fresh
+            }
+          } else {
+            // Context changed - clear preserved and start fresh
+            logDebug("AIChatContent", "Context changed, starting fresh session")
+            clearPreservedSession()
+          }
+        }
+
+        // Start fresh session
+        const options: StartSessionOptions | undefined = recordingContext
+          ? { recordingContext }
+          : undefined
+        controls.startSession(options)
+      }
+
+      initSession()
     }
   }, [checkIn.state, recordingContext, controls])
 
-  // Handle closing the chat - end session gracefully first
-  const handleClose = useCallback(async () => {
+  // Handle closing the chat - preserve session for later resumption
+  // User can come back and continue where they left off
+  const handleClose = useCallback(() => {
     if (checkIn.isActive) {
-      // End the session, which triggers onSessionEnd callback
-      await controls.endSession()
+      // Preserve the session instead of ending it
+      // This keeps the Gemini connection alive and saves state
+      controls.preserveSession()
+      logDebug("AIChatContent", "Session preserved on close")
     }
-    // Don't call cancelSession() - component unmounts on drawer close
-    // and calling it would set state to "idle" which triggers auto-start
     onClose?.()
   }, [checkIn.isActive, controls, onClose])
 
