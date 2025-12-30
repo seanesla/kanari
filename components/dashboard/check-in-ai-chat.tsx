@@ -105,17 +105,22 @@ export function AIChatContent({
 
   // Handle discard request from parent (drawer)
   // When requestDiscard becomes true, cancel the session and signal back
+  // IMPORTANT: Set sessionStartedRef.current = true BEFORE cancelSession()
+  // to prevent the auto-start effect from starting a new session when
+  // cancelSession() resets state to "idle"
   useEffect(() => {
     if (requestDiscard) {
+      sessionStartedRef.current = true  // Prevent auto-start
       controls.cancelSession()
       onDiscardComplete?.()
     }
   }, [requestDiscard, controls, onDiscardComplete])
 
-  // Reset the started flag when session ends or aborts
-  // This must run BEFORE the auto-start effect so abort recovery works correctly.
-  // When INITIALIZATION_ABORTED happens (e.g., React StrictMode cleanup), the
-  // session resets to "idle" state - resetting the flag allows the second mount to retry.
+  // Reset the started flag when session completes, errors, or resets to idle
+  // This allows retry after errors and fresh start after completion
+  // Also reset on "idle" to handle StrictMode's double-mount - when first mount
+  // aborts with INITIALIZATION_ABORTED and dispatches RESET, the second mount
+  // needs sessionStartedRef to be false so auto-start can fire again
   useEffect(() => {
     if (checkIn.state === "idle" || checkIn.state === "complete" || checkIn.state === "error") {
       sessionStartedRef.current = false
@@ -146,8 +151,8 @@ export function AIChatContent({
       // End the session, which triggers onSessionEnd callback
       await controls.endSession()
     }
-    // Reset to idle state for clean re-open later
-    controls.cancelSession()
+    // Don't call cancelSession() - component unmounts on drawer close
+    // and calling it would set state to "idle" which triggers auto-start
     onClose?.()
   }, [checkIn.isActive, controls, onClose])
 
@@ -182,6 +187,23 @@ export function AIChatContent({
     <div className="flex flex-col h-full overflow-hidden">
       {/* Main content area with animated state transitions */}
       <AnimatePresence mode="wait">
+
+        {/* ===== IDLE STATE ===== */}
+        {/* Brief loading state while auto-start effect kicks in */}
+        {checkIn.state === "idle" && (
+          <motion.div
+            key="idle"
+            className="flex-1 flex flex-col items-center justify-center gap-6 p-8"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <VoiceIndicatorLarge state="idle" audioLevel={0} />
+            <p className="text-sm text-muted-foreground text-center">
+              Starting AI check-in...
+            </p>
+          </motion.div>
+        )}
 
         {/* ===== INITIALIZING STATE ===== */}
         {/* Shown while connecting to Gemini Live API */}

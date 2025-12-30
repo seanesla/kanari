@@ -606,7 +606,7 @@ export class GeminiLiveClient {
     // Note: outputTranscription.finished indicates when transcription is complete
     // This is INDEPENDENT of turnComplete - they can arrive in any order
     const outputTranscription = content.outputTranscription as { text?: string; finished?: boolean } | undefined
-    if (outputTranscription) {
+    if (outputTranscription?.text) {
       this.config.events.onModelTranscript?.(
         outputTranscription.text ?? "",
         outputTranscription.finished ?? false
