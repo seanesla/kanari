@@ -180,6 +180,17 @@ export class GeminiLiveClient {
       }
 
       const session: SessionInfo = await response.json()
+      console.log("[GeminiLive] Received session:", JSON.stringify(session))
+
+      // Validate session response has required fields
+      if (!session.sessionId || !session.streamUrl || !session.secret) {
+        const missing = []
+        if (!session.sessionId) missing.push('sessionId')
+        if (!session.streamUrl) missing.push('streamUrl')
+        if (!session.secret) missing.push('secret')
+        throw new Error(`Invalid session response: missing ${missing.join(', ')}`)
+      }
+
       this.sessionId = session.sessionId
       this.streamUrl = session.streamUrl
       this.audioUrl = session.audioUrl

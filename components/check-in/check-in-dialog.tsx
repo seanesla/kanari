@@ -274,7 +274,7 @@ export function CheckInDialog({
                       ` • ${checkIn.mismatchCount} voice patterns noted`}
                   </p>
                 </div>
-                <Button onClick={() => onOpenChange(false)}>Done</Button>
+                <Button onClick={handleClose}>Done</Button>
               </motion.div>
             )}
           </AnimatePresence>

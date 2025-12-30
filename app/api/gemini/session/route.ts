@@ -75,12 +75,14 @@ export async function POST(
 
     // Return session info including secret for client authentication
     const baseUrl = request.nextUrl.origin
-    return NextResponse.json({
+    const responseData = {
       sessionId,
       streamUrl: `${baseUrl}/api/gemini/live/stream?sessionId=${sessionId}`,
       audioUrl: `${baseUrl}/api/gemini/live/audio`,
       secret,
-    })
+    }
+    console.log(`[Gemini Session] Response data:`, JSON.stringify(responseData))
+    return NextResponse.json(responseData)
   } catch (error) {
     // Log sanitized error
     const errorMessage = error instanceof Error ? error.message : "Unknown error"
