@@ -79,8 +79,8 @@ export function StepWelcome({ onNext }: StepWelcomeProps) {
               // Subtle accent glow on hover via CSS variable
               ["--hover-glow" as string]: `0 0 20px ${accentColor}20`,
             }}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 20, boxShadow: "0 0 0px transparent, 0 0px 0px transparent" }}
+            animate={{ opacity: 1, y: 0, boxShadow: "0 0 0px transparent, 0 0px 0px transparent" }}
             transition={{ delay: 0.4 + i * 0.1, type: "spring", stiffness: 300, damping: 25 }}
             whileHover={{
               scale: 1.02,

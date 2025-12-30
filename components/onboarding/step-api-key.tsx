@@ -143,8 +143,8 @@ export function StepApiKey({ initialApiKey = "", onNext, onBack }: StepApiKeyPro
         {/* Help text */}
         <motion.div
           className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm space-y-2 transition-colors hover:border-accent/30"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0, y: 10, boxShadow: "0 0 0px transparent" }}
+          animate={{ opacity: 1, y: 0, boxShadow: "0 0 0px transparent" }}
           transition={{ delay: 0.4, type: "spring", stiffness: 300, damping: 25 }}
           whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
         >

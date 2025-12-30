@@ -4,10 +4,14 @@
  * Complete Step
  *
  * Final step showing success and redirecting to dashboard.
+ *
+ * NOTE: This component is rendered inside a Three.js Html portal, which
+ * creates a separate React tree without access to Next.js App Router context.
+ * Navigation must be passed as a prop from the parent (OnboardingPage).
+ * See: docs/error-patterns/portal-children-context.md
  */
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { CheckCircle2, Sparkles, ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -15,17 +19,17 @@ import { useSceneMode } from "@/lib/scene-context"
 
 interface StepCompleteProps {
   onComplete: () => Promise<void>
+  onNavigate: () => void
 }
 
-export function StepComplete({ onComplete }: StepCompleteProps) {
-  const router = useRouter()
+export function StepComplete({ onComplete, onNavigate }: StepCompleteProps) {
   const { accentColor } = useSceneMode()
   const [isCompleting, setIsCompleting] = useState(false)
 
   const handleEnterDashboard = async () => {
     setIsCompleting(true)
     await onComplete()
-    router.push("/dashboard")
+    onNavigate()
   }
 
   return (
@@ -70,8 +74,8 @@ export function StepComplete({ onComplete }: StepCompleteProps) {
       {/* Tips */}
       <motion.div
         className="p-6 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm text-left max-w-md mx-auto transition-colors hover:border-accent/30"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: 20, boxShadow: "0 0 0px transparent" }}
+        animate={{ opacity: 1, y: 0, boxShadow: "0 0 0px transparent" }}
         transition={{ delay: 0.5, type: "spring", stiffness: 300, damping: 25 }}
         whileHover={{ boxShadow: `0 0 25px ${accentColor}15` }}
       >

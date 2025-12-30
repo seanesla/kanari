@@ -95,7 +95,7 @@ export default function OnboardingPage() {
       />
 
       {/* Panel 4: Complete */}
-      <StepComplete onComplete={handleComplete} />
+      <StepComplete onComplete={handleComplete} onNavigate={() => router.push("/dashboard")} />
     </Onboarding3DScene>
   )
 }

@@ -22,8 +22,8 @@ export const PANEL_POSITIONS: [number, number, number][] = [
   [0, 0, -56],     // Complete
 ]
 
-// Camera sits in front of each panel
-const CAMERA_DISTANCE = 5
+// Camera sits in front of each panel (closer = more intimate feel)
+const CAMERA_DISTANCE = 3.5
 
 interface FlyingCameraProps {
   currentStep: number

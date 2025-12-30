@@ -3,8 +3,11 @@
 /**
  * Floating Panel Component
  *
- * A 3D panel that floats in space with React content inside.
+ * A minimal 3D panel that floats in space with React content inside.
  * Uses Drei's Html component with transform for true 3D positioning.
+ *
+ * Design: Ethereal/minimal - no solid background planes. Content floats
+ * freely in space with just the glassmorphic card styling from step components.
  *
  * IMPORTANT: Html creates a React DOM portal outside the R3F reconciler.
  * We need useContextBridge to pass React context INTO the Html portal.
@@ -15,7 +18,7 @@
  */
 
 import { Html, Float, useContextBridge } from "@react-three/drei"
-import { useSceneMode, SceneContext } from "@/lib/scene-context"
+import { SceneContext } from "@/lib/scene-context"
 
 interface FloatingPanelProps {
   position: [number, number, number]
@@ -24,7 +27,6 @@ interface FloatingPanelProps {
 }
 
 export function FloatingPanel({ position, children, isActive }: FloatingPanelProps) {
-  const { accentColor } = useSceneMode()
   // Bridge context INTO the Html portal (separate from Canvas bridge)
   const ContextBridge = useContextBridge(SceneContext)
 
@@ -35,31 +37,7 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
       floatIntensity={isActive ? 0.4 : 0.2}
     >
       <group position={position}>
-        {/* Glowing backdrop plane */}
-        <mesh position={[0, 0, -0.05]}>
-          <planeGeometry args={[5.5, 4.5]} />
-          <meshStandardMaterial
-            color={isActive ? "#1a1a2e" : "#0d0d15"}
-            emissive={isActive ? accentColor : "#000000"}
-            emissiveIntensity={isActive ? 0.15 : 0}
-            transparent
-            opacity={isActive ? 0.85 : 0.2}
-          />
-        </mesh>
-
-        {/* Border glow for active panel */}
-        {isActive && (
-          <mesh position={[0, 0, -0.06]}>
-            <planeGeometry args={[5.7, 4.7]} />
-            <meshBasicMaterial
-              color={accentColor}
-              transparent
-              opacity={0.3}
-            />
-          </mesh>
-        )}
-
-        {/* Actual React content - ContextBridge passes context into Html portal */}
+        {/* React content floats freely - no solid background planes */}
         <Html
           transform
           distanceFactor={1.15}
