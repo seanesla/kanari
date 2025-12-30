@@ -401,6 +401,11 @@ export function useCheckIn(
   // the stream obtained from getUserMedia should be stopped immediately
   const cleanupRequestedRef = useRef(false)
 
+  // Counter to track current initialization. If multiple initializations overlap
+  // (e.g., due to Fast Refresh), only the most recent one should proceed.
+  // Older initializations will see a different ID and abort.
+  const initializationIdRef = useRef(0)
+
   // Track the last user message ID for updating with features
   const lastUserMessageIdRef = useRef<string | null>(null)
 
@@ -705,6 +710,17 @@ export function useCheckIn(
   // ========================================
 
   const initializeAudioCapture = useCallback(async () => {
+    // Capture the current initialization ID - if this changes during async operations,
+    // it means a newer initialization has started and we should abort
+    const currentInitId = ++initializationIdRef.current
+
+    // Helper to check abort reason
+    const getAbortReason = (): "cleanup" | "superseded" | null => {
+      if (cleanupRequestedRef.current) return "cleanup"
+      if (initializationIdRef.current !== currentInitId) return "superseded"
+      return null
+    }
+
     try {
       // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -716,12 +732,13 @@ export function useCheckIn(
         },
       })
 
-      // Check if cleanup was requested while we were waiting for getUserMedia
-      // This handles the race condition where component unmounts during async initialization
-      if (cleanupRequestedRef.current) {
-        console.log("[useCheckIn] Cleanup requested during getUserMedia, stopping stream immediately")
+      // Check if we should abort after getUserMedia resolved
+      const abortReason = getAbortReason()
+      if (abortReason) {
+        console.log(`[useCheckIn] Initialization aborted after getUserMedia (${abortReason})`)
         stream.getTracks().forEach((track) => track.stop())
-        throw new Error("INITIALIZATION_ABORTED")
+        // Use different error for superseded vs cleanup
+        throw new Error(abortReason === "superseded" ? "SESSION_SUPERSEDED" : "INITIALIZATION_ABORTED")
       }
 
       mediaStreamRef.current = stream
@@ -735,12 +752,20 @@ export function useCheckIn(
         await audioContext.resume()
       }
 
-      // Abort if context was closed during resume (e.g., React StrictMode unmount)
-      // Note: TypeScript's AudioContextState type is outdated and doesn't include "closed",
-      // but the Web Audio API spec includes it: https://webaudio.github.io/web-audio-api/#dom-audiocontextstate
+      // Check abort conditions after resume
+      const abortAfterResume = getAbortReason()
+      if (abortAfterResume) {
+        console.log(`[useCheckIn] Initialization aborted after audioContext.resume (${abortAfterResume})`)
+        stream.getTracks().forEach((track) => track.stop())
+        mediaStreamRef.current = null
+        audioContext.close()
+        audioContextRef.current = null
+        throw new Error(abortAfterResume === "superseded" ? "SESSION_SUPERSEDED" : "INITIALIZATION_ABORTED")
+      }
+
+      // Also check if context was closed (e.g., by cleanup running during resume)
       if ((audioContext.state as string) === "closed") {
         console.log("[useCheckIn] AudioContext closed during initialization, aborting")
-        // Clean up the stream we just created
         stream.getTracks().forEach((track) => track.stop())
         mediaStreamRef.current = null
         throw new Error("INITIALIZATION_ABORTED")
@@ -749,10 +774,20 @@ export function useCheckIn(
       // Load capture worklet
       await audioContext.audioWorklet.addModule("/capture.worklet.js")
 
-      // Abort if context was closed during module loading
+      // Check abort conditions after module loading
+      const abortAfterModule = getAbortReason()
+      if (abortAfterModule) {
+        console.log(`[useCheckIn] Initialization aborted after addModule (${abortAfterModule})`)
+        stream.getTracks().forEach((track) => track.stop())
+        mediaStreamRef.current = null
+        audioContext.close()
+        audioContextRef.current = null
+        throw new Error(abortAfterModule === "superseded" ? "SESSION_SUPERSEDED" : "INITIALIZATION_ABORTED")
+      }
+
+      // Also check if context was closed during module loading
       if ((audioContext.state as string) === "closed") {
         console.log("[useCheckIn] AudioContext closed during module loading, aborting")
-        // Clean up the stream we just created
         stream.getTracks().forEach((track) => track.stop())
         mediaStreamRef.current = null
         throw new Error("INITIALIZATION_ABORTED")
@@ -802,6 +837,11 @@ export function useCheckIn(
 
       captureWorkletRef.current = captureWorklet
     } catch (error) {
+      // Re-throw abort errors directly so startSession can handle them appropriately
+      if (error instanceof Error &&
+          (error.message === "INITIALIZATION_ABORTED" || error.message === "SESSION_SUPERSEDED")) {
+        throw error
+      }
       throw new Error(
         `Failed to initialize audio capture: ${error instanceof Error ? error.message : "Unknown error"}`
       )
@@ -910,6 +950,16 @@ export function useCheckIn(
           }
           // Reset to idle so second mount can try again
           dispatch({ type: "RESET" })
+          return
+        }
+
+        // SESSION_SUPERSEDED means a newer session started while this one was initializing.
+        // Just silently exit - the new session is handling things now.
+        // DON'T dispatch RESET or it will trigger auto-start and create an infinite loop.
+        if (err.message === "SESSION_SUPERSEDED") {
+          console.log("[useCheckIn] Session superseded by newer initialization")
+          // Don't cleanup - the new session owns the resources now
+          // Don't dispatch anything - let the new session handle state
           return
         }
 
