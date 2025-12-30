@@ -14,9 +14,9 @@ import { GoogleGenAI, Modality, ApiError } from "@google/genai"
 // Model for conversational check-in with native audio
 const LIVE_API_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
 
-// WebSocket endpoint for Gemini Live API
+// WebSocket endpoint for Gemini Live API (v1alpha to match ephemeral token API version)
 const LIVE_API_WS_URL =
-  "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+  "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent"
 
 interface SessionResponse {
   token: string
