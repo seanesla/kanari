@@ -179,9 +179,9 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-4 md:px-8 lg:px-16 xl:px-20 pt-28 pb-12 relative z-10">
-        {/* Header */}
-        <div className="relative mb-12 overflow-hidden rounded-lg p-6">
+      <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
+        {/* Header - min-h-[200px]: ensures consistent grid fade appearance across all dashboard pages */}
+        <div className="relative mb-12 overflow-hidden rounded-lg p-6 min-h-[200px] flex items-center">
           <DecorativeGrid />
           <div
             className={cn(

@@ -11,8 +11,9 @@ interface DashboardHeroProps {
  * Hero section for the dashboard with animated title and decorative grid
  */
 export function DashboardHero({ visible }: DashboardHeroProps) {
+  // min-h-[200px]: ensures consistent grid fade appearance across all dashboard pages
   return (
-    <div className="relative mb-12 overflow-hidden rounded-lg p-6">
+    <div className="relative mb-12 overflow-hidden rounded-lg p-6 min-h-[200px] flex items-center">
       <DecorativeGrid />
       <div
         className={cn(

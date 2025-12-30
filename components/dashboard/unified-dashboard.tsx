@@ -106,7 +106,7 @@ export function UnifiedDashboard() {
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-4 md:px-8 lg:px-12 pt-24 pb-12 relative z-10">
+      <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
         <DashboardHero visible={visible} />
 
         {/* Metrics Header */}
