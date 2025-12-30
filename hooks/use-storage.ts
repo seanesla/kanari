@@ -391,7 +391,26 @@ export function useCheckInSessionActions() {
     await db.checkInSessions.delete(id)
   }, [])
 
-  return { addCheckInSession, updateCheckInSession, deleteCheckInSession }
+  /**
+   * Delete all check-in sessions that have 0 messages.
+   * These are leftovers from sessions that were started but never used.
+   * Returns the number of deleted sessions.
+   */
+  const deleteEmptyCheckInSessions = useCallback(async () => {
+    const allSessions = await db.checkInSessions.toArray()
+    const emptySessionIds = allSessions
+      .filter(session => !session.messages || session.messages.length === 0)
+      .map(session => session.id)
+
+    if (emptySessionIds.length > 0) {
+      await db.checkInSessions.bulkDelete(emptySessionIds)
+      console.log(`[Storage] Deleted ${emptySessionIds.length} empty check-in sessions`)
+    }
+
+    return emptySessionIds.length
+  }, [])
+
+  return { addCheckInSession, updateCheckInSession, deleteCheckInSession, deleteEmptyCheckInSessions }
 }
 
 // ===========================================

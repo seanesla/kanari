@@ -163,13 +163,19 @@ export function AIChatContent({
   }, [checkIn.isActive, controls, onClose])
 
   // Handle user clicking the "end call" button
-  // This triggers the drawer's close flow, which will show the confirmation dialog
-  const handleEndCall = useCallback(() => {
-    // Don't end the session here - let the dialog flow handle it
-    // If user confirms "Discard", cancelSession() will be called via requestDiscard
-    // If user clicks "Keep Going", they return to the active session
-    onClose?.()
-  }, [onClose])
+  // Behavior depends on whether the user has spoken:
+  // - If messages exist: end session gracefully (saves to DB, shows complete screen)
+  // - If no messages: show discard dialog (nothing worth saving)
+  const handleEndCall = useCallback(async () => {
+    if (checkIn.messages.length > 0) {
+      // User has spoken - end session gracefully
+      // This saves the session and transitions to "complete" state
+      await controls.endSession()
+    } else {
+      // No messages yet - show discard confirmation dialog
+      onClose?.()
+    }
+  }, [checkIn.messages.length, controls, onClose])
 
   // Determine which UI state to show based on checkIn.state
   // These states come from the useCheckIn hook's state machine
