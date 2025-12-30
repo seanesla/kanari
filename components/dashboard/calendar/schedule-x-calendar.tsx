@@ -1,14 +1,22 @@
 'use client'
 
 import { useEffect, useMemo, useState, useRef, useCallback } from 'react'
+import { Temporal } from 'temporal-polyfill'
 import { useNextCalendarApp, ScheduleXCalendar } from '@schedule-x/react'
-import { createViewWeek } from '@schedule-x/calendar'
+import { createViewWeek, type CalendarEvent } from '@schedule-x/calendar'
 import { createEventsServicePlugin } from '@schedule-x/events-service'
 import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop'
 import { cn } from '@/lib/utils'
 import type { Suggestion } from '@/lib/types'
 import '@schedule-x/theme-default/dist/index.css'
 import './schedule-x-theme.css'
+
+// Extended event type with custom suggestion data
+// Source: Context7 - schedule-x/schedule-x docs - CalendarEvent allows [key: string]: any
+interface SuggestionEvent extends CalendarEvent {
+  _suggestion: Suggestion
+  _isCompleted?: boolean
+}
 
 interface ScheduleXWeekCalendarProps {
   scheduledSuggestions: Suggestion[]
@@ -22,7 +30,7 @@ interface ScheduleXWeekCalendarProps {
 }
 
 // Helper to map Suggestion to Schedule-X event format
-function suggestionToEvent(suggestion: Suggestion) {
+function suggestionToEvent(suggestion: Suggestion): SuggestionEvent | null {
   if (!suggestion.scheduledFor) return null
 
   // Schedule-X requires ZonedDateTime for timed events (not PlainDateTime)
@@ -45,12 +53,12 @@ function suggestionToEvent(suggestion: Suggestion) {
     start: startDateTime,
     end: endDateTime,
     calendarId: suggestion.category,
-    _suggestion: suggestion, // Store full suggestion for callbacks
+    _suggestion: suggestion,
   }
 }
 
 // Helper to map completed suggestion to faded event
-function completedToEvent(suggestion: Suggestion) {
+function completedToEvent(suggestion: Suggestion): SuggestionEvent | null {
   if (!suggestion.scheduledFor) return null
 
   const timeZone = Temporal.Now.timeZoneId()
@@ -185,9 +193,10 @@ export function ScheduleXWeekCalendar({
     plugins: [eventsService, createDragAndDropPlugin()],
     callbacks: {
       onEventClick(calendarEvent) {
-        const suggestion = (calendarEvent as any)._suggestion as Suggestion
-        if (suggestion && onEventClick) {
-          onEventClick(suggestion)
+        // CalendarEvent has [key: string]: any, so we can access _suggestion directly
+        const event = calendarEvent as SuggestionEvent
+        if (event._suggestion && onEventClick) {
+          onEventClick(event._suggestion)
         }
       },
       onClickDateTime(dateTime) {
@@ -199,12 +208,13 @@ export function ScheduleXWeekCalendar({
         }
       },
       onEventUpdate(updatedEvent) {
-        const suggestion = (updatedEvent as any)._suggestion as Suggestion
-        if (suggestion && onEventUpdate) {
+        // CalendarEvent has [key: string]: any, so we can access _suggestion directly
+        const event = updatedEvent as SuggestionEvent
+        if (event._suggestion && onEventUpdate) {
           // Convert Temporal.ZonedDateTime to ISO string (UTC)
           const zdt = updatedEvent.start as Temporal.ZonedDateTime
           const newScheduledFor = zdt.toInstant().toString()
-          onEventUpdate(suggestion, newScheduledFor)
+          onEventUpdate(event._suggestion, newScheduledFor)
         }
       },
     },
@@ -219,20 +229,19 @@ export function ScheduleXWeekCalendar({
 
     const scheduledEvents = scheduledSuggestions
       .map(suggestionToEvent)
-      .filter(Boolean) as any[]
+      .filter((event): event is SuggestionEvent => event !== null)
 
     const completedEvents = completedSuggestions
       .map(completedToEvent)
-      .filter(Boolean) as any[]
+      .filter((event): event is SuggestionEvent => event !== null)
 
-    const allEvents = [...scheduledEvents, ...completedEvents]
+    const allEvents: SuggestionEvent[] = [...scheduledEvents, ...completedEvents]
 
     // Use try-catch as the plugin may not be fully initialized on first render
     try {
       eventsService.set(allEvents)
-    } catch (e) {
+    } catch {
       // Calendar not fully mounted yet, will retry on next render
-      console.debug('Schedule-X: Calendar not ready, deferring event sync')
     }
   }, [scheduledSuggestions, completedSuggestions, eventsService, calendar])
 
