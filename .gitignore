@@ -41,9 +41,6 @@ next-env.d.ts
 coverage/
 .nyc_output/
 
-# Claude Code
-CLAUDE.md
-
 # Misc
 *.log
 *.pid
