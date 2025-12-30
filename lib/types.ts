@@ -29,6 +29,10 @@ export interface AudioFeatures {
   pauseRatio: number // Ratio of silence to speech
   pauseCount: number
   avgPauseDuration: number // milliseconds
+  // Pitch features (F0 analysis)
+  pitchMean: number // Mean fundamental frequency in Hz
+  pitchStdDev: number // Pitch variability (higher = stress indicator)
+  pitchRange: number // Max - Min pitch (low = monotone = fatigue indicator)
 }
 
 // ============================================

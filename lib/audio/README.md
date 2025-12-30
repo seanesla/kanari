@@ -98,6 +98,7 @@ Acoustic feature extraction using Meyda.
 - **Spectral:** MFCCs (13 coefficients), spectral centroid, flux, rolloff
 - **Energy:** RMS, zero-crossing rate
 - **Temporal:** Speech rate, pause ratio, pause count, average pause duration
+- **Pitch:** Mean F0, pitch standard deviation, pitch range (via YIN algorithm)
 
 **Usage:**
 ```typescript
@@ -121,6 +122,9 @@ console.log(features)
 //   pauseRatio: 0.35,
 //   pauseCount: 12,
 //   avgPauseDuration: 450.3,
+//   pitchMean: 165.2,      // Mean F0 in Hz
+//   pitchStdDev: 23.4,     // Pitch variability
+//   pitchRange: 87.6,      // Max - Min pitch
 // }
 ```
 
@@ -129,6 +133,7 @@ console.log(features)
 - RMS-based voice activity for temporal features
 - Energy peak detection for speech rate estimation
 - MFCC aggregation via mean across frames
+- YIN algorithm for fundamental frequency (pitch) detection
 
 ### 4. `processor.ts`
 
@@ -276,10 +281,9 @@ See `app/dashboard/record/page.tsx` for complete integration example.
 **Requirements:**
 - `navigator.mediaDevices.getUserMedia`
 - `AudioContext`
-- `ScriptProcessorNode` (deprecated but widely supported)
+- `AudioWorkletNode` (modern API, replaces deprecated ScriptProcessorNode)
 
 **Future:**
-- Replace `ScriptProcessorNode` with `AudioWorklet` for better performance
 - Consider using `NonRealTimeVAD` for offline processing
 
 ## Performance
@@ -310,16 +314,14 @@ All processing happens **client-side**:
 1. **VAD Accuracy:** Energy-based fallback is less accurate than Silero
 2. **Speech Rate:** Proxy-based estimation (energy peaks ≠ syllables)
 3. **Resampling:** Linear interpolation (good enough, not perfect)
-4. **ScriptProcessorNode:** Deprecated (but replacement not widely supported yet)
 
 ## Future Improvements
 
-1. Replace ScriptProcessorNode with AudioWorklet
-2. Add pitch/formant extraction
-3. Improve speech rate algorithm (use proper syllable detection)
-4. Add real-time feature visualization
-5. Support stereo input (currently mono only)
-6. Add audio preprocessing (noise reduction, normalization)
+1. Add formant extraction (F1-F3)
+2. Improve speech rate algorithm (use proper syllable detection)
+3. Add real-time feature visualization
+4. Support stereo input (currently mono only)
+5. Add audio preprocessing (noise reduction, normalization)
 
 ## Testing
 

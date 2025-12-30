@@ -13,6 +13,11 @@ const DEFAULT_SAMPLE_RATE = 16000
 const DEFAULT_BUFFER_SIZE = 512
 const DEFAULT_HOP_SIZE = 256
 
+// Pitch detection constants
+const YIN_THRESHOLD = 0.15 // Confidence threshold for pitch detection
+const MIN_PITCH_HZ = 50 // Minimum detectable pitch (low male voice)
+const MAX_PITCH_HZ = 500 // Maximum detectable pitch (high female voice)
+
 /**
  * Extract audio features from raw audio data using Meyda
  */
@@ -50,6 +55,9 @@ export class FeatureExtractor {
     // Extract temporal features (speech rate, pauses)
     const temporalFeatures = this.extractTemporalFeatures(audioData, frameFeatures.rms)
 
+    // Extract pitch features using YIN algorithm
+    const pitchFeatures = this.extractPitchFeatures(audioData)
+
     return {
       mfcc,
       spectralCentroid,
@@ -58,6 +66,7 @@ export class FeatureExtractor {
       rms,
       zcr,
       ...temporalFeatures,
+      ...pitchFeatures,
     }
   }
 
@@ -282,6 +291,113 @@ export class FeatureExtractor {
   private mean(values: number[]): number {
     if (values.length === 0) return 0
     return values.reduce((sum, val) => sum + val, 0) / values.length
+  }
+
+  /**
+   * Calculate standard deviation of array
+   */
+  private stdDev(values: number[]): number {
+    if (values.length < 2) return 0
+    const avg = this.mean(values)
+    const squaredDiffs = values.map((v) => (v - avg) ** 2)
+    return Math.sqrt(this.mean(squaredDiffs))
+  }
+
+  /**
+   * YIN pitch detection algorithm
+   * Returns fundamental frequency in Hz, or null if unvoiced/uncertain
+   */
+  private extractPitch(frame: Float32Array): number | null {
+    const halfLength = Math.floor(frame.length / 2)
+
+    // Compute min/max lags based on pitch range
+    const minLag = Math.floor(this.sampleRate / MAX_PITCH_HZ)
+    const maxLag = Math.min(halfLength, Math.floor(this.sampleRate / MIN_PITCH_HZ))
+
+    if (maxLag <= minLag) return null
+
+    // Step 1: Compute difference function d(τ)
+    const diff = new Float32Array(maxLag + 1)
+    for (let tau = 1; tau <= maxLag; tau++) {
+      let sum = 0
+      for (let j = 0; j < halfLength; j++) {
+        const delta = frame[j] - frame[j + tau]
+        sum += delta * delta
+      }
+      diff[tau] = sum
+    }
+
+    // Step 2: Compute cumulative mean normalized difference d'(τ)
+    const cmndf = new Float32Array(maxLag + 1)
+    cmndf[0] = 1
+    let runningSum = 0
+    for (let tau = 1; tau <= maxLag; tau++) {
+      runningSum += diff[tau]
+      cmndf[tau] = runningSum > 0 ? (diff[tau] * tau) / runningSum : 1
+    }
+
+    // Step 3: Absolute threshold - find first dip below threshold
+    let bestTau = -1
+    for (let tau = minLag; tau <= maxLag; tau++) {
+      if (cmndf[tau] < YIN_THRESHOLD) {
+        // Find local minimum
+        while (tau + 1 <= maxLag && cmndf[tau + 1] < cmndf[tau]) {
+          tau++
+        }
+        bestTau = tau
+        break
+      }
+    }
+
+    if (bestTau === -1) return null
+
+    // Step 4: Parabolic interpolation for sub-sample accuracy
+    if (bestTau > 0 && bestTau < maxLag) {
+      const s0 = cmndf[bestTau - 1]
+      const s1 = cmndf[bestTau]
+      const s2 = cmndf[bestTau + 1]
+      const adjustment = (s2 - s0) / (2 * (2 * s1 - s2 - s0))
+      if (Math.abs(adjustment) < 1) {
+        bestTau = bestTau + adjustment
+      }
+    }
+
+    // Convert lag to frequency
+    const pitch = this.sampleRate / bestTau
+    return pitch >= MIN_PITCH_HZ && pitch <= MAX_PITCH_HZ ? pitch : null
+  }
+
+  /**
+   * Extract pitch features across all frames
+   */
+  private extractPitchFeatures(audioData: Float32Array): {
+    pitchMean: number
+    pitchStdDev: number
+    pitchRange: number
+  } {
+    const pitchValues: number[] = []
+    const numFrames = Math.floor((audioData.length - this.bufferSize) / this.hopSize) + 1
+
+    for (let i = 0; i < numFrames; i++) {
+      const start = i * this.hopSize
+      const end = start + this.bufferSize
+      const frame = audioData.slice(start, end)
+
+      const pitch = this.extractPitch(frame)
+      if (pitch !== null) {
+        pitchValues.push(pitch)
+      }
+    }
+
+    if (pitchValues.length === 0) {
+      return { pitchMean: 0, pitchStdDev: 0, pitchRange: 0 }
+    }
+
+    const pitchMean = this.mean(pitchValues)
+    const pitchStdDev = this.stdDev(pitchValues)
+    const pitchRange = Math.max(...pitchValues) - Math.min(...pitchValues)
+
+    return { pitchMean, pitchStdDev, pitchRange }
   }
 }
 

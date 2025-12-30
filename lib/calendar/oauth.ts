@@ -232,36 +232,170 @@ export function isTokenExpired(tokens: OAuthTokens): boolean {
 }
 
 // ============================================
-// Token Storage (localStorage with optional encryption)
+// Token Storage (localStorage with AES-GCM encryption)
 // ============================================
 
 const STORAGE_KEY = "kanari_calendar_tokens"
+const KEY_DB_NAME = "kanari_crypto"
+const KEY_STORE_NAME = "keys"
+const ENCRYPTION_KEY_ID = "token_encryption_key"
 
 /**
- * Store tokens in localStorage
- * TODO: Add encryption using Web Crypto API (AES-GCM)
+ * Open IndexedDB for key storage
  */
-export function storeTokens(tokens: OAuthTokens): void {
+function openKeyDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(KEY_DB_NAME, 1)
+
+    request.onerror = () => reject(new Error("Failed to open key database"))
+
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result
+      if (!db.objectStoreNames.contains(KEY_STORE_NAME)) {
+        db.createObjectStore(KEY_STORE_NAME, { keyPath: "id" })
+      }
+    }
+
+    request.onsuccess = (event) => {
+      resolve((event.target as IDBOpenDBRequest).result)
+    }
+  })
+}
+
+/**
+ * Get or create AES-GCM encryption key
+ * Key is stored in IndexedDB (CryptoKey can't be JSON serialized)
+ */
+async function getOrCreateEncryptionKey(): Promise<CryptoKey> {
+  const db = await openKeyDatabase()
+
+  // Try to get existing key
+  const existingKey = await new Promise<CryptoKey | null>((resolve, reject) => {
+    const tx = db.transaction(KEY_STORE_NAME, "readonly")
+    const store = tx.objectStore(KEY_STORE_NAME)
+    const request = store.get(ENCRYPTION_KEY_ID)
+
+    request.onerror = () => reject(new Error("Failed to retrieve key"))
+    request.onsuccess = () => {
+      const result = request.result
+      resolve(result ? result.key : null)
+    }
+  })
+
+  if (existingKey) {
+    db.close()
+    return existingKey
+  }
+
+  // Generate new key
+  const newKey = await crypto.subtle.generateKey(
+    { name: "AES-GCM", length: 256 },
+    false, // Not extractable for security
+    ["encrypt", "decrypt"]
+  )
+
+  // Store the key
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(KEY_STORE_NAME, "readwrite")
+    const store = tx.objectStore(KEY_STORE_NAME)
+    const request = store.put({ id: ENCRYPTION_KEY_ID, key: newKey })
+
+    request.onerror = () => reject(new Error("Failed to store key"))
+    request.onsuccess = () => resolve()
+  })
+
+  db.close()
+  return newKey
+}
+
+/**
+ * Encrypt tokens using AES-GCM
+ */
+async function encryptTokens(tokens: OAuthTokens): Promise<string> {
+  const key = await getOrCreateEncryptionKey()
+  const iv = crypto.getRandomValues(new Uint8Array(12))
+  const encoded = new TextEncoder().encode(JSON.stringify(tokens))
+
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encoded
+  )
+
+  // Combine IV + ciphertext and base64 encode
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength)
+  combined.set(iv, 0)
+  combined.set(new Uint8Array(ciphertext), iv.length)
+
+  return btoa(String.fromCharCode(...combined))
+}
+
+/**
+ * Decrypt tokens using AES-GCM
+ */
+async function decryptTokens(encrypted: string): Promise<OAuthTokens> {
+  const key = await getOrCreateEncryptionKey()
+
+  // Decode base64 and split IV + ciphertext
+  const combined = Uint8Array.from(atob(encrypted), (c) => c.charCodeAt(0))
+  const iv = combined.slice(0, 12)
+  const ciphertext = combined.slice(12)
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    ciphertext
+  )
+
+  return JSON.parse(new TextDecoder().decode(decrypted))
+}
+
+/**
+ * Check if stored data is encrypted (base64) or plain JSON
+ */
+function isEncrypted(data: string): boolean {
+  try {
+    JSON.parse(data)
+    return false // Valid JSON = not encrypted
+  } catch {
+    return true // Not valid JSON = likely encrypted
+  }
+}
+
+/**
+ * Store tokens in localStorage with AES-GCM encryption
+ */
+export async function storeTokens(tokens: OAuthTokens): Promise<void> {
   if (typeof window === "undefined") return
 
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(tokens))
+    const encrypted = await encryptTokens(tokens)
+    localStorage.setItem(STORAGE_KEY, encrypted)
   } catch (error) {
     console.error("Failed to store tokens:", error)
   }
 }
 
 /**
- * Retrieve tokens from localStorage
+ * Retrieve tokens from localStorage with decryption
+ * Handles migration from unencrypted to encrypted storage
  */
-export function getStoredTokens(): OAuthTokens | null {
+export async function getStoredTokens(): Promise<OAuthTokens | null> {
   if (typeof window === "undefined") return null
 
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (!stored) return null
 
-    return JSON.parse(stored)
+    // Handle migration: if plain JSON, decrypt fails, re-encrypt
+    if (!isEncrypted(stored)) {
+      // Legacy unencrypted data - migrate to encrypted
+      const tokens = JSON.parse(stored) as OAuthTokens
+      await storeTokens(tokens) // Re-store encrypted
+      return tokens
+    }
+
+    return await decryptTokens(stored)
   } catch (error) {
     console.error("Failed to retrieve tokens:", error)
     return null
