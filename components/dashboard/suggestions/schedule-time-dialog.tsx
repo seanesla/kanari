@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useRef } from "react"
 import { Clock, CalendarPlus, Coffee, Dumbbell, Brain, Users, Moon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -12,7 +12,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
+import { createDatePicker } from "@schedule-x/date-picker"
+import "@schedule-x/theme-default/dist/date-picker.css"
 import {
   Select,
   SelectContent,
@@ -78,6 +79,48 @@ export function ScheduleTimeDialog({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
   const [selectedHour, setSelectedHour] = useState<string>("9")
   const [selectedMinute, setSelectedMinute] = useState<string>("0")
+  const datePickerRef = useRef<HTMLDivElement>(null)
+  const datePickerInstanceRef = useRef<any>(null)
+
+  // Initialize Schedule-X date picker
+  useEffect(() => {
+    if (!datePickerRef.current || !open) return
+
+    // Get today's date in YYYY-MM-DD format
+    const now = new Date()
+    const today = now.toISOString().split('T')[0]
+
+    const datePicker = createDatePicker({
+      locale: 'en-US',
+      selectedDate: selectedDate ? selectedDate.toISOString().split('T')[0] : today,
+      min: today, // Disable past dates
+      style: {
+        dark: true,
+        fullWidth: false,
+      },
+      listeners: {
+        onChange: (dateString) => {
+          if (dateString) {
+            // Convert YYYY-MM-DD string to Date object
+            const [year, month, day] = dateString.split('-').map(Number)
+            const date = new Date(year, month - 1, day)
+            setSelectedDate(date)
+          } else {
+            setSelectedDate(undefined)
+          }
+        },
+      },
+    })
+
+    datePicker.render(datePickerRef.current)
+    datePickerInstanceRef.current = datePicker
+
+    return () => {
+      if (datePickerInstanceRef.current) {
+        datePickerInstanceRef.current.destroy?.()
+      }
+    }
+  }, [open])
 
   // Reset state when dialog opens with new suggestion
   const handleOpenChange = (newOpen: boolean) => {
@@ -125,9 +168,6 @@ export function ScheduleTimeDialog({
   const Icon = categoryIcons[suggestion.category]
   const colors = categoryColors[suggestion.category]
 
-  // Disable past dates
-  const disabledDays = { before: new Date() }
-
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="border-border/70 bg-card/95 backdrop-blur-xl max-w-md !left-1/2 !top-1/2 !-translate-x-1/2 !-translate-y-1/2">
@@ -154,12 +194,9 @@ export function ScheduleTimeDialog({
 
         {/* Date picker */}
         <div className="flex justify-center py-2">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-            disabled={disabledDays}
-            className="rounded-md border border-border/50"
+          <div
+            ref={datePickerRef}
+            className="sx-date-picker-wrapper rounded-md border border-border/50"
           />
         </div>
 
