@@ -1,7 +1,7 @@
 "use client"
 
 import { createContext, useContext, useState, useCallback, useRef, useMemo, useEffect, type ReactNode, type MutableRefObject } from "react"
-import { db } from "@/lib/storage/db"
+import { db, type DBSettings } from "@/lib/storage/db"
 import { DEFAULT_ACCENT } from "@/lib/color-utils"
 import { DEFAULT_SANS, DEFAULT_SERIF, updateFontVariable, getFontCssFamily } from "@/lib/font-utils"
 import type { FontFamily, SerifFamily } from "@/lib/types"
@@ -25,6 +25,20 @@ interface SceneContextValue {
 }
 
 const SceneContext = createContext<SceneContextValue | null>(null)
+
+// Helper to create default settings object - avoids DRY violation across callbacks
+function createDefaultSettings(): DBSettings {
+  return {
+    id: "default",
+    defaultRecordingDuration: 30,
+    enableVAD: true,
+    enableNotifications: true,
+    calendarConnected: false,
+    autoScheduleRecovery: false,
+    preferredRecoveryTimes: [],
+    localStorageOnly: true,
+  }
+}
 
 export function SceneProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<SceneMode>("landing")
@@ -71,17 +85,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     db.settings.update("default", { accentColor: color }).then((updated) => {
       if (updated === 0) {
         // No record exists, create it
-        return db.settings.put({
-          id: "default",
-          defaultRecordingDuration: 30,
-          enableVAD: true,
-          enableNotifications: true,
-          calendarConnected: false,
-          autoScheduleRecovery: false,
-          preferredRecoveryTimes: [],
-          localStorageOnly: true,
-          accentColor: color,
-        })
+        return db.settings.put({ ...createDefaultSettings(), accentColor: color })
       }
     }).catch(() => {
       // IndexedDB not available
@@ -95,17 +99,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     db.settings.update("default", { selectedSansFont: font as FontFamily }).then((updated) => {
       if (updated === 0) {
         // No record exists, create it
-        return db.settings.put({
-          id: "default",
-          defaultRecordingDuration: 30,
-          enableVAD: true,
-          enableNotifications: true,
-          calendarConnected: false,
-          autoScheduleRecovery: false,
-          preferredRecoveryTimes: [],
-          localStorageOnly: true,
-          selectedSansFont: font as FontFamily,
-        })
+        return db.settings.put({ ...createDefaultSettings(), selectedSansFont: font as FontFamily })
       }
     }).catch(() => {
       // IndexedDB not available
@@ -119,17 +113,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     db.settings.update("default", { selectedSerifFont: font as SerifFamily }).then((updated) => {
       if (updated === 0) {
         // No record exists, create it
-        return db.settings.put({
-          id: "default",
-          defaultRecordingDuration: 30,
-          enableVAD: true,
-          enableNotifications: true,
-          calendarConnected: false,
-          autoScheduleRecovery: false,
-          preferredRecoveryTimes: [],
-          localStorageOnly: true,
-          selectedSerifFont: font as SerifFamily,
-        })
+        return db.settings.put({ ...createDefaultSettings(), selectedSerifFont: font as SerifFamily })
       }
     }).catch(() => {
       // IndexedDB not available
