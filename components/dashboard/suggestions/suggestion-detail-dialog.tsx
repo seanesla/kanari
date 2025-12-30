@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { formatScheduledTime } from "@/lib/date-utils"
 import type { Suggestion, SuggestionCategory, VoicePatterns, HistoricalContext, BurnoutPrediction, AudioFeatures } from "@/lib/types"
 
 const categoryIcons: Record<SuggestionCategory, typeof Coffee> = {
@@ -299,18 +300,4 @@ export function SuggestionDetailDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-function formatScheduledTime(isoString: string): string {
-  const date = new Date(isoString)
-  const now = new Date()
-  const isToday = date.toDateString() === now.toDateString()
-  const isTomorrow = date.toDateString() === new Date(now.getTime() + 86400000).toDateString()
-
-  const timeStr = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-  const dateStr = date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" })
-
-  if (isToday) return `Today at ${timeStr}`
-  if (isTomorrow) return `Tomorrow at ${timeStr}`
-  return `${dateStr} at ${timeStr}`
 }

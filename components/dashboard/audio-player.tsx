@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { Play, Pause, RotateCcw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { formatDuration } from "@/lib/date-utils"
 
 export interface AudioPlayerProps {
   audioData: Float32Array | number[]
@@ -14,12 +15,6 @@ export interface AudioPlayerProps {
   /** External seek position (0-1 normalized). When set, audio seeks to this position. */
   seekPosition?: number
   className?: string
-}
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, "0")}`
 }
 
 export function AudioPlayer({
@@ -258,7 +253,7 @@ export function AudioPlayer({
 
       {/* Time display */}
       <span className="text-sm tabular-nums text-muted-foreground min-w-[4rem]">
-        {formatTime(currentTime)}
+        {formatDuration(currentTime)}
       </span>
 
       {/* Progress bar */}
@@ -274,7 +269,7 @@ export function AudioPlayer({
 
       {/* Duration */}
       <span className="text-sm tabular-nums text-muted-foreground min-w-[4rem]">
-        {formatTime(duration)}
+        {formatDuration(duration)}
       </span>
 
       {/* Reset button */}

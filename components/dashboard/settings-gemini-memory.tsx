@@ -24,12 +24,15 @@ interface CollapsibleSectionProps {
 
 function CollapsibleSection({ title, icon, count, children, defaultOpen = false }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
+  const contentId = `collapsible-${title.toLowerCase().replace(/\s+/g, "-")}`
 
   return (
     <div className="border border-border/50 rounded-lg overflow-hidden">
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between px-4 py-3 hover:bg-secondary/30 transition-colors"
+        aria-expanded={isOpen}
+        aria-controls={contentId}
       >
         <div className="flex items-center gap-2">
           {icon}
@@ -45,7 +48,7 @@ function CollapsibleSection({ title, icon, count, children, defaultOpen = false 
         )}
       </button>
       {isOpen && (
-        <div className="px-4 py-3 border-t border-border/50 bg-secondary/10">
+        <div id={contentId} className="px-4 py-3 border-t border-border/50 bg-secondary/10">
           {children}
         </div>
       )}

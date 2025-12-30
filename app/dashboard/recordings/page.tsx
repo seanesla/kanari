@@ -12,24 +12,8 @@ import { RecordingWaveform } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
 import { RecordingDrawer } from "@/components/dashboard/recording-drawer"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
+import { formatDuration, formatDate } from "@/lib/date-utils"
 import type { Recording } from "@/lib/types"
-
-function formatDuration(seconds: number): string {
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, "0")}`
-}
-
-function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  })
-}
 
 function getStressIcon(level?: string) {
   if (!level) return Minus
@@ -124,6 +108,8 @@ function RecordingCard({ recording, onDelete, isHighlighted }: RecordingCardProp
                 size="icon"
                 onClick={toggleExpand}
                 className="h-8 w-8"
+                aria-expanded={isExpanded}
+                aria-label={isExpanded ? "Collapse recording details" : "Expand recording details"}
               >
                 {isExpanded ? (
                   <ChevronUp className="h-4 w-4 text-muted-foreground" />
