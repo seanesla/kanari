@@ -328,7 +328,7 @@ Return a JSON object with this exact structure (do not add extra fields):
   ],
   "stressInterpretation": "qualitative description of stress indicators",
   "fatigueInterpretation": "qualitative description of fatigue indicators",
-  "summary": "overall emotional state and delivery assessment"
+  "summary": "A single sentence (max 20 words) describing the speaker's emotional state. Focus on feelings and context, e.g., 'Feeling stressed about work deadlines but optimistic about the weekend.'"
 }`
 
 /**

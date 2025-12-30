@@ -137,6 +137,13 @@ export function VoiceNoteCard({ item, onDelete, onOpenChat, isHighlighted }: Voi
                 </div>
               )}
 
+              {/* Emotional summary from Gemini analysis */}
+              {recording.semanticAnalysis?.summary && (
+                <p className="text-sm text-muted-foreground italic mt-2 line-clamp-1">
+                  {recording.semanticAnalysis.summary}
+                </p>
+              )}
+
               {/* Status indicators */}
               {!recording.metrics && recording.status === "complete" && (
                 <p className="text-sm text-muted-foreground mt-2">Analysis pending</p>
