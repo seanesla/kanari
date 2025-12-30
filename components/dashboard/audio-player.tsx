@@ -51,8 +51,16 @@ export function AudioPlayer({
         const ctx = new AudioContext({ sampleRate })
         audioContextRef.current = ctx
 
-        // Convert to Float32Array - constructor handles TypedArray input efficiently
-        const samples = new Float32Array(audioData)
+        // Create Float32Array with our own ArrayBuffer (required by copyToChannel)
+        // Note: buffer.slice() is more efficient than Array.from() intermediate copy
+        // Type assertion needed because slice() of ArrayBufferLike returns ArrayBuffer | SharedArrayBuffer
+        // but we know ArrayBuffer.slice() always returns ArrayBuffer
+        const samples = audioData instanceof Float32Array
+          ? new Float32Array(audioData.buffer.slice(
+              audioData.byteOffset,
+              audioData.byteOffset + audioData.byteLength
+            ) as ArrayBuffer)
+          : new Float32Array(audioData)
 
         // Create audio buffer
         const buffer = ctx.createBuffer(1, samples.length, sampleRate)
@@ -74,8 +82,12 @@ export function AudioPlayer({
       if (sourceNodeRef.current) {
         try {
           sourceNodeRef.current.stop()
-        } catch {
-          // Already stopped
+        } catch (error) {
+          // InvalidStateError is expected if already stopped, log unexpected errors
+          if (process.env.NODE_ENV === "development" &&
+              !(error instanceof DOMException && error.name === "InvalidStateError")) {
+            console.warn("[AudioPlayer] Unexpected error stopping source:", error)
+          }
         }
       }
       if (audioContextRef.current) {
@@ -130,8 +142,12 @@ export function AudioPlayer({
     if (sourceNodeRef.current) {
       try {
         sourceNodeRef.current.stop()
-      } catch {
-        // Already stopped
+      } catch (error) {
+        // InvalidStateError is expected if already stopped, log unexpected errors
+        if (process.env.NODE_ENV === "development" &&
+            !(error instanceof DOMException && error.name === "InvalidStateError")) {
+          console.warn("[AudioPlayer] Unexpected error stopping source:", error)
+        }
       }
     }
 
@@ -171,8 +187,12 @@ export function AudioPlayer({
     // Stop source
     try {
       sourceNodeRef.current.stop()
-    } catch {
-      // Already stopped
+    } catch (error) {
+      // InvalidStateError is expected if already stopped, log unexpected errors
+      if (process.env.NODE_ENV === "development" &&
+          !(error instanceof DOMException && error.name === "InvalidStateError")) {
+        console.warn("[AudioPlayer] Unexpected error stopping source:", error)
+      }
     }
 
     setIsPlaying(false)
@@ -207,8 +227,12 @@ export function AudioPlayer({
       if (sourceNodeRef.current) {
         try {
           sourceNodeRef.current.stop()
-        } catch {
-          // Already stopped
+        } catch (error) {
+          // InvalidStateError is expected if already stopped, log unexpected errors
+          if (process.env.NODE_ENV === "development" &&
+              !(error instanceof DOMException && error.name === "InvalidStateError")) {
+            console.warn("[AudioPlayer] Unexpected error stopping source:", error)
+          }
         }
       }
       play()

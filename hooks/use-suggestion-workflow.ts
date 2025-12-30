@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo } from "react"
 import type { Suggestion, RecoveryBlock, UserSettings } from "@/lib/types"
 
 /**
@@ -152,25 +152,38 @@ export function useSuggestionWorkflow({
     setDroppedSuggestion(null)
   }, [])
 
+  // Memoize handlers object to prevent unnecessary re-renders in consumers
+  const handlers = useMemo<SuggestionWorkflowHandlers>(() => ({
+    handleSuggestionClick,
+    handleScheduleFromDialog,
+    handleExternalDrop,
+    handleTimeSlotClick,
+    handleScheduleConfirm,
+    handleDismiss,
+    handleComplete,
+    handleEventClick,
+    handleDragStart,
+    handleDragEnd,
+    closeDialogs,
+  }), [
+    handleSuggestionClick,
+    handleScheduleFromDialog,
+    handleExternalDrop,
+    handleTimeSlotClick,
+    handleScheduleConfirm,
+    handleDismiss,
+    handleComplete,
+    handleEventClick,
+    handleDragStart,
+    handleDragEnd,
+    closeDialogs,
+  ])
+
   return {
-    // State
     selectedSuggestion,
     scheduleDialogSuggestion,
     pendingDragActive,
     droppedSuggestion,
-    // Handlers
-    handlers: {
-      handleSuggestionClick,
-      handleScheduleFromDialog,
-      handleExternalDrop,
-      handleTimeSlotClick,
-      handleScheduleConfirm,
-      handleDismiss,
-      handleComplete,
-      handleEventClick,
-      handleDragStart,
-      handleDragEnd,
-      closeDialogs,
-    },
+    handlers,
   }
 }
