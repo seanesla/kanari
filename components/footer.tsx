@@ -17,10 +17,10 @@ export function Footer() {
             <Link href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground">
               How It Works
             </Link>
-            <Link href="https://github.com" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link href="https://github.com/seanesla/kanari" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
               GitHub
             </Link>
-            <Link href="https://aistudio.google.com" className="text-sm text-muted-foreground hover:text-foreground">
+            <Link href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
               Get API Key
             </Link>
           </nav>
