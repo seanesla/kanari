@@ -397,6 +397,10 @@ export function useCheckIn(
   const audioChunksRef = useRef<Float32Array[]>([])
   const sessionStartRef = useRef<string | null>(null)
 
+  // Flag to handle race condition: if cleanup is requested during async initialization,
+  // the stream obtained from getUserMedia should be stopped immediately
+  const cleanupRequestedRef = useRef(false)
+
   // Track the last user message ID for updating with features
   const lastUserMessageIdRef = useRef<string | null>(null)
 
@@ -711,6 +715,15 @@ export function useCheckIn(
           noiseSuppression: true,
         },
       })
+
+      // Check if cleanup was requested while we were waiting for getUserMedia
+      // This handles the race condition where component unmounts during async initialization
+      if (cleanupRequestedRef.current) {
+        console.log("[useCheckIn] Cleanup requested during getUserMedia, stopping stream immediately")
+        stream.getTracks().forEach((track) => track.stop())
+        throw new Error("INITIALIZATION_ABORTED")
+      }
+
       mediaStreamRef.current = stream
 
       // Create audio context at 16kHz
@@ -796,14 +809,25 @@ export function useCheckIn(
   }, [geminiControls])
 
   const cleanupAudioCapture = useCallback(() => {
+    // Mark cleanup as requested - this handles the race condition where
+    // getUserMedia might resolve AFTER cleanup is called
+    cleanupRequestedRef.current = true
+
     // Stop microphone
     if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach((track) => track.stop())
+      mediaStreamRef.current.getTracks().forEach((track) => {
+        track.stop()
+        // Verify track is actually stopped
+        if (track.readyState !== "ended") {
+          console.warn("[useCheckIn] Track not stopped after .stop():", track.readyState)
+        }
+      })
       mediaStreamRef.current = null
     }
 
-    // Disconnect worklet
+    // Clear message handler before disconnect (prevents memory leaks)
     if (captureWorkletRef.current) {
+      captureWorkletRef.current.port.onmessage = null
       captureWorkletRef.current.disconnect()
       captureWorkletRef.current = null
     }
@@ -829,6 +853,9 @@ export function useCheckIn(
 
       try {
         dispatch({ type: "START_INITIALIZING" })
+
+        // Reset the cleanup abort flag for this new session
+        cleanupRequestedRef.current = false
 
         // Create new session
         const session: CheckInSession = {
