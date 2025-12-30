@@ -22,6 +22,7 @@ const dashboardLinks = [
   { id: "dashboard", href: "/dashboard", label: "Dashboard", exact: true },
   { id: "history", href: "/dashboard/history", label: "Sessions", exact: false },
   { id: "analytics", href: "/dashboard/analytics", label: "Analytics", exact: false },
+  { id: "achievements", href: "/dashboard/achievements", label: "Achievements", exact: true },
   { id: "settings", href: "/dashboard/settings", label: "Settings", exact: true },
 ]
 
