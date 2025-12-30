@@ -128,9 +128,9 @@ function ScheduleXWeekCalendarInner({
       end: '24:00',
     },
     weekOptions: {
-      gridHeight: 600,
+      gridHeight: 2400,
       nDays: 7,
-      eventWidth: 95,
+      eventWidth: 75,
     },
     calendars: {
       break: {
