@@ -170,10 +170,27 @@ export function UnifiedDashboard() {
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-4 md:px-8 lg:px-12 pt-24 pb-12 relative z-10">
-        {/* Header */}
+        {/* Hero Section */}
+        <div className="relative mb-12">
+          <div
+            className={cn(
+              "relative transition-all duration-1000 delay-100",
+              visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            )}
+          >
+            <h1 className="text-3xl md:text-4xl font-serif leading-[0.95] mb-3">
+              Your <span className="text-accent">dashboard</span>
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
+              Schedule recovery activities and track your wellness journey at a glance.
+            </p>
+          </div>
+        </div>
+
+        {/* Metrics Header */}
         <div
           className={cn(
-            "mb-6 transition-all duration-1000 delay-100",
+            "mb-6 transition-all duration-1000 delay-200",
             visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
@@ -183,7 +200,7 @@ export function UnifiedDashboard() {
         {/* Main Content */}
         <div
           className={cn(
-            "transition-all duration-1000 delay-200",
+            "transition-all duration-1000 delay-300",
             visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >

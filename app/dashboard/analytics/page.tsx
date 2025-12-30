@@ -194,11 +194,10 @@ export default function AnalyticsPage() {
               Back to Dashboard
             </Link>
           </Button>
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-4">Analytics</p>
-          <h1 className="text-4xl md:text-5xl font-serif leading-[0.95] mb-4">
+          <h1 className="text-3xl md:text-4xl font-serif leading-[0.95] mb-3">
             Wellness <span className="text-accent">insights</span>
           </h1>
-          <p className="text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl">
+          <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
             Detailed analysis of your stress, fatigue trends, and burnout risk over time.
           </p>
         </div>
