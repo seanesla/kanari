@@ -1,0 +1,115 @@
+/* Schedule-X Dark Theme Override for Dashboard */
+
+/* Override Schedule-X CSS variables to match dashboard theme */
+.sx__calendar-wrapper {
+  /* Background colors */
+  --sx-color-background: hsl(var(--background));
+  --sx-color-surface: hsl(var(--card));
+  --sx-color-surface-container: hsl(var(--card));
+  --sx-color-surface-container-low: hsl(var(--background));
+  --sx-color-surface-container-high: hsl(var(--muted));
+
+  /* Border colors */
+  --sx-color-outline: hsl(var(--border));
+  --sx-color-outline-variant: hsl(var(--border));
+
+  /* Text colors */
+  --sx-color-on-surface: hsl(var(--foreground));
+  --sx-color-on-background: hsl(var(--foreground));
+  --sx-color-on-primary-container: hsl(var(--foreground));
+
+  /* Muted text */
+  --sx-color-neutral: hsl(var(--muted-foreground));
+  --sx-color-neutral-variant: hsl(var(--muted-foreground));
+
+  /* Accent/highlight colors */
+  --sx-color-primary: hsl(var(--accent));
+  --sx-color-primary-container: hsl(var(--accent));
+  --sx-color-on-primary: hsl(var(--accent-foreground));
+
+  /* Surface variations for dark mode */
+  --sx-color-surface-dim: hsl(var(--muted));
+  --sx-color-surface-bright: hsl(var(--card));
+
+  /* Internal colors */
+  --sx-internal-color-gray-ripple-background: hsl(var(--muted));
+  --sx-internal-color-light-gray: hsl(var(--muted));
+  --sx-internal-color-text: hsl(var(--foreground));
+
+  /* Shadow */
+  --sx-color-shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* Style adjustments for dark theme */
+.sx__calendar-wrapper .sx__time-grid-day {
+  border-right: 1px solid hsl(var(--border));
+}
+
+.sx__calendar-wrapper .sx__time-grid-hour {
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.sx__calendar-wrapper .sx__week-grid__time-axis {
+  background: hsl(var(--background));
+  border-right: 1px solid hsl(var(--border));
+}
+
+.sx__calendar-wrapper .sx__week-grid__header {
+  background: hsl(var(--card));
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+/* Event styling improvements */
+.sx__calendar-wrapper .sx__event {
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 4px 8px;
+}
+
+/* Hover states */
+.sx__calendar-wrapper .sx__event:hover {
+  opacity: 0.9;
+  cursor: pointer;
+}
+
+/* Time axis labels */
+.sx__calendar-wrapper .sx__time-axis-time {
+  color: hsl(var(--muted-foreground));
+  font-size: 0.75rem;
+}
+
+/* Header date labels */
+.sx__calendar-wrapper .sx__date-grid-day-header {
+  color: hsl(var(--foreground));
+  font-weight: 600;
+}
+
+/* Today highlight */
+.sx__calendar-wrapper .sx__is-today {
+  background: hsl(var(--accent) / 0.1);
+}
+
+/* Current time indicator */
+.sx__calendar-wrapper .sx__current-time-line {
+  border-top: 2px solid hsl(var(--accent));
+}
+
+/* Scrollbar styling for dark theme */
+.sx__calendar-wrapper .sx__scroll-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.sx__calendar-wrapper .sx__scroll-container::-webkit-scrollbar-track {
+  background: hsl(var(--background));
+}
+
+.sx__calendar-wrapper .sx__scroll-container::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted));
+  border-radius: 4px;
+}
+
+.sx__calendar-wrapper .sx__scroll-container::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground));
+}
