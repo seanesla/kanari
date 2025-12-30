@@ -67,7 +67,6 @@ Copy `.env.example` to `.env` with:
 
 - `next.config.mjs`: `ignoreBuildErrors: true` (dev convenience)
 - Path alias: `@/*` maps to project root
-- Use `model: "opus"` (claude-opus-4-5) for Explore subagents
 
 ## Documentation Attribution
 
