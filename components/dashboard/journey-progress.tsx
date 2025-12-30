@@ -19,7 +19,7 @@ interface StepProps {
 
 function Step({ label, isComplete, isLast = false }: StepProps) {
   return (
-    <div className="flex items-center flex-1">
+    <div className="flex items-center md:flex-1">
       <div className="flex items-center gap-3">
         {/* Step circle */}
         <div
@@ -40,7 +40,7 @@ function Step({ label, isComplete, isLast = false }: StepProps) {
         {/* Label */}
         <span
           className={cn(
-            "text-sm font-medium transition-colors whitespace-nowrap",
+            "text-sm font-medium transition-colors",
             isComplete ? "text-foreground" : "text-muted-foreground"
           )}
         >
@@ -48,9 +48,9 @@ function Step({ label, isComplete, isLast = false }: StepProps) {
         </span>
       </div>
 
-      {/* Connector line */}
+      {/* Connector line - hidden on mobile, shown on desktop */}
       {!isLast && (
-        <div className="flex-1 h-px mx-4 bg-border relative min-w-8">
+        <div className="hidden md:block flex-1 h-px mx-4 bg-border relative min-w-8">
           <div
             className={cn(
               "absolute inset-0 bg-accent transition-all duration-500",
@@ -73,11 +73,12 @@ export function JourneyProgress({
   return (
     <div
       className={cn(
-        "rounded-lg border border-border/70 bg-card/20 backdrop-blur-xl p-6",
+        "rounded-lg border border-border/70 bg-card/20 backdrop-blur-xl p-4 md:p-6",
         className
       )}
     >
-      <div className="flex items-center">
+      {/* 2x2 grid on mobile, horizontal flex on desktop */}
+      <div className="grid grid-cols-2 gap-4 md:flex md:items-center">
         <Step label="Recorded" isComplete={hasRecordings} />
         <Step label="Analyzed" isComplete={hasAnalysis} />
         <Step label="Get Suggestions" isComplete={hasSuggestions} />

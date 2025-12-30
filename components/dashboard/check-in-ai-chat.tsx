@@ -163,8 +163,10 @@ export function AIChatContent({
   // Handle user clicking the "end call" button
   const handleEndCall = useCallback(async () => {
     await controls.endSession()
+    // Signal session is no longer active before closing to prevent discard dialog
+    onSessionChange?.(false)
     onClose?.()
-  }, [controls, onClose])
+  }, [controls, onClose, onSessionChange])
 
   // Determine which UI state to show based on checkIn.state
   // These states come from the useCheckIn hook's state machine

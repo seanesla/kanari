@@ -179,7 +179,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
+      <main className="px-4 md:px-8 lg:px-16 xl:px-20 pt-28 pb-12 relative z-10">
         {/* Header */}
         <div className="relative mb-12 overflow-hidden rounded-lg p-6">
           <DecorativeGrid />
@@ -223,7 +223,7 @@ export default function AnalyticsPage() {
           >
             <div
               className={cn(
-                "rounded-lg border p-8 md:p-12 backdrop-blur-xl",
+                "rounded-lg border p-4 md:p-8 lg:p-12 backdrop-blur-xl",
                 riskLevelConfig[burnoutPrediction.riskLevel].bg,
                 riskLevelConfig[burnoutPrediction.riskLevel].border
               )}
@@ -319,7 +319,7 @@ export default function AnalyticsPage() {
               {/* Chart 1: 7-Day Trend */}
               <div
                 className={cn(
-                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
+                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
                   chartsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
                 )}
                 style={{ transitionDelay: chartsVisible ? "400ms" : "0ms" }}
@@ -340,7 +340,7 @@ export default function AnalyticsPage() {
               {/* Chart 2: Wellness Score Gauge */}
               <div
                 className={cn(
-                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
+                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
                   chartsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
                 )}
                 style={{ transitionDelay: chartsVisible ? "500ms" : "0ms" }}
