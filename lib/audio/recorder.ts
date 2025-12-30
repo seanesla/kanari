@@ -175,7 +175,11 @@ export class AudioRecorder {
 
     // Close audio context
     if (this.audioContext) {
-      this.audioContext.close().catch(() => {})
+      this.audioContext.close().catch((error) => {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[AudioRecorder] Failed to close audio context:", error)
+        }
+      })
       this.audioContext = null
     }
 

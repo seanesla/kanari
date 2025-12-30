@@ -240,8 +240,11 @@ export function ScheduleXWeekCalendar({
     // Use try-catch as the plugin may not be fully initialized on first render
     try {
       eventsService.set(allEvents)
-    } catch {
+    } catch (error) {
       // Calendar not fully mounted yet, will retry on next render
+      if (process.env.NODE_ENV === "development") {
+        console.debug("[ScheduleXCalendar] Events service not ready:", error)
+      }
     }
   }, [scheduledSuggestions, completedSuggestions, eventsService, calendar])
 

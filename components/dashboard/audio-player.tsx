@@ -51,10 +51,8 @@ export function AudioPlayer({
         const ctx = new AudioContext({ sampleRate })
         audioContextRef.current = ctx
 
-        // Convert to Float32Array with regular ArrayBuffer (not SharedArrayBuffer)
-        const samples = new Float32Array(
-          audioData instanceof Float32Array ? Array.from(audioData) : audioData
-        )
+        // Convert to Float32Array - constructor handles TypedArray input efficiently
+        const samples = new Float32Array(audioData)
 
         // Create audio buffer
         const buffer = ctx.createBuffer(1, samples.length, sampleRate)

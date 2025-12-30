@@ -1,26 +1,35 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useSyncExternalStore } from "react"
 
 /**
  * Hook for responsive breakpoint detection
+ *
+ * Uses useSyncExternalStore to avoid SSR hydration mismatches.
+ * Server always renders with isMobile=false, client hydrates correctly.
  *
  * @param breakpoint - Width in pixels below which is considered "mobile" (default: 1024)
  * @returns Object with isMobile boolean
  */
 export function useResponsive(breakpoint: number = 1024) {
-  const [isMobile, setIsMobile] = useState(false)
+  const subscribe = useCallback(
+    (callback: () => void) => {
+      window.addEventListener("resize", callback)
+      return () => window.removeEventListener("resize", callback)
+    },
+    []
+  )
 
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < breakpoint)
+  const getSnapshot = useCallback(
+    () => window.innerWidth < breakpoint,
+    [breakpoint]
+  )
 
-    // Check on mount
-    checkMobile()
+  // Server snapshot: always return false (desktop-first)
+  // This ensures consistent SSR output and prevents hydration mismatch
+  const getServerSnapshot = useCallback(() => false, [])
 
-    // Listen for resize events
-    window.addEventListener("resize", checkMobile)
-    return () => window.removeEventListener("resize", checkMobile)
-  }, [breakpoint])
+  const isMobile = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 
   return { isMobile }
 }

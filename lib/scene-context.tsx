@@ -62,8 +62,11 @@ export function SceneProvider({ children }: { children: ReactNode }) {
         setSelectedSerifFontState(settings.selectedSerifFont)
         updateFontVariable("--font-serif", getFontCssFamily(settings.selectedSerifFont, "serif"))
       }
-    }).catch(() => {
+    }).catch((error) => {
       // IndexedDB not available or error, use defaults
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[SceneProvider] Failed to load settings from IndexedDB:", error)
+      }
     })
   }, [])
 
@@ -87,8 +90,10 @@ export function SceneProvider({ children }: { children: ReactNode }) {
         // No record exists, create it
         return db.settings.put({ ...createDefaultSettings(), accentColor: color })
       }
-    }).catch(() => {
-      // IndexedDB not available
+    }).catch((error) => {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[SceneProvider] Failed to save accent color:", error)
+      }
     })
   }, [])
 
@@ -101,8 +106,10 @@ export function SceneProvider({ children }: { children: ReactNode }) {
         // No record exists, create it
         return db.settings.put({ ...createDefaultSettings(), selectedSansFont: font as FontFamily })
       }
-    }).catch(() => {
-      // IndexedDB not available
+    }).catch((error) => {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[SceneProvider] Failed to save sans font:", error)
+      }
     })
   }, [])
 
@@ -115,8 +122,10 @@ export function SceneProvider({ children }: { children: ReactNode }) {
         // No record exists, create it
         return db.settings.put({ ...createDefaultSettings(), selectedSerifFont: font as SerifFamily })
       }
-    }).catch(() => {
-      // IndexedDB not available
+    }).catch((error) => {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[SceneProvider] Failed to save serif font:", error)
+      }
     })
   }, [])
 
