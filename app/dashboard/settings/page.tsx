@@ -21,7 +21,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
         {/* Header Section */}
-        <div className="relative mb-12">
+        <div className="relative mb-32 md:mb-36">
           <div
             className={cn(
               "relative transition-all duration-1000 delay-100",

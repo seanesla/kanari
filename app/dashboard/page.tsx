@@ -231,7 +231,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
         {/* HERO SECTION */}
-        <div className="relative mb-24 md:mb-28">
+        <div className="relative mb-32 md:mb-36">
           {/* Content */}
           <div
             className={cn(
