@@ -78,7 +78,16 @@ Return 0-1 achievements. Returning 0 is the EXPECTED default. Only return an ach
  */
 export function generateAchievementUserPrompt(stats: UserStatsForAchievements): string {
   const lines: string[] = [
-    "Based on this user's wellness journey stats, generate personalized achievements they've earned.",
+    "Evaluate this user's wellness journey. Return 0 achievements unless they meet the strict criteria in the system prompt.",
+    "",
+    "## Data Quality (CHECK THIS FIRST)",
+    `- Journey duration: ${stats.dataQuality.journeyDurationDays} days`,
+    `- Has enough history (14+ days): ${stats.dataQuality.hasEnoughHistory}`,
+    `- Consistent usage (50%+ days active): ${stats.dataQuality.hasConsistentUsage}`,
+    `- Has measurable trends: ${stats.dataQuality.hasMeasurableTrends}`,
+    `- Suggestion engagement rate: ${Math.round(stats.dataQuality.suggestionEngagementRate * 100)}%`,
+    "",
+    "**If hasEnoughHistory is false, return ZERO achievements.**",
     "",
     "## User Stats",
     "",
@@ -89,10 +98,6 @@ export function generateAchievementUserPrompt(stats: UserStatsForAchievements): 
     `- Longest streak ever: ${stats.longestStreak} days`,
     `- Days active: ${stats.daysActive}`,
     stats.firstRecordingDate ? `- First recording: ${stats.firstRecordingDate}` : "- First recording: None yet",
-    "",
-    "### Time Patterns",
-    `- Preferred time of day: ${stats.preferredTimeOfDay}`,
-    `- Most active day: ${stats.mostActiveDay}`,
     "",
     "### Wellness Metrics",
     `- Average stress score: ${stats.averageStressScore}/100`,
@@ -129,7 +134,7 @@ export function generateAchievementUserPrompt(stats: UserStatsForAchievements): 
   }
 
   lines.push("")
-  lines.push("Generate 0-2 NEW achievements this user has earned. Be creative and specific to their journey.")
+  lines.push("Return 0 achievements unless this user has genuinely earned something exceptional. Remember: participation is NOT an achievement.")
 
   return lines.filter(line => line !== undefined).join("\n")
 }
@@ -174,7 +179,7 @@ export const ACHIEVEMENT_RESPONSE_SCHEMA = {
         },
         required: ["title", "description", "category", "rarity", "insight", "emoji"],
       },
-      maxItems: 2,
+      maxItems: 1,
     },
     reasoning: {
       type: "string",
@@ -186,54 +191,39 @@ export const ACHIEVEMENT_RESPONSE_SCHEMA = {
 
 /**
  * Example achievements for reference (not used in prompts, just for documentation)
+ * These represent the MINIMUM bar for achievements - genuinely impressive accomplishments
  */
 export const EXAMPLE_ACHIEVEMENTS = [
   {
-    title: "Monday Mood Master",
-    description: "Your stress levels on Mondays have improved 20% over the past month",
+    title: "Stress Slayer",
+    description: "Your average stress dropped 25% over the past month through consistent self-care",
     category: "improvement" as AchievementCategory,
     rarity: "rare" as AchievementRarity,
-    insight: "Monday stress dropped from 72 to 58 average",
-    emoji: "🌟",
+    insight: "Stress score went from 68 to 51 average over 4 weeks",
+    emoji: "⚔️",
   },
   {
-    title: "Night Owl Navigator",
-    description: "You've consistently checked in during evening hours, building a healthy nighttime routine",
-    category: "pattern" as AchievementCategory,
-    rarity: "uncommon" as AchievementRarity,
-    insight: "80% of recordings between 8pm-11pm",
-    emoji: "🦉",
-  },
-  {
-    title: "Mindfulness Maven",
-    description: "You've completed 10 mindfulness suggestions - that's real dedication to mental wellness",
+    title: "Recovery Champion",
+    description: "You've completed 15 recovery suggestions and rated them as genuinely helpful",
     category: "recovery" as AchievementCategory,
     rarity: "rare" as AchievementRarity,
-    insight: "10 mindfulness suggestions completed",
-    emoji: "🧘",
+    insight: "15 helpful suggestions completed over 6 weeks",
+    emoji: "🏆",
   },
   {
-    title: "Streak Starter",
-    description: "You've checked in 3 days in a row - building the habit!",
+    title: "Consistency King",
+    description: "A 21-day streak with improving wellness metrics - true dedication to your health",
     category: "streak" as AchievementCategory,
-    rarity: "common" as AchievementRarity,
-    insight: "3-day recording streak",
-    emoji: "🔥",
-  },
-  {
-    title: "First Voice",
-    description: "You made your first voice recording. Every journey begins with a single step.",
-    category: "milestone" as AchievementCategory,
-    rarity: "common" as AchievementRarity,
-    insight: "First recording completed",
-    emoji: "🎤",
-  },
-  {
-    title: "Feedback Champion",
-    description: "You've provided helpful feedback on 5 suggestions, making Kanari smarter for everyone",
-    category: "engagement" as AchievementCategory,
     rarity: "uncommon" as AchievementRarity,
-    insight: "5 effectiveness ratings submitted",
-    emoji: "💬",
+    insight: "21-day streak with 15% stress reduction",
+    emoji: "👑",
+  },
+  {
+    title: "Wellness Warrior",
+    description: "Two months of consistent use with measurable improvement in both stress and fatigue",
+    category: "milestone" as AchievementCategory,
+    rarity: "epic" as AchievementRarity,
+    insight: "60 days active with 30% stress reduction and 20% fatigue reduction",
+    emoji: "🛡️",
   },
 ]

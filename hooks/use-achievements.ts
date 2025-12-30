@@ -161,7 +161,16 @@ export function useAchievements(): UseAchievementsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to generate achievements"
       setError(errorMessage)
-      console.error("Achievement generation error:", err)
+      // Detailed error logging for debugging
+      console.error("Achievement generation error:", {
+        error: err,
+        errorMessage,
+        context: {
+          recordingsCount: recordings.length,
+          suggestionsCount: suggestions.length,
+          sessionsCount: sessions.length,
+        }
+      })
       return []
     } finally {
       setLoading(false)
@@ -217,4 +226,45 @@ export function useCanGenerateAchievements(
   )
 
   return hasRecordings || hasSuggestionActivity
+}
+
+/**
+ * 24-hour cooldown for achievement generation
+ * Prevents excessive API calls by only allowing one check per day
+ */
+const ACHIEVEMENT_COOLDOWN_KEY = "achievement-last-check"
+const ACHIEVEMENT_COOLDOWN_MS = 24 * 60 * 60 * 1000 // 24 hours
+
+export function useAchievementCooldown(): {
+  canCheck: boolean
+  lastCheck: Date | null
+  markChecked: () => void
+} {
+  const [canCheck, setCanCheck] = useState(false)
+  const [lastCheck, setLastCheck] = useState<Date | null>(null)
+
+  // Check cooldown status on mount
+  useEffect(() => {
+    const storedTimestamp = localStorage.getItem(ACHIEVEMENT_COOLDOWN_KEY)
+
+    if (!storedTimestamp) {
+      // Never checked before - allow check
+      setCanCheck(true)
+      return
+    }
+
+    const lastCheckTime = parseInt(storedTimestamp, 10)
+    const elapsed = Date.now() - lastCheckTime
+    setLastCheck(new Date(lastCheckTime))
+    setCanCheck(elapsed >= ACHIEVEMENT_COOLDOWN_MS)
+  }, [])
+
+  const markChecked = useCallback(() => {
+    const now = Date.now()
+    localStorage.setItem(ACHIEVEMENT_COOLDOWN_KEY, now.toString())
+    setLastCheck(new Date(now))
+    setCanCheck(false)
+  }, [])
+
+  return { canCheck, lastCheck, markChecked }
 }

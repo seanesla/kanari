@@ -8,7 +8,7 @@ import { useSuggestions, featuresToVoicePatterns, computeHistoricalContext } fro
 import { useCalendar } from "@/hooks/use-calendar"
 import { useResponsive } from "@/hooks/use-responsive"
 import { useSuggestionWorkflow } from "@/hooks/use-suggestion-workflow"
-import { useAchievements, useCanGenerateAchievements } from "@/hooks/use-achievements"
+import { useAchievements, useCanGenerateAchievements, useAchievementCooldown } from "@/hooks/use-achievements"
 import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
 import { DashboardHero } from "./dashboard-hero"
 import { DashboardLayout } from "./dashboard-layout"
@@ -57,6 +57,9 @@ export function UnifiedDashboard() {
   // Check if user has enough data for achievements
   const canGenerateAchievements = useCanGenerateAchievements(allRecordings || [], suggestions)
 
+  // 24-hour cooldown for achievement generation
+  const { canCheck: cooldownAllowsCheck, markChecked } = useAchievementCooldown()
+
   // Suggestion workflow (dialogs, drag-drop, handlers)
   const {
     selectedSuggestion,
@@ -81,20 +84,24 @@ export function UnifiedDashboard() {
     }
   }, [shouldAnimate])
 
-  // Check for new achievements periodically when user has enough data
+  // Check for new achievements (with 24-hour cooldown to save API credits)
   useEffect(() => {
+    // Cooldown check - only allow one API call per 24 hours
+    if (!cooldownAllowsCheck) return
     if (!canGenerateAchievements || achievementsLoading) return
     if (!allRecordings || allRecordings.length === 0) return
 
     // Generate achievements after a short delay to avoid blocking initial load
-    const timer = setTimeout(() => {
-      generateAchievements(allRecordings, suggestions, checkInSessions)
+    const timer = setTimeout(async () => {
+      await generateAchievements(allRecordings, suggestions, checkInSessions)
+      // Mark as checked to start 24-hour cooldown
+      markChecked()
     }, 3000)
 
     return () => clearTimeout(timer)
-    // Only re-run when recording count changes (not on every render)
+    // Only run once when cooldown allows, not on every recording change
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allRecordings?.length, canGenerateAchievements])
+  }, [cooldownAllowsCheck, canGenerateAchievements])
 
   // Burnout prediction
   const burnoutPrediction: BurnoutPrediction | null = useMemo(() => {
