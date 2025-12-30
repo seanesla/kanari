@@ -14,8 +14,16 @@ import { useCallback, useSyncExternalStore } from "react"
 export function useResponsive(breakpoint: number = 1024) {
   const subscribe = useCallback(
     (callback: () => void) => {
-      window.addEventListener("resize", callback)
-      return () => window.removeEventListener("resize", callback)
+      let timeoutId: ReturnType<typeof setTimeout>
+      const debouncedCallback = () => {
+        clearTimeout(timeoutId)
+        timeoutId = setTimeout(callback, 150)
+      }
+      window.addEventListener("resize", debouncedCallback)
+      return () => {
+        clearTimeout(timeoutId)
+        window.removeEventListener("resize", debouncedCallback)
+      }
     },
     []
   )

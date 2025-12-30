@@ -131,6 +131,7 @@ export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): PartialTheme
         boxShadow: "0 4px 12px rgba(0, 0, 0, 0.5)",
         padding: "12px 16px",
         border: "1px solid rgba(255, 255, 255, 0.1)",
+        backdropFilter: "blur(8px)",
       },
       basic: {},
       chip: {},
