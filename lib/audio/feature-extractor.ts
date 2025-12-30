@@ -1,6 +1,6 @@
 "use client"
 
-import Meyda, { MeydaAnalyzer } from "meyda"
+import Meyda from "meyda"
 import type { AudioFeatures } from "@/lib/types"
 
 export interface FeatureExtractionOptions {

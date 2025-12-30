@@ -1,11 +1,18 @@
-import type { Theme } from "@nivo/core"
+import type { PartialTheme } from "@nivo/theming"
 import { DEFAULT_ACCENT } from "@/lib/color-utils"
 
+// Default text style properties for Nivo charts
+const baseTextStyle = {
+  fontFamily: "inherit" as const,
+  outlineOpacity: 1,
+}
+
 // Factory function for Nivo theme with dynamic accent color
-export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): Theme {
+export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): PartialTheme {
   return {
     background: "transparent",
     text: {
+      ...baseTextStyle,
       fontSize: 12,
       fill: "#999",
       outlineWidth: 0,
@@ -20,6 +27,7 @@ export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): Theme {
       },
       legend: {
         text: {
+          ...baseTextStyle,
           fontSize: 12,
           fill: "#999",
           outlineWidth: 0,
@@ -32,6 +40,7 @@ export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): Theme {
           strokeWidth: 1,
         },
         text: {
+          ...baseTextStyle,
           fontSize: 11,
           fill: "#999",
           outlineWidth: 0,
@@ -47,8 +56,19 @@ export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): Theme {
       },
     },
     legends: {
+      hidden: {
+        symbol: { fill: "#333", opacity: 0 },
+        text: {
+          ...baseTextStyle,
+          fontSize: 12,
+          fill: "#666",
+          outlineWidth: 0,
+          outlineColor: "transparent",
+        },
+      },
       title: {
         text: {
+          ...baseTextStyle,
           fontSize: 12,
           fill: "#999",
           outlineWidth: 0,
@@ -56,6 +76,7 @@ export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): Theme {
         },
       },
       text: {
+        ...baseTextStyle,
         fontSize: 12,
         fill: "#999",
         outlineWidth: 0,
@@ -64,6 +85,7 @@ export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): Theme {
       ticks: {
         line: {},
         text: {
+          ...baseTextStyle,
           fontSize: 10,
           fill: "#999",
           outlineWidth: 0,
@@ -73,11 +95,11 @@ export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): Theme {
     },
     annotations: {
       text: {
+        ...baseTextStyle,
         fontSize: 13,
         fill: "#999",
         outlineWidth: 2,
         outlineColor: "#000",
-        outlineOpacity: 1,
       },
       link: {
         stroke: "#666",
@@ -101,7 +123,6 @@ export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): Theme {
       },
     },
     tooltip: {
-      wrapper: {},
       container: {
         background: "rgba(20, 20, 20, 0.95)",
         color: "#fff",
@@ -110,7 +131,6 @@ export function getNivoTheme(accentColor: string = DEFAULT_ACCENT): Theme {
         boxShadow: "0 4px 12px rgba(0, 0, 0, 0.5)",
         padding: "12px 16px",
         border: "1px solid rgba(255, 255, 255, 0.1)",
-        backdropFilter: "blur(8px)",
       },
       basic: {},
       chip: {},

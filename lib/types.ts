@@ -4,6 +4,8 @@
 
 export type RecordingStatus = "recording" | "processing" | "complete" | "error"
 
+export type TestStatus = "pass" | "fail" | "warn"
+
 export interface Recording {
   id: string
   createdAt: string

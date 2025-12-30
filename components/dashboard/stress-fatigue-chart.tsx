@@ -2,7 +2,10 @@
 
 import { useMemo } from "react"
 import { AnimatePresence, motion } from "framer-motion"
-import { ResponsiveLine, type Serie, type SliceTooltipProps } from "@nivo/line"
+import { ResponsiveLine, type LineSeries, type SliceTooltipProps } from "@nivo/line"
+
+// Extended type for series with color
+type ChartSeries = LineSeries & { color: string }
 import { TrendingUp, TrendingDown, Minus, Mic, ChevronDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { getNivoTheme, getChartColors, getAreaFillDefinitions } from "@/lib/chart-theme"
@@ -130,10 +133,10 @@ function analyzeFatigueBiomarkers(features: NonNullable<StressFatigueChartProps[
 }
 
 // Custom tooltip component matching glassmorphism style
-function CustomTooltip({ slice }: SliceTooltipProps) {
+function CustomTooltip({ slice }: SliceTooltipProps<ChartSeries>) {
   return (
     <div className="rounded-lg bg-card/95 backdrop-blur-xl border border-border/50 px-4 py-3 shadow-xl">
-      <p className="text-sm font-medium text-foreground mb-2">{slice.points[0]?.data.x}</p>
+      <p className="text-sm font-medium text-foreground mb-2">{String(slice.points[0]?.data.x ?? '')}</p>
       <div className="space-y-1.5">
         {slice.points.map((point) => (
           <div key={point.id} className="flex items-center gap-2">
@@ -171,7 +174,7 @@ export function StressFatigueChart({
   const areaFillDefinitions = useMemo(() => getAreaFillDefinitions(accentColor), [accentColor])
 
   // Transform data to Nivo format
-  const chartData: Serie[] = useMemo(() => {
+  const chartData: ChartSeries[] = useMemo(() => {
     if (data.length === 0) return []
 
     return [

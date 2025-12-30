@@ -10,6 +10,7 @@ import {
   fromRecording,
   fromTrendData,
   fromSuggestion,
+  type DBTrendData,
 } from "@/lib/storage/db"
 import type {
   Recording,
@@ -123,7 +124,16 @@ export function useTrendDataActions() {
   }, [])
 
   const updateTrendData = useCallback(async (date: string, updates: Partial<TrendData>) => {
-    await db.trendData.update(date, updates)
+    // Convert TrendData (string date) to DBTrendData (Date object) for Dexie
+    const dbUpdates: Partial<DBTrendData> = {
+      ...updates,
+      date: updates.date ? new Date(updates.date) : undefined,
+    }
+    // Remove undefined date to avoid overwriting with undefined
+    if (dbUpdates.date === undefined) {
+      delete dbUpdates.date
+    }
+    await db.trendData.update(date, dbUpdates)
   }, [])
 
   return { addTrendData, updateTrendData }

@@ -6,7 +6,7 @@ import { Mic, Clock, TrendingUp, TrendingDown, Minus, Trash2, ChevronDown, Chevr
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Empty } from "@/components/ui/empty"
+import { Empty, EmptyMedia, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
 import { useRecordings, useRecordingActions } from "@/hooks/use-storage"
 import { RecordingWaveform } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
@@ -253,11 +253,16 @@ function RecordingsPageContent() {
         >
           {recordings.length === 0 ? (
             <div className="rounded-2xl border border-border/70 bg-card/30 backdrop-blur-xl p-12">
-              <Empty
-                icon={Clock}
-                title="No recordings yet"
-                description="Start recording to build your history and track wellness trends over time."
-              >
+              <Empty>
+                <EmptyMedia variant="icon">
+                  <Clock />
+                </EmptyMedia>
+                <EmptyHeader>
+                  <EmptyTitle>No recordings yet</EmptyTitle>
+                  <EmptyDescription>
+                    Start recording to build your history and track wellness trends over time.
+                  </EmptyDescription>
+                </EmptyHeader>
                 <Button
                   onClick={handleOpenDrawer}
                   className="bg-accent text-accent-foreground hover:bg-accent/90 mt-4"

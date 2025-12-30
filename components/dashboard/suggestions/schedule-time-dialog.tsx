@@ -95,24 +95,27 @@ export function ScheduleTimeDialog({
   useEffect(() => {
     if (!datePickerRef.current || !open) return
 
-    // Get today's date in YYYY-MM-DD format
-    const now = new Date()
-    const today = now.toISOString().split('T')[0]
+    // Get today's date as Temporal.PlainDate
+    const today = Temporal.Now.plainDateISO()
+
+    // Convert selectedDate (Date) to Temporal.PlainDate if present
+    const selectedPlainDate = selectedDate
+      ? Temporal.PlainDate.from(selectedDate.toISOString().split('T')[0])
+      : today
 
     const datePicker = createDatePicker({
       locale: 'en-US',
-      selectedDate: selectedDate ? selectedDate.toISOString().split('T')[0] : today,
+      selectedDate: selectedPlainDate,
       min: today, // Disable past dates
       style: {
         dark: true,
         fullWidth: false,
       },
       listeners: {
-        onChange: (dateString) => {
-          if (dateString) {
-            // Convert YYYY-MM-DD string to Date object
-            const [year, month, day] = dateString.split('-').map(Number)
-            const date = new Date(year, month - 1, day)
+        onChange: (plainDate) => {
+          if (plainDate) {
+            // Convert Temporal.PlainDate to Date object
+            const date = new Date(plainDate.year, plainDate.month - 1, plainDate.day)
             setSelectedDate(date)
           } else {
             setSelectedDate(undefined)

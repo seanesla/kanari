@@ -191,7 +191,7 @@ export function isRecordingSupported(): boolean {
   return !!(
     typeof navigator !== "undefined" &&
     navigator.mediaDevices &&
-    navigator.mediaDevices.getUserMedia &&
+    typeof navigator.mediaDevices.getUserMedia === "function" &&
     typeof AudioContext !== "undefined"
   )
 }

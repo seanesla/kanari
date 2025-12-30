@@ -40,7 +40,7 @@ export function AudioPlayer({
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null)
   const startTimeRef = useRef<number>(0)
   const pauseOffsetRef = useRef<number>(0)
-  const animationFrameRef = useRef<number>()
+  const animationFrameRef = useRef<number>(0)
   const isPlayingRef = useRef(false) // Track isPlaying for closures
 
   // Keep ref in sync with state for closures
@@ -56,10 +56,10 @@ export function AudioPlayer({
         const ctx = new AudioContext({ sampleRate })
         audioContextRef.current = ctx
 
-        // Convert number[] to Float32Array if needed
-        const samples = audioData instanceof Float32Array
-          ? audioData
-          : new Float32Array(audioData)
+        // Convert to Float32Array with regular ArrayBuffer (not SharedArrayBuffer)
+        const samples = new Float32Array(
+          audioData instanceof Float32Array ? Array.from(audioData) : audioData
+        )
 
         // Create audio buffer
         const buffer = ctx.createBuffer(1, samples.length, sampleRate)

@@ -298,7 +298,7 @@ export function UnifiedDashboard() {
           isCalendarConnected={isCalendarConnected}
           voicePatterns={voicePatterns}
           history={historicalContext}
-          burnoutPrediction={burnoutPrediction}
+          burnoutPrediction={burnoutPrediction ?? undefined}
           features={allRecordings?.[0]?.features}
         />
 

@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useRef, useMemo, useE
 import { db } from "@/lib/storage/db"
 import { DEFAULT_ACCENT } from "@/lib/color-utils"
 import { DEFAULT_SANS, DEFAULT_SERIF, updateFontVariable, getFontCssFamily } from "@/lib/font-utils"
+import type { FontFamily, SerifFamily } from "@/lib/types"
 
 export type SceneMode = "landing" | "transitioning" | "dashboard"
 
@@ -91,7 +92,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     setSelectedSansFontState(font)
     updateFontVariable("--font-sans", getFontCssFamily(font, "sans"))
     // Persist to IndexedDB
-    db.settings.update("default", { selectedSansFont: font }).then((updated) => {
+    db.settings.update("default", { selectedSansFont: font as FontFamily }).then((updated) => {
       if (updated === 0) {
         // No record exists, create it
         return db.settings.put({
@@ -103,7 +104,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
           autoScheduleRecovery: false,
           preferredRecoveryTimes: [],
           localStorageOnly: true,
-          selectedSansFont: font,
+          selectedSansFont: font as FontFamily,
         })
       }
     }).catch(() => {
@@ -115,7 +116,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     setSelectedSerifFontState(font)
     updateFontVariable("--font-serif", getFontCssFamily(font, "serif"))
     // Persist to IndexedDB
-    db.settings.update("default", { selectedSerifFont: font }).then((updated) => {
+    db.settings.update("default", { selectedSerifFont: font as SerifFamily }).then((updated) => {
       if (updated === 0) {
         // No record exists, create it
         return db.settings.put({
@@ -127,7 +128,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
           autoScheduleRecovery: false,
           preferredRecoveryTimes: [],
           localStorageOnly: true,
-          selectedSerifFont: font,
+          selectedSerifFont: font as SerifFamily,
         })
       }
     }).catch(() => {

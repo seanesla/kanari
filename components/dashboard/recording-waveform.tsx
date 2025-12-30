@@ -79,7 +79,7 @@ export function RecordingWaveform({
   const color = colorProp || accentColor // Use accent color from context if not provided
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const barsRef = useRef<number[]>([])
-  const animationFrameRef = useRef<number>()
+  const animationFrameRef = useRef<number>(0)
   const waveformDataRef = useRef<number[]>([])
 
   // Initialize bars for real-time mode
