@@ -62,6 +62,7 @@ function RecordingCard({ recording, onDelete, isHighlighted }: RecordingCardProp
 
   return (
     <div
+      id={`recording-${recording.id}`}
       className={cn(
         "group rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl transition-all duration-300 hover:border-accent/50 hover:bg-card/40 overflow-hidden",
         isHighlighted && "ring-2 ring-accent ring-offset-2 ring-offset-background animate-pulse"
@@ -170,6 +171,26 @@ function RecordingsPageContent() {
   useEffect(() => {
     if (searchParams.get("newRecording") === "true") {
       setDrawerOpen(true)
+      // Clean up the URL without triggering a navigation
+      window.history.replaceState({}, "", "/dashboard/recordings")
+    }
+  }, [searchParams])
+
+  // Check for highlight param (from calendar tooltip navigation)
+  useEffect(() => {
+    const highlightId = searchParams.get("highlight")
+    if (highlightId) {
+      // Set the highlighted recording
+      setHighlightedRecordingId(highlightId)
+
+      // Scroll the recording into view after a brief delay for rendering
+      setTimeout(() => {
+        const element = document.getElementById(`recording-${highlightId}`)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }, 100)
+
       // Clean up the URL without triggering a navigation
       window.history.replaceState({}, "", "/dashboard/recordings")
     }

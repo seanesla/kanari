@@ -112,3 +112,15 @@
   min-height: 0;
 }
 
+/* ============================================
+   Recording Event Styles
+   ============================================ */
+
+/* Recording events - let the custom component handle all styling */
+.sx__event[data-calendar-id="recording"] {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+

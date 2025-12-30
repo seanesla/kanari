@@ -147,6 +147,7 @@ export function UnifiedDashboard() {
               <ScheduleXWeekCalendar
                 scheduledSuggestions={scheduledSuggestions}
                 completedSuggestions={completedSuggestions}
+                recordings={allRecordings}
                 onEventClick={handlers.handleEventClick}
                 onTimeSlotClick={handlers.handleTimeSlotClick}
                 onExternalDrop={handlers.handleExternalDrop}

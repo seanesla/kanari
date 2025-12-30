@@ -10,21 +10,38 @@ import { cn } from '@/lib/utils'
 import { logDebug } from '@/lib/logger'
 import { useSceneMode } from '@/lib/scene-context'
 import { generateDarkVariant, generateLightVariant } from '@/lib/color-utils'
-import type { Suggestion } from '@/lib/types'
+import { RecordingMarker } from './recording-marker'
+import { RecordingTooltip } from './recording-tooltip'
+import type { Suggestion, Recording } from '@/lib/types'
 import '@schedule-x/theme-default/dist/index.css'
 import './schedule-x-theme.css'
+
+// Event type enum to distinguish between different event sources
+type EventType = 'suggestion' | 'recording'
 
 // Extended event type with custom suggestion data
 // Source: Context7 - schedule-x/schedule-x docs - CalendarEvent allows [key: string]: any
 interface SuggestionEvent extends CalendarEvent {
+  _type: 'suggestion'
   _suggestion: Suggestion
   _isCompleted?: boolean
 }
 
+// Extended event type for recording markers
+interface RecordingEvent extends CalendarEvent {
+  _type: 'recording'
+  _recording: Recording
+}
+
+// Union type for all custom events
+type CustomCalendarEvent = SuggestionEvent | RecordingEvent
+
 interface ScheduleXWeekCalendarProps {
   scheduledSuggestions: Suggestion[]
   completedSuggestions?: Suggestion[]
+  recordings?: Recording[]
   onEventClick?: (suggestion: Suggestion) => void
+  onRecordingClick?: (recording: Recording) => void
   onTimeSlotClick?: (date: Date, hour: number) => void
   onEventUpdate?: (suggestion: Suggestion, newScheduledFor: string) => void
   onExternalDrop?: (suggestionId: string, date: Date, hour: number, minute: number) => void
@@ -60,6 +77,7 @@ function suggestionToEvent(suggestion: Suggestion): SuggestionEvent | null {
     start: startDateTime,
     end: endDateTime,
     calendarId: suggestion.category,
+    _type: 'suggestion',
     _suggestion: suggestion,
   }
 }
@@ -84,8 +102,37 @@ function completedToEvent(suggestion: Suggestion): SuggestionEvent | null {
     start: startDateTime,
     end: endDateTime,
     calendarId: 'completed',
+    _type: 'suggestion',
     _suggestion: suggestion,
     _isCompleted: true,
+  }
+}
+
+// Helper to map Recording to Schedule-X event format (as marker)
+function recordingToEvent(recording: Recording): RecordingEvent | null {
+  if (!recording.createdAt) return null
+
+  // Source: Context7 - schedule-x/schedule-x docs - "Timed Event Example"
+  const timeZone = Temporal.Now.timeZoneId()
+  const instant = Temporal.Instant.from(recording.createdAt)
+  const startDateTime = instant.toZonedDateTimeISO(timeZone)
+  // 20-min duration gives enough height for a proper pill-shaped event (~33px)
+  const endDateTime = startDateTime.add({ minutes: 20 })
+
+  const stressScore = recording.metrics?.stressScore
+  const fatigueScore = recording.metrics?.fatigueScore
+  const title = stressScore !== undefined
+    ? `S:${stressScore} F:${fatigueScore ?? '?'}`
+    : 'Recording'
+
+  return {
+    id: `recording-${recording.id}`,
+    title,
+    start: startDateTime,
+    end: endDateTime,
+    calendarId: 'recording',
+    _type: 'recording',
+    _recording: recording,
   }
 }
 
@@ -99,7 +146,9 @@ export function ScheduleXWeekCalendar(props: ScheduleXWeekCalendarProps) {
 function ScheduleXWeekCalendarInner({
   scheduledSuggestions,
   completedSuggestions = [],
+  recordings = [],
   onEventClick,
+  onRecordingClick,
   onTimeSlotClick,
   onEventUpdate,
   onExternalDrop,
@@ -110,6 +159,11 @@ function ScheduleXWeekCalendarInner({
   const [isDragOver, setIsDragOver] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const eventsService = useMemo(() => createEventsServicePlugin(), [])
+
+  // Tooltip state for recording markers
+  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
+  const [tooltipOpen, setTooltipOpen] = useState(false)
 
   // Generate break category colors from accent
   const breakColors = useMemo(() => ({
@@ -211,14 +265,38 @@ function ScheduleXWeekCalendarInner({
           onContainer: '#9ca3af',
         },
       },
+      recording: {
+        colorName: 'recording',
+        lightColors: {
+          main: '#f59e0b',
+          container: '#fef3c7',
+          onContainer: '#92400e',
+        },
+        darkColors: {
+          main: '#f59e0b',
+          container: '#78350f',
+          onContainer: '#fef3c7',
+        },
+      },
     },
     events: [],
     plugins: [eventsService, createDragAndDropPlugin()],
     callbacks: {
-      onEventClick(calendarEvent) {
-        // CalendarEvent has [key: string]: any, so we can access _suggestion directly
-        const event = calendarEvent as SuggestionEvent
-        if (event._suggestion && onEventClick) {
+      onEventClick(calendarEvent, e) {
+        const event = calendarEvent as CustomCalendarEvent
+
+        // Handle recording events - open tooltip
+        if (event._type === 'recording') {
+          const mouseEvent = e as MouseEvent
+          setSelectedRecording(event._recording)
+          setTooltipPosition({ x: mouseEvent.clientX, y: mouseEvent.clientY })
+          setTooltipOpen(true)
+          onRecordingClick?.(event._recording)
+          return
+        }
+
+        // Handle suggestion events
+        if (event._type === 'suggestion' && onEventClick) {
           onEventClick(event._suggestion)
         }
       },
@@ -243,7 +321,7 @@ function ScheduleXWeekCalendarInner({
     },
   })
 
-  // Sync events when scheduledSuggestions change
+  // Sync events when scheduledSuggestions or recordings change
   // Source: Context7 - schedule-x/schedule-x docs - "EventsService Plugin"
   // The plugin needs the calendar to be mounted before calling .set()
   useEffect(() => {
@@ -258,7 +336,15 @@ function ScheduleXWeekCalendarInner({
       .map(completedToEvent)
       .filter((event): event is SuggestionEvent => event !== null)
 
-    const allEvents: SuggestionEvent[] = [...scheduledEvents, ...completedEvents]
+    const recordingEvents = recordings
+      .map(recordingToEvent)
+      .filter((event): event is RecordingEvent => event !== null)
+
+    const allEvents: CustomCalendarEvent[] = [
+      ...scheduledEvents,
+      ...completedEvents,
+      ...recordingEvents,
+    ]
 
     // Use try-catch as the plugin may not be fully initialized on first render
     try {
@@ -267,7 +353,7 @@ function ScheduleXWeekCalendarInner({
       // Calendar not fully mounted yet, will retry on next render
       logDebug("ScheduleXCalendar", "Events service not ready:", error)
     }
-  }, [scheduledSuggestions, completedSuggestions, eventsService, calendar])
+  }, [scheduledSuggestions, completedSuggestions, recordings, eventsService, calendar])
 
   // Calculate drop target time from mouse position
   const calculateDropTime = useCallback((e: React.DragEvent): { date: Date; hour: number; minute: number } | null => {
@@ -339,6 +425,39 @@ function ScheduleXWeekCalendarInner({
     onExternalDrop(suggestionId, dropTime.date, dropTime.hour, dropTime.minute)
   }, [onExternalDrop, calculateDropTime])
 
+  // Custom component renderer for time grid events
+  // Source: Context7 - schedule-x/schedule-x docs - "Customize Event Modal Content in React"
+  // Note: When using customComponents.timeGridEvent, we must render ALL event types ourselves
+  const customComponents = useMemo(() => ({
+    timeGridEvent: ({ calendarEvent }: { calendarEvent: CalendarEvent }) => {
+      const event = calendarEvent as CustomCalendarEvent
+
+      // Render recording as a compact pill event
+      if (event._type === 'recording') {
+        return <RecordingMarker recording={event._recording} />
+      }
+
+      // Render suggestion events with default-like styling
+      // We need to render this ourselves since customComponents replaces the default
+      const isCompleted = (event as SuggestionEvent)._isCompleted
+      return (
+        <div
+          className={cn(
+            "h-full w-full rounded px-2 py-1 overflow-hidden cursor-pointer",
+            "text-xs font-medium leading-tight",
+            isCompleted && "opacity-60"
+          )}
+          style={{
+            // Use the calendar category colors from Schedule-X
+            // The container element already has the background color set by Schedule-X
+          }}
+        >
+          <div className="truncate">{calendarEvent.title}</div>
+        </div>
+      )
+    },
+  }), [])
+
   return (
     <div
       ref={containerRef}
@@ -352,7 +471,7 @@ function ScheduleXWeekCalendarInner({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <ScheduleXCalendar calendarApp={calendar} />
+      <ScheduleXCalendar calendarApp={calendar} customComponents={customComponents} />
       {isDragOver && (
         <div className="absolute inset-0 bg-accent/5 rounded-lg pointer-events-none flex items-center justify-center">
           <div className="bg-background/90 px-4 py-2 rounded-lg text-sm font-medium text-accent">
@@ -360,6 +479,14 @@ function ScheduleXWeekCalendarInner({
           </div>
         </div>
       )}
+
+      {/* Recording Tooltip */}
+      <RecordingTooltip
+        recording={selectedRecording}
+        open={tooltipOpen}
+        onOpenChange={setTooltipOpen}
+        anchorPosition={tooltipPosition}
+      />
     </div>
   )
 }
