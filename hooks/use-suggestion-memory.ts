@@ -39,7 +39,7 @@ export function useSuggestionMemory() {
     const completed = allSuggestions
       .filter(
         (s) =>
-          s.status === "completed" &&
+          (s.status === "completed" || s.status === "accepted") &&
           new Date(s.lastUpdatedAt || s.createdAt).getTime() >= thirtyDaysAgo
       )
       .slice(0, 20)
@@ -75,7 +75,7 @@ export function useSuggestionMemory() {
     // Calculate category usage stats from completed suggestions
     const categoryCount = new Map<SuggestionCategory, number>()
     allSuggestions
-      .filter((s) => s.status === "completed")
+      .filter((s) => s.status === "completed" || s.status === "accepted")
       .forEach((s) => {
         categoryCount.set(s.category, (categoryCount.get(s.category) || 0) + 1)
       })
@@ -85,14 +85,16 @@ export function useSuggestionMemory() {
     )
 
     // Calculate completion rate
+    // Treat accepted as completed for memory stats (see docs/error-patterns/accepted-suggestions-missing-from-memory.md)
     const totalActionable = allSuggestions.filter(
       (s) =>
         s.status === "completed" ||
+        s.status === "accepted" ||
         s.status === "dismissed" ||
         s.status === "scheduled"
     ).length
     const totalCompleted = allSuggestions.filter(
-      (s) => s.status === "completed"
+      (s) => s.status === "completed" || s.status === "accepted"
     ).length
     const averageCompletionRate =
       totalActionable > 0
