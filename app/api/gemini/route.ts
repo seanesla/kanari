@@ -1,29 +1,58 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateAPIKey, generateSuggestions } from "@/lib/gemini/client"
-import { SYSTEM_PROMPT, generateUserPrompt, buildWellnessContext } from "@/lib/gemini/prompts"
-import type { Suggestion, StressLevel, FatigueLevel, TrendDirection } from "@/lib/types"
+import { validateAPIKey, getAPIKeyFromRequest, generateSuggestions, generateDiffAwareSuggestions } from "@/lib/gemini/client"
+import {
+  SYSTEM_PROMPT,
+  DIFF_AWARE_SYSTEM_PROMPT,
+  generateUserPrompt,
+  generateDiffAwareUserPrompt,
+  buildWellnessContext,
+  getTimeOfDay,
+  getDayType,
+} from "@/lib/gemini/prompts"
+import type {
+  Suggestion,
+  StressLevel,
+  FatigueLevel,
+  TrendDirection,
+  GeminiMemoryContext,
+  EnrichedWellnessContext,
+} from "@/lib/types"
 
 /**
  * POST /api/gemini
  *
- * Generate personalized recovery suggestions using Gemini API
+ * Generate personalized recovery suggestions using Gemini API.
+ * Supports two modes: legacy (new suggestions) and diff-aware (review existing).
  *
  * Request body:
  * {
+ *   // Required wellness data
  *   stressScore: number,
  *   stressLevel: StressLevel,
  *   fatigueScore: number,
  *   fatigueLevel: FatigueLevel,
  *   trend: TrendDirection,
+ *
+ *   // Optional enriched context
  *   voicePatterns?: { speechRate, energyLevel, pauseFrequency, voiceTone },
  *   history?: { recordingCount, daysOfData, averageStress, averageFatigue, stressChange, fatigueChange },
  *   burnout?: { riskLevel, predictedDays, factors },
- *   confidence?: number
+ *   confidence?: number,
+ *
+ *   // Diff-aware mode (optional)
+ *   diffMode?: boolean,
+ *   existingSuggestions?: Suggestion[],
+ *   memoryContext?: GeminiMemoryContext
  * }
  *
- * Response:
+ * Response (legacy mode):
+ * { suggestions: Suggestion[] }
+ *
+ * Response (diff mode):
  * {
- *   suggestions: Suggestion[]
+ *   diffMode: true,
+ *   suggestions: GeminiDiffSuggestion[],
+ *   summary: { kept, updated, dropped, added }
  * }
  */
 export async function POST(request: NextRequest) {
@@ -39,7 +68,11 @@ export async function POST(request: NextRequest) {
       voicePatterns,
       history,
       burnout,
-      confidence
+      confidence,
+      // Diff-aware mode fields
+      diffMode,
+      existingSuggestions,
+      memoryContext,
     } = body
 
     // Validate required fields
@@ -375,18 +408,13 @@ export async function POST(request: NextRequest) {
       trend as TrendDirection
     )
 
-    // Build enriched context object for future prompt enhancement
-    // Currently validated but not yet used in prompts (see lib/gemini/prompts.ts)
-    const enrichedContext = {
-      ...context,
-      ...(voicePatterns && { voicePatterns }),
-      ...(history && { history }),
-      ...(burnout && { burnout }),
-      ...(confidence !== undefined && { confidence })
-    }
+    // Add enriched context if provided
+    if (voicePatterns) context.voicePatterns = voicePatterns
+    if (history) context.history = history
+    if (burnout) context.burnout = burnout
+    if (confidence !== undefined) context.confidence = confidence
 
-    // Generate user prompt (currently uses basic context only)
-    // Future enhancement: pass enrichedContext when prompts.ts is updated
+    // Generate user prompt with enriched context
     const userPrompt = generateUserPrompt(context)
 
     // Call Gemini API with Google Search grounding enabled

@@ -1,6 +1,6 @@
-export { KanbanBoard } from "./kanban-board"
-export { KanbanColumn } from "./kanban-column"
-export { SuggestionCard, SuggestionCardOverlay } from "./suggestion-card"
+// Unified dashboard components
+export { DraggableSuggestionCard } from "./draggable-suggestion-card"
+export { PendingSidebar } from "./pending-sidebar"
 export { SuggestionDetailDialog } from "./suggestion-detail-dialog"
 export { ScheduleTimeDialog } from "./schedule-time-dialog"
 export {

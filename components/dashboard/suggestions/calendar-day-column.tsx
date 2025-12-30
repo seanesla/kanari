@@ -25,7 +25,7 @@ export function CalendarDayColumn({
   const dayNumber = date.getDate()
 
   return (
-    <div className="flex flex-col min-w-[60px] flex-1">
+    <div className="flex flex-col min-w-[60px]">
       {/* Day header */}
       <div className={cn(
         "text-center py-2 border-b border-border/50",
