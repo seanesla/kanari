@@ -90,7 +90,7 @@ export function FontPicker() {
       <div className="mt-6 flex items-center justify-end">
         <button
           onClick={resetFontsToDefault}
-          className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 border border-border rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+          className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-secondary/50 transition-colors"
           aria-label="Reset all fonts to their default values"
         >
           Reset to Defaults
