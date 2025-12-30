@@ -30,8 +30,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Offset for navbar + page padding */}
           <div className="relative w-full h-full px-8 md:px-16 lg:px-20 pt-14">
             <DecorativeGrid />
-            <div className="absolute -top-32 -right-32 h-96 w-96 rounded-full bg-accent/10 blur-3xl" />
-            <div className="absolute -bottom-24 -left-24 h-80 w-80 rounded-full bg-accent/5 blur-3xl" />
           </div>
         </div>
         {/* Page content */}
