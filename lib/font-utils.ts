@@ -44,21 +44,45 @@ export const SERIF_FONTS: FontOption[] = [
   { name: "EB Garamond", variable: "--font-serif", cssFamily: '"EB Garamond", Georgia' },
 ]
 
-// Mono fonts (7 options)
-export const MONO_FONTS: FontOption[] = [
-  { name: "Geist Mono", variable: "--font-mono", cssFamily: '"Geist Mono", monospace' },
-  { name: "JetBrains Mono", variable: "--font-mono", cssFamily: '"JetBrains Mono", monospace' },
-  { name: "Fira Code", variable: "--font-mono", cssFamily: '"Fira Code", monospace' },
-  { name: "Roboto Mono", variable: "--font-mono", cssFamily: '"Roboto Mono", monospace' },
-  { name: "IBM Plex Mono", variable: "--font-mono", cssFamily: '"IBM Plex Mono", monospace' },
-  { name: "Inconsolata", variable: "--font-mono", cssFamily: '"Inconsolata", monospace' },
-  { name: "Source Code Pro", variable: "--font-mono", cssFamily: '"Source Code Pro", monospace' },
-]
-
 // Defaults
 export const DEFAULT_SANS = "Instrument Sans"
 export const DEFAULT_SERIF = "Instrument Serif"
-export const DEFAULT_MONO = "Geist Mono"
+
+// CSS variable mapping for font previews
+export const FONT_CSS_VARIABLES: Record<string, string> = {
+  // Sans
+  "Instrument Sans": "var(--font-instrument-sans)",
+  "Inter": "var(--font-inter)",
+  "DM Sans": "var(--font-dm-sans)",
+  "Work Sans": "var(--font-work-sans)",
+  "Public Sans": "var(--font-public-sans)",
+  "Plus Jakarta Sans": "var(--font-plus-jakarta-sans)",
+  "Manrope": "var(--font-manrope)",
+  "Sora": "var(--font-sora)",
+  "Outfit": "var(--font-outfit)",
+  "Quicksand": "var(--font-quicksand)",
+  "Karla": "var(--font-karla)",
+  "Nunito Sans": "var(--font-nunito-sans)",
+  "Poppins": "var(--font-poppins)",
+  "Raleway": "var(--font-raleway)",
+  "Rubik": "var(--font-rubik)",
+  "Source Sans 3": "var(--font-source-sans-3)",
+  "Montserrat": "var(--font-montserrat)",
+  "Lexend": "var(--font-lexend)",
+  // Serif
+  "Instrument Serif": "var(--font-instrument-serif)",
+  "Merriweather": "var(--font-merriweather)",
+  "Lora": "var(--font-lora)",
+  "Playfair Display": "var(--font-playfair-display)",
+  "IBM Plex Serif": "var(--font-ibm-plex-serif)",
+  "Spectral": "var(--font-spectral)",
+  "Crimson Pro": "var(--font-crimson-pro)",
+  "Libre Baskerville": "var(--font-libre-baskerville)",
+  "Cardo": "var(--font-cardo)",
+  "Bitter": "var(--font-bitter)",
+  "Fraunces": "var(--font-fraunces)",
+  "EB Garamond": "var(--font-eb-garamond)",
+}
 
 /**
  * Update a CSS custom property (CSS variable) for font switching
@@ -78,16 +102,16 @@ export function updateFontVariable(variable: string, fontFamily: string): void {
 /**
  * Get CSS family string for a font name
  */
-export function getFontCssFamily(fontName: string, fontType: "sans" | "serif" | "mono" = "sans"): string {
-  const fontList = fontType === "sans" ? SANS_FONTS : fontType === "serif" ? SERIF_FONTS : MONO_FONTS
+export function getFontCssFamily(fontName: string, fontType: "sans" | "serif" = "sans"): string {
+  const fontList = fontType === "sans" ? SANS_FONTS : SERIF_FONTS
   const font = fontList.find((f) => f.name === fontName)
-  return font?.cssFamily || (fontType === "sans" ? '"Instrument Sans", system-ui' : fontType === "serif" ? '"Instrument Serif", Georgia' : '"Geist Mono", monospace')
+  return font?.cssFamily || (fontType === "sans" ? '"Instrument Sans", system-ui' : '"Instrument Serif", Georgia')
 }
 
 /**
  * Check if a font name is valid
  */
-export function isValidFont(fontName: string, fontType: "sans" | "serif" | "mono"): boolean {
-  const fontList = fontType === "sans" ? SANS_FONTS : fontType === "serif" ? SERIF_FONTS : MONO_FONTS
+export function isValidFont(fontName: string, fontType: "sans" | "serif"): boolean {
+  const fontList = fontType === "sans" ? SANS_FONTS : SERIF_FONTS
   return fontList.some((f) => f.name === fontName)
 }

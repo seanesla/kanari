@@ -4,7 +4,6 @@ import {
   // Current fonts (defaults)
   Instrument_Sans,
   Instrument_Serif,
-  Geist_Mono,
   // Sans fonts
   Inter,
   DM_Sans,
@@ -35,13 +34,6 @@ import {
   Bitter,
   Fraunces,
   EB_Garamond,
-  // Mono fonts
-  JetBrains_Mono,
-  Fira_Code,
-  Roboto_Mono,
-  IBM_Plex_Mono,
-  Inconsolata,
-  Source_Code_Pro,
 } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { Providers } from "@/components/providers"
@@ -105,19 +97,6 @@ const bitter = Bitter({ subsets: ["latin"], variable: "--font-bitter" })
 const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-fraunces" })
 const ebGaramond = EB_Garamond({ subsets: ["latin"], variable: "--font-eb-garamond" })
 
-// Mono fonts
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" })
-const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono" })
-const firaCode = Fira_Code({ subsets: ["latin"], variable: "--font-fira-code" })
-const robotoMono = Roboto_Mono({ subsets: ["latin"], variable: "--font-roboto-mono" })
-const ibmPlexMono = IBM_Plex_Mono({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-  variable: "--font-ibm-plex-mono",
-})
-const inconsolata = Inconsolata({ subsets: ["latin"], variable: "--font-inconsolata" })
-const sourceCodePro = Source_Code_Pro({ subsets: ["latin"], variable: "--font-source-code-pro" })
-
 export const metadata: Metadata = {
   title: "kanari",
   description: "Your metrics are lying to you.",
@@ -142,8 +121,6 @@ export default function RootLayout({
             ${instrumentSerif.variable} ${merriweather.variable} ${lora.variable} ${playfairDisplay.variable}
             ${ibmPlexSerif.variable} ${spectral.variable} ${crimsonPro.variable} ${libreBaskerville.variable}
             ${cardo.variable} ${bitter.variable} ${fraunces.variable} ${ebGaramond.variable}
-            ${geistMono.variable} ${jetbrainsMono.variable} ${firaCode.variable} ${robotoMono.variable}
-            ${ibmPlexMono.variable} ${inconsolata.variable} ${sourceCodePro.variable}
             font-sans antialiased
           `}
         >
