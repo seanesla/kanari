@@ -242,12 +242,12 @@ export function CheckInDrawer({
   return (
     <>
       <Drawer open={open} onOpenChange={handleOpenChange}>
-        <DrawerContent className="max-h-[85vh]">
+        <DrawerContent className="h-screen !mt-0 !max-h-none !rounded-none">
           {/*
             ===== HEADER SECTION =====
             Shows title, instruction, and close button (when not in session)
           */}
-          <DrawerHeader className="px-6 py-4 border-b border-border/50">
+          <DrawerHeader className="px-4 py-4 border-b border-border/50">
             <div className="flex items-center justify-between">
               <div>
                 <DrawerTitle className="text-lg">Check in</DrawerTitle>

@@ -27,15 +27,16 @@
  * - Has mute functionality to pause microphone input
  */
 
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Phone, PhoneOff, Mic, MicOff } from "lucide-react"
+import { Phone, PhoneOff, Mic, MicOff, History } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCheckIn, type StartSessionOptions } from "@/hooks/use-check-in"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { VoiceIndicatorLarge } from "@/components/check-in/voice-indicator"
 import { ConversationView } from "@/components/check-in/conversation-view"
+import { ConversationHistory } from "@/components/check-in/conversation-history"
 import type { CheckInSession, VoicePatterns } from "@/lib/types"
 
 interface AIChatContentProps {
@@ -72,6 +73,9 @@ export function AIChatContent({
   // Prevent duplicate session starts from React StrictMode double-mounting
   // or rapid tab switching
   const sessionStartedRef = useRef(false)
+
+  // State for showing/hiding the conversation history sidebar
+  const [showHistory, setShowHistory] = useState(false)
 
   // Main check-in hook that manages the Gemini Live connection
   // This hook handles all the complex WebSocket, audio capture, and playback logic
@@ -184,9 +188,26 @@ export function AIChatContent({
         : 0
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* Main content area with animated state transitions */}
-      <AnimatePresence mode="wait">
+    <div className="flex h-full overflow-hidden">
+      {/* History sidebar - slides in from left */}
+      <AnimatePresence>
+        {showHistory && (
+          <motion.div
+            className="flex-shrink-0 w-72 h-full"
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: 288, opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+          >
+            <ConversationHistory onClose={() => setShowHistory(false)} />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main chat content area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Main content area with animated state transitions */}
+        <AnimatePresence mode="wait">
 
         {/* ===== IDLE STATE ===== */}
         {/* Brief loading state while auto-start effect kicks in */}
@@ -355,51 +376,64 @@ export function AIChatContent({
             <Button onClick={handleClose}>Done</Button>
           </motion.div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>
 
-      {/* ===== FOOTER CONTROLS ===== */}
-      {/* Only shown during active conversation (not during init/complete/error) */}
-      {showConversation && (
-        <div className="flex-shrink-0 px-6 py-4 border-t bg-muted/30">
-          <div className="flex items-center justify-center gap-4">
-            {/*
-              Mute button - toggles microphone on/off
-              Red background when muted to clearly indicate state
-            */}
-            <Button
-              variant="outline"
-              size="icon"
-              className={cn(
-                "h-12 w-12 rounded-full",
-                checkIn.isMuted && "bg-red-500 hover:bg-red-600 text-white"
-              )}
-              onClick={() => controls.toggleMute()}
-            >
-              {checkIn.isMuted ? (
-                <MicOff className="h-5 w-5" />
-              ) : (
-                <Mic className="h-5 w-5" />
-              )}
-            </Button>
+        {/* ===== FOOTER CONTROLS ===== */}
+        {/* Only shown during active conversation (not during init/complete/error) */}
+        {showConversation && (
+          <div className="flex-shrink-0 px-6 py-4 border-t bg-muted/30">
+            <div className="flex items-center justify-center gap-4">
+              {/*
+                History button - toggles the conversation history sidebar
+              */}
+              <Button
+                variant="outline"
+                size="icon"
+                className={cn(
+                  "h-12 w-12 rounded-full",
+                  showHistory && "bg-accent text-accent-foreground"
+                )}
+                onClick={() => setShowHistory(!showHistory)}
+              >
+                <History className="h-5 w-5" />
+              </Button>
 
-            {/*
-              End call button - large red button to end the conversation
-              Triggers graceful session end and saves to database
-            */}
-            <Button
-              variant="destructive"
-              size="icon"
-              className="h-14 w-14 rounded-full"
-              onClick={handleEndCall}
-            >
-              <PhoneOff className="h-6 w-6" />
-            </Button>
+              {/*
+                Mute button - toggles microphone on/off
+                Red background when muted to clearly indicate state
+              */}
+              <Button
+                variant="outline"
+                size="icon"
+                className={cn(
+                  "h-12 w-12 rounded-full",
+                  checkIn.isMuted && "bg-red-500 hover:bg-red-600 text-white"
+                )}
+                onClick={() => controls.toggleMute()}
+              >
+                {checkIn.isMuted ? (
+                  <MicOff className="h-5 w-5" />
+                ) : (
+                  <Mic className="h-5 w-5" />
+                )}
+              </Button>
 
-            {/* Invisible spacer for visual symmetry with mute button */}
-            <div className="h-12 w-12" />
+              {/*
+                End call button - large red button to end the conversation
+                Triggers graceful session end and saves to database
+              */}
+              <Button
+                variant="destructive"
+                size="icon"
+                className="h-14 w-14 rounded-full"
+                onClick={handleEndCall}
+              >
+                <PhoneOff className="h-6 w-6" />
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }
