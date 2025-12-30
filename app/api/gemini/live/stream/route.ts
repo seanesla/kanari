@@ -13,13 +13,25 @@
 
 import { NextRequest } from "next/server"
 import { sessionManager } from "@/lib/gemini/session-manager"
-import type { LiveServerMessage } from "@google/genai"
+// Note: We don't import LiveServerMessage because we use our own ExtendedServerMessage
+// type that's more flexible with the actual API response format
 
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
-// Extended message type to handle fields that may not be in SDK types yet
-interface ExtendedServerMessage extends LiveServerMessage {
+/**
+ * Extended message type to handle fields that may not be in SDK types yet.
+ *
+ * We use a standalone interface (not extending LiveServerMessage) because
+ * the SDK types may have stricter definitions for some fields that don't
+ * match what the API actually returns. This gives us flexibility to handle
+ * the raw API response format.
+ */
+interface ExtendedServerMessage {
+  // From LiveServerMessage base
+  setupComplete?: boolean
+
+  // Server content (audio, text, turn signals)
   serverContent?: {
     modelTurn?: {
       parts?: Array<{
@@ -38,10 +50,13 @@ interface ExtendedServerMessage extends LiveServerMessage {
       finished?: boolean // Per SDK Transcription type
     }
   }
+
   // Voice activity detection signal (user speech start/end)
+  // The API returns vadSignalType as a string, not a strict enum
   voiceActivityDetectionSignal?: {
     vadSignalType?: string
   }
+
   // Tool call (function calling)
   // Source: Context7 - /googleapis/js-genai docs - "LiveServerToolCall"
   toolCall?: {
@@ -197,8 +212,9 @@ export async function GET(request: NextRequest) {
       }
 
       // Handle Gemini messages
-      const onMessage = (msg: LiveServerMessage) => {
-        const formatted = formatServerMessage(msg as ExtendedServerMessage)
+      // The emitter sends raw API responses which we type as ExtendedServerMessage
+      const onMessage = (msg: ExtendedServerMessage) => {
+        const formatted = formatServerMessage(msg)
         send("message", formatted)
       }
 

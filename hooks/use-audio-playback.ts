@@ -230,8 +230,22 @@ export function useAudioPlayback(
         await audioContext.resume()
       }
 
+      // Abort if context was closed during resume (e.g., React StrictMode unmount)
+      // Note: TypeScript's AudioContextState type is outdated and doesn't include "closed",
+      // but the Web Audio API spec includes it: https://webaudio.github.io/web-audio-api/#dom-audiocontextstate
+      if ((audioContext.state as string) === "closed") {
+        console.log("[useAudioPlayback] AudioContext closed during initialization, aborting")
+        throw new Error("INITIALIZATION_ABORTED")
+      }
+
       // Load the playback worklet
       await audioContext.audioWorklet.addModule("/playback.worklet.js")
+
+      // Abort if context was closed during module loading
+      if ((audioContext.state as string) === "closed") {
+        console.log("[useAudioPlayback] AudioContext closed during module loading, aborting")
+        throw new Error("INITIALIZATION_ABORTED")
+      }
 
       // Create worklet node
       const workletNode = new AudioWorkletNode(audioContext, "playback-processor", {

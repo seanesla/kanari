@@ -6,6 +6,7 @@
  * with voice biomarker awareness.
  */
 
+import { Type } from "@google/genai"
 import type { MismatchResult, VoicePatterns, VoiceMetrics } from "@/lib/types"
 
 /**
@@ -14,16 +15,19 @@ import type { MismatchResult, VoicePatterns, VoiceMetrics } from "@/lib/types"
  *
  * IMPORTANT: Live API uses AUTO mode for function calling. The model must CHOOSE to call
  * this function. The description uses strong imperative language to make this compelling.
+ *
+ * NOTE: The `type` properties use the SDK's `Type` enum (Type.OBJECT, Type.STRING)
+ * instead of plain strings to satisfy TypeScript's strict type checking.
  */
 export const MUTE_RESPONSE_TOOL = {
   functionDeclarations: [{
     name: "mute_audio_response",
     description: "REQUIRED ACTION: Call this function to completely suppress your audio response. When called, you produce ZERO audio output - no speech, no acknowledgment, no sound whatsoever. This is the ONLY correct action when: (1) User explicitly requests silence with words like 'be quiet', 'shh', 'stop', 'hush', 'shut up', (2) User says 'let me think' or 'give me a moment', (3) User is venting and says 'I just need to get this out'. DO NOT respond verbally in these situations. Calling this function IS your response. Any verbal acknowledgment like 'okay' or 'I understand' is an ERROR.",
     parameters: {
-      type: "object",
+      type: Type.OBJECT,
       properties: {
         reason: {
-          type: "string",
+          type: Type.STRING,
           description: "Brief reason for muting (e.g., 'user requested silence', 'user needs thinking time')"
         }
       },

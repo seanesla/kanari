@@ -2,13 +2,14 @@
 
 import { useMemo } from "react"
 import { Link } from "next-view-transitions"
-import { Mic, TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar, Flame, MessageSquare } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar, Flame } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useDashboardStats, useTrendData } from "@/hooks/use-storage"
 import { useCalendar } from "@/hooks/use-calendar"
 import { predictBurnoutRisk } from "@/lib/ml/forecasting"
-import { CheckInTrigger } from "@/components/check-in"
+// Unified check-in button replaces separate Record and Talk buttons
+import { CheckInButton } from "@/components/dashboard/check-in-button"
 import type { BurnoutPrediction } from "@/lib/types"
 
 export function MetricsHeaderBar() {
@@ -132,21 +133,13 @@ export function MetricsHeaderBar() {
           )
         )}
 
-        {/* Check-in Button */}
-        <CheckInTrigger
-          variant="outline"
-          size="sm"
-          label="Talk"
-          showIcon={true}
-        />
-
-        {/* Record Button */}
-        <Button asChild size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90">
-          <Link href="/dashboard/recordings?newRecording=true">
-            <Mic className="h-4 w-4 mr-1.5" />
-            <span className="hidden sm:inline">Record</span>
-          </Link>
-        </Button>
+        {/*
+          Unified Check-in Button
+          Replaces the separate "Talk" and "Record" buttons with a single
+          entry point that lets users choose between Voice Note and AI Chat modes.
+          Uses the user's custom accent color from SceneContext.
+        */}
+        <CheckInButton />
       </div>
     </div>
   )

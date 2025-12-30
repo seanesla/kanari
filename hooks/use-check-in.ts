@@ -722,8 +722,28 @@ export function useCheckIn(
         await audioContext.resume()
       }
 
+      // Abort if context was closed during resume (e.g., React StrictMode unmount)
+      // Note: TypeScript's AudioContextState type is outdated and doesn't include "closed",
+      // but the Web Audio API spec includes it: https://webaudio.github.io/web-audio-api/#dom-audiocontextstate
+      if ((audioContext.state as string) === "closed") {
+        console.log("[useCheckIn] AudioContext closed during initialization, aborting")
+        // Clean up the stream we just created
+        stream.getTracks().forEach((track) => track.stop())
+        mediaStreamRef.current = null
+        throw new Error("INITIALIZATION_ABORTED")
+      }
+
       // Load capture worklet
       await audioContext.audioWorklet.addModule("/capture.worklet.js")
+
+      // Abort if context was closed during module loading
+      if ((audioContext.state as string) === "closed") {
+        console.log("[useCheckIn] AudioContext closed during module loading, aborting")
+        // Clean up the stream we just created
+        stream.getTracks().forEach((track) => track.stop())
+        mediaStreamRef.current = null
+        throw new Error("INITIALIZATION_ABORTED")
+      }
 
       // Create worklet node
       const captureWorklet = new AudioWorkletNode(audioContext, "capture-processor")
@@ -848,6 +868,25 @@ export function useCheckIn(
         callbacksRef.current.onSessionStart?.(session)
       } catch (error) {
         const err = error instanceof Error ? error : new Error("Failed to start session")
+
+        // INITIALIZATION_ABORTED is expected in React StrictMode - the first mount's
+        // async initialization is aborted when StrictMode unmounts the component.
+        // The second mount will succeed, so we silently clean up without showing errors.
+        if (err.message === "INITIALIZATION_ABORTED") {
+          console.log("[useCheckIn] Session initialization aborted (StrictMode cleanup)")
+          // Cleanup only what was initialized (in reverse order)
+          if (captureInitialized) {
+            cleanupAudioCapture()
+          }
+          if (playbackInitialized) {
+            playbackControls.cleanup()
+          }
+          // Reset to idle so second mount can try again
+          dispatch({ type: "RESET" })
+          return
+        }
+
+        // Real errors get shown to the user
         dispatch({ type: "SET_ERROR", error: err.message })
         callbacksRef.current.onError?.(err)
 

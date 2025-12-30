@@ -146,7 +146,8 @@ class GeminiSessionManager {
           },
           onmessage: (msg: LiveServerMessage) => {
             // Debug: Log raw message to see what Gemini actually sends
-            const msgAny = msg as Record<string, unknown>
+            // Cast through unknown to allow accessing fields not in SDK types
+            const msgAny = msg as unknown as Record<string, unknown>
             // Check for inputTranscription at root level
             if (msgAny.inputTranscription) {
               console.log(`[SessionManager] INPUT TRANSCRIPTION (root):`, JSON.stringify(msgAny.inputTranscription))
