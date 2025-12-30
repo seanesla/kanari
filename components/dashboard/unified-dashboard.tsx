@@ -15,6 +15,7 @@ import { MetricsHeaderBar } from "./metrics-header-bar"
 import { PendingSidebar } from "./suggestions/pending-sidebar"
 import { ScheduleXWeekCalendar } from "./calendar"
 import { SuggestionDetailDialog, ScheduleTimeDialog } from "./suggestions"
+import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import type { Suggestion, BurnoutPrediction } from "@/lib/types"
 
 export function UnifiedDashboard() {
@@ -171,7 +172,8 @@ export function UnifiedDashboard() {
     <div className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-4 md:px-8 lg:px-12 pt-24 pb-12 relative z-10">
         {/* Hero Section */}
-        <div className="relative mb-12">
+        <div className="relative mb-12 overflow-hidden rounded-lg p-6">
+          <DecorativeGrid />
           <div
             className={cn(
               "relative transition-all duration-1000 delay-100",

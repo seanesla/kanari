@@ -11,6 +11,7 @@ import { useRecordings, useRecordingActions } from "@/hooks/use-storage"
 import { RecordingWaveform } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
 import { RecordingDrawer } from "@/components/dashboard/recording-drawer"
+import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import type { Recording } from "@/lib/types"
 
 function formatDuration(seconds: number): string {
@@ -219,7 +220,8 @@ function RecordingsPageContent() {
     <div className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
         {/* HERO SECTION */}
-        <div className="relative mb-12">
+        <div className="relative mb-12 overflow-hidden rounded-lg p-6">
+          <DecorativeGrid />
           <div
             className={cn(
               "relative transition-all duration-1000 delay-100",

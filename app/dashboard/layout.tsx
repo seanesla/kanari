@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react"
 import { useSceneMode } from "@/lib/scene-context"
-import { DecorativeGrid } from "@/components/ui/decorative-grid"
 
 const DashboardAnimationContext = createContext({ shouldAnimate: false })
 export const useDashboardAnimation = () => useContext(DashboardAnimationContext)
@@ -25,14 +24,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <DashboardAnimationContext.Provider value={{ shouldAnimate }}>
       <div className="relative" data-dashboard>
-        {/* Background grid - scrolls with content */}
-        <div className="absolute top-0 left-0 right-0 h-[420px] pointer-events-none z-0 overflow-hidden">
-          {/* Offset for navbar + page padding */}
-          <div className="relative w-full h-full px-8 md:px-16 lg:px-20 pt-14">
-            <DecorativeGrid />
-          </div>
-        </div>
-        {/* Page content */}
         {children}
       </div>
     </DashboardAnimationContext.Provider>

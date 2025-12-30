@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { SettingsContent } from "@/components/dashboard/settings-content"
+import { DecorativeGrid } from "@/components/ui/decorative-grid"
 
 export default function SettingsPage() {
   const { shouldAnimate } = useDashboardAnimation()
@@ -21,7 +22,8 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
         {/* Header Section */}
-        <div className="relative mb-12">
+        <div className="relative mb-12 overflow-hidden rounded-lg p-6">
+          <DecorativeGrid />
           <div
             className={cn(
               "relative transition-all duration-1000 delay-100",

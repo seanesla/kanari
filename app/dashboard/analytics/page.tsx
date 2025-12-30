@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo, useRef } from "react"
-import { TrendingUp, AlertTriangle, TrendingDown, Minus, ChevronDown, ArrowLeft } from "lucide-react"
-import { Link } from "next-view-transitions"
+import { TrendingUp, AlertTriangle, TrendingDown, Minus, ChevronDown } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   RadialBarChart,
@@ -12,12 +11,12 @@ import {
 } from "recharts"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
 import { predictBurnoutRisk } from "@/lib/ml/forecasting"
 import { useDashboardStats, useTrendData, useScheduledSuggestions, useRecordings } from "@/hooks/use-storage"
 import { StressFatigueChart } from "@/components/dashboard/stress-fatigue-chart"
 import { JourneyProgress } from "@/components/dashboard/journey-progress"
 import { useSceneMode } from "@/lib/scene-context"
+import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import type { BurnoutPrediction } from "@/lib/types"
 
 export default function AnalyticsPage() {
@@ -182,24 +181,21 @@ export default function AnalyticsPage() {
     <div className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
         {/* Header */}
-        <div
-          className={cn(
-            "relative mb-12 transition-all duration-1000 delay-100",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-          )}
-        >
-          <Button asChild variant="ghost" size="sm" className="mb-4 -ml-2">
-            <Link href="/dashboard">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Dashboard
-            </Link>
-          </Button>
-          <h1 className="text-3xl md:text-4xl font-serif leading-[0.95] mb-3">
-            Wellness <span className="text-accent">insights</span>
-          </h1>
-          <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
-            Detailed analysis of your stress, fatigue trends, and burnout risk over time.
-          </p>
+        <div className="relative mb-12 overflow-hidden rounded-lg p-6">
+          <DecorativeGrid />
+          <div
+            className={cn(
+              "relative transition-all duration-1000 delay-100",
+              visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+            )}
+          >
+            <h1 className="text-3xl md:text-4xl font-serif leading-[0.95] mb-3">
+              Wellness <span className="text-accent">insights</span>
+            </h1>
+            <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
+              Detailed analysis of your stress, fatigue trends, and burnout risk over time.
+            </p>
+          </div>
         </div>
 
         {/* Journey Progress */}
