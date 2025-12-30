@@ -346,6 +346,8 @@ export interface UserSettings {
   selectedSansFont?: FontFamily
   selectedSerifFont?: SerifFamily
   selectedMonoFont?: MonoFamily
+  // API Configuration
+  geminiApiKey?: string // User's Gemini API key (stored locally)
 }
 
 // ============================================

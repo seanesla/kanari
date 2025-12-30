@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { sessionManager } from "@/lib/gemini/session-manager"
 import { ApiError } from "@google/genai"
+import { getAPIKeyFromRequest, validateAPIKey } from "@/lib/gemini/client"
 
 interface SessionResponse {
   sessionId: string
@@ -49,10 +50,13 @@ export async function POST(
   request: NextRequest
 ): Promise<NextResponse<SessionResponse | ErrorResponse>> {
   try {
-    // Check API key is configured
-    if (!process.env.GEMINI_API_KEY) {
+    // Get and validate API key (from header first, then env)
+    let apiKey: string
+    try {
+      apiKey = validateAPIKey(getAPIKeyFromRequest(request))
+    } catch (error) {
       return NextResponse.json(
-        { error: "Gemini API key not configured", code: "CONFIG_ERROR" as const },
+        { error: "Gemini API key not configured. Please add your API key in Settings.", code: "CONFIG_ERROR" as const },
         { status: 500 }
       )
     }
@@ -71,7 +75,7 @@ export async function POST(
 
     // Create session on server and get session secret
     console.log(`[Gemini Session] Creating session ${sessionId}`)
-    const { secret } = await sessionManager.createSession(sessionId, systemInstruction)
+    const { secret } = await sessionManager.createSession(sessionId, systemInstruction, apiKey)
 
     // Return session info including secret for client authentication
     const baseUrl = request.nextUrl.origin

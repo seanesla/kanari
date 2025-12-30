@@ -53,20 +53,20 @@ interface ManagedSession {
  */
 class GeminiSessionManager {
   private sessions = new Map<string, ManagedSession>()
-  private ai: GoogleGenAI | null = null
+  // Cache clients by API key to reuse connections
+  private clients = new Map<string, GoogleGenAI>()
 
   /**
-   * Initialize the Google GenAI client
+   * Get or create a Google GenAI client for the given API key
    */
-  private getClient(): GoogleGenAI {
-    if (!this.ai) {
-      const apiKey = process.env.GEMINI_API_KEY
-      if (!apiKey) {
-        throw new Error("GEMINI_API_KEY environment variable not set")
-      }
-      this.ai = new GoogleGenAI({ apiKey })
+  private getClient(apiKey: string): GoogleGenAI {
+    // Check if we already have a client for this key
+    let client = this.clients.get(apiKey)
+    if (!client) {
+      client = new GoogleGenAI({ apiKey })
+      this.clients.set(apiKey, client)
     }
-    return this.ai
+    return client
   }
 
   /**
@@ -79,10 +79,14 @@ class GeminiSessionManager {
   /**
    * Create a new Gemini Live session
    * Returns the session secret for client authentication
+   * @param sessionId - Unique session identifier
+   * @param systemInstruction - Optional system instruction for the session
+   * @param apiKey - Gemini API key (from user settings or environment)
    */
   async createSession(
     sessionId: string,
-    systemInstruction?: string
+    systemInstruction?: string,
+    apiKey?: string
   ): Promise<{ sessionId: string; secret: string }> {
     // Check max sessions limit
     if (this.sessions.size >= MAX_CONCURRENT_SESSIONS) {
@@ -99,7 +103,13 @@ class GeminiSessionManager {
       throw new Error(`Session ${sessionId} already exists`)
     }
 
-    const ai = this.getClient()
+    // Get API key (param takes precedence over env)
+    const key = apiKey || process.env.GEMINI_API_KEY
+    if (!key) {
+      throw new Error("Gemini API key not configured. Please add your API key in Settings.")
+    }
+
+    const ai = this.getClient(key)
     const emitter = new EventEmitter()
     const secret = this.generateSessionSecret()
 

@@ -286,8 +286,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get and validate API key
-    const apiKey = validateAPIKey(process.env.GEMINI_API_KEY)
+    // Get and validate API key (from header first, then env)
+    const apiKey = validateAPIKey(getAPIKeyFromRequest(request))
 
     // ============================================
     // Diff-Aware Mode
@@ -447,14 +447,16 @@ export async function POST(request: NextRequest) {
  *
  * Health check endpoint
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    // Check if API key is configured (without exposing it)
-    const hasApiKey = !!process.env.GEMINI_API_KEY
+    // Check if API key is configured (from header or env, without exposing it)
+    const hasApiKey = !!getAPIKeyFromRequest(request)
+    const hasEnvKey = !!process.env.GEMINI_API_KEY
 
     return NextResponse.json({
       status: "ok",
       configured: hasApiKey,
+      source: hasApiKey ? (hasEnvKey ? "env" : "header") : "none",
       endpoint: "/api/gemini",
       methods: ["POST"],
     })

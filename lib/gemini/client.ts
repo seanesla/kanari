@@ -154,11 +154,25 @@ export async function generateSuggestions(
 }
 
 /**
+ * Get API key from request header or fall back to environment variable
+ * Priority: X-Gemini-Api-Key header > GEMINI_API_KEY env var
+ */
+export function getAPIKeyFromRequest(request: Request): string | undefined {
+  // Try header first (user-provided key from settings)
+  const headerKey = request.headers.get("X-Gemini-Api-Key")
+  if (headerKey) {
+    return headerKey
+  }
+  // Fall back to environment variable
+  return process.env.GEMINI_API_KEY
+}
+
+/**
  * Validate API key format
  */
 export function validateAPIKey(apiKey: string | undefined): string {
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY environment variable is not set")
+    throw new Error("Gemini API key not configured. Please add your API key in Settings.")
   }
 
   if (!apiKey.startsWith("AIza")) {

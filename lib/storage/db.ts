@@ -87,6 +87,17 @@ class KanariDB extends Dexie {
       settings: "id",
       checkInSessions: "id, startedAt, recordingId",
     })
+
+    // Version 4: Add geminiApiKey to settings (no schema change, just data field)
+    // The settings table already stores arbitrary fields, so no stores() change needed
+    this.version(4).stores({
+      recordings: "id, createdAt, status",
+      suggestions: "id, createdAt, status, category, recordingId, version",
+      recoveryBlocks: "id, suggestionId, scheduledAt, completed",
+      trendData: "id, date",
+      settings: "id",
+      checkInSessions: "id, startedAt, recordingId",
+    })
   }
 }
 

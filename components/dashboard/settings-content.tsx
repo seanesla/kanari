@@ -1,14 +1,15 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
-import { Calendar, Key, Mic, Shield, AlertCircle, CheckCircle2, Paintbrush } from "lucide-react"
+import { Calendar, Key, Mic, Shield, AlertCircle, CheckCircle2, Paintbrush, Eye, EyeOff, Loader2 } from "lucide-react"
 import { useCalendar } from "@/hooks/use-calendar"
 import { GeminiMemorySection } from "./settings-gemini-memory"
 import { ColorPicker } from "./color-picker"
 import { FontPicker } from "./font-picker"
+import { db } from "@/lib/storage/db"
 
 export function SettingsContent() {
   const [settings, setSettings] = useState({
@@ -18,6 +19,88 @@ export function SettingsContent() {
     autoScheduleRecovery: false,
     localStorageOnly: true,
   })
+
+  // Gemini API key state
+  const [geminiApiKey, setGeminiApiKey] = useState("")
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [apiKeyStatus, setApiKeyStatus] = useState<"idle" | "valid" | "invalid" | "checking">("idle")
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+
+  // Load settings from IndexedDB on mount
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const savedSettings = await db.settings.get("default")
+        if (savedSettings?.geminiApiKey) {
+          setGeminiApiKey(savedSettings.geminiApiKey)
+          // Validate the existing key format
+          if (savedSettings.geminiApiKey.startsWith("AIza")) {
+            setApiKeyStatus("valid")
+          } else {
+            setApiKeyStatus("invalid")
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load settings:", error)
+      }
+    }
+    loadSettings()
+  }, [])
+
+  // Validate API key format when it changes
+  const handleApiKeyChange = useCallback((value: string) => {
+    setGeminiApiKey(value)
+    setSaveMessage(null)
+    if (!value) {
+      setApiKeyStatus("idle")
+    } else if (value.startsWith("AIza") && value.length > 20) {
+      setApiKeyStatus("valid")
+    } else {
+      setApiKeyStatus("invalid")
+    }
+  }, [])
+
+  // Save settings to IndexedDB
+  const handleSaveSettings = useCallback(async () => {
+    setIsSaving(true)
+    setSaveMessage(null)
+    try {
+      // Get existing settings or create new with defaults
+      const existingSettings = await db.settings.get("default")
+
+      // Build settings object with defaults, existing values, and current UI state
+      const defaults = {
+        defaultRecordingDuration: 30,
+        calendarConnected: false,
+        preferredRecoveryTimes: [] as string[],
+      }
+
+      const updatedSettings = {
+        ...defaults,
+        ...existingSettings,
+        // Current UI state
+        enableNotifications: settings.enableNotifications,
+        dailyReminder: settings.dailyReminder,
+        enableVAD: settings.enableVAD,
+        autoScheduleRecovery: settings.autoScheduleRecovery,
+        localStorageOnly: settings.localStorageOnly,
+        // Always set id and API key
+        id: "default" as const,
+        geminiApiKey: geminiApiKey || undefined,
+      }
+
+      await db.settings.put(updatedSettings)
+      setSaveMessage({ type: "success", text: "Settings saved successfully!" })
+      // Clear success message after 3 seconds
+      setTimeout(() => setSaveMessage(null), 3000)
+    } catch (error) {
+      console.error("Failed to save settings:", error)
+      setSaveMessage({ type: "error", text: "Failed to save settings. Please try again." })
+    } finally {
+      setIsSaving(false)
+    }
+  }, [settings, geminiApiKey])
 
   const { isConnected, isLoading, error, connect, disconnect, clearError } = useCalendar()
   const [showSuccess, setShowSuccess] = useState(false)
@@ -283,11 +366,45 @@ export function SettingsContent() {
                   Google AI Studio
                 </a>
               </p>
-              <input
-                type="password"
-                placeholder="Enter your Gemini API key"
-                className="h-10 w-full rounded-md border border-border bg-background px-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent font-sans"
-              />
+              <div className="relative">
+                <input
+                  type={showApiKey ? "text" : "password"}
+                  value={geminiApiKey}
+                  onChange={(e) => handleApiKeyChange(e.target.value)}
+                  placeholder="Enter your Gemini API key (starts with AIza...)"
+                  className={`h-10 w-full rounded-md border bg-background px-3 pr-10 text-sm focus:outline-none focus:ring-1 font-sans ${
+                    apiKeyStatus === "valid"
+                      ? "border-green-500 focus:border-green-500 focus:ring-green-500"
+                      : apiKeyStatus === "invalid"
+                      ? "border-destructive focus:border-destructive focus:ring-destructive"
+                      : "border-border focus:border-accent focus:ring-accent"
+                  }`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showApiKey ? "Hide API key" : "Show API key"}
+                >
+                  {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {/* Validation feedback */}
+              {apiKeyStatus === "valid" && (
+                <p className="mt-2 text-sm text-green-500 flex items-center gap-1">
+                  <CheckCircle2 className="h-4 w-4" />
+                  Valid API key format
+                </p>
+              )}
+              {apiKeyStatus === "invalid" && geminiApiKey && (
+                <p className="mt-2 text-sm text-destructive flex items-center gap-1">
+                  <AlertCircle className="h-4 w-4" />
+                  API key should start with "AIza"
+                </p>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground font-sans">
+                Your API key is stored locally in your browser and never sent to our servers.
+              </p>
             </div>
           </div>
         </div>
@@ -298,8 +415,41 @@ export function SettingsContent() {
         </div>
       </div>
 
+      {/* Save Message */}
+      {saveMessage && (
+        <div
+          className={`rounded-lg p-4 ${
+            saveMessage.type === "success"
+              ? "bg-green-500/10 border border-green-500/20 text-green-500"
+              : "bg-destructive/10 border border-destructive/20 text-destructive"
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {saveMessage.type === "success" ? (
+              <CheckCircle2 className="h-5 w-5" />
+            ) : (
+              <AlertCircle className="h-5 w-5" />
+            )}
+            <p className="font-medium">{saveMessage.text}</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-end">
-        <Button className="bg-accent text-accent-foreground hover:bg-accent/90">Save Changes</Button>
+        <Button
+          onClick={handleSaveSettings}
+          disabled={isSaving}
+          className="bg-accent text-accent-foreground hover:bg-accent/90"
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            "Save Changes"
+          )}
+        </Button>
       </div>
     </div>
   )

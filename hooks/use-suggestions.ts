@@ -17,6 +17,7 @@ import type {
 import { useAllSuggestions, useSuggestionActions } from "./use-storage"
 import { useSuggestionMemory } from "./use-suggestion-memory"
 import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
+import { createGeminiHeaders } from "@/lib/utils"
 
 /**
  * React hook for managing Gemini-powered recovery suggestions with diff-aware generation.
@@ -180,11 +181,14 @@ export function useSuggestions(): UseSuggestionsResult {
       // Build memory context
       const memory = buildMemoryContext()
 
+      // Get headers with API key from settings
+      const headers = await createGeminiHeaders({
+        "Content-Type": "application/json",
+      })
+
       const response = await fetch("/api/gemini", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({
           stressScore: metrics.stressScore,
           stressLevel: metrics.stressLevel,

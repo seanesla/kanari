@@ -20,6 +20,7 @@
  */
 
 import { validateServerMessage } from "./schemas"
+import { getGeminiApiKey } from "@/lib/utils"
 
 // Event types emitted by the client
 export interface LiveClientEvents {
@@ -181,11 +182,17 @@ export class GeminiLiveClient {
     this.config.events.onConnecting?.()
 
     try {
-      // 1. Create session on server
+      // 1. Create session on server (include API key from settings if available)
       console.log("[GeminiLive] Creating session...")
+      const apiKey = await getGeminiApiKey()
+      const headers: Record<string, string> = { "Content-Type": "application/json" }
+      if (apiKey) {
+        headers["X-Gemini-Api-Key"] = apiKey
+      }
+
       const response = await fetch("/api/gemini/session", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
       })
 
       if (!response.ok) {
