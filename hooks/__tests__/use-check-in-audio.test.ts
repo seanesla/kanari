@@ -8,6 +8,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 let useCheckIn: typeof import("../use-check-in").useCheckIn
 type GeminiLiveCallbacks = {
   onDisconnected?: (reason: string) => void
+  onTurnComplete?: () => void
+  onUserTranscript?: (text: string, isFinal: boolean) => void
 }
 
 let geminiCallbacks: GeminiLiveCallbacks | null = null
@@ -188,5 +190,33 @@ describe("useCheckIn microphone lifecycle", () => {
     })
 
     expect(stopMock).toHaveBeenCalled()
+  })
+
+  it("starts a new user message after an assistant reply even without VAD speech-start", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    expect(geminiCallbacks?.onUserTranscript).toEqual(expect.any(Function))
+    expect(geminiCallbacks?.onTurnComplete).toEqual(expect.any(Function))
+
+    act(() => {
+      geminiCallbacks?.onUserTranscript?.("What do you mean as the year winds down?", false)
+    })
+
+    act(() => {
+      geminiCallbacks?.onTurnComplete?.()
+    })
+
+    act(() => {
+      geminiCallbacks?.onUserTranscript?.("Pretty normal, I guess.", false)
+    })
+
+    const userMessages = result.current[0].messages.filter((msg) => msg.role === "user")
+    expect(userMessages).toHaveLength(2)
+    expect(userMessages[0]?.content).toContain("What do you mean")
+    expect(userMessages[1]?.content).toContain("Pretty normal")
   })
 })

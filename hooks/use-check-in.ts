@@ -42,6 +42,7 @@ import {
   consumePreservedSession,
   markSessionInvalid,
 } from "@/lib/gemini/preserved-session"
+import { mergeTranscriptUpdate } from "@/lib/gemini/transcript-merge"
 import type { SessionContext } from "@/lib/gemini/live-client"
 import type {
   CheckInState,
@@ -552,6 +553,12 @@ export function useCheckIn(
   // Track the last user message ID for updating with features
   const lastUserMessageIdRef = useRef<string | null>(null)
 
+  // When VAD "speech start" events are missing, user transcript updates can keep
+  // appending into the previous bubble. We treat the end of an assistant turn
+  // (returning to listening) as a boundary for the next user utterance.
+  // Pattern doc: docs/error-patterns/voice-transcript-utterance-boundary-missing.md
+  const pendingUserUtteranceResetRef = useRef(false)
+
   // Prevent double-handling utterance end (Gemini may emit both "speech end" and a final transcript)
   const userSpeechEndHandledRef = useRef(false)
 
@@ -678,6 +685,7 @@ export function useCheckIn(
       dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
       // Clear the active voice message ID for this new utterance
       lastUserMessageIdRef.current = null
+      pendingUserUtteranceResetRef.current = false
       userSpeechEndHandledRef.current = false
       userSpeechStartRef.current = new Date().toISOString() // Capture timestamp when user STARTS speaking
     },
@@ -721,6 +729,18 @@ export function useCheckIn(
       processUserUtterance()
     },
     onUserTranscript: (text, finished) => {
+      // If the previous turn ended and we never received a VAD "speech start" for
+      // this utterance, ensure we don't keep appending into the last user bubble.
+      if (pendingUserUtteranceResetRef.current && text.trim()) {
+        pendingUserUtteranceResetRef.current = false
+        audioChunksRef.current = []
+        userTranscriptRef.current = ""
+        dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
+        lastUserMessageIdRef.current = null
+        userSpeechEndHandledRef.current = false
+        userSpeechStartRef.current = null
+      }
+
       // Capture timestamp on FIRST chunk of user speech
       // (VAD signals may not fire, so capture here as fallback)
       if (userTranscriptRef.current === "" && text.trim() && !userSpeechStartRef.current) {
@@ -728,7 +748,7 @@ export function useCheckIn(
       }
 
       // Accumulate transcript chunks (Gemini sends word-by-word without finished flag)
-      userTranscriptRef.current = userTranscriptRef.current + text
+      userTranscriptRef.current = mergeTranscriptUpdate(userTranscriptRef.current, text).next
 
       // Update transcript preview with accumulated text (used for mismatch detection and UI fallbacks)
       dispatch({ type: "SET_USER_TRANSCRIPT", text: userTranscriptRef.current })
@@ -784,9 +804,22 @@ export function useCheckIn(
         dispatch({ type: "ADD_MESSAGE", message: streamingMessage })
         currentTranscriptRef.current = text
       } else {
-        // Subsequent chunks: update the existing message in place
-        currentTranscriptRef.current += text
-        dispatch({ type: "UPDATE_STREAMING_MESSAGE", text })
+        // Subsequent chunks: update the existing message in place.
+        // The Live API may emit either delta chunks or cumulative transcript snapshots,
+        // so we merge carefully to avoid duplication/concatenation artifacts.
+        const merged = mergeTranscriptUpdate(currentTranscriptRef.current, text)
+        currentTranscriptRef.current = merged.next
+        if (merged.delta) {
+          dispatch({ type: "UPDATE_STREAMING_MESSAGE", text: merged.delta })
+        }
+      }
+
+      // Some sessions may send transcription completion without a `turnComplete` signal.
+      // Use `finished` as an additional boundary so the next turn doesn't append into the
+      // previous bubble.
+      if (finished) {
+        dispatch({ type: "FINALIZE_STREAMING_MESSAGE" })
+        currentTranscriptRef.current = ""
       }
     },
     onModelThinking: (text) => {
@@ -812,6 +845,7 @@ export function useCheckIn(
       currentThinkingRef.current = ""
       // Transition to listening - this handles both AI greeting and regular responses
       dispatch({ type: "SET_LISTENING" })
+      pendingUserUtteranceResetRef.current = true
     },
     onInterrupted: () => {
       // User barged in - clear playback and reset for next response
@@ -825,6 +859,7 @@ export function useCheckIn(
       // Model chose to stay silent - don't play audio, transition to listening
       console.log("[useCheckIn] AI chose silence:", reason)
       dispatch({ type: "SET_LISTENING" })
+      pendingUserUtteranceResetRef.current = true
     },
     onWidget: (event) => {
       const now = new Date().toISOString()
