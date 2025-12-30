@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { StressFatigueChart } from "@/components/dashboard/stress-fatigue-chart"
 import { useDashboardStats, useTrendData, useScheduledSuggestions, useRecordings } from "@/hooks/use-storage"
-import { WeekCalendar } from "@/components/dashboard/calendar"
+import { ScheduleXWeekCalendar } from "@/components/dashboard/calendar"
 import { SuggestionDetailDialog } from "@/components/dashboard/suggestions"
 import { JourneyProgress } from "@/components/dashboard/journey-progress"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
@@ -609,7 +609,7 @@ export default function DashboardPage() {
                         </SheetTrigger>
                         <SheetContent side="bottom" className="h-[70vh]">
                           <div className="h-full pt-4">
-                            <WeekCalendar
+                            <ScheduleXWeekCalendar
                               scheduledSuggestions={scheduledSuggestions}
                               onEventClick={setSelectedSuggestion}
                               className="h-full"
@@ -622,7 +622,7 @@ export default function DashboardPage() {
                 </>
               ) : (
                 /* Desktop: Full calendar */
-                <WeekCalendar
+                <ScheduleXWeekCalendar
                   scheduledSuggestions={scheduledSuggestions}
                   onEventClick={setSelectedSuggestion}
                   className="min-h-[500px]"
