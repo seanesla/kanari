@@ -94,6 +94,12 @@ export class GeminiLiveClient {
   private reconnectAttempts = 0
   private maxReconnectAttempts = 3
 
+  // Prevent duplicate onConnected firing (ready event + setupComplete message)
+  private hasAnnouncedConnected = false
+  private connectedSource: "ready-event" | "setupComplete" | null = null
+  // Prevent duplicate onDisconnected firing
+  private hasAnnouncedDisconnected = false
+
   // Session info from server
   private sessionId: string | null = null
   private streamUrl: string | null = null
@@ -114,6 +120,46 @@ export class GeminiLiveClient {
   // Use persistent storage to survive HMR rebuilds
   private readonly DEDUP_STORAGE_KEY = "gemini_live_dedup_hashes"
   private processedEventHashes: Set<string>
+
+  /**
+   * Mark connection as ready and emit onConnected only once per session.
+   * This protects against duplicate signals (e.g., initial SSE "ready" +
+   * subsequent setupComplete message) which previously re-fired onConnected,
+   * causing duplicate greetings and UI flicker.
+   * Pattern doc: docs/error-patterns/gemini-double-greeting.md
+   */
+  private markConnected(source: "ready-event" | "setupComplete"): void {
+    if (this.hasAnnouncedConnected) {
+      logDebug(
+        "GeminiLive",
+        `Connected already signaled via ${this.connectedSource}, ignoring ${source}`
+      )
+      return
+    }
+
+    this.hasAnnouncedConnected = true
+    this.connectedSource = source
+    this.state = "ready"
+    this.reconnectAttempts = 0
+    this.consecutiveAudioFailures = 0
+    this.hasAnnouncedDisconnected = false
+
+    if (this.connectionTimeoutId) {
+      clearTimeout(this.connectionTimeoutId)
+      this.connectionTimeoutId = null
+    }
+
+    this.config.events.onConnected?.()
+  }
+
+  /**
+   * Announce disconnection once per session to avoid duplicate UI flips.
+   */
+  private notifyDisconnected(reason: string): void {
+    if (this.hasAnnouncedDisconnected) return
+    this.hasAnnouncedDisconnected = true
+    this.config.events.onDisconnected?.(reason)
+  }
 
   constructor(config: LiveClientConfig) {
     this.config = config
@@ -188,6 +234,15 @@ export class GeminiLiveClient {
    *                  Includes contextSummary (from Gemini 3 analysis) and timeContext
    */
   async connect(context?: SessionContext): Promise<void> {
+    if (this.state === "connecting" || this.state === "ready") {
+      logWarn("GeminiLive", "Connect called while already connecting/ready - ignoring")
+      return
+    }
+
+    // Reset connection flags for this attempt
+    this.hasAnnouncedConnected = false
+    this.hasAnnouncedDisconnected = false
+
     if (this.eventSource) {
       this.disconnect()
     }
@@ -338,6 +393,10 @@ export class GeminiLiveClient {
         isOpen = false
         reader.cancel()
       },
+      dispatchEvent: (event: MessageEvent) => {
+        dispatch(event.type, typeof event.data === "string" ? event.data : JSON.stringify(event.data))
+        return true
+      },
       onopen: null,
       onerror: null,
       onmessage: null,
@@ -347,7 +406,6 @@ export class GeminiLiveClient {
       CONNECTING: 0,
       OPEN: 1,
       CLOSED: 2,
-      dispatchEvent: () => false,
     } as EventSource
   }
 
@@ -386,18 +444,8 @@ export class GeminiLiveClient {
 
           // Handle ready event (session is ready)
           this.eventSource.addEventListener("ready", () => {
-            logDebug("GeminiLive", "Session ready")
-            this.state = "ready"
-            this.reconnectAttempts = 0
-            this.consecutiveAudioFailures = 0 // Reset audio failure counter
-
-            // Clear connection timeout
-            if (this.connectionTimeoutId) {
-              clearTimeout(this.connectionTimeoutId)
-              this.connectionTimeoutId = null
-            }
-
-            this.config.events.onConnected?.()
+            logDebug("GeminiLive", "Session ready (ready event)")
+            this.markConnected("ready-event")
             resolve()
           })
 
@@ -417,6 +465,9 @@ export class GeminiLiveClient {
               this.handleMessage(JSON.parse(event.data))
             } catch (error) {
               logError("GeminiLive", "Failed to parse message event:", error)
+              this.config.events.onError?.(
+                error instanceof Error ? error : new Error("Failed to parse message event")
+              )
             }
           })
 
@@ -425,14 +476,24 @@ export class GeminiLiveClient {
             // Verify it's a MessageEvent with data (server-sent error)
             if (!(event instanceof MessageEvent) || !event.data) {
               logError("GeminiLive", "SSE error event without data")
+              this.state = "error"
               this.config.events.onError?.(new Error("Unknown SSE error"))
+              this.notifyDisconnected("Unknown SSE error")
               return
             }
             try {
               const data = JSON.parse(event.data)
-              this.config.events.onError?.(new Error(data.message || "SSE error"))
+              const message =
+                (data.message as string | undefined) ||
+                (data.error?.message as string | undefined) ||
+                "SSE error"
+              this.state = "error"
+              this.config.events.onError?.(new Error(message))
+              this.notifyDisconnected(message)
             } catch {
+              this.state = "error"
               this.config.events.onError?.(new Error("Invalid SSE error format"))
+              this.notifyDisconnected("Invalid SSE error format")
             }
           })
 
@@ -449,7 +510,7 @@ export class GeminiLiveClient {
             }
             logDebug("GeminiLive", "Session closed:", reason)
             this.state = "disconnected"
-            this.config.events.onDisconnected?.(reason)
+            this.notifyDisconnected(reason)
           })
 
           // Set a timeout for initial connection
@@ -464,6 +525,7 @@ export class GeminiLiveClient {
           logError("GeminiLive", "SSE connection error:", error)
           this.state = "error"
           this.config.events.onError?.(error instanceof Error ? error : new Error("SSE connection failed"))
+          this.notifyDisconnected("SSE connection failed")
           reject(error instanceof Error ? error : new Error("SSE connection failed"))
         })
     })
@@ -538,7 +600,7 @@ export class GeminiLiveClient {
     if (validatedMessage.setupComplete) {
       logDebug("GeminiLive", "Setup complete")
       this.state = "ready"
-      this.config.events.onConnected?.()
+      this.markConnected("setupComplete")
       return
     }
 
@@ -847,6 +909,10 @@ export class GeminiLiveClient {
       this.eventSource = null
     }
 
+    // Reset connection signal guard for next session
+    this.hasAnnouncedConnected = false
+    this.connectedSource = null
+
     // Clear connection timeout if it exists
     if (this.connectionTimeoutId) {
       clearTimeout(this.connectionTimeoutId)
@@ -883,6 +949,8 @@ export class GeminiLiveClient {
     if (this.state !== "error") {
       this.state = "disconnected"
     }
+
+    this.notifyDisconnected("Manual disconnect")
   }
 
   /**

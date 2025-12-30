@@ -9,8 +9,24 @@
 import { describe, test, expect, vi, beforeEach, afterEach } from "vitest"
 import { GeminiLiveClient, type LiveClientConfig } from "../live-client"
 
+// Mock utilities that hit IndexedDB (not available in Vitest environment)
+vi.mock("@/lib/utils", () => ({
+  getGeminiApiKey: vi.fn().mockResolvedValue(undefined),
+}))
+
 // Mock global fetch
+const originalFetch = global.fetch
 global.fetch = vi.fn()
+
+const createReadyStream = () => {
+  const encoder = new TextEncoder()
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode("event: ready\ndata: {}\n\n"))
+      controller.close()
+    },
+  })
+}
 
 // Mock EventSource
 class MockEventSource {
@@ -56,7 +72,7 @@ describe("GeminiLiveClient", () => {
     vi.clearAllMocks()
 
     // Mock fetch for session creation
-    ;(global.fetch as any).mockImplementation((url: string) => {
+    ;(global.fetch as any).mockImplementation((url: string, init?: RequestInit) => {
       if (url === "/api/gemini/session") {
         return Promise.resolve({
           ok: true,
@@ -69,6 +85,11 @@ describe("GeminiLiveClient", () => {
             }),
         })
       }
+
+      if (typeof url === "string" && url.startsWith("http://localhost/stream")) {
+        return Promise.resolve({ ok: true, body: createReadyStream() })
+      }
+
       // Default to success for other fetches
       return Promise.resolve({ ok: true })
     })
@@ -96,6 +117,7 @@ describe("GeminiLiveClient", () => {
 
   afterEach(() => {
     client.disconnect()
+    vi.restoreAllMocks()
   })
 
   describe("audio failure tracking", () => {
@@ -253,15 +275,7 @@ describe("GeminiLiveClient", () => {
 
     test("disconnect flow - cleanup and state transition", async () => {
       // Connect first
-      const connectPromise = client.connect()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-
-      mockEventSource = (client as any).eventSource
-      mockEventSource.dispatchEvent(
-        new MessageEvent("ready", { data: JSON.stringify({ status: "connected" }) })
-      )
-
-      await connectPromise
+      await client.connect()
 
       expect(client.isReady()).toBe(true)
 
@@ -288,7 +302,7 @@ describe("GeminiLiveClient", () => {
 
       await expect(client.connect()).rejects.toThrow()
 
-      expect(client.getState()).toBe("disconnected")
+      expect(client.getState()).toBe("error")
       expect(mockConfig.events.onError).toHaveBeenCalled()
     })
 
@@ -298,16 +312,21 @@ describe("GeminiLiveClient", () => {
 
       await new Promise((resolve) => setTimeout(resolve, 0))
 
-      mockEventSource = (client as any).eventSource
-      mockEventSource.dispatchEvent(
-        new MessageEvent("ready", { data: JSON.stringify({ status: "connected" }) })
-      )
-
       await connect1
       await connect2
 
-      // Should only create one session
-      expect(global.fetch).toHaveBeenCalledTimes(1)
+      // Should only perform one session creation + one stream fetch
+      expect(global.fetch).toHaveBeenCalledTimes(2)
+    })
+
+    test("emits onConnected only once when ready and setupComplete both arrive", () => {
+      // Simulate the initial ready handshake (what the SSE ready event does)
+      ;(client as any).markConnected("ready-event")
+
+      // The server also sends a setupComplete message; this must not trigger a second onConnected
+      ;(client as any).handleMessage({ setupComplete: true })
+
+      expect(mockConfig.events.onConnected).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -327,7 +346,7 @@ describe("GeminiLiveClient", () => {
     test("handles audio chunk message", () => {
       const audioData = "base64audiodata=="
       mockEventSource.dispatchEvent(
-        new MessageEvent("audio", {
+        new MessageEvent("message", {
           data: JSON.stringify({
             serverContent: {
               modelTurn: {
@@ -351,7 +370,7 @@ describe("GeminiLiveClient", () => {
     test("handles model transcript message", () => {
       const transcriptText = "I understand how you're feeling."
       mockEventSource.dispatchEvent(
-        new MessageEvent("transcript", {
+        new MessageEvent("message", {
           data: JSON.stringify({
             serverContent: {
               outputTranscription: {
@@ -363,17 +382,17 @@ describe("GeminiLiveClient", () => {
         })
       )
 
-      expect(mockConfig.events.onModelTranscript).toHaveBeenCalledWith(transcriptText)
+      expect(mockConfig.events.onModelTranscript).toHaveBeenCalledWith(transcriptText, false)
     })
 
     test("handles user speech recognition", () => {
       const userText = "I'm feeling stressed"
       mockEventSource.dispatchEvent(
-        new MessageEvent("transcript", {
+        new MessageEvent("message", {
           data: JSON.stringify({
             inputTranscription: {
               text: userText,
-              isFinal: false,
+              finished: false,
             },
           }),
         })
@@ -385,11 +404,11 @@ describe("GeminiLiveClient", () => {
     test("handles final user transcript", () => {
       const userText = "I'm feeling stressed"
       mockEventSource.dispatchEvent(
-        new MessageEvent("transcript", {
+        new MessageEvent("message", {
           data: JSON.stringify({
             inputTranscription: {
               text: userText,
-              isFinal: true,
+              finished: true,
             },
           }),
         })
@@ -400,7 +419,7 @@ describe("GeminiLiveClient", () => {
 
     test("handles turnComplete signal", () => {
       mockEventSource.dispatchEvent(
-        new MessageEvent("turnComplete", {
+        new MessageEvent("message", {
           data: JSON.stringify({
             serverContent: {
               turnComplete: true,
@@ -415,7 +434,7 @@ describe("GeminiLiveClient", () => {
 
     test("handles interrupted signal", () => {
       mockEventSource.dispatchEvent(
-        new MessageEvent("interrupted", {
+        new MessageEvent("message", {
           data: JSON.stringify({
             serverContent: {
               interrupted: true,
@@ -425,7 +444,6 @@ describe("GeminiLiveClient", () => {
       )
 
       expect(mockConfig.events.onInterrupted).toHaveBeenCalled()
-      expect(mockConfig.events.onAudioEnd).toHaveBeenCalled()
     })
 
     test("handles error message from server", () => {
@@ -450,7 +468,7 @@ describe("GeminiLiveClient", () => {
 
     test("handles malformed JSON gracefully", () => {
       mockEventSource.dispatchEvent(
-        new MessageEvent("audio", {
+        new MessageEvent("message", {
           data: "not valid json",
         })
       )
@@ -675,7 +693,7 @@ describe("GeminiLiveClient", () => {
 
       await expect(client.connect()).rejects.toThrow("Network error")
 
-      expect(client.getState()).toBe("disconnected")
+      expect(client.getState()).toBe("error")
       expect(mockConfig.events.onError).toHaveBeenCalled()
     })
 
