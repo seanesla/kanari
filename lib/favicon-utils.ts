@@ -14,7 +14,9 @@ export function generateFaviconSVG(color: string): string {
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="32" height="32" viewBox="0 0 184.75795 202.84779" xmlns="http://www.w3.org/2000/svg">
-  <path fill="${color}" d="${logoPath}" />
+  <g transform="translate(-9.9153971,-51.160348)">
+    <path fill="${color}" d="${logoPath}" />
+  </g>
 </svg>`
 }
 
@@ -30,7 +32,11 @@ export function svgToDataUri(svg: string): string {
 
 /**
  * Update the favicon in the document head
- * Creates or updates the favicon link element with the new color
+ * Uses data-dynamic-favicon attribute to identify our custom link
+ * This prevents conflicts with Next.js auto-generated favicon links
+ *
+ * Cache busting: Removes and recreates link element with timestamp fragment
+ * to help refresh pinned site favicons in browsers
  */
 export function updateFavicon(color: string) {
   if (typeof document === "undefined") return
@@ -39,15 +45,19 @@ export function updateFavicon(color: string) {
   const svg = generateFaviconSVG(color)
   const dataUri = svgToDataUri(svg)
 
-  // Find existing favicon link or create new one
-  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
-
-  if (!link) {
-    link = document.createElement("link")
-    link.rel = "icon"
-    link.type = "image/svg+xml"
-    document.head.appendChild(link)
+  // Remove existing favicon link completely (cache busting for pinned sites)
+  const oldLink = document.querySelector<HTMLLinkElement>(
+    'link[data-dynamic-favicon="true"]'
+  )
+  if (oldLink) {
+    oldLink.remove()
   }
 
-  link.href = dataUri
+  // Create new link with cache-busting timestamp fragment
+  const link = document.createElement("link")
+  link.rel = "icon"
+  link.type = "image/svg+xml"
+  link.setAttribute("data-dynamic-favicon", "true")
+  link.href = dataUri + '#' + Date.now()
+  document.head.appendChild(link)
 }
