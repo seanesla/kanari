@@ -15,9 +15,9 @@
 
 "use client"
 
-import { Suspense, useCallback, useEffect, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
-import { Clock, Plus } from "lucide-react"
+import { Clock, Plus, Mic, MessageSquare } from "lucide-react"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -30,6 +30,9 @@ import { VoiceNoteCard, AIChatCard } from "@/components/dashboard/history-cards"
 import { ChatSessionDrawer } from "@/components/dashboard/chat-session-drawer"
 import { RecordingDrawer } from "@/components/dashboard/recording-drawer"
 import type { Recording, HistoryItem, CheckInSession } from "@/lib/types"
+
+/** Filter options for the sessions timeline */
+type FilterType = "all" | "voice_note" | "ai_chat"
 
 /**
  * Main history page content component
@@ -55,8 +58,17 @@ function HistoryPageContent() {
   // Highlight state for newly created items
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null)
 
+  // Filter state for timeline
+  const [filter, setFilter] = useState<FilterType>("all")
+
   // Fetch unified history timeline
   const historyItems = useHistory()
+
+  // Filter items based on selected filter
+  const filteredItems = useMemo(() => {
+    if (filter === "all") return historyItems
+    return historyItems.filter((item) => item.type === filter)
+  }, [historyItems, filter])
 
   // Get delete actions for both types
   const { deleteRecording } = useRecordingActions()
@@ -156,6 +168,45 @@ function HistoryPageContent() {
               <Plus className="h-4 w-4" />
               New Check-in
             </Button>
+
+            {/* Filter toggle buttons */}
+            <div className="flex items-center gap-2 mt-4">
+              <button
+                onClick={() => setFilter("all")}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                  filter === "all"
+                    ? "bg-accent text-accent-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilter("voice_note")}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5",
+                  filter === "voice_note"
+                    ? "bg-accent text-accent-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <Mic className="h-3.5 w-3.5" />
+                Voice Notes
+              </button>
+              <button
+                onClick={() => setFilter("ai_chat")}
+                className={cn(
+                  "px-3 py-1.5 rounded-full text-sm font-medium transition-all flex items-center gap-1.5",
+                  filter === "ai_chat"
+                    ? "bg-accent text-accent-foreground"
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
+                )}
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                AI Chats
+              </button>
+            </div>
           </div>
         </div>
 
@@ -167,7 +218,7 @@ function HistoryPageContent() {
           )}
         >
           {historyItems.length === 0 ? (
-            // EMPTY STATE
+            // EMPTY STATE - no sessions at all
             <div className="rounded-2xl border border-border/70 bg-card/30 backdrop-blur-xl p-12">
               <Empty>
                 <EmptyMedia variant="icon">
@@ -189,10 +240,36 @@ function HistoryPageContent() {
                 </Button>
               </Empty>
             </div>
+          ) : filteredItems.length === 0 ? (
+            // EMPTY STATE - no items matching current filter
+            <div className="rounded-2xl border border-border/70 bg-card/30 backdrop-blur-xl p-12">
+              <Empty>
+                <EmptyMedia variant="icon">
+                  {filter === "voice_note" ? <Mic /> : <MessageSquare />}
+                </EmptyMedia>
+                <EmptyHeader>
+                  <EmptyTitle>
+                    No {filter === "voice_note" ? "voice notes" : "AI chats"} yet
+                  </EmptyTitle>
+                  <EmptyDescription>
+                    {filter === "voice_note"
+                      ? "Record a voice note to track your stress and fatigue levels."
+                      : "Start an AI conversation to talk through how you're feeling."}
+                  </EmptyDescription>
+                </EmptyHeader>
+                <Button
+                  onClick={() => setFilter("all")}
+                  variant="outline"
+                  className="mt-4"
+                >
+                  Show All Sessions
+                </Button>
+              </Empty>
+            </div>
           ) : (
             // HISTORY TIMELINE - mixed voice notes and AI chats
             <div className="space-y-4">
-              {historyItems.map((item) => {
+              {filteredItems.map((item) => {
                 // VOICE NOTE card
                 if (item.type === "voice_note") {
                   return (

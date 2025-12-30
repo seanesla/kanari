@@ -258,7 +258,9 @@ export function AIChatCard({ item, onDelete, onOpenDetail }: AIChatCardProps) {
     : "—"
 
   // Determine if there were voice mismatches detected
-  const hasMismatches = session.mismatchCount && session.mismatchCount > 0
+  // Note: Must use proper boolean check, not `&&` with a number that could be 0
+  // because `{0 && <Component />}` renders "0" in React (numbers are valid children)
+  const hasMismatches = (session.mismatchCount ?? 0) > 0
 
   return (
     <div
