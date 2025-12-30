@@ -475,6 +475,12 @@ export function useCheckIn(
       console.log("[useCheckIn] Disconnected:", reason)
       const currentState = stateRef.current
 
+      // Always release microphone + playback resources on disconnect.
+      // This prevents the browser from thinking the mic is still active
+      // after leaving AI chat or when the server drops the connection.
+      cleanupAudioCapture()
+      playbackControls.cleanup()
+
       // Only auto-complete if we were in an active state (user had chance to interact)
       const activeStates: CheckInState[] = [
         "ready",
