@@ -19,8 +19,8 @@ class PlaybackProcessor extends AudioWorkletProcessor {
 
     // Queue size limits to prevent unbounded memory growth
     // At 24kHz, each chunk is ~1024 samples = ~43ms
-    // 50 chunks = ~2.1 seconds of buffer
-    this.maxQueueLength = 50
+    // 150 chunks = ~6.4 seconds of buffer
+    this.maxQueueLength = 150
     this.droppedChunks = 0
 
     // Track sample count incrementally to avoid O(n) calculation
@@ -49,11 +49,7 @@ class PlaybackProcessor extends AudioWorkletProcessor {
 
         // Check queue size limit
         if (this.queue.length >= this.maxQueueLength) {
-          // Drop oldest chunk to make room (graceful degradation)
-          const dropped = this.queue.shift()
-          if (dropped) {
-            this.cachedBufferedSamples -= dropped.length
-          }
+          // Reject new chunk to maintain playback continuity (don't skip forward)
           this.droppedChunks++
 
           // Notify main thread of backpressure
@@ -62,6 +58,8 @@ class PlaybackProcessor extends AudioWorkletProcessor {
             dropped: this.droppedChunks,
             queueLength: this.queue.length,
           })
+
+          return // Don't add to queue - reject to prevent skipping
         }
 
         // Received audio data - convert Int16 to Float32 and queue

@@ -68,6 +68,8 @@ export interface CheckInData {
   connectionState: GeminiLiveData["state"]
   /** Error message if any */
   error: string | null
+  /** Microphone mute state */
+  isMuted: boolean
 }
 
 export interface CheckInControls {
@@ -79,6 +81,8 @@ export interface CheckInControls {
   cancelSession: () => void
   /** Get current session for saving */
   getSession: () => CheckInSession | null
+  /** Toggle microphone mute */
+  toggleMute: () => void
 }
 
 export interface StartSessionOptions {
@@ -138,6 +142,7 @@ export type CheckInAction =
   | { type: "SET_OUTPUT_LEVEL"; level: number }
   | { type: "SET_CONNECTION_STATE"; state: GeminiLiveData["state"] }
   | { type: "SET_ERROR"; error: string }
+  | { type: "SET_MUTED"; muted: boolean }
   | { type: "RESET" }
 
 export const initialState: CheckInData = {
@@ -153,6 +158,7 @@ export const initialState: CheckInData = {
   audioLevels: { input: 0, output: 0 },
   connectionState: "idle",
   error: null,
+  isMuted: false,
 }
 
 export function checkInReducer(state: CheckInData, action: CheckInAction): CheckInData {
@@ -264,6 +270,9 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
 
     case "SET_ERROR":
       return { ...state, state: "error", isActive: false, error: action.error }
+
+    case "SET_MUTED":
+      return { ...state, isMuted: action.muted }
 
     case "RESET":
       return initialState
@@ -866,6 +875,23 @@ export function useCheckIn(
     }
   }, [data.session, data.messages, data.mismatchCount])
 
+  const toggleMute = useCallback(() => {
+    if (!mediaStreamRef.current) {
+      console.warn("[useCheckIn] Cannot toggle mute: no media stream")
+      return
+    }
+
+    const audioTrack = mediaStreamRef.current.getAudioTracks()[0]
+    if (!audioTrack) {
+      console.warn("[useCheckIn] Cannot toggle mute: no audio track")
+      return
+    }
+
+    // Toggle the track's enabled state
+    audioTrack.enabled = !audioTrack.enabled
+    dispatch({ type: "SET_MUTED", muted: !audioTrack.enabled })
+  }, [])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -878,6 +904,7 @@ export function useCheckIn(
     endSession,
     cancelSession,
     getSession,
+    toggleMute,
   }
 
   return [data, controls]

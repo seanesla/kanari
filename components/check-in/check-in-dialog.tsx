@@ -284,14 +284,21 @@ export function CheckInDialog({
         {showConversation && (
           <div className="flex-shrink-0 px-6 py-4 border-t bg-muted/30">
             <div className="flex items-center justify-center gap-4">
-              {/* Mute button (future enhancement) */}
+              {/* Mute button */}
               <Button
                 variant="outline"
                 size="icon"
-                className="h-12 w-12 rounded-full"
-                disabled
+                className={cn(
+                  "h-12 w-12 rounded-full",
+                  checkIn.isMuted && "bg-red-500 hover:bg-red-600 text-white"
+                )}
+                onClick={() => controls.toggleMute()}
               >
-                <Mic className="h-5 w-5" />
+                {checkIn.isMuted ? (
+                  <MicOff className="h-5 w-5" />
+                ) : (
+                  <Mic className="h-5 w-5" />
+                )}
               </Button>
 
               {/* End call button */}
