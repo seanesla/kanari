@@ -1,5 +1,12 @@
 # CLAUDE.md
 
+## Naming: Dashboard vs Overview
+
+- **Dashboard** = the route group (`app/dashboard/`) containing all app pages
+- **Overview** = the main page at `/dashboard` (NOT called "Dashboard")
+
+Do NOT rename `OverviewPage` to `DashboardPage` or change "Overview" labels to "Dashboard".
+
 ## Hackathon Context
 
 **Google DeepMind Gemini 3 Hackathon** (Dec 17, 2025 - Feb 9, 2026)

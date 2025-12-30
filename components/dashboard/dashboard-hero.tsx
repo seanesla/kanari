@@ -7,9 +7,7 @@ interface DashboardHeroProps {
   visible: boolean
 }
 
-/**
- * Hero section for the dashboard with animated title and decorative grid
- */
+// Hero for Overview page - says "overview" not "dashboard" (see CLAUDE.md)
 export function DashboardHero({ visible }: DashboardHeroProps) {
   // min-h-[200px]: ensures consistent grid fade appearance across all dashboard pages
   return (
@@ -22,7 +20,7 @@ export function DashboardHero({ visible }: DashboardHeroProps) {
         )}
       >
         <h1 className="text-3xl md:text-4xl font-serif leading-[0.95] mb-3">
-          Your <span className="text-accent">dashboard</span>
+          Your <span className="text-accent">overview</span>
         </h1>
         <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
           Schedule recovery activities and track your wellness journey at a glance.
