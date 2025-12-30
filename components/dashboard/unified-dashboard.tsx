@@ -3,11 +3,12 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/app/dashboard/layout"
-import { useDashboardStats, useTrendData, useScheduledSuggestions, useRecordings } from "@/hooks/use-storage"
+import { useDashboardStats, useTrendData, useScheduledSuggestions, useRecordings, useCheckInSessions } from "@/hooks/use-storage"
 import { useSuggestions, featuresToVoicePatterns, computeHistoricalContext } from "@/hooks/use-suggestions"
 import { useCalendar } from "@/hooks/use-calendar"
 import { useResponsive } from "@/hooks/use-responsive"
 import { useSuggestionWorkflow } from "@/hooks/use-suggestion-workflow"
+import { useAchievements, useCanGenerateAchievements } from "@/hooks/use-achievements"
 import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
 import { DashboardHero } from "./dashboard-hero"
 import { DashboardLayout } from "./dashboard-layout"
@@ -15,6 +16,7 @@ import { MetricsHeaderBar } from "./metrics-header-bar"
 import { PendingSidebar } from "./suggestions/pending-sidebar"
 import { ScheduleXWeekCalendar } from "./calendar"
 import { SuggestionDetailDialog, ScheduleTimeDialog } from "./suggestions"
+import { AchievementToastQueue } from "@/components/achievements"
 import type { BurnoutPrediction } from "@/lib/types"
 
 export function UnifiedDashboard() {
@@ -41,6 +43,20 @@ export function UnifiedDashboard() {
     completeSuggestion,
   } = useSuggestions()
 
+  // Check-in sessions for achievements
+  const checkInSessions = useCheckInSessions(30)
+
+  // Achievements hook
+  const {
+    newAchievements,
+    loading: achievementsLoading,
+    generateAchievements,
+    markAsSeen,
+  } = useAchievements()
+
+  // Check if user has enough data for achievements
+  const canGenerateAchievements = useCanGenerateAchievements(allRecordings || [], suggestions)
+
   // Suggestion workflow (dialogs, drag-drop, handlers)
   const {
     selectedSuggestion,
@@ -64,6 +80,21 @@ export function UnifiedDashboard() {
       return () => clearTimeout(timer)
     }
   }, [shouldAnimate])
+
+  // Check for new achievements periodically when user has enough data
+  useEffect(() => {
+    if (!canGenerateAchievements || achievementsLoading) return
+    if (!allRecordings || allRecordings.length === 0) return
+
+    // Generate achievements after a short delay to avoid blocking initial load
+    const timer = setTimeout(() => {
+      generateAchievements(allRecordings, suggestions, checkInSessions)
+    }, 3000)
+
+    return () => clearTimeout(timer)
+    // Only re-run when recording count changes (not on every render)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRecordings?.length, canGenerateAchievements])
 
   // Burnout prediction
   const burnoutPrediction: BurnoutPrediction | null = useMemo(() => {
@@ -166,6 +197,7 @@ export function UnifiedDashboard() {
           onSchedule={handlers.handleScheduleFromDialog}
           onDismiss={handlers.handleDismiss}
           onComplete={handlers.handleComplete}
+          onCompleteWithFeedback={handlers.handleCompleteWithFeedback}
           isCalendarConnected={isCalendarConnected}
           voicePatterns={voicePatterns}
           history={historicalContext}
@@ -182,6 +214,12 @@ export function UnifiedDashboard() {
           defaultDate={droppedSuggestion?.date}
           defaultHour={droppedSuggestion?.hour}
           defaultMinute={droppedSuggestion?.minute}
+        />
+
+        {/* Achievement Toast Queue - Shows celebration for new achievements */}
+        <AchievementToastQueue
+          achievements={newAchievements}
+          onDismiss={markAsSeen}
         />
       </main>
     </div>

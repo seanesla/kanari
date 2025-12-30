@@ -9,3 +9,10 @@ export {
   countSuggestionsByCategory,
   type FilterValue,
 } from "./category-filter-tabs"
+
+// Effectiveness tracking components
+export {
+  EffectivenessFeedbackDialog,
+  EffectivenessStats,
+  type EffectivenessFeedbackDialogProps,
+} from "./effectiveness-feedback-dialog"

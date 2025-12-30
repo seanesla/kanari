@@ -1,6 +1,20 @@
 "use client"
 
-import { NonRealTimeVAD } from "@ricky0123/vad-web"
+// Dynamic import to avoid SSR issues with onnxruntime-web
+// The vad-web package imports onnxruntime-web/wasm which requires browser APIs
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let NonRealTimeVADClass: any = null
+
+async function getVAD() {
+  if (typeof window === "undefined") {
+    throw new Error("VAD can only be used in browser environment")
+  }
+  if (!NonRealTimeVADClass) {
+    const vadModule = await import("@ricky0123/vad-web")
+    NonRealTimeVADClass = vadModule.NonRealTimeVAD
+  }
+  return NonRealTimeVADClass
+}
 
 export interface VADOptions {
   /**
@@ -101,6 +115,9 @@ export class VoiceActivityDetector {
    */
   private async processWithVAD(audioData: Float32Array): Promise<SpeechSegment[]> {
     const segments: SpeechSegment[] = []
+
+    // Get VAD class via dynamic import (avoids SSR issues)
+    const NonRealTimeVAD = await getVAD()
 
     // Create NonRealTimeVAD instance for offline audio processing
     const vad = await NonRealTimeVAD.new({

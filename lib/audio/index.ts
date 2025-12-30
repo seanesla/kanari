@@ -5,7 +5,7 @@
  *
  * Complete audio processing pipeline for voice biomarker extraction:
  * 1. Recording - Web Audio API wrapper (recorder.ts)
- * 2. VAD - Voice Activity Detection (vad.ts)
+ * 2. VAD - Voice Activity Detection (vad.ts) - LAZY LOADED to avoid SSR issues
  * 3. Feature Extraction - Acoustic features via Meyda (feature-extractor.ts)
  * 4. Processing - Main orchestrator (processor.ts)
  */
@@ -19,14 +19,9 @@ export {
   type RecorderOptions,
 } from "./recorder"
 
-// VAD
-export {
-  VoiceActivityDetector,
-  SimpleVAD,
-  segmentSpeech,
-  type VADOptions,
-  type SpeechSegment,
-} from "./vad"
+// VAD - Re-export types only, classes are lazy loaded
+// Import VAD classes dynamically via: import("@/lib/audio/vad")
+export type { VADOptions, SpeechSegment } from "./vad"
 
 // Feature Extractor
 export {
@@ -52,3 +47,11 @@ export {
   float32ToBase64Pcm,
   calculateRMS,
 } from "./pcm-converter"
+
+/**
+ * Lazy load VAD module to avoid SSR issues with onnxruntime-web
+ * Usage: const { VoiceActivityDetector, segmentSpeech } = await loadVAD()
+ */
+export async function loadVAD() {
+  return import("./vad")
+}

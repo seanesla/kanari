@@ -13,6 +13,7 @@ import type {
   BurnoutPrediction,
   GeminiDiffSuggestion,
   SuggestionDecision,
+  EffectivenessFeedback,
 } from "@/lib/types"
 import { useAllSuggestions, useSuggestionActions } from "./use-storage"
 import { useSuggestionMemory } from "./use-suggestion-memory"
@@ -61,7 +62,12 @@ interface UseSuggestionsResult {
   moveSuggestion: (id: string, newStatus: SuggestionStatus, scheduledFor?: string) => Promise<boolean>
   scheduleSuggestion: (id: string, scheduledFor: string) => Promise<boolean>
   dismissSuggestion: (id: string) => Promise<boolean>
-  completeSuggestion: (id: string) => Promise<boolean>
+  /**
+   * Mark a suggestion as completed with optional effectiveness feedback.
+   * @param id - The suggestion ID to complete
+   * @param feedback - Optional effectiveness feedback from the user (very_helpful, somewhat_helpful, not_helpful, skipped)
+   */
+  completeSuggestion: (id: string, feedback?: EffectivenessFeedback) => Promise<boolean>
 }
 
 /**
@@ -363,16 +369,34 @@ export function useSuggestions(): UseSuggestionsResult {
   }, [updateSuggestionInDB])
 
   /**
-   * Mark a scheduled suggestion as completed
-   * Returns true on success, false on failure
+   * Mark a scheduled suggestion as completed with optional effectiveness feedback.
+   *
+   * When user completes a suggestion, they can optionally provide feedback on
+   * whether the suggestion was helpful (very_helpful, somewhat_helpful, not_helpful, skipped).
+   * This feedback is stored with the suggestion for analytics and to improve future recommendations.
+   *
+   * @param id - The suggestion ID to complete
+   * @param feedback - Optional effectiveness feedback from the user
+   * @returns true on success, false on failure
    */
-  const completeSuggestion = useCallback(async (id: string): Promise<boolean> => {
+  const completeSuggestion = useCallback(async (id: string, feedback?: EffectivenessFeedback): Promise<boolean> => {
     try {
       setUpdateError(null)
-      await updateSuggestionInDB(id, {
+      const now = new Date().toISOString()
+
+      // Build update object with completion data and optional feedback
+      const updates: Partial<Suggestion> = {
         status: "completed",
-        lastUpdatedAt: new Date().toISOString(),
-      })
+        completedAt: now,
+        lastUpdatedAt: now,
+      }
+
+      // Add effectiveness feedback if provided
+      if (feedback) {
+        updates.effectiveness = feedback
+      }
+
+      await updateSuggestionInDB(id, updates)
       return true
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to complete suggestion"

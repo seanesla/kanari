@@ -34,7 +34,7 @@ import { useRecordingActions, useTrendDataActions } from "@/hooks/use-storage"
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
 import { RecordingWaveform, AudioLevelMeter } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
-import { PostRecordingPrompt } from "@/components/check-in"
+import { PostRecordingPrompt, EmotionTimeline } from "@/components/check-in"
 import { featuresToPatterns } from "@/lib/gemini/mismatch-detector"
 import { float32ToWavBase64 } from "@/lib/audio"
 import type { Recording, AudioFeatures, GeminiSemanticAnalysis } from "@/lib/types"
@@ -443,54 +443,30 @@ export function VoiceNoteContent({
 
       {/* Emotion Analysis Section - Shows Gemini semantic analysis results */}
       {isComplete && isSaved && (isAnalyzingEmotion || emotionAnalysis) && (
-        <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
-          <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-widest text-muted-foreground">
             Emotion Analysis
           </p>
           {isAnalyzingEmotion ? (
             // Loading state while Gemini analyzes the audio
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Analyzing emotions with Gemini...</span>
+            <div className="p-4 rounded-lg bg-purple-500/5 border border-purple-500/20">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Analyzing emotions with Gemini...</span>
+              </div>
             </div>
           ) : emotionAnalysis ? (
-            // Display emotion analysis results
-            <div className="space-y-3">
-              {/* Overall emotion with confidence */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-muted-foreground text-sm">Overall Emotion</p>
-                  <p className="font-medium text-lg capitalize">
-                    {emotionAnalysis.overallEmotion === "happy" && "😊 "}
-                    {emotionAnalysis.overallEmotion === "sad" && "😢 "}
-                    {emotionAnalysis.overallEmotion === "angry" && "😤 "}
-                    {emotionAnalysis.overallEmotion === "neutral" && "😐 "}
-                    {emotionAnalysis.overallEmotion}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-muted-foreground text-sm">Confidence</p>
-                  <p className="font-medium">
-                    {(emotionAnalysis.emotionConfidence * 100).toFixed(0)}%
-                  </p>
-                </div>
-              </div>
-              {/* Summary from Gemini */}
-              {emotionAnalysis.summary && (
-                <div className="pt-2 border-t border-purple-500/10">
-                  <p className="text-sm text-muted-foreground italic">
-                    "{emotionAnalysis.summary}"
-                  </p>
-                </div>
-              )}
-              {/* Segment count indicator */}
-              {emotionAnalysis.segments.length > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  Analyzed {emotionAnalysis.segments.length} speech segment
-                  {emotionAnalysis.segments.length !== 1 ? "s" : ""}
-                </p>
-              )}
-            </div>
+            // Display emotion timeline visualization
+            // The EmotionTimeline component shows:
+            // - Overall emotion with confidence score
+            // - Per-segment emotion breakdown with timestamps
+            // - Stress and fatigue interpretations
+            // - Key observations from Gemini's analysis
+            <EmotionTimeline
+              analysis={emotionAnalysis}
+              showObservations={true}
+              defaultExpanded={false}
+            />
           ) : null}
         </div>
       )}

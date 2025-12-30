@@ -1,0 +1,99 @@
+"use client"
+
+/**
+ * Welcome Step
+ *
+ * First step of onboarding - introduces Kanari and explains what it does.
+ */
+
+import { motion } from "framer-motion"
+import { Mic, Brain, Calendar, Shield } from "lucide-react"
+import { Button } from "@/components/ui/button"
+
+interface StepWelcomeProps {
+  onNext: () => void
+}
+
+const features = [
+  {
+    icon: Mic,
+    title: "Voice Analysis",
+    description: "Record 30-second check-ins to track your wellness",
+  },
+  {
+    icon: Brain,
+    title: "AI Insights",
+    description: "Gemini analyzes patterns to predict burnout risk",
+  },
+  {
+    icon: Calendar,
+    title: "Recovery Planning",
+    description: "Get personalized suggestions and schedule rest",
+  },
+  {
+    icon: Shield,
+    title: "Privacy First",
+    description: "All analysis happens locally in your browser",
+  },
+]
+
+export function StepWelcome({ onNext }: StepWelcomeProps) {
+  return (
+    <div className="space-y-8">
+      {/* Header */}
+      <div className="text-center space-y-4">
+        <motion.h1
+          className="text-4xl md:text-5xl font-serif"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          Welcome to <span className="text-accent">kanari</span>
+        </motion.h1>
+        <motion.p
+          className="text-lg text-muted-foreground max-w-md mx-auto"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          Your voice knows when you&apos;re heading toward burnout—often before you do.
+          Let&apos;s set things up so kanari can help protect you.
+        </motion.p>
+      </div>
+
+      {/* Feature cards */}
+      <motion.div
+        className="grid sm:grid-cols-2 gap-4"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        {features.map((feature, i) => (
+          <motion.div
+            key={feature.title}
+            className="p-4 rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 + i * 0.1 }}
+          >
+            <feature.icon className="h-6 w-6 text-accent mb-3" />
+            <h3 className="font-medium mb-1">{feature.title}</h3>
+            <p className="text-sm text-muted-foreground">{feature.description}</p>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      {/* Action */}
+      <motion.div
+        className="flex justify-center pt-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.8 }}
+      >
+        <Button onClick={onNext} size="lg" className="px-8">
+          Get Started
+        </Button>
+      </motion.div>
+    </div>
+  )
+}

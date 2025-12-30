@@ -145,12 +145,65 @@ export interface HistoricalContext {
 }
 
 // ============================================
+// Google Search Grounding Types
+// ============================================
+
+/**
+ * Citation from a web search source
+ * Used to reference specific parts of the response that came from the source
+ */
+export interface GroundingCitation {
+  startIndex: number
+  endIndex: number
+  uri: string
+}
+
+/**
+ * Web search source used for grounding
+ * Contains the source URL, title, and any citations
+ */
+export interface WebSearchSource {
+  uri: string
+  title: string
+  citations?: GroundingCitation[]
+}
+
+/**
+ * Grounding metadata from Google Search
+ * Returned when suggestions are backed by web research
+ */
+export interface GroundingMetadata {
+  /** Search queries that were performed */
+  webSearchQueries?: string[]
+  /** Sources that were used to ground the response */
+  webSearchSource?: WebSearchSource[]
+}
+
+// ============================================
 // Suggestion Types
 // ============================================
 
 export type SuggestionStatus = "pending" | "accepted" | "dismissed" | "scheduled" | "completed"
 export type SuggestionCategory = "break" | "exercise" | "mindfulness" | "social" | "rest"
 export type KanbanColumn = "pending" | "scheduled" | "completed"
+
+/**
+ * Effectiveness rating for completed suggestions
+ * Used to track whether a suggestion actually helped the user
+ */
+export type EffectivenessRating = "very_helpful" | "somewhat_helpful" | "not_helpful" | "skipped"
+
+/**
+ * Effectiveness feedback data collected after suggestion completion
+ */
+export interface EffectivenessFeedback {
+  /** The rating given by the user */
+  rating: EffectivenessRating
+  /** When the feedback was collected */
+  ratedAt: string
+  /** Optional comment from the user */
+  comment?: string
+}
 
 // ============================================
 // Diff-Aware Suggestion Types
@@ -221,6 +274,9 @@ export interface Suggestion {
   lastDecision?: SuggestionDecision // Last decision made by Gemini
   lastDecisionReason?: string // Why this decision was made
   lastUpdatedAt?: string // When this suggestion was last updated
+  // Effectiveness tracking
+  effectiveness?: EffectivenessFeedback // Feedback collected after completion
+  completedAt?: string // When the suggestion was marked complete
 }
 
 // Map suggestion status to kanban column
@@ -349,6 +405,9 @@ export interface UserSettings {
   selectedMonoFont?: MonoFamily
   // API Configuration
   geminiApiKey?: string // User's Gemini API key (stored locally)
+  // Onboarding
+  hasCompletedOnboarding?: boolean // Whether user has completed the onboarding flow
+  onboardingCompletedAt?: string // ISO timestamp when onboarding was completed
 }
 
 // ============================================

@@ -8,6 +8,14 @@
 import type { GeminiSemanticAnalysis, GeminiDiffResponse } from "@/lib/types"
 import { AUDIO_SEMANTIC_PROMPT, AUDIO_SEMANTIC_SCHEMA, DIFF_AWARE_SCHEMA } from "./prompts"
 
+/**
+ * Google Search tool configuration for grounding
+ * When enabled, Gemini can perform web searches to back responses with real data
+ */
+export interface GoogleSearchTool {
+  google_search: Record<string, never> // Empty object enables the tool
+}
+
 export interface GeminiRequest {
   contents: Array<{
     role: "user" | "model"
@@ -32,6 +40,37 @@ export interface GeminiRequest {
     responseMimeType?: string
     responseSchema?: object
   }
+  /**
+   * Tools available to the model
+   * - google_search: Enables web search grounding for factual responses
+   */
+  tools?: GoogleSearchTool[]
+}
+
+/**
+ * Web search source citation from Google Search grounding
+ */
+export interface GroundingCitation {
+  startIndex: number
+  endIndex: number
+  uri: string
+}
+
+/**
+ * Web search source from grounding
+ */
+export interface WebSearchSource {
+  uri: string
+  title: string
+  citations?: GroundingCitation[]
+}
+
+/**
+ * Grounding metadata returned when google_search tool is used
+ */
+export interface GroundingMetadata {
+  webSearchQueries?: string[]
+  webSearchSource?: WebSearchSource[]
 }
 
 export interface GeminiResponse {
@@ -44,6 +83,11 @@ export interface GeminiResponse {
     }
     finishReason: string
     index: number
+    /**
+     * Grounding metadata when google_search tool is enabled
+     * Contains search queries and sources used for grounding
+     */
+    groundingMetadata?: GroundingMetadata
   }>
   usageMetadata?: {
     promptTokenCount: number
@@ -57,6 +101,24 @@ export interface GeminiSuggestionRaw {
   rationale: string
   duration: number
   category: "break" | "exercise" | "mindfulness" | "social" | "rest"
+}
+
+/**
+ * Extended suggestion with grounding sources
+ * Used when Google Search grounding is enabled
+ */
+export interface GeminiSuggestionWithGrounding extends GeminiSuggestionRaw {
+  /** Sources from Google Search that back this suggestion */
+  sources?: WebSearchSource[]
+}
+
+/**
+ * Response from suggestion generation with grounding enabled
+ */
+export interface SuggestionsWithGroundingResponse {
+  suggestions: GeminiSuggestionRaw[]
+  /** Grounding metadata from Google Search */
+  grounding?: GroundingMetadata
 }
 
 /**
@@ -88,16 +150,21 @@ export async function callGeminiAPI(apiKey: string, request: GeminiRequest): Pro
 /**
  * Generate wellness suggestions using Gemini
  *
+ * Uses Google Search grounding to provide research-backed recommendations.
+ * The model searches for relevant wellness research to support each suggestion.
+ *
  * @param apiKey - Gemini API key
  * @param systemPrompt - System instruction for Gemini
  * @param userPrompt - User prompt with wellness data
- * @returns Array of raw suggestion objects
+ * @param enableGrounding - Enable Google Search grounding for research-backed suggestions (default: true)
+ * @returns Object containing suggestions and optional grounding metadata
  */
 export async function generateSuggestions(
   apiKey: string,
   systemPrompt: string,
-  userPrompt: string
-): Promise<GeminiSuggestionRaw[]> {
+  userPrompt: string,
+  enableGrounding: boolean = true
+): Promise<SuggestionsWithGroundingResponse> {
   const request: GeminiRequest = {
     systemInstruction: {
       parts: [{ text: systemPrompt }],
@@ -115,6 +182,11 @@ export async function generateSuggestions(
       maxOutputTokens: 2048, // Increased for Gemini 3's thinking tokens
       responseMimeType: "application/json", // Request JSON response
     },
+    // Enable Google Search grounding for research-backed suggestions
+    // This allows Gemini to search for wellness research to support recommendations
+    ...(enableGrounding && {
+      tools: [{ google_search: {} }],
+    }),
   }
 
   const response = await callGeminiAPI(apiKey, request)
@@ -124,7 +196,11 @@ export async function generateSuggestions(
     throw new Error("No response from Gemini API")
   }
 
-  const text = response.candidates[0].content.parts[0].text
+  const candidate = response.candidates[0]
+  const text = candidate.content.parts[0].text
+
+  // Extract grounding metadata if available
+  const grounding = candidate.groundingMetadata
 
   // Parse JSON response
   try {
@@ -147,7 +223,10 @@ export async function generateSuggestions(
       }
     }
 
-    return suggestions
+    return {
+      suggestions,
+      grounding,
+    }
   } catch (error) {
     throw new Error(`Failed to parse Gemini response: ${error instanceof Error ? error.message : "Unknown error"}`)
   }

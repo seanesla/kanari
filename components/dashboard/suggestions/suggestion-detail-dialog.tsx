@@ -15,7 +15,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { formatScheduledTime } from "@/lib/date-utils"
-import type { Suggestion, SuggestionCategory, VoicePatterns, HistoricalContext, BurnoutPrediction, AudioFeatures } from "@/lib/types"
+import { EffectivenessFeedbackDialog } from "./effectiveness-feedback-dialog"
+import type { Suggestion, SuggestionCategory, VoicePatterns, HistoricalContext, BurnoutPrediction, AudioFeatures, EffectivenessFeedback } from "@/lib/types"
 
 const categoryIcons: Record<SuggestionCategory, typeof Coffee> = {
   break: Coffee,
@@ -40,7 +41,13 @@ interface SuggestionDetailDialogProps {
   onSchedule?: (suggestion: Suggestion) => void
   onAccept?: (suggestion: Suggestion) => void
   onDismiss?: (suggestion: Suggestion) => void
+  /** @deprecated Use onCompleteWithFeedback instead for the full flow with feedback collection */
   onComplete?: (suggestion: Suggestion) => void
+  /**
+   * Called when a suggestion is marked complete with effectiveness feedback.
+   * This is the preferred completion flow - shows a feedback dialog after the user clicks "Mark Complete".
+   */
+  onCompleteWithFeedback?: (suggestion: Suggestion, feedback: EffectivenessFeedback) => void
   isCalendarConnected?: boolean
   // Enriched context for "Why this suggestion?"
   voicePatterns?: VoicePatterns
@@ -57,6 +64,7 @@ export function SuggestionDetailDialog({
   onAccept,
   onDismiss,
   onComplete,
+  onCompleteWithFeedback,
   isCalendarConnected = false,
   voicePatterns,
   history,
@@ -65,6 +73,12 @@ export function SuggestionDetailDialog({
 }: SuggestionDetailDialogProps) {
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showRawValues, setShowRawValues] = useState(false)
+
+  // State for tracking the feedback dialog flow
+  // When user clicks "Mark Complete", we first show the feedback dialog
+  const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
+  // Store the suggestion being completed while feedback dialog is open
+  const [completingSuggestion, setCompletingSuggestion] = useState<Suggestion | null>(null)
 
   if (!suggestion) return null
 
@@ -75,7 +89,49 @@ export function SuggestionDetailDialog({
   const isCompleted = suggestion.status === "accepted" || suggestion.status === "completed"
   const isDismissed = suggestion.status === "dismissed"
 
+  /**
+   * Handle the "Mark Complete" button click.
+   * If onCompleteWithFeedback is provided, show the feedback dialog first.
+   * Otherwise, fall back to the legacy onComplete callback.
+   */
+  const handleMarkComplete = () => {
+    if (onCompleteWithFeedback) {
+      // New flow: close the detail dialog and show feedback dialog
+      setCompletingSuggestion(suggestion)
+      onOpenChange(false) // Close the detail dialog
+      setShowFeedbackDialog(true) // Show feedback dialog
+    } else if (onComplete) {
+      // Legacy flow: complete without feedback
+      onComplete(suggestion)
+    }
+  }
+
+  /**
+   * Handle feedback submission from the effectiveness dialog.
+   * Completes the suggestion with the user's feedback.
+   */
+  const handleFeedbackSubmit = (feedback: EffectivenessFeedback) => {
+    if (completingSuggestion && onCompleteWithFeedback) {
+      onCompleteWithFeedback(completingSuggestion, feedback)
+    }
+    // Reset state
+    setCompletingSuggestion(null)
+    setShowFeedbackDialog(false)
+  }
+
+  /**
+   * Handle feedback dialog close/skip.
+   * Resets the feedback flow state.
+   */
+  const handleFeedbackDialogClose = (open: boolean) => {
+    if (!open) {
+      setShowFeedbackDialog(false)
+      setCompletingSuggestion(null)
+    }
+  }
+
   return (
+  <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="border-border/70 bg-card/95 backdrop-blur-xl max-w-lg">
         <DialogHeader>
@@ -278,7 +334,7 @@ export function SuggestionDetailDialog({
               </Button>
               <Button
                 size="sm"
-                onClick={() => onComplete?.(suggestion)}
+                onClick={handleMarkComplete}
                 className="bg-success text-success-foreground hover:bg-success/90"
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
@@ -299,5 +355,14 @@ export function SuggestionDetailDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Effectiveness Feedback Dialog - shown after user clicks "Mark Complete" */}
+    <EffectivenessFeedbackDialog
+      suggestion={completingSuggestion}
+      open={showFeedbackDialog}
+      onOpenChange={handleFeedbackDialogClose}
+      onSubmit={handleFeedbackSubmit}
+    />
+  </>
   )
 }

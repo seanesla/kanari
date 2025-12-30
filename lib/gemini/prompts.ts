@@ -91,6 +91,13 @@ SUGGESTION GUIDELINES:
 6. Avoid medical advice or diagnosis
 7. Ground rationale in observed voice patterns and historical trends
 
+RESEARCH-BACKED SUGGESTIONS:
+When Google Search is available, use it to find and cite relevant wellness research in your rationales:
+- Reference specific studies or research findings that support your recommendation
+- Mention research institutions or journals when relevant (e.g., "Research from Stanford shows...")
+- Include evidence-based benefits in your rationale
+- Cite real statistics when available (e.g., "Studies show 10 minutes of walking can reduce stress by 20%")
+
 EXAMPLE OUTPUT:
 [
   {

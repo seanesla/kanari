@@ -2,7 +2,7 @@
 
 import type { AudioFeatures } from "@/lib/types"
 import { FeatureExtractor } from "./feature-extractor"
-import { segmentSpeech, type SpeechSegment } from "./vad"
+import type { SpeechSegment } from "./vad"
 
 export interface ProcessorOptions {
   /**
@@ -140,9 +140,13 @@ export class AudioProcessor {
 
   /**
    * Run Voice Activity Detection
+   * Uses dynamic import to avoid SSR issues with onnxruntime-web
    */
   private async runVAD(audioData: Float32Array): Promise<SpeechSegment[]> {
     try {
+      // Dynamic import to avoid SSR issues
+      const { segmentSpeech } = await import("./vad")
+
       const segments = await segmentSpeech(audioData, {
         sampleRate: this.options.sampleRate,
         ...this.options.vadOptions,

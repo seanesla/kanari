@@ -11,6 +11,7 @@ import type {
   CheckInSession,
   CheckInMessage,
 } from "@/lib/types"
+import type { StoredAchievement, AchievementCategory, AchievementRarity } from "@/lib/achievements/types"
 
 // Database record types with IndexedDB-friendly structure
 export interface DBRecording extends Omit<Recording, "createdAt"> {
@@ -41,6 +42,11 @@ export interface DBCheckInSession extends Omit<CheckInSession, "startedAt" | "en
   endedAt?: Date
 }
 
+export interface DBAchievement extends Omit<StoredAchievement, "earnedAt" | "seenAt"> {
+  earnedAt: Date
+  seenAt?: Date
+}
+
 // Database class
 class KanariDB extends Dexie {
   recordings!: EntityTable<DBRecording, "id">
@@ -49,6 +55,7 @@ class KanariDB extends Dexie {
   trendData!: EntityTable<DBTrendData & { id: string }, "id">
   settings!: EntityTable<DBSettings, "id">
   checkInSessions!: EntityTable<DBCheckInSession, "id">
+  achievements!: EntityTable<DBAchievement, "id">
 
   constructor() {
     super("kanari")
@@ -97,6 +104,17 @@ class KanariDB extends Dexie {
       trendData: "id, date",
       settings: "id",
       checkInSessions: "id, startedAt, recordingId",
+    })
+
+    // Version 5: Add achievements table for dynamic AI-generated achievements
+    this.version(5).stores({
+      recordings: "id, createdAt, status",
+      suggestions: "id, createdAt, status, category, recordingId, version",
+      recoveryBlocks: "id, suggestionId, scheduledAt, completed",
+      trendData: "id, date",
+      settings: "id",
+      checkInSessions: "id, startedAt, recordingId",
+      achievements: "id, earnedAt, category, rarity, seen",
     })
   }
 }
@@ -184,5 +202,21 @@ export function fromCheckInSession(record: CheckInSession): DBCheckInSession {
     ...record,
     startedAt: new Date(record.startedAt),
     endedAt: record.endedAt ? new Date(record.endedAt) : undefined,
+  }
+}
+
+export function toAchievement(dbRecord: DBAchievement): StoredAchievement {
+  return {
+    ...dbRecord,
+    earnedAt: dbRecord.earnedAt.toISOString(),
+    seenAt: dbRecord.seenAt?.toISOString(),
+  }
+}
+
+export function fromAchievement(record: StoredAchievement): DBAchievement {
+  return {
+    ...record,
+    earnedAt: new Date(record.earnedAt),
+    seenAt: record.seenAt ? new Date(record.seenAt) : undefined,
   }
 }

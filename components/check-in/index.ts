@@ -11,3 +11,9 @@ export { CheckInTrigger, CheckInFab, PostRecordingPrompt } from "./check-in-trig
 export { ConversationView } from "./conversation-view"
 export { MessageBubble, TypingIndicator, TranscriptPreview } from "./message-bubble"
 export { VoiceIndicator, VoiceIndicatorLarge } from "./voice-indicator"
+export {
+  EmotionTimeline,
+  EmotionTimelineCompact,
+  EMOTION_CONFIG,
+} from "./emotion-timeline"
+export type { EmotionTimelineProps } from "./emotion-timeline"

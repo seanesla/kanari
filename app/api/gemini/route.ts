@@ -389,8 +389,14 @@ export async function POST(request: NextRequest) {
     // Future enhancement: pass enrichedContext when prompts.ts is updated
     const userPrompt = generateUserPrompt(context)
 
-    // Call Gemini API
-    const rawSuggestions = await generateSuggestions(apiKey, SYSTEM_PROMPT, userPrompt)
+    // Call Gemini API with Google Search grounding enabled
+    // Grounding allows Gemini to search for wellness research to back recommendations
+    const { suggestions: rawSuggestions, grounding } = await generateSuggestions(
+      apiKey,
+      SYSTEM_PROMPT,
+      userPrompt,
+      true // Enable Google Search grounding
+    )
 
     // Transform to Suggestion type with IDs and timestamps
     const suggestions: Suggestion[] = rawSuggestions.map((raw) => ({
@@ -403,7 +409,12 @@ export async function POST(request: NextRequest) {
       createdAt: new Date().toISOString(),
     }))
 
-    return NextResponse.json({ suggestions })
+    // Include grounding metadata in response if available
+    // This provides sources that back the suggestions
+    return NextResponse.json({
+      suggestions,
+      ...(grounding && { grounding }),
+    })
   } catch (error) {
     console.error("Gemini API error:", error)
 

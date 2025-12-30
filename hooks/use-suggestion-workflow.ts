@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useMemo } from "react"
-import type { Suggestion, RecoveryBlock, UserSettings } from "@/lib/types"
+import type { Suggestion, RecoveryBlock, UserSettings, EffectivenessFeedback } from "@/lib/types"
 
 /**
  * Dropped suggestion info when dragging to calendar
@@ -33,7 +33,18 @@ export interface SuggestionWorkflowHandlers {
   handleTimeSlotClick: (date: Date, hour: number) => void
   handleScheduleConfirm: (suggestion: Suggestion, scheduledFor: string) => Promise<boolean>
   handleDismiss: (suggestion: Suggestion) => Promise<boolean>
+  /**
+   * Complete a suggestion without feedback (legacy flow).
+   * For the full flow with feedback dialog, use the suggestion detail dialog's built-in feedback integration.
+   */
   handleComplete: (suggestion: Suggestion) => Promise<boolean>
+  /**
+   * Complete a suggestion with effectiveness feedback.
+   * Called after user provides feedback (very_helpful, somewhat_helpful, not_helpful) or skips.
+   * @param suggestion - The suggestion being completed
+   * @param feedback - The effectiveness feedback from the user
+   */
+  handleCompleteWithFeedback: (suggestion: Suggestion, feedback: EffectivenessFeedback) => Promise<boolean>
   handleEventClick: (suggestion: Suggestion) => void
   handleDragStart: () => void
   handleDragEnd: () => void
@@ -44,7 +55,8 @@ interface UseSuggestionWorkflowParams {
   suggestions: Suggestion[]
   scheduleSuggestion: (id: string, scheduledFor: string) => Promise<boolean>
   dismissSuggestion: (id: string) => Promise<boolean>
-  completeSuggestion: (id: string) => Promise<boolean>
+  /** Complete a suggestion with optional effectiveness feedback */
+  completeSuggestion: (id: string, feedback?: EffectivenessFeedback) => Promise<boolean>
   scheduleGoogleEvent?: (suggestion: Suggestion, settings?: UserSettings) => Promise<RecoveryBlock | null>
   isCalendarConnected?: boolean
 }
@@ -127,9 +139,27 @@ export function useSuggestionWorkflow({
     return success
   }, [dismissSuggestion])
 
-  // Complete suggestion from detail dialog
+  // Complete suggestion from detail dialog (legacy - no feedback)
   const handleComplete = useCallback(async (suggestion: Suggestion): Promise<boolean> => {
     const success = await completeSuggestion(suggestion.id)
+    if (success) {
+      setSelectedSuggestion(null)
+    }
+    return success
+  }, [completeSuggestion])
+
+  /**
+   * Complete suggestion with effectiveness feedback.
+   * This is the preferred flow - called after user rates how helpful the suggestion was.
+   *
+   * @param suggestion - The suggestion being completed
+   * @param feedback - User's effectiveness feedback (very_helpful, somewhat_helpful, not_helpful, skipped)
+   */
+  const handleCompleteWithFeedback = useCallback(async (
+    suggestion: Suggestion,
+    feedback: EffectivenessFeedback
+  ): Promise<boolean> => {
+    const success = await completeSuggestion(suggestion.id, feedback)
     if (success) {
       setSelectedSuggestion(null)
     }
@@ -161,6 +191,7 @@ export function useSuggestionWorkflow({
     handleScheduleConfirm,
     handleDismiss,
     handleComplete,
+    handleCompleteWithFeedback,
     handleEventClick,
     handleDragStart,
     handleDragEnd,
@@ -173,6 +204,7 @@ export function useSuggestionWorkflow({
     handleScheduleConfirm,
     handleDismiss,
     handleComplete,
+    handleCompleteWithFeedback,
     handleEventClick,
     handleDragStart,
     handleDragEnd,
