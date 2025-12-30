@@ -4,12 +4,19 @@ import { useEffect, useState } from "react"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { useAchievements, useAchievementCooldown } from "@/hooks/use-achievements"
+import { useRecordings, useCheckInSessions } from "@/hooks/use-storage"
+import { useAllSuggestions } from "@/hooks/use-storage"
 import { AchievementsShowcase } from "@/components/achievements/achievements-showcase"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 
 export default function AchievementsPage() {
   const { shouldAnimate } = useDashboardAnimation()
   const [visible, setVisible] = useState(!shouldAnimate)
+
+  // Get data needed for generating achievements
+  const recordings = useRecordings()
+  const suggestions = useAllSuggestions()
+  const sessions = useCheckInSessions()
 
   const {
     achievements,
@@ -31,7 +38,7 @@ export default function AchievementsPage() {
   // Handle generate with cooldown
   const handleGenerate = async () => {
     if (!canCheck) return
-    await generateAchievements()
+    await generateAchievements(recordings, suggestions, sessions)
     markChecked()
   }
 

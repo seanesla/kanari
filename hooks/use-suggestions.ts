@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback, useRef } from "react"
+import { logError } from "@/lib/logger"
 import type {
   Suggestion,
   VoiceMetrics,
@@ -276,7 +277,7 @@ export function useSuggestions(): UseSuggestionsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to regenerate suggestions"
       setError(errorMessage)
-      console.error("Error regenerating suggestions:", err)
+      logError("Suggestions", "Error regenerating suggestions:", err)
     } finally {
       setLoading(false)
     }
@@ -297,7 +298,7 @@ export function useSuggestions(): UseSuggestionsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to update suggestion"
       setUpdateError(errorMessage)
-      console.error("Error updating suggestion:", err)
+      logError("Suggestions", "Error updating suggestion:", err)
       return false
     }
   }, [updateSuggestionInDB])
@@ -322,7 +323,7 @@ export function useSuggestions(): UseSuggestionsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to move suggestion"
       setUpdateError(errorMessage)
-      console.error("Error moving suggestion:", err)
+      logError("Suggestions", "Error moving suggestion:", err)
       return false
     }
   }, [updateSuggestionInDB])
@@ -343,7 +344,7 @@ export function useSuggestions(): UseSuggestionsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to schedule suggestion"
       setUpdateError(errorMessage)
-      console.error("Error scheduling suggestion:", err)
+      logError("Suggestions", "Error scheduling suggestion:", err)
       return false
     }
   }, [updateSuggestionInDB])
@@ -363,7 +364,7 @@ export function useSuggestions(): UseSuggestionsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to dismiss suggestion"
       setUpdateError(errorMessage)
-      console.error("Error dismissing suggestion:", err)
+      logError("Suggestions", "Error dismissing suggestion:", err)
       return false
     }
   }, [updateSuggestionInDB])
@@ -401,7 +402,7 @@ export function useSuggestions(): UseSuggestionsResult {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to complete suggestion"
       setUpdateError(errorMessage)
-      console.error("Error completing suggestion:", err)
+      logError("Suggestions", "Error completing suggestion:", err)
       return false
     }
   }, [updateSuggestionInDB])

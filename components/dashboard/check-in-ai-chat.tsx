@@ -28,6 +28,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { logDebug, logError } from "@/lib/logger"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Phone, PhoneOff, Mic, MicOff } from "lucide-react"
@@ -82,24 +83,24 @@ export function AIChatContent({
         // Only save sessions that have at least one message
         // Empty sessions (0 messages) are not meaningful and should not be stored
         if (session.messages.length === 0) {
-          console.log("[AIChatContent] Skipping save - session has no messages")
+          logDebug("AIChatContent", "Skipping save - session has no messages")
           return
         }
         // Persist the conversation to IndexedDB for history
         await addCheckInSession(session)
         onSessionComplete?.(session)
       } catch (error) {
-        console.error("[AIChatContent] Failed to save check-in session:", error)
+        logError("AIChatContent", "Failed to save check-in session:", error)
       }
     },
     // Called when voice patterns don't match spoken content
     // (e.g., saying "I'm fine" but voice shows stress)
     onMismatch: (result) => {
-      console.log("[AIChatContent] Voice/content mismatch detected:", result)
+      logDebug("AIChatContent", "Voice/content mismatch detected:", result)
     },
     // Called on connection or processing errors
     onError: (error) => {
-      console.error("[AIChatContent] Error:", error)
+      logError("AIChatContent", "Error:", error)
     },
   })
 

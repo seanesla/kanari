@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback } from "react"
+import { logDebug } from "@/lib/logger"
 import { useLiveQuery } from "dexie-react-hooks"
 import {
   db,
@@ -404,7 +405,7 @@ export function useCheckInSessionActions() {
 
     if (emptySessionIds.length > 0) {
       await db.checkInSessions.bulkDelete(emptySessionIds)
-      console.log(`[Storage] Deleted ${emptySessionIds.length} empty check-in sessions`)
+      logDebug("Storage", `Deleted ${emptySessionIds.length} empty check-in sessions`)
     }
 
     return emptySessionIds.length

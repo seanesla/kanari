@@ -1,5 +1,8 @@
 "use client"
 
+import { resampleAudio } from "./pcm-converter"
+import { logWarn, logError } from "@/lib/logger"
+
 // Dynamic import to avoid SSR issues with onnxruntime-web
 // The vad-web package imports onnxruntime-web/wasm which requires browser APIs
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -75,7 +78,8 @@ export class VoiceActivityDetector {
 
     // Validate sample rate
     if (this.options.sampleRate !== 16000) {
-      console.warn(
+      logWarn(
+        "VAD",
         `Silero VAD requires 16kHz sample rate. Got ${this.options.sampleRate}Hz. Converting...`
       )
     }
@@ -87,18 +91,18 @@ export class VoiceActivityDetector {
    */
   async segment(audioData: Float32Array): Promise<SpeechSegment[]> {
     try {
-      // Resample if necessary
+      // Resample if necessary (use shared resampling function from pcm-converter)
       const processedAudio =
         this.options.sampleRate === 16000
           ? audioData
-          : this.resample(audioData, this.options.sampleRate, 16000)
+          : resampleAudio(audioData, this.options.sampleRate, 16000)
 
       // Process with VAD
       const segments = await this.processWithVAD(processedAudio)
 
       return segments
     } catch (error) {
-      console.error("VAD segmentation failed:", error)
+      logError("VAD", "Segmentation failed:", error)
       // Fallback: return entire audio as single segment
       return [
         {
@@ -152,36 +156,6 @@ export class VoiceActivityDetector {
     }
 
     return segments
-  }
-
-  /**
-   * Simple linear interpolation resampling
-   * For production, consider using a proper resampling library
-   */
-  private resample(
-    audioData: Float32Array,
-    fromRate: number,
-    toRate: number
-  ): Float32Array {
-    if (fromRate === toRate) return audioData
-
-    const ratio = toRate / fromRate
-    const newLength = Math.round(audioData.length * ratio)
-    const resampled = new Float32Array(newLength)
-
-    for (let i = 0; i < newLength; i++) {
-      const srcIndex = i / ratio
-      const srcIndexFloor = Math.floor(srcIndex)
-      const srcIndexCeil = Math.min(srcIndexFloor + 1, audioData.length - 1)
-      const fraction = srcIndex - srcIndexFloor
-
-      // Linear interpolation
-      resampled[i] =
-        audioData[srcIndexFloor] * (1 - fraction) +
-        audioData[srcIndexCeil] * fraction
-    }
-
-    return resampled
   }
 }
 
@@ -287,7 +261,7 @@ export async function segmentSpeech(
     const vad = new VoiceActivityDetector(options)
     return await vad.segment(audioData)
   } catch (error) {
-    console.warn("Silero VAD failed, falling back to energy-based VAD:", error)
+    logWarn("VAD", "Silero VAD failed, falling back to energy-based VAD:", error)
     const simpleVad = new SimpleVAD(options?.sampleRate ?? 16000)
     return simpleVad.segment(audioData)
   }

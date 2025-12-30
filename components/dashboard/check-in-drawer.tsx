@@ -103,9 +103,13 @@ export function CheckInDrawer({
     // Reset state when drawer opens
     setMicPermission("prompt")
 
+    // Store permission result for cleanup
+    let permissionResult: PermissionStatus | null = null
+
     // Query current permission state
     navigator.permissions?.query({ name: "microphone" as PermissionName })
       .then((result) => {
+        permissionResult = result
         setMicPermission(result.state as "granted" | "denied" | "prompt")
 
         // Listen for permission changes while drawer is open
@@ -117,6 +121,13 @@ export function CheckInDrawer({
         // Permissions API not available, will check when recording starts
         setMicPermission("prompt")
       })
+
+    // Cleanup: remove permission listener on unmount
+    return () => {
+      if (permissionResult) {
+        permissionResult.onchange = null
+      }
+    }
   }, [open])
 
   // Reset mode to default when drawer closes

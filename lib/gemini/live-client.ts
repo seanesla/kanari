@@ -21,6 +21,7 @@
 
 import { validateServerMessage } from "./schemas"
 import { getGeminiApiKey } from "@/lib/utils"
+import { logDebug, logWarn, logError } from "@/lib/logger"
 
 // Event types emitted by the client
 export interface LiveClientEvents {
@@ -112,7 +113,7 @@ export class GeminiLiveClient {
       const stored = sessionStorage.getItem(this.DEDUP_STORAGE_KEY)
       this.processedEventHashes = stored ? new Set(JSON.parse(stored)) : new Set()
     } catch (error) {
-      console.warn("[LiveClient] Failed to load dedup hashes:", error)
+      logWarn("LiveClient", "Failed to load dedup hashes:", error)
       this.processedEventHashes = new Set()
     }
   }
@@ -133,7 +134,7 @@ export class GeminiLiveClient {
    */
   private async attemptReconnect(): Promise<void> {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error("[GeminiLive] Max reconnection attempts reached")
+      logError("GeminiLive", "Max reconnection attempts reached")
       this.state = "error"
       this.config.events.onError?.(
         new Error(`Connection failed after ${this.maxReconnectAttempts} attempts`)
@@ -143,7 +144,7 @@ export class GeminiLiveClient {
 
     this.reconnectAttempts++
     const delay = this.getReconnectDelay()
-    console.log(`[GeminiLive] Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+    logDebug("GeminiLive", `Reconnecting in ${Math.round(delay)}ms (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
 
     await new Promise((resolve) => setTimeout(resolve, delay))
 
@@ -151,7 +152,7 @@ export class GeminiLiveClient {
       try {
         await this.connect()
       } catch (error) {
-        console.error("[GeminiLive] Reconnection attempt failed:", error)
+        logError("GeminiLive", "Reconnection attempt failed:", error)
       }
     }
   }
@@ -183,7 +184,7 @@ export class GeminiLiveClient {
 
     try {
       // 1. Create session on server (include API key from settings if available)
-      console.log("[GeminiLive] Creating session...")
+      logDebug("GeminiLive", "Creating session...")
       const apiKey = await getGeminiApiKey()
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       if (apiKey) {
@@ -201,13 +202,13 @@ export class GeminiLiveClient {
           const error = await response.json()
           errorMessage = error.error || errorMessage
         } catch (parseError) {
-          console.error("[GeminiLive] Failed to parse error response:", parseError)
+          logError("GeminiLive", "Failed to parse error response:", parseError)
         }
         throw new Error(errorMessage)
       }
 
       const session: SessionInfo = await response.json()
-      console.log("[GeminiLive] Received session:", JSON.stringify(session))
+      logDebug("GeminiLive", "Received session:", JSON.stringify(session))
 
       // Validate session response has required fields
       if (!session.sessionId || !session.streamUrl || !session.secret) {
@@ -223,12 +224,12 @@ export class GeminiLiveClient {
       this.audioUrl = session.audioUrl
       this.sessionSecret = session.secret
 
-      console.log("[GeminiLive] Session created:", this.sessionId)
+      logDebug("GeminiLive", "Session created:", this.sessionId)
 
       // 2. Connect to SSE stream
       await this.connectSSE()
     } catch (error) {
-      console.error("[GeminiLive] Connection failed:", error)
+      logError("GeminiLive", "Connection failed:", error)
       this.state = "error"
       const err = error instanceof Error ? error : new Error("Connection failed")
       this.config.events.onError?.(err)
@@ -292,7 +293,7 @@ export class GeminiLiveClient {
           }
         }
       } catch (error) {
-        console.error("[GeminiLive] SSE stream error:", error)
+        logError("GeminiLive", "SSE stream error:", error)
         reject(error instanceof Error ? error : new Error("Stream read error"))
       }
     }
@@ -337,7 +338,7 @@ export class GeminiLiveClient {
         return
       }
 
-      console.log("[GeminiLive] Connecting to SSE stream...")
+      logDebug("GeminiLive", "Connecting to SSE stream...")
 
       // Use fetch with custom headers for better security
       fetch(this.streamUrl, {
@@ -361,7 +362,7 @@ export class GeminiLiveClient {
 
           // Handle ready event (session is ready)
           this.eventSource.addEventListener("ready", () => {
-            console.log("[GeminiLive] Session ready")
+            logDebug("GeminiLive", "Session ready")
             this.state = "ready"
             this.reconnectAttempts = 0
             this.consecutiveAudioFailures = 0 // Reset audio failure counter
@@ -380,9 +381,9 @@ export class GeminiLiveClient {
           this.eventSource.addEventListener("connected", (event) => {
             try {
               const data = JSON.parse(event.data)
-              console.log("[GeminiLive] Connected to session:", data.sessionId)
+              logDebug("GeminiLive", "Connected to session:", data.sessionId)
             } catch (error) {
-              console.error("[GeminiLive] Failed to parse connected event:", error)
+              logError("GeminiLive", "Failed to parse connected event:", error)
             }
           })
 
@@ -391,7 +392,7 @@ export class GeminiLiveClient {
             try {
               this.handleMessage(JSON.parse(event.data))
             } catch (error) {
-              console.error("[GeminiLive] Failed to parse message event:", error)
+              logError("GeminiLive", "Failed to parse message event:", error)
             }
           })
 
@@ -399,7 +400,7 @@ export class GeminiLiveClient {
           this.eventSource.addEventListener("error", (event) => {
             // Verify it's a MessageEvent with data (server-sent error)
             if (!(event instanceof MessageEvent) || !event.data) {
-              console.error("[GeminiLive] SSE error event without data")
+              logError("GeminiLive", "SSE error event without data")
               this.config.events.onError?.(new Error("Unknown SSE error"))
               return
             }
@@ -422,7 +423,7 @@ export class GeminiLiveClient {
                 // Use default reason if parsing fails
               }
             }
-            console.log("[GeminiLive] Session closed:", reason)
+            logDebug("GeminiLive", "Session closed:", reason)
             this.state = "disconnected"
             this.config.events.onDisconnected?.(reason)
           })
@@ -436,7 +437,7 @@ export class GeminiLiveClient {
           }, 30000)
         })
         .catch((error) => {
-          console.error("[GeminiLive] SSE connection error:", error)
+          logError("GeminiLive", "SSE connection error:", error)
           this.state = "error"
           this.config.events.onError?.(error instanceof Error ? error : new Error("SSE connection failed"))
           reject(error instanceof Error ? error : new Error("SSE connection failed"))
@@ -474,7 +475,7 @@ export class GeminiLiveClient {
     if (this.shouldDeduplicateMessage(message)) {
       const hash = this.hashMessage(message)
       if (this.processedEventHashes.has(hash)) {
-        console.log("[LiveClient] Skipping duplicate event (HMR replay)")
+        logDebug("LiveClient", "Skipping duplicate event (HMR replay)")
         return
       }
       this.processedEventHashes.add(hash)
@@ -486,7 +487,7 @@ export class GeminiLiveClient {
           JSON.stringify(Array.from(this.processedEventHashes))
         )
       } catch (error) {
-        console.warn("[LiveClient] Failed to persist dedup hashes:", error)
+        logWarn("LiveClient", "Failed to persist dedup hashes:", error)
       }
 
       // Clear old hashes periodically to prevent memory leak (keep last 100)
@@ -497,7 +498,7 @@ export class GeminiLiveClient {
         try {
           sessionStorage.setItem(this.DEDUP_STORAGE_KEY, JSON.stringify(hashes.slice(-100)))
         } catch (error) {
-          console.warn("[LiveClient] Failed to persist trimmed dedup hashes:", error)
+          logWarn("LiveClient", "Failed to persist trimmed dedup hashes:", error)
         }
       }
     }
@@ -505,13 +506,13 @@ export class GeminiLiveClient {
     // Validate message with Zod schema
     const validatedMessage = validateServerMessage(message)
     if (!validatedMessage) {
-      console.warn("[GeminiLive] Invalid message received, skipping")
+      logWarn("GeminiLive", "Invalid message received, skipping")
       return
     }
 
     // Setup complete
     if (validatedMessage.setupComplete) {
-      console.log("[GeminiLive] Setup complete")
+      logDebug("GeminiLive", "Setup complete")
       this.state = "ready"
       this.config.events.onConnected?.()
       return
@@ -527,7 +528,7 @@ export class GeminiLiveClient {
     if (validatedMessage.inputTranscription) {
       const transcription = validatedMessage.inputTranscription
       if (transcription.text) {
-        console.log("[LiveClient] User transcript (root):", transcription.text, "finished:", transcription.finished)
+        logDebug("LiveClient", "User transcript (root):", transcription.text, "finished:", transcription.finished)
         this.config.events.onUserTranscript?.(transcription.text, transcription.finished ?? false)
       }
       return
@@ -537,7 +538,7 @@ export class GeminiLiveClient {
     // Source: Context7 - /googleapis/js-genai docs - "VoiceActivityDetectionSignal"
     if (validatedMessage.voiceActivityDetectionSignal) {
       const vadType = validatedMessage.voiceActivityDetectionSignal.vadSignalType
-      console.log("[LiveClient] VAD signal:", vadType)
+      logDebug("LiveClient", "VAD signal:", vadType)
       if (vadType === "VAD_SIGNAL_TYPE_SOS") {
         this.config.events.onUserSpeechStart?.()
       } else if (vadType === "VAD_SIGNAL_TYPE_EOS") {
@@ -554,7 +555,7 @@ export class GeminiLiveClient {
     }
 
     // Unknown message type
-    console.log("[GeminiLive] Unknown message:", validatedMessage)
+    logDebug("GeminiLive", "Unknown message:", validatedMessage)
   }
 
   /**
@@ -569,17 +570,17 @@ export class GeminiLiveClient {
     }> | undefined
 
     if (!functionCalls || functionCalls.length === 0) {
-      console.warn("[LiveClient] Empty tool call received")
+      logWarn("LiveClient", "Empty tool call received")
       return
     }
 
     for (const fc of functionCalls) {
-      console.log("[LiveClient] Function call:", fc.name, "args:", fc.args)
+      logDebug("LiveClient", "Function call:", fc.name, "args:", fc.args)
 
       if (fc.name === "mute_audio_response") {
         // Model chose silence - activate silence mode to suppress audio
         const reason = (fc.args?.reason as string) || "no reason provided"
-        console.log("[LiveClient] Model chose silence:", reason)
+        logDebug("LiveClient", "Model chose silence:", reason)
 
         // CRITICAL: Set silence mode to suppress all audio for this turn
         this.silenceMode = true
@@ -593,7 +594,7 @@ export class GeminiLiveClient {
           response: { acknowledged: true }
         }])
       } else {
-        console.warn("[LiveClient] Unknown function call:", fc.name)
+        logWarn("LiveClient", "Unknown function call:", fc.name)
       }
     }
   }
@@ -622,18 +623,18 @@ export class GeminiLiveClient {
 
     // Check for interruption (barge-in)
     if (content.interrupted) {
-      console.log("[GeminiLive] Interrupted by user")
+      logDebug("GeminiLive", "Interrupted by user")
       this.config.events.onInterrupted?.()
       return
     }
 
     // Check for turn complete - reset silence mode
     if (content.turnComplete) {
-      console.log("[GeminiLive] Turn complete")
+      logDebug("GeminiLive", "Turn complete")
 
       // Reset silence mode for next turn
       if (this.silenceMode) {
-        console.log("[LiveClient] Resetting silence mode")
+        logDebug("LiveClient", "Resetting silence mode")
         this.silenceMode = false
       }
 
@@ -652,7 +653,7 @@ export class GeminiLiveClient {
           if (inlineData.mimeType?.startsWith("audio/")) {
             // BUG FIX 3: Suppress audio when in silence mode
             if (this.silenceMode) {
-              console.log("[LiveClient] Suppressing audio chunk in silence mode")
+              logDebug("LiveClient", "Suppressing audio chunk in silence mode")
               continue // Skip this audio chunk
             }
             this.config.events.onAudioChunk?.(inlineData.data)
@@ -711,8 +712,9 @@ export class GeminiLiveClient {
    */
   private handleAudioFailure(error: Error): void {
     this.consecutiveAudioFailures++
-    console.error(
-      `[GeminiLive] Audio send failed (${this.consecutiveAudioFailures}/${this.MAX_AUDIO_FAILURES}):`,
+    logError(
+      "GeminiLive",
+      `Audio send failed (${this.consecutiveAudioFailures}/${this.MAX_AUDIO_FAILURES}):`,
       error
     )
 
@@ -739,7 +741,7 @@ export class GeminiLiveClient {
    */
   sendText(text: string): void {
     if (!this.isReady() || !this.sessionId || !this.audioUrl || !this.sessionSecret) {
-      console.warn("[GeminiLive] Not ready to send text")
+      logWarn("GeminiLive", "Not ready to send text")
       return
     }
 
@@ -752,7 +754,7 @@ export class GeminiLiveClient {
         text,
       }),
     }).catch((error) => {
-      console.error("[GeminiLive] Failed to send text:", error)
+      logError("GeminiLive", "Failed to send text:", error)
       this.config.events.onSendError?.(
         error instanceof Error ? error : new Error(String(error)),
         "text"
@@ -771,7 +773,7 @@ export class GeminiLiveClient {
     functionResponses: Array<{ id: string; name: string; response: Record<string, unknown> }>
   ): void {
     if (!this.isReady() || !this.sessionId || !this.sessionSecret) {
-      console.warn("[GeminiLive] Not ready to send tool response")
+      logWarn("GeminiLive", "Not ready to send tool response")
       return
     }
 
@@ -784,7 +786,7 @@ export class GeminiLiveClient {
         functionResponses,
       }),
     }).catch((error) => {
-      console.error("[GeminiLive] Failed to send tool response:", error)
+      logError("GeminiLive", "Failed to send tool response:", error)
     })
   }
 
@@ -803,7 +805,7 @@ export class GeminiLiveClient {
         audioEnd: true,
       }),
     }).catch((error) => {
-      console.error("[GeminiLive] Failed to send audio end:", error)
+      logError("GeminiLive", "Failed to send audio end:", error)
       this.config.events.onSendError?.(
         error instanceof Error ? error : new Error(String(error)),
         "audioEnd"
@@ -837,7 +839,7 @@ export class GeminiLiveClient {
           secret: this.sessionSecret
         }),
       }).catch((error) => {
-        console.error("[GeminiLive] Failed to close session:", error)
+        logError("GeminiLive", "Failed to close session:", error)
       })
     }
 
@@ -845,7 +847,7 @@ export class GeminiLiveClient {
     try {
       sessionStorage.removeItem(this.DEDUP_STORAGE_KEY)
     } catch (error) {
-      console.warn("[LiveClient] Failed to clear dedup hashes:", error)
+      logWarn("LiveClient", "Failed to clear dedup hashes:", error)
     }
 
     this.sessionId = null
