@@ -1,4 +1,5 @@
 import type { TrendData, BurnoutPrediction, TrendDirection } from "@/lib/types"
+import { FORECASTING, WEIGHTS } from "./thresholds"
 
 /**
  * Burnout prediction using trend analysis
@@ -73,8 +74,8 @@ function analyzeTrend(trendData: TrendData[]): TrendAnalysis {
  * Determine trend direction from slope
  */
 function getTrendDirection(slope: number): TrendDirection {
-  if (slope > 2) return "declining" // Getting worse
-  if (slope < -2) return "improving" // Getting better
+  if (slope > FORECASTING.SLOPE_DECLINING) return "declining" // Getting worse
+  if (slope < FORECASTING.SLOPE_IMPROVING) return "improving" // Getting better
   return "stable"
 }
 
@@ -85,22 +86,22 @@ function calculateRiskScore(analysis: TrendAnalysis): number {
   let risk = 0
 
   // Factor 1: Recent average score (40% weight)
-  risk += analysis.recentAverage * 0.4
+  risk += analysis.recentAverage * WEIGHTS.RISK_RECENT_AVERAGE
 
   // Factor 2: Upward trend (30% weight)
   // Positive slope means worsening condition
   if (analysis.slope > 0) {
-    risk += Math.min(analysis.slope * 3, 30)
+    risk += Math.min(analysis.slope * 3, WEIGHTS.RISK_UPWARD_TREND_MAX)
   }
 
   // Factor 3: High volatility (20% weight)
   // Unstable patterns suggest poor regulation
-  risk += Math.min(analysis.volatility * 0.3, 20)
+  risk += Math.min(analysis.volatility * 0.3, WEIGHTS.RISK_VOLATILITY_MAX)
 
   // Factor 4: Recent vs overall comparison (10% weight)
   // Recent significantly worse than historical average = risk
-  if (analysis.recentAverage > analysis.overallAverage + 10) {
-    risk += 10
+  if (analysis.recentAverage > analysis.overallAverage + FORECASTING.RECENT_VS_OVERALL_DIFF) {
+    risk += WEIGHTS.RISK_RECENT_WORSE
   }
 
   return Math.min(100, Math.max(0, Math.round(risk)))
@@ -110,9 +111,9 @@ function calculateRiskScore(analysis: TrendAnalysis): number {
  * Map risk score to categorical level
  */
 function scoreToRiskLevel(score: number): BurnoutPrediction["riskLevel"] {
-  if (score >= 75) return "critical"
-  if (score >= 55) return "high"
-  if (score >= 35) return "moderate"
+  if (score >= FORECASTING.RISK_CRITICAL) return "critical"
+  if (score >= FORECASTING.RISK_HIGH) return "high"
+  if (score >= FORECASTING.RISK_MODERATE) return "moderate"
   return "low"
 }
 
@@ -121,15 +122,15 @@ function scoreToRiskLevel(score: number): BurnoutPrediction["riskLevel"] {
  */
 function estimateDaysUntilBurnout(analysis: TrendAnalysis, riskScore: number): number {
   // If already at high risk, predict sooner
-  if (riskScore >= 75) return 3
+  if (riskScore >= FORECASTING.RISK_CRITICAL) return FORECASTING.DAYS_RAPID_DECLINE
 
   // Use slope to estimate trajectory
-  if (analysis.slope > 5) return 3 // Rapid decline
-  if (analysis.slope > 2) return 5 // Moderate decline
-  if (analysis.slope > 0) return 7 // Slow decline
+  if (analysis.slope > FORECASTING.SLOPE_RAPID) return FORECASTING.DAYS_RAPID_DECLINE
+  if (analysis.slope > FORECASTING.SLOPE_MODERATE) return FORECASTING.DAYS_MODERATE_DECLINE
+  if (analysis.slope > 0) return FORECASTING.DAYS_SLOW_DECLINE
 
   // Stable or improving
-  return 7
+  return FORECASTING.DAYS_SLOW_DECLINE
 }
 
 /**
@@ -140,28 +141,28 @@ function identifyFactors(analysis: TrendAnalysis, trendData: TrendData[]): strin
 
   // Recent stress levels
   const recentStress = trendData.slice(-3).reduce((sum, d) => sum + d.stressScore, 0) / 3
-  if (recentStress > 60) {
+  if (recentStress > FORECASTING.STRESS_ELEVATED) {
     factors.push("Elevated stress levels")
   }
 
   // Recent fatigue levels
   const recentFatigue = trendData.slice(-3).reduce((sum, d) => sum + d.fatigueScore, 0) / 3
-  if (recentFatigue > 60) {
+  if (recentFatigue > FORECASTING.FATIGUE_ELEVATED) {
     factors.push("High fatigue levels")
   }
 
   // Worsening trend
-  if (analysis.slope > 2) {
+  if (analysis.slope > FORECASTING.SLOPE_DECLINING) {
     factors.push("Declining trend over time")
   }
 
   // High volatility
-  if (analysis.volatility > 15) {
+  if (analysis.volatility > FORECASTING.VOLATILITY_HIGH) {
     factors.push("Inconsistent wellness patterns")
   }
 
   // Sustained high burden
-  if (analysis.recentAverage > 65) {
+  if (analysis.recentAverage > FORECASTING.BURDEN_HIGH) {
     factors.push("Sustained high stress/fatigue")
   }
 
@@ -177,20 +178,20 @@ function identifyFactors(analysis: TrendAnalysis, trendData: TrendData[]): strin
  * Calculate confidence based on data availability and consistency
  */
 function calculateConfidence(trendData: TrendData[], analysis: TrendAnalysis): number {
-  let confidence = 0.5 // Base confidence
+  let confidence = FORECASTING.CONFIDENCE_BASE
 
   // More data points = higher confidence
-  if (trendData.length >= 14) confidence += 0.3
-  else if (trendData.length >= 7) confidence += 0.2
-  else if (trendData.length >= 3) confidence += 0.1
-  else confidence -= 0.2 // Very little data
+  if (trendData.length >= FORECASTING.DATA_POINTS_HIGH) confidence += FORECASTING.CONFIDENCE_BOOST_HIGH_DATA
+  else if (trendData.length >= FORECASTING.DATA_POINTS_MODERATE) confidence += FORECASTING.CONFIDENCE_BOOST_MODERATE_DATA
+  else if (trendData.length >= FORECASTING.DATA_POINTS_LOW) confidence += FORECASTING.CONFIDENCE_BOOST_LOW_DATA
+  else confidence += FORECASTING.CONFIDENCE_PENALTY_MINIMAL_DATA // Very little data
 
   // Lower volatility = more predictable = higher confidence
-  if (analysis.volatility < 10) confidence += 0.15
-  else if (analysis.volatility > 20) confidence -= 0.1
+  if (analysis.volatility < FORECASTING.VOLATILITY_LOW) confidence += FORECASTING.CONFIDENCE_BOOST_LOW_VOLATILITY
+  else if (analysis.volatility > FORECASTING.VOLATILITY_CONCERNING) confidence += FORECASTING.CONFIDENCE_PENALTY_HIGH_VOLATILITY
 
   // Strong trend (either direction) = higher confidence
-  if (Math.abs(analysis.slope) > 3) confidence += 0.05
+  if (Math.abs(analysis.slope) > 3) confidence += FORECASTING.CONFIDENCE_BOOST_STRONG_TREND
 
   return Math.max(0.1, Math.min(1, confidence))
 }

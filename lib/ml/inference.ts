@@ -4,6 +4,7 @@ import type {
   StressLevel,
   FatigueLevel,
 } from "@/lib/types"
+import { STRESS, FATIGUE, SCORE_LEVELS, CONFIDENCE, WEIGHTS, VALIDATION } from "./thresholds"
 
 /**
  * Heuristic-based stress and fatigue classification
@@ -27,50 +28,47 @@ function calculateStressScore(features: AudioFeatures): number {
   let weight = 0
 
   // Speech rate (stressed people speak faster)
-  // Normal: 3-5 syllables/sec, stressed: >5.5
-  if (features.speechRate > 5.5) {
-    score += 30
-    weight += 30
-  } else if (features.speechRate > 4.5) {
-    score += 15
-    weight += 30
+  if (features.speechRate > STRESS.SPEECH_RATE_HIGH) {
+    score += WEIGHTS.SPEECH_RATE
+    weight += WEIGHTS.SPEECH_RATE
+  } else if (features.speechRate > STRESS.SPEECH_RATE_MODERATE) {
+    score += WEIGHTS.MODERATE_INDICATOR
+    weight += WEIGHTS.SPEECH_RATE
   } else {
-    weight += 30
+    weight += WEIGHTS.SPEECH_RATE
   }
 
   // RMS energy (stressed: higher and more variable)
-  // We use RMS as proxy for loudness/intensity
-  if (features.rms > 0.3) {
-    score += 25
-    weight += 25
-  } else if (features.rms > 0.2) {
-    score += 12
-    weight += 25
+  if (features.rms > STRESS.RMS_HIGH) {
+    score += WEIGHTS.RMS_ENERGY
+    weight += WEIGHTS.RMS_ENERGY
+  } else if (features.rms > STRESS.RMS_MODERATE) {
+    score += WEIGHTS.MODERATE_SECONDARY
+    weight += WEIGHTS.RMS_ENERGY
   } else {
-    weight += 25
+    weight += WEIGHTS.RMS_ENERGY
   }
 
   // Spectral flux (stressed: more rapid spectral changes)
-  // Higher values indicate more dynamic/agitated speech
-  if (features.spectralFlux > 0.15) {
-    score += 25
-    weight += 25
-  } else if (features.spectralFlux > 0.1) {
-    score += 12
-    weight += 25
+  if (features.spectralFlux > STRESS.SPECTRAL_FLUX_HIGH) {
+    score += WEIGHTS.SPECTRAL_FLUX
+    weight += WEIGHTS.SPECTRAL_FLUX
+  } else if (features.spectralFlux > STRESS.SPECTRAL_FLUX_MODERATE) {
+    score += WEIGHTS.MODERATE_SECONDARY
+    weight += WEIGHTS.SPECTRAL_FLUX
   } else {
-    weight += 25
+    weight += WEIGHTS.SPECTRAL_FLUX
   }
 
   // Zero crossing rate (stressed: higher ZCR due to tension)
-  if (features.zcr > 0.08) {
-    score += 20
-    weight += 20
-  } else if (features.zcr > 0.05) {
-    score += 10
-    weight += 20
+  if (features.zcr > STRESS.ZCR_HIGH) {
+    score += WEIGHTS.ZCR
+    weight += WEIGHTS.ZCR
+  } else if (features.zcr > STRESS.ZCR_MODERATE) {
+    score += WEIGHTS.MODERATE_TERTIARY
+    weight += WEIGHTS.ZCR
   } else {
-    weight += 20
+    weight += WEIGHTS.ZCR
   }
 
   return weight > 0 ? Math.round((score / weight) * 100) : 0
@@ -85,49 +83,47 @@ function calculateFatigueScore(features: AudioFeatures): number {
   let weight = 0
 
   // Speech rate (fatigued people speak slower)
-  // Normal: 3-5 syllables/sec, fatigued: <3
-  if (features.speechRate < 3) {
-    score += 30
-    weight += 30
-  } else if (features.speechRate < 3.5) {
-    score += 15
-    weight += 30
+  if (features.speechRate < FATIGUE.SPEECH_RATE_LOW) {
+    score += WEIGHTS.SPEECH_RATE
+    weight += WEIGHTS.SPEECH_RATE
+  } else if (features.speechRate < FATIGUE.SPEECH_RATE_MODERATE) {
+    score += WEIGHTS.MODERATE_INDICATOR
+    weight += WEIGHTS.SPEECH_RATE
   } else {
-    weight += 30
+    weight += WEIGHTS.SPEECH_RATE
   }
 
   // RMS energy (fatigued: lower energy/volume)
-  if (features.rms < 0.1) {
-    score += 25
-    weight += 25
-  } else if (features.rms < 0.15) {
-    score += 12
-    weight += 25
+  if (features.rms < FATIGUE.RMS_LOW) {
+    score += WEIGHTS.RMS_ENERGY
+    weight += WEIGHTS.RMS_ENERGY
+  } else if (features.rms < FATIGUE.RMS_MODERATE) {
+    score += WEIGHTS.MODERATE_SECONDARY
+    weight += WEIGHTS.RMS_ENERGY
   } else {
-    weight += 25
+    weight += WEIGHTS.RMS_ENERGY
   }
 
   // Pause ratio (fatigued: more pauses)
-  if (features.pauseRatio > 0.4) {
-    score += 25
-    weight += 25
-  } else if (features.pauseRatio > 0.3) {
-    score += 12
-    weight += 25
+  if (features.pauseRatio > FATIGUE.PAUSE_RATIO_HIGH) {
+    score += WEIGHTS.PAUSE_RATIO
+    weight += WEIGHTS.PAUSE_RATIO
+  } else if (features.pauseRatio > FATIGUE.PAUSE_RATIO_MODERATE) {
+    score += WEIGHTS.MODERATE_SECONDARY
+    weight += WEIGHTS.PAUSE_RATIO
   } else {
-    weight += 25
+    weight += WEIGHTS.PAUSE_RATIO
   }
 
   // Spectral centroid (fatigued: lower, less bright voice)
-  // Normalized spectral centroid (0-1 range assumed)
-  if (features.spectralCentroid < 0.3) {
-    score += 20
-    weight += 20
-  } else if (features.spectralCentroid < 0.45) {
-    score += 10
-    weight += 20
+  if (features.spectralCentroid < FATIGUE.SPECTRAL_CENTROID_LOW) {
+    score += WEIGHTS.SPECTRAL_CENTROID
+    weight += WEIGHTS.SPECTRAL_CENTROID
+  } else if (features.spectralCentroid < FATIGUE.SPECTRAL_CENTROID_MODERATE) {
+    score += WEIGHTS.MODERATE_TERTIARY
+    weight += WEIGHTS.SPECTRAL_CENTROID
   } else {
-    weight += 20
+    weight += WEIGHTS.SPECTRAL_CENTROID
   }
 
   return weight > 0 ? Math.round((score / weight) * 100) : 0
@@ -137,16 +133,16 @@ function calculateFatigueScore(features: AudioFeatures): number {
  * Map numeric score to categorical level
  */
 function scoreToStressLevel(score: number): StressLevel {
-  if (score >= 70) return "high"
-  if (score >= 50) return "elevated"
-  if (score >= 30) return "moderate"
+  if (score >= SCORE_LEVELS.HIGH) return "high"
+  if (score >= SCORE_LEVELS.ELEVATED) return "elevated"
+  if (score >= SCORE_LEVELS.MODERATE) return "moderate"
   return "low"
 }
 
 function scoreToFatigueLevel(score: number): FatigueLevel {
-  if (score >= 70) return "exhausted"
-  if (score >= 50) return "tired"
-  if (score >= 30) return "normal"
+  if (score >= SCORE_LEVELS.HIGH) return "exhausted"
+  if (score >= SCORE_LEVELS.ELEVATED) return "tired"
+  if (score >= SCORE_LEVELS.MODERATE) return "normal"
   return "rested"
 }
 
@@ -155,16 +151,16 @@ function scoreToFatigueLevel(score: number): FatigueLevel {
  * Factors: pause count (more data = better), RMS (too low = poor quality)
  */
 function calculateConfidence(features: AudioFeatures): number {
-  let confidence = 0.7 // Base confidence
+  let confidence = CONFIDENCE.BASE
 
   // More pauses = more speech samples = higher confidence
-  if (features.pauseCount > 10) confidence += 0.15
-  else if (features.pauseCount > 5) confidence += 0.1
-  else if (features.pauseCount < 3) confidence -= 0.1
+  if (features.pauseCount > CONFIDENCE.PAUSE_COUNT_HIGH) confidence += CONFIDENCE.BOOST_HIGH
+  else if (features.pauseCount > CONFIDENCE.PAUSE_COUNT_MODERATE) confidence += CONFIDENCE.BOOST_MODERATE
+  else if (features.pauseCount < CONFIDENCE.PAUSE_COUNT_LOW) confidence += CONFIDENCE.PENALTY_LOW_DATA
 
   // Very low RMS = poor audio quality
-  if (features.rms < 0.05) confidence -= 0.2
-  else if (features.rms > 0.15) confidence += 0.1
+  if (features.rms < CONFIDENCE.RMS_POOR_QUALITY) confidence += CONFIDENCE.PENALTY_POOR_AUDIO
+  else if (features.rms > CONFIDENCE.RMS_GOOD_QUALITY) confidence += CONFIDENCE.BOOST_MODERATE
 
   // Clamp to [0, 1]
   return Math.max(0, Math.min(1, confidence))
@@ -208,16 +204,16 @@ export function validateFeatures(features: AudioFeatures): boolean {
 
   // Check for reasonable ranges (basic sanity checks)
   if (
-    features.rms < 0 || features.rms > 1 ||
-    features.speechRate < 0 || features.speechRate > 20 ||
-    features.pauseRatio < 0 || features.pauseRatio > 1 ||
-    features.zcr < 0 || features.zcr > 1
+    features.rms < VALIDATION.RMS_MIN || features.rms > VALIDATION.RMS_MAX ||
+    features.speechRate < VALIDATION.SPEECH_RATE_MIN || features.speechRate > VALIDATION.SPEECH_RATE_MAX ||
+    features.pauseRatio < VALIDATION.PAUSE_RATIO_MIN || features.pauseRatio > VALIDATION.PAUSE_RATIO_MAX ||
+    features.zcr < VALIDATION.ZCR_MIN || features.zcr > VALIDATION.ZCR_MAX
   ) {
     return false
   }
 
   // Ensure we have enough speech data
-  if (features.pauseCount < 2) {
+  if (features.pauseCount < VALIDATION.MIN_PAUSE_COUNT) {
     return false // Too little speech to analyze
   }
 
