@@ -294,18 +294,37 @@ async function getOrCreateEncryptionKey(): Promise<CryptoKey> {
     ["encrypt", "decrypt"]
   )
 
-  // Store the key
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(KEY_STORE_NAME, "readwrite")
-    const store = tx.objectStore(KEY_STORE_NAME)
-    const request = store.put({ id: ENCRYPTION_KEY_ID, key: newKey })
+  // Store the key atomically - use add() to fail if key already exists (race condition protection)
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction(KEY_STORE_NAME, "readwrite")
+      const store = tx.objectStore(KEY_STORE_NAME)
+      const request = store.add({ id: ENCRYPTION_KEY_ID, key: newKey })
 
-    request.onerror = () => reject(new Error("Failed to store key"))
-    request.onsuccess = () => resolve()
-  })
+      request.onerror = () => reject(request.error)
+      request.onsuccess = () => resolve()
+    })
 
-  db.close()
-  return newKey
+    db.close()
+    return newKey
+  } catch (error) {
+    // Another caller won the race - fetch their key instead
+    if (error instanceof DOMException && error.name === "ConstraintError") {
+      const winnerKey = await new Promise<CryptoKey>((resolve, reject) => {
+        const tx = db.transaction(KEY_STORE_NAME, "readonly")
+        const store = tx.objectStore(KEY_STORE_NAME)
+        const request = store.get(ENCRYPTION_KEY_ID)
+
+        request.onerror = () => reject(new Error("Failed to retrieve key after race"))
+        request.onsuccess = () => resolve(request.result.key)
+      })
+
+      db.close()
+      return winnerKey
+    }
+    db.close()
+    throw error
+  }
 }
 
 /**
