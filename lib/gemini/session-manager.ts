@@ -123,6 +123,9 @@ class GeminiSessionManager {
           // Enable output transcription to get actual spoken words
           // Source: Context7 - /googleapis/js-genai docs - "outputAudioTranscription"
           outputAudioTranscription: {},
+          // Enable input transcription to get user speech with isFinal flag
+          // Source: Context7 - /googleapis/js-genai docs - "inputAudioTranscription"
+          inputAudioTranscription: {},
           // System instruction as simple string
           ...(systemInstruction ? { systemInstruction } : {}),
         },
@@ -138,6 +141,23 @@ class GeminiSessionManager {
             emitter.emit("ready")
           },
           onmessage: (msg: LiveServerMessage) => {
+            // Debug: Log raw message to see what Gemini actually sends
+            const msgAny = msg as Record<string, unknown>
+            // Check for inputTranscription at root level
+            if (msgAny.inputTranscription) {
+              console.log(`[SessionManager] INPUT TRANSCRIPTION (root):`, JSON.stringify(msgAny.inputTranscription))
+            }
+            // Check for voiceActivityDetectionSignal
+            if (msgAny.voiceActivityDetectionSignal) {
+              console.log(`[SessionManager] VAD SIGNAL:`, JSON.stringify(msgAny.voiceActivityDetectionSignal))
+            }
+            // Check inside serverContent
+            if (msgAny.serverContent) {
+              const sc = msgAny.serverContent as Record<string, unknown>
+              if (sc.inputTranscription) {
+                console.log(`[SessionManager] INPUT TRANSCRIPTION (serverContent):`, JSON.stringify(sc.inputTranscription))
+              }
+            }
             emitter.emit("message", msg)
           },
           onerror: (e: ErrorEvent) => {
@@ -189,10 +209,11 @@ class GeminiSessionManager {
       // SDK expects plain object with data + mimeType, NOT native Blob
       // Native Blob has .type property, but SDK checks .mimeType property
       // Source: SDK tAudioBlob() validates .mimeType starts with "audio/"
+      // Source: Context7 - /websites/ai_google_dev_gemini-api docs - "Enable Model Audio Input Transcription"
       await managed.session.sendRealtimeInput({
         audio: {
           data: base64Audio, // Base64 string directly (no conversion needed)
-          mimeType: "audio/pcm", // Required: must start with "audio/"
+          mimeType: "audio/pcm;rate=16000", // Required format for input transcription
         },
       })
     } catch (error) {

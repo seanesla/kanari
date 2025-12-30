@@ -344,6 +344,9 @@ export function useCheckIn(
     thinking: data.currentAssistantThinking,
   })
 
+  // Track current user transcript for use in callbacks (avoid stale closures)
+  const userTranscriptRef = useRef<string>("")
+
   // ========================================
   // Gemini Live Hook
   // ========================================
@@ -389,18 +392,34 @@ export function useCheckIn(
     onUserSpeechStart: () => {
       dispatch({ type: "SET_USER_SPEAKING" })
       audioChunksRef.current = [] // Start collecting audio for this utterance
+      userTranscriptRef.current = "" // Reset accumulated transcript for new utterance
     },
     onUserSpeechEnd: () => {
       dispatch({ type: "SET_PROCESSING" })
+      // Add user message when speech ends (before processing)
+      const transcript = userTranscriptRef.current
+      if (transcript.trim()) {
+        addUserMessage(transcript)
+      }
       // Process collected audio for mismatch detection
       processUserUtterance()
     },
-    onUserTranscript: (text, isFinal) => {
-      dispatch({ type: "SET_USER_TRANSCRIPT", text })
+    onUserTranscript: (text, finished) => {
+      console.log("[useCheckIn] onUserTranscript:", text, "finished:", finished)
+      // Accumulate transcript chunks (Gemini sends word-by-word without finished flag)
+      userTranscriptRef.current = userTranscriptRef.current + text
 
-      if (isFinal && text.trim()) {
-        // Add user message to conversation
-        addUserMessage(text)
+      // finished flag is rarely sent by Gemini, but handle it if it comes
+      if (finished && userTranscriptRef.current.trim()) {
+        console.log("[useCheckIn] Adding user message (finished=true):", userTranscriptRef.current)
+        addUserMessage(userTranscriptRef.current)
+        userTranscriptRef.current = ""
+        dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
+        dispatch({ type: "SET_PROCESSING" })
+        processUserUtterance()
+      } else {
+        // Still speaking - update transcript preview with accumulated text
+        dispatch({ type: "SET_USER_TRANSCRIPT", text: userTranscriptRef.current })
       }
     },
     onModelTranscript: (text) => {
@@ -416,6 +435,15 @@ export function useCheckIn(
       })
     },
     onAudioChunk: (base64Audio) => {
+      // When model starts responding, save accumulated user transcript as a message
+      // Only do this on FIRST audio chunk (before state changes to assistant_speaking)
+      // This handles the case where Gemini doesn't send finished: true with inputTranscription
+      if (stateRef.current !== "assistant_speaking" && userTranscriptRef.current.trim()) {
+        console.log("[useCheckIn] Saving user message on model response start:", userTranscriptRef.current)
+        addUserMessage(userTranscriptRef.current)
+        userTranscriptRef.current = ""
+        dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
+      }
       dispatch({ type: "SET_ASSISTANT_SPEAKING" })
       playbackControls.queueAudio(base64Audio)
     },
@@ -455,6 +483,11 @@ export function useCheckIn(
       thinking: data.currentAssistantThinking,
     }
   }, [data.currentAssistantTranscript, data.currentAssistantThinking])
+
+  // Sync userTranscriptRef with current user transcript (for use in callbacks)
+  useEffect(() => {
+    userTranscriptRef.current = data.currentUserTranscript
+  }, [data.currentUserTranscript])
 
   // ========================================
   // Audio Playback Hook

@@ -34,7 +34,7 @@ export interface LiveClientEvents {
   onAudioEnd: () => void
 
   // Transcription events
-  onUserTranscript: (text: string, isFinal: boolean) => void
+  onUserTranscript: (text: string, finished: boolean) => void // Per SDK Transcription type
   onModelTranscript: (text: string) => void
   onModelThinking: (text: string) => void
 
@@ -442,11 +442,25 @@ export class GeminiLiveClient {
       return
     }
 
-    // Input transcription
+    // Input transcription (at root level - legacy check)
     if (validatedMessage.inputTranscription) {
       const transcription = validatedMessage.inputTranscription
       if (transcription.text) {
-        this.config.events.onUserTranscript?.(transcription.text, transcription.isFinal ?? false)
+        console.log("[LiveClient] User transcript (root):", transcription.text, "finished:", transcription.finished)
+        this.config.events.onUserTranscript?.(transcription.text, transcription.finished ?? false)
+      }
+      return
+    }
+
+    // Voice activity detection signal (user speech start/end)
+    // Source: Context7 - /googleapis/js-genai docs - "VoiceActivityDetectionSignal"
+    if (validatedMessage.voiceActivityDetectionSignal) {
+      const vadType = validatedMessage.voiceActivityDetectionSignal.vadSignalType
+      console.log("[LiveClient] VAD signal:", vadType)
+      if (vadType === "VAD_SIGNAL_TYPE_SOS") {
+        this.config.events.onUserSpeechStart?.()
+      } else if (vadType === "VAD_SIGNAL_TYPE_EOS") {
+        this.config.events.onUserSpeechEnd?.()
       }
       return
     }
@@ -459,6 +473,13 @@ export class GeminiLiveClient {
    * Handle server content messages
    */
   private handleServerContent(content: Record<string, unknown>): void {
+    // Handle input transcription (user's speech) - may come in serverContent
+    const inputTranscription = content.inputTranscription as { text?: string; finished?: boolean } | undefined
+    if (inputTranscription?.text) {
+      console.log("[LiveClient] User transcript:", inputTranscription.text, "finished:", inputTranscription.finished)
+      this.config.events.onUserTranscript?.(inputTranscription.text, inputTranscription.finished ?? false)
+    }
+
     // Handle output transcription (what model is ACTUALLY saying)
     // Source: Context7 - /googleapis/js-genai docs - "outputAudioTranscription"
     const outputTranscription = content.outputTranscription as { text?: string; finished?: boolean } | undefined

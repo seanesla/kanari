@@ -20,10 +20,6 @@ export const runtime = "nodejs"
 
 // Extended message type to handle fields that may not be in SDK types yet
 interface ExtendedServerMessage extends LiveServerMessage {
-  inputTranscription?: {
-    text?: string
-    isFinal?: boolean
-  }
   serverContent?: {
     modelTurn?: {
       parts?: Array<{
@@ -37,6 +33,14 @@ interface ExtendedServerMessage extends LiveServerMessage {
       text?: string
       finished?: boolean
     }
+    inputTranscription?: {
+      text?: string
+      finished?: boolean // Per SDK Transcription type
+    }
+  }
+  // Voice activity detection signal (user speech start/end)
+  voiceActivityDetectionSignal?: {
+    vadSignalType?: string
   }
 }
 
@@ -92,12 +96,21 @@ function formatServerMessage(msg: ExtendedServerMessage): object {
       content.outputTranscription = msg.serverContent.outputTranscription
     }
 
+    // Input transcription (what user is saying)
+    // Per SDK types, this is ALSO inside serverContent, not at root level
+    if (msg.serverContent.inputTranscription) {
+      console.log("[SSE] Input transcription:", JSON.stringify(msg.serverContent.inputTranscription))
+      content.inputTranscription = msg.serverContent.inputTranscription
+    }
+
     formatted.serverContent = content
   }
 
-  // Input transcription (may be on extended message type)
-  if (msg.inputTranscription) {
-    formatted.inputTranscription = msg.inputTranscription
+  // Voice activity detection signal (user speech start/end)
+  // Source: Context7 - /googleapis/js-genai docs - "voiceActivityDetectionSignal"
+  if (msg.voiceActivityDetectionSignal) {
+    console.log("[SSE] VAD signal:", JSON.stringify(msg.voiceActivityDetectionSignal))
+    formatted.voiceActivityDetectionSignal = msg.voiceActivityDetectionSignal
   }
 
   return formatted

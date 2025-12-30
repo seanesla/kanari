@@ -56,7 +56,7 @@ const OutputTranscriptionSchema = z.object({
  */
 const InputTranscriptionSchema = z.object({
   text: z.string().optional(),
-  isFinal: z.boolean().optional(),
+  finished: z.boolean().optional(), // Per SDK Transcription type
 })
 
 /**
@@ -67,6 +67,7 @@ const ServerContentSchema = z.object({
   turnComplete: z.boolean().optional(),
   interrupted: z.boolean().optional(),
   outputTranscription: OutputTranscriptionSchema.optional(),
+  inputTranscription: InputTranscriptionSchema.optional(), // Also check inside serverContent
 })
 
 /**
@@ -99,6 +100,14 @@ const ToolResponseSchema = z.object({
 })
 
 /**
+ * Voice activity detection signal schema
+ * Source: Context7 - /googleapis/js-genai docs - "VoiceActivityDetectionSignal"
+ */
+const VoiceActivityDetectionSignalSchema = z.object({
+  vadSignalType: z.string().optional(),
+})
+
+/**
  * Complete server message schema
  *
  * This schema validates the full structure of messages received from Gemini Live API
@@ -124,6 +133,9 @@ export const ServerMessageSchema = z.object({
       message: z.string().optional(),
     })
     .optional(),
+
+  // Voice activity detection (user speech start/end)
+  voiceActivityDetectionSignal: VoiceActivityDetectionSignalSchema.optional(),
 })
 
 /**
