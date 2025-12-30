@@ -43,6 +43,7 @@ vi.mock("@/lib/gemini/live-prompts", () => ({
   generateMismatchContext: vi.fn(() => "Mismatch context"),
   generateVoicePatternContext: vi.fn(() => "Voice pattern context"),
   generatePostRecordingContext: vi.fn(() => "Post-recording context"),
+  buildCheckInSystemInstruction: vi.fn(() => "Check-in system instruction"),
   // Used by the server-side Live session manager.
   GEMINI_TOOLS: [],
 }))
@@ -99,12 +100,23 @@ vi.mock("@/hooks/use-gemini-live", () => ({
 
 // Mock use-audio-playback hook
 vi.mock("@/hooks/use-audio-playback", () => ({
-  useAudioPlayback: vi.fn(() => ({
-    isPlaying: false,
-    volume: 1.0,
-    audioLevel: 0,
-    enqueueAudio: vi.fn(),
-    stop: vi.fn(),
-    setVolume: vi.fn(),
-  })),
+  useAudioPlayback: vi.fn(() => [
+    {
+      state: "ready",
+      isReady: true,
+      isPlaying: false,
+      audioLevel: 0,
+      queuedChunks: 0,
+      bufferedSamples: 0,
+      error: null,
+    },
+    {
+      initialize: vi.fn(async () => {}),
+      queueAudio: vi.fn(),
+      clearQueue: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      cleanup: vi.fn(),
+    },
+  ]),
 }))

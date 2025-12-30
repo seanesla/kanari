@@ -469,11 +469,11 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      // Check for parsing errors
-      if (error.message.includes("parse")) {
+      // Structured output parsing errors (model returned invalid JSON)
+      if (error.message.includes("Gemini response parse error")) {
         return NextResponse.json(
-          { error: "Failed to parse API response" },
-          { status: 500 }
+          { error: "External API error", details: error.message },
+          { status: 502 }
         )
       }
     }

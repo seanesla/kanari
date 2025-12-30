@@ -1,7 +1,17 @@
-import { describe, it, expect } from "vitest"
-import { analyzeVoiceMetrics, validateFeatures } from "../inference"
+import { beforeAll, describe, expect, it, vi } from "vitest"
 import type { AudioFeatures } from "@/lib/types"
 import { SCORE_LEVELS } from "../thresholds"
+
+let analyzeVoiceMetrics!: typeof import("@/lib/ml/inference").analyzeVoiceMetrics
+let validateFeatures!: typeof import("@/lib/ml/inference").validateFeatures
+
+beforeAll(async () => {
+  // The global Vitest setup mocks `@/lib/ml/inference` for most tests.
+  // This suite needs the real implementation.
+  const actual = await vi.importActual<typeof import("@/lib/ml/inference")>("@/lib/ml/inference")
+  analyzeVoiceMetrics = actual.analyzeVoiceMetrics
+  validateFeatures = actual.validateFeatures
+})
 
 /**
  * Helper to create a baseline AudioFeatures object with sensible defaults.

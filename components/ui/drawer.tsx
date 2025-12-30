@@ -48,13 +48,40 @@ function DrawerOverlay({
 function DrawerContent({
   className,
   children,
+  onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Content>) {
+  const contentRef = React.useRef<React.ElementRef<typeof DrawerPrimitive.Content>>(null)
+
   return (
     <DrawerPortal data-slot="drawer-portal">
       <DrawerOverlay />
       <DrawerPrimitive.Content
         data-slot="drawer-content"
+        ref={contentRef}
+        tabIndex={-1}
+        onOpenAutoFocus={(event) => {
+          onOpenAutoFocus?.(event)
+          if (event.defaultPrevented) return
+          event.preventDefault()
+
+          const root = contentRef.current
+          if (!root) return
+
+          const firstFocusable = root.querySelector<HTMLElement>(
+            [
+              'button:not([disabled])',
+              '[href]',
+              'input:not([disabled])',
+              'select:not([disabled])',
+              'textarea:not([disabled])',
+              '[tabindex]:not([tabindex="-1"])',
+              '[contenteditable="true"]',
+            ].join(",")
+          )
+
+          ;(firstFocusable ?? root)?.focus()
+        }}
         className={cn(
           'group/drawer-content bg-background fixed z-50 flex h-auto flex-col',
           'data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-lg data-[vaul-drawer-direction=top]:border-b',

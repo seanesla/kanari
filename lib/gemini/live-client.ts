@@ -1,13 +1,12 @@
 /**
  * Gemini Live API Client
  *
- * Manages connection to server-side Gemini Live session for real-time
- * voice conversations. Uses SSE for receiving and POST for sending.
+ * Browser-first Gemini Live client for real-time voice conversations.
  *
  * Architecture:
- * - Server manages the actual Gemini session (API key stays server-side)
- * - Client receives audio/transcripts via Server-Sent Events (SSE)
- * - Client sends audio via POST requests
+ * - Browser connects directly to Gemini Live via WebSocket (no server session state)
+ * - Audio/text/tool responses are sent over the same socket
+ * - Fixes Vercel serverless instance sharding (in-memory sessions are not shared)
  *
  * Features:
  * - Audio streaming (16kHz PCM input, 24kHz PCM output)
@@ -40,6 +39,10 @@ import type {
   SystemContextSummary,
   SystemTimeContext,
 } from "./live-prompts"
+import type { Session } from "@google/genai"
+
+// Gemini Live model (Dec 2025 native audio preview)
+const LIVE_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
 
 // Context for AI-initiated conversations
 export interface SessionContext {
@@ -96,21 +99,12 @@ export type LiveClientState =
   | "ready"
   | "error"
 
-// Session info returned from /api/gemini/session
-interface SessionInfo {
-  sessionId: string
-  streamUrl: string
-  audioUrl: string
-  secret: string
-}
-
 /**
  * Gemini Live API Client
  *
- * Connects to server-managed Gemini session via SSE + POST.
+ * Connects directly from the browser via `@google/genai` Live WebSocket sessions.
  */
 export class GeminiLiveClient {
-  private eventSource: EventSource | null = null
   private config: LiveClientConfig
   private state: LiveClientState = "disconnected"
   private reconnectAttempts = 0
@@ -118,15 +112,16 @@ export class GeminiLiveClient {
 
   // Prevent duplicate onConnected firing (ready event + setupComplete message)
   private hasAnnouncedConnected = false
-  private connectedSource: "ready-event" | "setupComplete" | null = null
+  private connectedSource: "ws-open" | "setupComplete" | null = null
   // Prevent duplicate onDisconnected firing
   private hasAnnouncedDisconnected = false
 
-  // Session info from server
+  // Live WebSocket session (browser direct)
+  private session: Session | null = null
   private sessionId: string | null = null
-  private streamUrl: string | null = null
-  private audioUrl: string | null = null
-  private sessionSecret: string | null = null
+  private disconnectRequestedDuringConnect = false
+  private pendingMessages: Array<Record<string, unknown>> = []
+  private isSessionInitialized = false
 
   // Audio failure tracking
   private consecutiveAudioFailures = 0
@@ -145,12 +140,12 @@ export class GeminiLiveClient {
 
   /**
    * Mark connection as ready and emit onConnected only once per session.
-   * This protects against duplicate signals (e.g., initial SSE "ready" +
+   * This protects against duplicate signals (e.g., websocket open +
    * subsequent setupComplete message) which previously re-fired onConnected,
    * causing duplicate greetings and UI flicker.
    * Pattern doc: docs/error-patterns/gemini-double-greeting.md
    */
-  private markConnected(source: "ready-event" | "setupComplete"): void {
+  private markConnected(source: "ws-open" | "setupComplete"): void {
     if (this.hasAnnouncedConnected) {
       logDebug(
         "GeminiLive",
@@ -254,7 +249,7 @@ export class GeminiLiveClient {
    * Returns true if connected and event source is active.
    */
   isConnectionHealthy(): boolean {
-    return this.state === "ready" && this.eventSource !== null
+    return this.state === "ready" && this.session !== null
   }
 
   /**
@@ -284,7 +279,7 @@ export class GeminiLiveClient {
   }
 
   /**
-   * Connect to Gemini Live API via server
+   * Connect to Gemini Live API directly from the browser.
    *
    * @param context - Optional context for AI-initiated conversations
    *                  Includes contextSummary (from Gemini 3 analysis) and timeContext
@@ -298,298 +293,175 @@ export class GeminiLiveClient {
     // Reset connection flags for this attempt
     this.hasAnnouncedConnected = false
     this.hasAnnouncedDisconnected = false
+    this.disconnectRequestedDuringConnect = false
+    this.pendingMessages = []
+    this.isSessionInitialized = false
 
-    if (this.eventSource) {
+    if (this.connectionTimeoutId) {
+      clearTimeout(this.connectionTimeoutId)
+      this.connectionTimeoutId = null
+    }
+
+    if (this.session) {
       this.disconnect()
     }
 
     this.state = "connecting"
     this.config.events.onConnecting?.()
 
+    let connectPromise: Promise<Session> | null = null
+    let createdSession: Session | null = null
+
     try {
-      // 1. Create session on server (include API key from settings if available)
-      logDebug("GeminiLive", "Creating session...")
       const apiKey = await getGeminiApiKey()
-      const headers: Record<string, string> = { "Content-Type": "application/json" }
-      if (apiKey) {
-        headers["X-Gemini-Api-Key"] = apiKey
+      if (!apiKey) {
+        throw new Error("Gemini API key not configured. Please add your Gemini API key in Settings.")
       }
 
-      // Build request body with optional context for AI-initiated conversations
-      const body: Record<string, unknown> = {}
-      if (context?.contextSummary) {
-        body.contextSummary = context.contextSummary
-      }
-      if (context?.timeContext) {
-        body.timeContext = context.timeContext
-      }
+      const [{ GoogleGenAI, Modality }, { buildCheckInSystemInstruction, GEMINI_TOOLS }] =
+        await Promise.all([import("@google/genai"), import("./live-prompts")])
 
-      const response = await fetch("/api/gemini/session", {
-        method: "POST",
-        headers,
-        // Only include body if we have context to send
-        ...(Object.keys(body).length > 0 ? { body: JSON.stringify(body) } : {}),
+      const systemInstruction = buildCheckInSystemInstruction(
+        context?.contextSummary,
+        context?.timeContext
+      )
+
+      const ai = new GoogleGenAI({ apiKey })
+
+      connectPromise = ai.live.connect({
+        model: LIVE_MODEL,
+        config: {
+          responseModalities: [Modality.AUDIO],
+          outputAudioTranscription: {},
+          inputAudioTranscription: {},
+          systemInstruction,
+          tools: GEMINI_TOOLS,
+        },
+        callbacks: {
+          onopen: () => {
+            logDebug("GeminiLive", "WebSocket opened")
+          },
+          onmessage: (msg: unknown) => {
+            this.handleLiveServerMessage(msg)
+          },
+          onerror: (e: ErrorEvent) => {
+            const message = e.message || "WebSocket error"
+            logError("GeminiLive", "WebSocket error:", message)
+            this.state = "error"
+            this.config.events.onError?.(new Error(message))
+            this.notifyDisconnected(message)
+          },
+          onclose: (e: CloseEvent) => {
+            const reason = e.reason || "Session closed"
+            logDebug("GeminiLive", "WebSocket closed:", reason)
+
+            // Drop session state; user can reconnect to start a new session.
+            this.session = null
+            this.isSessionInitialized = false
+            this.pendingMessages = []
+            this.sessionId = null
+
+            if (this.state !== "error") {
+              this.state = "disconnected"
+            }
+
+            this.notifyDisconnected(reason)
+          },
+        },
       })
 
-      if (!response.ok) {
-        let errorMessage = "Failed to create session"
+      // Prevent the connect() call from hanging forever in edge cases.
+      const timeoutMs = 30000
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        this.connectionTimeoutId = setTimeout(() => {
+          reject(new Error("Connection timeout"))
+        }, timeoutMs)
+      })
+
+      createdSession = await Promise.race([connectPromise, timeoutPromise])
+
+      if (this.connectionTimeoutId) {
+        clearTimeout(this.connectionTimeoutId)
+        this.connectionTimeoutId = null
+      }
+
+      if (this.disconnectRequestedDuringConnect) {
         try {
-          const error = await response.json()
-          errorMessage = error.error || errorMessage
-        } catch (parseError) {
-          logError("GeminiLive", "Failed to parse error response:", parseError)
+          createdSession.close()
+        } catch (closeError) {
+          logWarn("GeminiLive", "Error closing session after canceled connect:", closeError)
         }
-        throw new Error(errorMessage)
+        this.state = "disconnected"
+        this.notifyDisconnected("Manual disconnect")
+        return
       }
 
-      const session: SessionInfo = await response.json()
-      // SECURITY: never log the per-session secret (even in dev logs, it gets copy/pasted).
-      logDebug("GeminiLive", "Received session metadata:", {
-        sessionId: session.sessionId,
-        streamUrl: session.streamUrl,
-        hasSecret: Boolean(session.secret),
-      })
+      this.session = createdSession
+      this.isSessionInitialized = true
 
-      // Validate session response has required fields
-      if (!session.sessionId || !session.streamUrl || !session.secret) {
-        const missing = []
-        if (!session.sessionId) missing.push('sessionId')
-        if (!session.streamUrl) missing.push('streamUrl')
-        if (!session.secret) missing.push('secret')
-        throw new Error(`Invalid session response: missing ${missing.join(', ')}`)
+      // We can safely announce readiness only after we have a Session instance.
+      this.markConnected("ws-open")
+
+      // Flush any early messages delivered before the Session resolved.
+      if (this.pendingMessages.length > 0) {
+        const queued = this.pendingMessages
+        this.pendingMessages = []
+        for (const msg of queued) {
+          this.handleMessage(msg)
+        }
       }
-
-      this.sessionId = session.sessionId
-      this.streamUrl = session.streamUrl
-      this.audioUrl = session.audioUrl
-      this.sessionSecret = session.secret
-
-      logDebug("GeminiLive", "Session created:", this.sessionId)
-
-      // 2. Connect to SSE stream
-      await this.connectSSE()
     } catch (error) {
       logError("GeminiLive", "Connection failed:", error)
       this.state = "error"
       const err = error instanceof Error ? error : new Error("Connection failed")
       this.config.events.onError?.(err)
+
+      // Ensure we don't leak a socket if it opens after a timeout/error.
+      this.disconnectRequestedDuringConnect = true
+      if (createdSession) {
+        try {
+          createdSession.close()
+        } catch {
+          // best-effort
+        }
+      } else if (connectPromise) {
+        void connectPromise.then((lateSession) => {
+          try {
+            lateSession.close()
+          } catch {
+            // best-effort
+          }
+        })
+      }
+
+      if (this.connectionTimeoutId) {
+        clearTimeout(this.connectionTimeoutId)
+        this.connectionTimeoutId = null
+      }
       throw err
     }
   }
 
   /**
-   * Create an SSE reader from a ReadableStream
-   * Implements EventSource-like API for compatibility
+   * Handle an incoming LiveServerMessage from the SDK.
+   * The SDK may deliver some messages before the `connect()` promise resolves,
+   * so we buffer until `this.session` is set.
    */
-  private createSSEReader(
-    body: ReadableStream<Uint8Array>,
-    resolve: () => void,
-    reject: (error: Error) => void
-  ): EventSource {
-    const decoder = new TextDecoder()
-    const reader = body.getReader()
-    let buffer = ""
-    const eventListeners: Map<string, Array<(event: MessageEvent) => void>> = new Map()
-    let isOpen = true
+  private handleLiveServerMessage(msg: unknown): void {
+    if (!msg || typeof msg !== "object") return
+    const message = msg as Record<string, unknown>
 
-    const dispatch = (eventType: string, data: string) => {
-      const listeners = eventListeners.get(eventType)
-      if (listeners) {
-        const event = new MessageEvent(eventType, { data })
-        listeners.forEach((listener) => listener(event))
-      }
+    if (this.disconnectRequestedDuringConnect) {
+      return
     }
 
-    const processLine = (line: string, currentEvent: { type: string; data: string }) => {
-      if (line.startsWith("event:")) {
-        currentEvent.type = line.slice(6).trim()
-      } else if (line.startsWith("data:")) {
-        currentEvent.data += line.slice(5).trim()
-      }
+    if (!this.isSessionInitialized) {
+      // Buffer until connect() resolves and `this.session` is available.
+      this.pendingMessages.push(message)
+      return
     }
 
-    const readStream = async () => {
-      const currentEvent = { type: "message", data: "" }
-
-      try {
-        while (isOpen) {
-          const { done, value } = await reader.read()
-          if (done) break
-
-          buffer += decoder.decode(value, { stream: true })
-          const lines = buffer.split("\n")
-          buffer = lines.pop() || ""
-
-          for (const line of lines) {
-            if (line.trim() === "") {
-              if (currentEvent.data) {
-                dispatch(currentEvent.type, currentEvent.data)
-                currentEvent.type = "message"
-                currentEvent.data = ""
-              }
-            } else {
-              processLine(line, currentEvent)
-            }
-          }
-        }
-      } catch (error) {
-        logError("GeminiLive", "SSE stream error:", error)
-        reject(error instanceof Error ? error : new Error("Stream read error"))
-      }
-    }
-
-    readStream()
-
-    // Return EventSource-like object
-    return {
-      addEventListener: (type: string, listener: EventListenerOrEventListenerObject) => {
-        const fn = typeof listener === "function" ? listener : listener.handleEvent
-        if (!eventListeners.has(type)) {
-          eventListeners.set(type, [])
-        }
-        eventListeners.get(type)!.push(fn as (event: MessageEvent) => void)
-      },
-      removeEventListener: () => {},
-      close: () => {
-        isOpen = false
-        reader.cancel()
-      },
-      dispatchEvent: (event: MessageEvent) => {
-        dispatch(event.type, typeof event.data === "string" ? event.data : JSON.stringify(event.data))
-        return true
-      },
-      onopen: null,
-      onerror: null,
-      onmessage: null,
-      readyState: 1,
-      url: "",
-      withCredentials: false,
-      CONNECTING: 0,
-      OPEN: 1,
-      CLOSED: 2,
-    } as EventSource
-  }
-
-  /**
-   * Connect to the SSE stream for receiving messages
-   * Uses fetch with custom headers instead of EventSource for security
-   */
-  private connectSSE(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (!this.streamUrl || !this.sessionSecret) {
-        reject(new Error("No stream URL or session secret"))
-        return
-      }
-
-      logDebug("GeminiLive", "Connecting to SSE stream...")
-
-      // Use fetch with custom headers for better security
-      fetch(this.streamUrl, {
-        method: "GET",
-        headers: {
-          "x-session-secret": this.sessionSecret,
-          Accept: "text/event-stream",
-        },
-      })
-        .then(async (response) => {
-          if (!response.ok) {
-            throw new Error(`SSE connection failed: ${response.statusText}`)
-          }
-
-          if (!response.body) {
-            throw new Error("SSE response has no body")
-          }
-
-          // Create a custom EventSource-like object for compatibility
-          this.eventSource = this.createSSEReader(response.body, resolve, reject)
-
-          // Handle ready event (session is ready)
-          this.eventSource.addEventListener("ready", () => {
-            logDebug("GeminiLive", "Session ready (ready event)")
-            this.markConnected("ready-event")
-            resolve()
-          })
-
-          // Handle connected event (initial connection)
-          this.eventSource.addEventListener("connected", (event) => {
-            try {
-              const data = JSON.parse(event.data)
-              logDebug("GeminiLive", "Connected to session:", data.sessionId)
-            } catch (error) {
-              logError("GeminiLive", "Failed to parse connected event:", error)
-            }
-          })
-
-          // Handle Gemini messages
-          this.eventSource.addEventListener("message", (event) => {
-            try {
-              this.handleMessage(JSON.parse(event.data))
-            } catch (error) {
-              logError("GeminiLive", "Failed to parse message event:", error)
-              this.config.events.onError?.(
-                error instanceof Error ? error : new Error("Failed to parse message event")
-              )
-            }
-          })
-
-          // Handle errors from server
-          this.eventSource.addEventListener("error", (event) => {
-            // Verify it's a MessageEvent with data (server-sent error)
-            if (!(event instanceof MessageEvent) || !event.data) {
-              logError("GeminiLive", "SSE error event without data")
-              this.state = "error"
-              this.config.events.onError?.(new Error("Unknown SSE error"))
-              this.notifyDisconnected("Unknown SSE error")
-              return
-            }
-            try {
-              const data = JSON.parse(event.data)
-              const message =
-                (data.message as string | undefined) ||
-                (data.error?.message as string | undefined) ||
-                "SSE error"
-              this.state = "error"
-              this.config.events.onError?.(new Error(message))
-              this.notifyDisconnected(message)
-            } catch {
-              this.state = "error"
-              this.config.events.onError?.(new Error("Invalid SSE error format"))
-              this.notifyDisconnected("Invalid SSE error format")
-            }
-          })
-
-          // Handle close
-          this.eventSource.addEventListener("close", (event) => {
-            let reason = "Session closed"
-            if (event instanceof MessageEvent && event.data) {
-              try {
-                const data = JSON.parse(event.data)
-                reason = data.reason || reason
-              } catch {
-                // Use default reason if parsing fails
-              }
-            }
-            logDebug("GeminiLive", "Session closed:", reason)
-            this.state = "disconnected"
-            this.notifyDisconnected(reason)
-          })
-
-          // Set a timeout for initial connection
-          this.connectionTimeoutId = setTimeout(() => {
-            if (this.state === "connecting") {
-              reject(new Error("Connection timeout"))
-              this.disconnect()
-            }
-          }, 30000)
-        })
-        .catch((error) => {
-          logError("GeminiLive", "SSE connection error:", error)
-          this.state = "error"
-          this.config.events.onError?.(error instanceof Error ? error : new Error("SSE connection failed"))
-          this.notifyDisconnected("SSE connection failed")
-          reject(error instanceof Error ? error : new Error("SSE connection failed"))
-        })
-    })
+    this.handleMessage(message)
   }
 
   /**
@@ -660,7 +532,15 @@ export class GeminiLiveClient {
     // Setup complete
     if (validatedMessage.setupComplete) {
       logDebug("GeminiLive", "Setup complete")
-      this.state = "ready"
+
+      // SDK provides an object with sessionId; legacy SSE proxy emits boolean true.
+      if (typeof validatedMessage.setupComplete === "object" && validatedMessage.setupComplete) {
+        const maybeSessionId = (validatedMessage.setupComplete as Record<string, unknown>).sessionId
+        if (typeof maybeSessionId === "string") {
+          this.sessionId = maybeSessionId
+        }
+      }
+
       this.markConnected("setupComplete")
       return
     }
@@ -957,31 +837,22 @@ export class GeminiLiveClient {
    * @param base64Audio - Base64 encoded PCM audio (16kHz, 16-bit, mono)
    */
   sendAudio(base64Audio: string): void {
-    if (!this.isReady() || !this.sessionId || !this.audioUrl || !this.sessionSecret) {
+    if (!this.isReady() || !this.session) {
       return
     }
 
-    // Fire and forget - don't await to avoid blocking audio stream
-    // But track failures to detect session death
-    fetch(this.audioUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId: this.sessionId,
-        secret: this.sessionSecret,
-        audio: base64Audio,
-      }),
-    })
-      .then((response) => {
-        if (response.ok) {
-          this.consecutiveAudioFailures = 0
-        } else {
-          this.handleAudioFailure(new Error(`HTTP ${response.status}`))
-        }
+    try {
+      // SDK expects plain object with data + mimeType (NOT native Blob).
+      this.session.sendRealtimeInput({
+        audio: {
+          data: base64Audio,
+          mimeType: "audio/pcm;rate=16000",
+        },
       })
-      .catch((error) => {
-        this.handleAudioFailure(error)
-      })
+      this.consecutiveAudioFailures = 0
+    } catch (error) {
+      this.handleAudioFailure(error instanceof Error ? error : new Error(String(error)))
+    }
   }
 
   /**
@@ -1018,26 +889,22 @@ export class GeminiLiveClient {
    * @param text - Text message to send
    */
   sendText(text: string): void {
-    if (!this.isReady() || !this.sessionId || !this.audioUrl || !this.sessionSecret) {
+    if (!this.isReady() || !this.session) {
       logWarn("GeminiLive", "Not ready to send text")
       return
     }
 
-    fetch(this.audioUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId: this.sessionId,
-        secret: this.sessionSecret,
-        text,
-      }),
-    }).catch((error) => {
+    try {
+      this.session.sendClientContent({
+        turns: [{ role: "user", parts: [{ text }] }],
+      })
+    } catch (error) {
       logError("GeminiLive", "Failed to send text:", error)
       this.config.events.onSendError?.(
         error instanceof Error ? error : new Error(String(error)),
         "text"
       )
-    })
+    }
   }
 
   /**
@@ -1050,56 +917,53 @@ export class GeminiLiveClient {
   private sendToolResponse(
     functionResponses: Array<{ id: string; name: string; response: Record<string, unknown> }>
   ): void {
-    if (!this.isReady() || !this.sessionId || !this.sessionSecret) {
+    if (!this.isReady() || !this.session) {
       logWarn("GeminiLive", "Not ready to send tool response")
       return
     }
 
-    fetch("/api/gemini/live/tool-response", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId: this.sessionId,
-        secret: this.sessionSecret,
-        functionResponses,
-      }),
-    }).catch((error) => {
+    try {
+      this.session.sendToolResponse({ functionResponses })
+    } catch (error) {
       logError("GeminiLive", "Failed to send tool response:", error)
-    })
+    }
   }
 
   /**
    * Signal end of audio stream (user stopped speaking)
    */
   sendAudioEnd(): void {
-    if (!this.isReady() || !this.sessionId || !this.audioUrl || !this.sessionSecret) return
+    if (!this.isReady() || !this.session) return
 
-    fetch(this.audioUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId: this.sessionId,
-        secret: this.sessionSecret,
-        audioEnd: true,
-      }),
-    }).catch((error) => {
+    try {
+      this.session.sendRealtimeInput({ audioStreamEnd: true })
+    } catch (error) {
       logError("GeminiLive", "Failed to send audio end:", error)
       this.config.events.onSendError?.(
         error instanceof Error ? error : new Error(String(error)),
         "audioEnd"
       )
-    })
+    }
   }
 
   /**
    * Disconnect from Gemini Live API
    */
   disconnect(): void {
-    // Close SSE connection
-    if (this.eventSource) {
-      this.eventSource.close()
-      this.eventSource = null
+    this.disconnectRequestedDuringConnect = true
+
+    // Close active WebSocket session (if present)
+    if (this.session) {
+      try {
+        this.session.close()
+      } catch (error) {
+        logWarn("GeminiLive", "Error closing session:", error)
+      }
+      this.session = null
     }
+
+    this.isSessionInitialized = false
+    this.pendingMessages = []
 
     // Reset connection signal guard for next session
     this.hasAnnouncedConnected = false
@@ -1111,20 +975,6 @@ export class GeminiLiveClient {
       this.connectionTimeoutId = null
     }
 
-    // Close server session
-    if (this.sessionId && this.sessionSecret) {
-      fetch("/api/gemini/session", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sessionId: this.sessionId,
-          secret: this.sessionSecret
-        }),
-      }).catch((error) => {
-        logError("GeminiLive", "Failed to close session:", error)
-      })
-    }
-
     // Clear deduplication hashes from sessionStorage
     try {
       sessionStorage.removeItem(this.DEDUP_STORAGE_KEY)
@@ -1133,9 +983,6 @@ export class GeminiLiveClient {
     }
 
     this.sessionId = null
-    this.streamUrl = null
-    this.audioUrl = null
-    this.sessionSecret = null
 
     // Only set to disconnected if not already in error state
     if (this.state !== "error") {

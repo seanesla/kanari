@@ -16,6 +16,7 @@ import {
   CHECK_IN_CONTEXT_SUMMARY_SCHEMA,
   type CheckInContextSummaryResponse,
 } from "@/lib/gemini/prompts"
+import { parseGeminiJson } from "@/lib/gemini/json"
 import type { TimeContext, VoiceTrends } from "@/lib/gemini/check-in-context"
 
 // ============================================
@@ -165,11 +166,28 @@ async function generateContextSummary(
     },
   }
 
-  const response = await fetch(`${endpoint}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30_000) // 30s timeout
+
+  let response: Response
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Gemini API request timed out after 30s")
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   if (!response.ok) {
     const errorText = await response.text()
@@ -182,25 +200,24 @@ async function generateContextSummary(
     throw new Error("No response from Gemini API")
   }
 
-  const text = data.candidates[0].content.parts[0].text
-
-  try {
-    const parsed = JSON.parse(text) as CheckInContextSummaryResponse
-
-    // Validate structure
-    if (
-      typeof parsed.patternSummary !== "string" ||
-      !Array.isArray(parsed.keyObservations) ||
-      typeof parsed.suggestedOpener !== "string" ||
-      typeof parsed.contextNotes !== "string"
-    ) {
-      throw new Error("Invalid response structure")
-    }
-
-    return parsed
-  } catch (error) {
-    throw new Error(`Failed to parse Gemini response: ${error instanceof Error ? error.message : "Unknown error"}`)
+  const text = data.candidates[0]?.content?.parts?.[0]?.text
+  if (typeof text !== "string") {
+    throw new Error("Gemini response parse error: missing text")
   }
+
+  const parsed = parseGeminiJson<CheckInContextSummaryResponse>(text)
+
+  // Validate structure
+  if (
+    typeof parsed.patternSummary !== "string" ||
+    !Array.isArray(parsed.keyObservations) ||
+    typeof parsed.suggestedOpener !== "string" ||
+    typeof parsed.contextNotes !== "string"
+  ) {
+    throw new Error("Gemini response parse error: Invalid response structure")
+  }
+
+  return parsed
 }
 
 export async function POST(request: NextRequest) {
@@ -238,7 +255,10 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      if (error.message.includes("Gemini API error")) {
+      if (
+        error.message.includes("Gemini API error") ||
+        error.message.includes("Gemini response parse error")
+      ) {
         return NextResponse.json(
           { error: "External API error", details: error.message },
           { status: 502 }

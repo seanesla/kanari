@@ -34,6 +34,16 @@ describe("ServerMessageSchema", () => {
       }
     })
 
+    test("should validate setupComplete message (SDK object form)", () => {
+      const message = { setupComplete: { sessionId: "sess_123" } }
+      const result = ServerMessageSchema.safeParse(message)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.setupComplete).toEqual({ sessionId: "sess_123" })
+      }
+    })
+
     test("should validate serverContent with audio (inlineData)", () => {
       const message = {
         serverContent: {
@@ -260,7 +270,7 @@ describe("ServerMessageSchema", () => {
 
   describe("invalid messages", () => {
     test("should reject setupComplete with wrong type", () => {
-      const message = { setupComplete: "true" } // should be boolean
+      const message = { setupComplete: "true" } // should be boolean or object
       const result = ServerMessageSchema.safeParse(message)
 
       expect(result.success).toBe(false)
@@ -601,8 +611,16 @@ describe("validateServerMessage()", () => {
     expect(result?.setupComplete).toBe(true)
   })
 
+  test("should accept SDK setupComplete object form", () => {
+    const input = { setupComplete: { sessionId: "sess_123" } }
+    const result = validateServerMessage(input)
+
+    expect(result).not.toBeNull()
+    expect(result?.setupComplete).toEqual({ sessionId: "sess_123" })
+  })
+
   test("should return null for invalid message", () => {
-    const input = { setupComplete: "not a boolean" }
+    const input = { setupComplete: "not a boolean or object" }
     const result = validateServerMessage(input)
 
     expect(result).toBeNull()

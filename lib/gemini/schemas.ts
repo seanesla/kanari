@@ -125,7 +125,17 @@ const VoiceActivityDetectionSignalSchema = z.object({
  */
 export const ServerMessageSchema = z.object({
   // Setup complete signal
-  setupComplete: z.boolean().optional(),
+  // Gemini SDK delivers `setupComplete` as an object; our legacy SSE proxy emits `true`.
+  setupComplete: z
+    .union([
+      z.boolean(),
+      z
+        .object({
+          sessionId: z.string().optional(),
+        })
+        .passthrough(),
+    ])
+    .optional(),
 
   // Server content (audio, text, turn signals)
   serverContent: ServerContentSchema.optional(),

@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { validateAPIKey, getAPIKeyFromRequest } from "@/lib/gemini/client"
+import { parseGeminiJson } from "@/lib/gemini/json"
 import {
   ACHIEVEMENT_SYSTEM_PROMPT,
   ACHIEVEMENT_RESPONSE_SCHEMA,
@@ -49,11 +50,28 @@ async function generateAchievements(
     },
   }
 
-  const response = await fetch(`${endpoint}?key=${apiKey}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(request),
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30_000) // 30s timeout
+
+  let response: Response
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    })
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error("Gemini API request timed out after 30s")
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   if (!response.ok) {
     const errorText = await response.text()
@@ -66,37 +84,36 @@ async function generateAchievements(
     throw new Error("No response from Gemini API")
   }
 
-  const text = data.candidates[0].content.parts[0].text
-
-  try {
-    const parsed = JSON.parse(text) as GeminiAchievementResponse
-
-    // Validate structure
-    if (!Array.isArray(parsed.achievements)) {
-      throw new Error("Invalid response: achievements is not an array")
-    }
-
-    // Validate each achievement
-    const validCategories = ["streak", "milestone", "improvement", "engagement", "pattern", "recovery"]
-    const validRarities = ["common", "uncommon", "rare", "epic", "legendary"]
-
-    for (const achievement of parsed.achievements) {
-      if (
-        typeof achievement.title !== "string" ||
-        typeof achievement.description !== "string" ||
-        !validCategories.includes(achievement.category) ||
-        !validRarities.includes(achievement.rarity) ||
-        typeof achievement.insight !== "string" ||
-        typeof achievement.emoji !== "string"
-      ) {
-        throw new Error("Invalid achievement structure")
-      }
-    }
-
-    return parsed
-  } catch (error) {
-    throw new Error(`Failed to parse Gemini response: ${error instanceof Error ? error.message : "Unknown error"}`)
+  const text = data.candidates[0]?.content?.parts?.[0]?.text
+  if (typeof text !== "string") {
+    throw new Error("Gemini response parse error: missing text")
   }
+
+  const parsed = parseGeminiJson<GeminiAchievementResponse>(text)
+
+  // Validate structure
+  if (!Array.isArray(parsed.achievements)) {
+    throw new Error("Gemini response parse error: Invalid response: achievements is not an array")
+  }
+
+  // Validate each achievement
+  const validCategories = ["streak", "milestone", "improvement", "engagement", "pattern", "recovery"]
+  const validRarities = ["common", "uncommon", "rare", "epic", "legendary"]
+
+  for (const achievement of parsed.achievements) {
+    if (
+      typeof achievement.title !== "string" ||
+      typeof achievement.description !== "string" ||
+      !validCategories.includes(achievement.category) ||
+      !validRarities.includes(achievement.rarity) ||
+      typeof achievement.insight !== "string" ||
+      typeof achievement.emoji !== "string"
+    ) {
+      throw new Error("Gemini response parse error: Invalid achievement structure")
+    }
+  }
+
+  return parsed
 }
 
 /**
@@ -173,7 +190,10 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      if (error.message.includes("Gemini API error")) {
+      if (
+        error.message.includes("Gemini API error") ||
+        error.message.includes("Gemini response parse error")
+      ) {
         return NextResponse.json(
           { error: "External API error", details: error.message },
           { status: 502 }

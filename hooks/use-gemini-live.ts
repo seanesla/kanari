@@ -3,13 +3,12 @@
 /**
  * useGeminiLive Hook
  *
- * Manages connection to server-side Gemini Live session for real-time
- * voice conversations. Uses SSE for receiving and POST for sending.
+ * Manages connection to Gemini Live API for real-time voice conversations.
+ * Uses a direct browser WebSocket session via `@google/genai` (no server-side session state).
  *
  * Architecture:
- * - Server manages the actual Gemini session (API key stays server-side)
- * - Client receives audio/transcripts via Server-Sent Events (SSE)
- * - Client sends audio via POST requests
+ * - Browser connects directly to Gemini Live WebSocket using the user's API key (stored locally)
+ * - Audio/text/tool responses are exchanged over the live session
  *
  * Source: Context7 - /googleapis/js-genai docs - "Live.connect"
  */

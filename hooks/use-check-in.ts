@@ -11,11 +11,12 @@
  */
 
 import { useReducer, useRef, useCallback, useEffect } from "react"
-import { useGeminiLive, type GeminiLiveData } from "./use-gemini-live"
-import { useAudioPlayback } from "./use-audio-playback"
+import { useGeminiLive, type GeminiLiveData } from "@/hooks/use-gemini-live"
+import { useAudioPlayback } from "@/hooks/use-audio-playback"
 import { processAudio } from "@/lib/audio/processor"
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
 import { int16ToBase64 } from "@/lib/audio/pcm-converter"
+import { createGeminiHeaders } from "@/lib/utils"
 import {
   detectMismatch,
   shouldRunMismatchDetection,
@@ -1579,9 +1580,13 @@ export function useCheckIn(
 
           // Best-effort: generate a richer context summary using Gemini 3
           try {
+            const headers = await createGeminiHeaders({
+              "Content-Type": "application/json",
+            })
+
             const contextResponse = await fetch("/api/gemini/check-in-context", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers,
               body: JSON.stringify(formattedContext),
             })
 

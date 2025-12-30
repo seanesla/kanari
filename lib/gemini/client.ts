@@ -7,6 +7,7 @@
 
 import type { GeminiSemanticAnalysis, GeminiDiffResponse } from "@/lib/types"
 import { AUDIO_SEMANTIC_PROMPT, AUDIO_SEMANTIC_SCHEMA, DIFF_AWARE_SCHEMA } from "./prompts"
+import { parseGeminiJson } from "./json"
 
 /**
  * Google Search tool configuration for grounding
@@ -121,30 +122,52 @@ export interface SuggestionsWithGroundingResponse {
   grounding?: GroundingMetadata
 }
 
+/** Default timeout for Gemini API calls (30 seconds) */
+const GEMINI_API_TIMEOUT_MS = 30_000
+
 /**
  * Call Gemini API with request payload
  *
  * @param apiKey - Gemini API key (from environment)
  * @param request - Gemini request object
+ * @param timeoutMs - Optional timeout in milliseconds (default: 30s)
  * @returns Gemini API response
  */
-export async function callGeminiAPI(apiKey: string, request: GeminiRequest): Promise<GeminiResponse> {
+export async function callGeminiAPI(
+  apiKey: string,
+  request: GeminiRequest,
+  timeoutMs: number = GEMINI_API_TIMEOUT_MS
+): Promise<GeminiResponse> {
   const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
 
-  const response = await fetch(`${endpoint}?key=${apiKey}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(request),
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Gemini API error (${response.status}): ${errorText}`)
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify(request),
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Gemini API error (${response.status}): ${errorText}`)
+    }
+
+    return response.json()
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Gemini API request timed out after ${timeoutMs}ms`)
+    }
+    throw error
+  } finally {
+    clearTimeout(timeoutId)
   }
-
-  return response.json()
 }
 
 /**
@@ -202,33 +225,28 @@ export async function generateSuggestions(
   // Extract grounding metadata if available
   const grounding = candidate.groundingMetadata
 
-  // Parse JSON response
-  try {
-    const suggestions = JSON.parse(text) as GeminiSuggestionRaw[]
+  const suggestions = parseGeminiJson<GeminiSuggestionRaw[]>(text)
 
-    // Validate structure
-    if (!Array.isArray(suggestions)) {
-      throw new Error("Response is not an array")
-    }
+  // Validate structure
+  if (!Array.isArray(suggestions)) {
+    throw new Error("Gemini response parse error: Response is not an array")
+  }
 
-    // Validate each suggestion
-    for (const suggestion of suggestions) {
-      if (
-        typeof suggestion.content !== "string" ||
-        typeof suggestion.rationale !== "string" ||
-        typeof suggestion.duration !== "number" ||
-        !["break", "exercise", "mindfulness", "social", "rest"].includes(suggestion.category)
-      ) {
-        throw new Error("Invalid suggestion structure")
-      }
+  // Validate each suggestion
+  for (const suggestion of suggestions) {
+    if (
+      typeof suggestion.content !== "string" ||
+      typeof suggestion.rationale !== "string" ||
+      typeof suggestion.duration !== "number" ||
+      !["break", "exercise", "mindfulness", "social", "rest"].includes(suggestion.category)
+    ) {
+      throw new Error("Gemini response parse error: Invalid suggestion structure")
     }
+  }
 
-    return {
-      suggestions,
-      grounding,
-    }
-  } catch (error) {
-    throw new Error(`Failed to parse Gemini response: ${error instanceof Error ? error.message : "Unknown error"}`)
+  return {
+    suggestions,
+    grounding,
   }
 }
 
@@ -275,9 +293,18 @@ export async function verifyGeminiApiKey(
     return { valid: false, error: "API key is required" }
   }
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 10_000) // 10s timeout for validation
+
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+      "https://generativelanguage.googleapis.com/v1beta/models",
+      {
+        headers: {
+          "x-goog-api-key": apiKey,
+        },
+        signal: controller.signal,
+      }
     )
 
     if (response.ok) {
@@ -285,8 +312,13 @@ export async function verifyGeminiApiKey(
     } else {
       return { valid: false, error: "Invalid API key. Please check and try again." }
     }
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      return { valid: false, error: "API key validation timed out. Please try again." }
+    }
     return { valid: false, error: "Failed to validate API key. Check your connection." }
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 
@@ -339,47 +371,40 @@ export async function analyzeAudioSemantic(
 
   const text = response.candidates[0].content.parts[0].text
 
-  // Parse JSON response
-  try {
-    const analysis = JSON.parse(text) as GeminiSemanticAnalysis
+  const analysis = parseGeminiJson<GeminiSemanticAnalysis>(text)
 
-    // Validate structure
-    if (!analysis.segments || !Array.isArray(analysis.segments)) {
-      throw new Error("Missing or invalid segments array")
-    }
-
-    if (!analysis.overallEmotion || typeof analysis.emotionConfidence !== "number") {
-      throw new Error("Missing or invalid emotion data")
-    }
-
-    if (!analysis.observations || !Array.isArray(analysis.observations)) {
-      throw new Error("Missing or invalid observations array")
-    }
-
-    if (!analysis.stressInterpretation || !analysis.fatigueInterpretation || !analysis.summary) {
-      throw new Error("Missing required interpretation fields")
-    }
-
-    // Validate segments
-    for (const segment of analysis.segments) {
-      if (!segment.timestamp || !segment.content || !segment.emotion) {
-        throw new Error("Invalid segment structure")
-      }
-    }
-
-    // Validate observations
-    for (const obs of analysis.observations) {
-      if (!obs.type || !obs.observation || !obs.relevance) {
-        throw new Error("Invalid observation structure")
-      }
-    }
-
-    return analysis
-  } catch (error) {
-    throw new Error(
-      `Failed to parse Gemini audio semantic response: ${error instanceof Error ? error.message : "Unknown error"}`
-    )
+  // Validate structure
+  if (!analysis.segments || !Array.isArray(analysis.segments)) {
+    throw new Error("Gemini response parse error: Missing or invalid segments array")
   }
+
+  if (!analysis.overallEmotion || typeof analysis.emotionConfidence !== "number") {
+    throw new Error("Gemini response parse error: Missing or invalid emotion data")
+  }
+
+  if (!analysis.observations || !Array.isArray(analysis.observations)) {
+    throw new Error("Gemini response parse error: Missing or invalid observations array")
+  }
+
+  if (!analysis.stressInterpretation || !analysis.fatigueInterpretation || !analysis.summary) {
+    throw new Error("Gemini response parse error: Missing required interpretation fields")
+  }
+
+  // Validate segments
+  for (const segment of analysis.segments) {
+    if (!segment.timestamp || !segment.content || !segment.emotion) {
+      throw new Error("Gemini response parse error: Invalid segment structure")
+    }
+  }
+
+  // Validate observations
+  for (const obs of analysis.observations) {
+    if (!obs.type || !obs.observation || !obs.relevance) {
+      throw new Error("Gemini response parse error: Invalid observation structure")
+    }
+  }
+
+  return analysis
 }
 
 /**
@@ -425,50 +450,43 @@ export async function generateDiffAwareSuggestions(
 
   const text = response.candidates[0].content.parts[0].text
 
-  // Parse JSON response
-  try {
-    const diffResponse = JSON.parse(text) as GeminiDiffResponse
+  const diffResponse = parseGeminiJson<GeminiDiffResponse>(text)
 
-    // Validate structure
-    if (!diffResponse.suggestions || !Array.isArray(diffResponse.suggestions)) {
-      throw new Error("Response missing suggestions array")
-    }
-
-    if (!diffResponse.summary) {
-      throw new Error("Response missing summary object")
-    }
-
-    // Validate each suggestion
-    const validDecisions = ["keep", "update", "drop", "new"]
-    const validCategories = ["break", "exercise", "mindfulness", "social", "rest"]
-
-    for (const suggestion of diffResponse.suggestions) {
-      if (
-        typeof suggestion.id !== "string" ||
-        !validDecisions.includes(suggestion.decision) ||
-        typeof suggestion.content !== "string" ||
-        typeof suggestion.rationale !== "string" ||
-        typeof suggestion.duration !== "number" ||
-        !validCategories.includes(suggestion.category)
-      ) {
-        throw new Error("Invalid suggestion structure in diff response")
-      }
-    }
-
-    // Validate summary
-    if (
-      typeof diffResponse.summary.kept !== "number" ||
-      typeof diffResponse.summary.updated !== "number" ||
-      typeof diffResponse.summary.dropped !== "number" ||
-      typeof diffResponse.summary.added !== "number"
-    ) {
-      throw new Error("Invalid summary structure")
-    }
-
-    return diffResponse
-  } catch (error) {
-    throw new Error(
-      `Failed to parse Gemini diff response: ${error instanceof Error ? error.message : "Unknown error"}`
-    )
+  // Validate structure
+  if (!diffResponse.suggestions || !Array.isArray(diffResponse.suggestions)) {
+    throw new Error("Gemini response parse error: Response missing suggestions array")
   }
+
+  if (!diffResponse.summary) {
+    throw new Error("Gemini response parse error: Response missing summary object")
+  }
+
+  // Validate each suggestion
+  const validDecisions = ["keep", "update", "drop", "new"]
+  const validCategories = ["break", "exercise", "mindfulness", "social", "rest"]
+
+  for (const suggestion of diffResponse.suggestions) {
+    if (
+      typeof suggestion.id !== "string" ||
+      !validDecisions.includes(suggestion.decision) ||
+      typeof suggestion.content !== "string" ||
+      typeof suggestion.rationale !== "string" ||
+      typeof suggestion.duration !== "number" ||
+      !validCategories.includes(suggestion.category)
+    ) {
+      throw new Error("Gemini response parse error: Invalid suggestion structure in diff response")
+    }
+  }
+
+  // Validate summary
+  if (
+    typeof diffResponse.summary.kept !== "number" ||
+    typeof diffResponse.summary.updated !== "number" ||
+    typeof diffResponse.summary.dropped !== "number" ||
+    typeof diffResponse.summary.added !== "number"
+  ) {
+    throw new Error("Gemini response parse error: Invalid summary structure")
+  }
+
+  return diffResponse
 }

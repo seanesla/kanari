@@ -390,9 +390,9 @@ describe("POST /api/gemini/semantic", () => {
       expect(data.error).toContain("External API error")
     })
 
-    it("returns 500 for parsing errors", async () => {
+    it("returns 502 for structured output parsing errors", async () => {
       mockAnalyzeAudioSemantic.mockRejectedValue(
-        new Error("Failed to parse Gemini response: Missing segments")
+        new Error("Gemini response parse error: Missing segments")
       )
 
       const request = createRequest(
@@ -403,8 +403,8 @@ describe("POST /api/gemini/semantic", () => {
       const response = await POST(request)
       const data = await response.json()
 
-      expect(response.status).toBe(500)
-      expect(data.error).toContain("parse")
+      expect(response.status).toBe(502)
+      expect(data.error).toContain("External API error")
     })
 
     it("returns 500 for unknown errors", async () => {

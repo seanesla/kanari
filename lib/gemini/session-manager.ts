@@ -10,6 +10,10 @@
  * - Client receives audio via SSE, sends audio via POST
  * - Server proxies messages between client and Gemini
  *
+ * NOTE: In-memory session state is not safe in serverless runtimes (e.g. Vercel) where
+ * subsequent requests may land on different instances.
+ * See: docs/error-patterns/serverless-in-memory-session-state.md
+ *
  * Source: Context7 - /googleapis/js-genai docs - "Live.connect"
  */
 

@@ -17,9 +17,10 @@ pnpm test:run     # Vitest single run
 
 ## Environment
 
-Copy `.env.example` to `.env` with:
-- `GEMINI_API_KEY` - Required for semantic audio analysis
+Copy `.env.example` to `.env.local` with:
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` - For Calendar integration
+
+Note: Gemini API keys are entered by the user in the Settings UI (no server env fallback).
 
 ## Architecture
 
@@ -62,6 +63,18 @@ Copy `.env.example` to `.env` with:
 
 - `next.config.mjs`: `ignoreBuildErrors: true` (dev convenience)
 - Path alias: `@/*` maps to project root
+
+## Context7 (Library Docs)
+
+Fetch up-to-date library documentation via MCP:
+
+1. `mcp__context7__resolve-library-id` - Find library ID (e.g., `/vercel/next.js`)
+2. `mcp__context7__query-docs` - Query docs with that ID
+
+**Attribution:**
+```typescript
+// Source: Context7 - [library-id] docs - "[topic]"
+```
 
 # Error fixing workflow
 
