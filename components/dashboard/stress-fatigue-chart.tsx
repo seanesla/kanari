@@ -193,6 +193,17 @@ export function StressFatigueChart({
 
   const trend = useMemo(() => calculateTrend(data), [data])
 
+  // Memoize biomarker analysis to avoid recalculating on every render
+  const stressBiomarkers = useMemo(
+    () => aggregatedFeatures ? analyzeStressBiomarkers(aggregatedFeatures) : [],
+    [aggregatedFeatures]
+  )
+
+  const fatigueBiomarkers = useMemo(
+    () => aggregatedFeatures ? analyzeFatigueBiomarkers(aggregatedFeatures) : [],
+    [aggregatedFeatures]
+  )
+
   const trendConfig = {
     improving: {
       label: "Improving",
@@ -352,7 +363,7 @@ export function StressFatigueChart({
                 <div className="mb-4">
                   <p className="text-xs text-muted-foreground mb-2">Stress Indicators:</p>
                   <div className="space-y-2">
-                    {analyzeStressBiomarkers(aggregatedFeatures).map((biomarker, idx) => (
+                    {stressBiomarkers.map((biomarker, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-xs">
                         <span
                           className={cn(
@@ -373,7 +384,7 @@ export function StressFatigueChart({
                 <div>
                   <p className="text-xs text-muted-foreground mb-2">Fatigue Indicators:</p>
                   <div className="space-y-2">
-                    {analyzeFatigueBiomarkers(aggregatedFeatures).map((biomarker, idx) => (
+                    {fatigueBiomarkers.map((biomarker, idx) => (
                       <div key={idx} className="flex items-start gap-2 text-xs">
                         <span
                           className={cn(
