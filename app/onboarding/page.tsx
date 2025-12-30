@@ -3,15 +3,16 @@
 /**
  * Onboarding Page
  *
- * Multi-step onboarding flow for first-time users.
- * Collects API key and basic preferences before redirecting to dashboard.
+ * Multi-step onboarding flow with 3D floating panels.
+ * Camera flies between panels as user navigates steps.
+ * All panels exist in 3D space - you physically travel to each one.
  */
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useOnboarding } from "@/hooks/use-onboarding"
+import { Onboarding3DScene } from "@/components/onboarding/onboarding-3d-scene"
 import {
-  OnboardingLayout,
   StepWelcome,
   StepTheme,
   StepApiKey,
@@ -70,29 +71,31 @@ export default function OnboardingPage() {
     await completeOnboarding()
   }
 
+  // All step components are passed as children - they'll be placed in 3D panels
   return (
-    <OnboardingLayout currentStep={currentStep} totalSteps={TOTAL_STEPS}>
-      {currentStep === 0 && <StepWelcome onNext={goNext} />}
+    <Onboarding3DScene currentStep={currentStep} totalSteps={TOTAL_STEPS}>
+      {/* Panel 0: Welcome */}
+      <StepWelcome onNext={goNext} />
 
-      {currentStep === 1 && <StepTheme onNext={goNext} onBack={goBack} />}
+      {/* Panel 1: Theme */}
+      <StepTheme onNext={goNext} onBack={goBack} />
 
-      {currentStep === 2 && (
-        <StepApiKey
-          initialApiKey={settings?.geminiApiKey || pendingSettings.geminiApiKey || ""}
-          onNext={handleApiKeySubmit}
-          onBack={goBack}
-        />
-      )}
+      {/* Panel 2: API Key */}
+      <StepApiKey
+        initialApiKey={settings?.geminiApiKey || pendingSettings.geminiApiKey || ""}
+        onNext={handleApiKeySubmit}
+        onBack={goBack}
+      />
 
-      {currentStep === 3 && (
-        <StepPreferences
-          initialSettings={{ ...settings, ...pendingSettings }}
-          onNext={handlePreferencesSubmit}
-          onBack={goBack}
-        />
-      )}
+      {/* Panel 3: Preferences */}
+      <StepPreferences
+        initialSettings={{ ...settings, ...pendingSettings }}
+        onNext={handlePreferencesSubmit}
+        onBack={goBack}
+      />
 
-      {currentStep === 4 && <StepComplete onComplete={handleComplete} />}
-    </OnboardingLayout>
+      {/* Panel 4: Complete */}
+      <StepComplete onComplete={handleComplete} />
+    </Onboarding3DScene>
   )
 }

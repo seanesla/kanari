@@ -81,3 +81,19 @@ Example:
 // https://github.com/schedule-x/schedule-x/blob/main/website/app/docs/calendar/events/page.mdx
 const startDateTime = instant.toZonedDateTimeISO(timeZone)
 ```
+
+# Error fixing workflow
+
+When I find or you report a bug:
+
+1. Write a test first that reproduces the error
+2. Fix the bug
+3. Search the entire codebase for other instances of the same error pattern
+4. Add tests for any other instances found
+5. Document the error pattern in a markdown file:
+   - What the error looks like
+   - Why it happens
+   - How to detect it automatically
+   - Link this file in relevant comments
+
+Goal: Don't fix one bug. Fix the class of bugs it belongs to.Claude is AI and can make mistakes. Please double-check responses.

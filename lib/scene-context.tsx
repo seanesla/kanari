@@ -24,7 +24,8 @@ interface SceneContextValue {
   resetFontsToDefault: () => void
 }
 
-const SceneContext = createContext<SceneContextValue | null>(null)
+// Exported for useContextBridge in 3D scenes (Drei Html portals)
+export const SceneContext = createContext<SceneContextValue | null>(null)
 
 // Helper to create default settings object - avoids DRY violation across callbacks
 function createDefaultSettings(): DBSettings {

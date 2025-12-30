@@ -19,27 +19,30 @@ interface HeroColorPickerProps {
 }
 
 export function HeroColorPicker({ children }: HeroColorPickerProps) {
-  const { accentColor, setAccentColor } = useSceneMode()
+  const { accentColor, setAccentColor, isLoading } = useSceneMode()
   const [localColor, setLocalColor] = useState(accentColor)
   const [isHovered, setIsHovered] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [showHint, setShowHint] = useState(false)
 
-  // Show hint after a delay on every page visit
+  // Show hint after a delay, but only after loading animation is done
   useEffect(() => {
+    // Don't start timer until loading animation is complete
+    if (isLoading) return
+
     const showTimer = setTimeout(() => {
       setShowHint(true)
-    }, 2000) // Show after 2s delay
+    }, 2000) // Show 2s after loading completes
 
     const hideTimer = setTimeout(() => {
       setShowHint(false)
-    }, 6000) // Auto-hide after 6s total (4s visible)
+    }, 6000) // Auto-hide 6s after loading completes (4s visible)
 
     return () => {
       clearTimeout(showTimer)
       clearTimeout(hideTimer)
     }
-  }, [])
+  }, [isLoading])
 
   // Sync with context changes
   useEffect(() => {
@@ -153,20 +156,20 @@ export function HeroColorPicker({ children }: HeroColorPickerProps) {
         </PopoverContent>
       </Popover>
 
-      {/* Discovery hint tooltip */}
+      {/* Discovery hint tooltip - positioned above */}
       <AnimatePresence>
         {showHint && (
           <motion.div
-            className="absolute left-1/2 -translate-x-1/2 top-full mt-3 pointer-events-none z-50"
-            initial={{ opacity: 0, y: -8 }}
+            className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 pointer-events-none z-50"
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
+            exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.3 }}
           >
             <div className="relative">
-              {/* Arrow */}
+              {/* Arrow pointing down */}
               <div
-                className="absolute left-1/2 -translate-x-1/2 -top-1.5 w-3 h-3 rotate-45 bg-card border-l border-t border-border/50"
+                className="absolute left-1/2 -translate-x-1/2 -bottom-1.5 w-3 h-3 rotate-45 bg-card border-r border-b border-border/50"
               />
               {/* Tooltip content */}
               <div className="bg-card/95 backdrop-blur-sm border border-border/50 rounded-lg px-3 py-2 shadow-lg">

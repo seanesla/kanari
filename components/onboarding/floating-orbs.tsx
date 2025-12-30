@@ -21,8 +21,9 @@ import { SCENE_COLORS } from "@/lib/constants"
 
 /**
  * Starfield - distant twinkling stars in a sphere around the camera
+ * Exported for reuse in onboarding 3D scene
  */
-function Starfield() {
+export function Starfield() {
   const starsRef = useRef<THREE.Points>(null)
 
   // Generate random star positions distributed in a sphere
@@ -44,10 +45,11 @@ function Starfield() {
     return pos
   }, [])
 
-  // Slow rotation for subtle movement
+  // Very slow rotation - stars are distant, move slower than foreground (parallax)
+  // Source: Context7 - /pmndrs/react-three-fiber docs - "useFrame & depth"
   useFrame((state) => {
     if (!starsRef.current) return
-    starsRef.current.rotation.y = state.clock.elapsedTime * 0.008
+    starsRef.current.rotation.y = state.clock.elapsedTime * 0.003
   })
 
   return (
@@ -72,10 +74,20 @@ function Starfield() {
 /**
  * AccentNebula - floating particles in the accent color
  * Uses Drei Sparkles for GPU-optimized particle animation
+ * Exported for reuse in onboarding 3D scene
  */
-function AccentNebula({ accentColor }: { accentColor: string }) {
+export function AccentNebula({ accentColor }: { accentColor: string }) {
+  const nebulaRef = useRef<THREE.Group>(null)
+
+  // Faster rotation than stars - particles are closer (parallax depth cue)
+  // Source: Context7 - /pmndrs/react-three-fiber docs - "useFrame & depth"
+  useFrame((state) => {
+    if (!nebulaRef.current) return
+    nebulaRef.current.rotation.y = state.clock.elapsedTime * 0.01
+  })
+
   return (
-    <>
+    <group ref={nebulaRef}>
       {/* Primary layer - scattered accent particles */}
       <Sparkles
         count={60}
@@ -97,15 +109,16 @@ function AccentNebula({ accentColor }: { accentColor: string }) {
         scale={[25, 25, 18]}
         noise={[0.2, 0.2, 0.2]}
       />
-    </>
+    </group>
   )
 }
 
 /**
  * FloatingGeometry - distant geometric shapes that drift gently
  * Matches the aesthetic of truth-core and section-accent
+ * Exported for reuse in onboarding 3D scene
  */
-function FloatingGeometry({ accentColor }: { accentColor: string }) {
+export function FloatingGeometry({ accentColor }: { accentColor: string }) {
   // Positions for geometric accents - spread out in the background
   const shapes = useMemo(
     () => [
