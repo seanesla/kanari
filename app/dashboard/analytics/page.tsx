@@ -15,6 +15,7 @@ import { predictBurnoutRisk } from "@/lib/ml/forecasting"
 import { useDashboardStats, useTrendData, useScheduledSuggestions, useRecordings } from "@/hooks/use-storage"
 import { StressFatigueChart } from "@/components/dashboard/stress-fatigue-chart"
 import { JourneyProgress } from "@/components/dashboard/journey-progress"
+import { AnalyticsInsightsSection } from "@/components/dashboard/analytics-insights"
 import { useSceneMode } from "@/lib/scene-context"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import type { BurnoutPrediction } from "@/lib/types"
@@ -211,6 +212,16 @@ export default function AnalyticsPage() {
             hasSuggestions={stats.suggestionsAccepted > 0}
             hasScheduledRecovery={scheduledSuggestions.length > 0}
           />
+        </div>
+
+        {/* AI Insights Section */}
+        <div
+          className={cn(
+            "mb-16 transition-all duration-1000 delay-250",
+            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          )}
+        >
+          <AnalyticsInsightsSection />
         </div>
 
         {/* Burnout Prediction */}

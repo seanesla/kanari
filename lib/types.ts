@@ -631,3 +631,47 @@ export type HistoryItem = VoiceNoteHistoryItem | AIChatHistoryItem
 
 // Re-export SceneMode for convenience
 export type { SceneMode } from "./scene-context"
+
+// ============================================
+// Analytics Insights Types
+// ============================================
+
+/** Reference to a specific moment in a recording */
+export interface RecordingReference {
+  recordingId: string
+  timestamp?: string // MM:SS from segment
+  createdAt: string // For display
+}
+
+/** Aggregated observation with sources */
+export interface AggregatedObservation {
+  type: "stress_cue" | "fatigue_cue" | "positive_cue"
+  observation: string
+  relevance: "high" | "medium" | "low"
+  references: RecordingReference[]
+  frequency: number
+}
+
+/** Detected pattern */
+export interface DetectedPattern {
+  description: string
+  occurrenceRate: number // 0-100%
+  affectedRecordingIds: string[]
+}
+
+export type AnalyticsTimeRange = "7_days" | "30_days" | "all_time"
+
+export interface AnalyticsInsights {
+  timeRange: AnalyticsTimeRange
+  recordingCount: number
+  observations: {
+    stress: AggregatedObservation[]
+    fatigue: AggregatedObservation[]
+    positive: AggregatedObservation[]
+  }
+  interpretations: {
+    stressSummary: string
+    fatigueSummary: string
+  }
+  patterns: DetectedPattern[]
+}
