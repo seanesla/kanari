@@ -162,17 +162,20 @@
     mask-image: linear-gradient(to bottom, black 60%, transparent);
   }
 
+  /* Sharper fade for more visible top/bottom edges on decorative grid */
   .mask-fade-vertical {
     mask-image: linear-gradient(
       to bottom,
       transparent 0%,
-      black 50%,
+      black 25%,
+      black 75%,
       transparent 100%
     );
     -webkit-mask-image: linear-gradient(
       to bottom,
       transparent 0%,
-      black 50%,
+      black 25%,
+      black 75%,
       transparent 100%
     );
   }
@@ -207,6 +210,20 @@
 
 .status-fail {
   animation: subtle-glitch 3s ease-in-out infinite;
+}
+
+/* Animated gradient sweep for decorative grid */
+@keyframes gradient-sweep {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-gradient-sweep {
+  animation: gradient-sweep 12s linear infinite;
 }
 
 /* View transitions */
