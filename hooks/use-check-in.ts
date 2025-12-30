@@ -311,6 +311,9 @@ export function useCheckIn(
   // Post-recording context ref
   const postRecordingContextRef = useRef<string | null>(null)
 
+  // Track current state for use in callbacks (avoid stale closures)
+  const stateRef = useRef<CheckInState>(data.state)
+
   // ========================================
   // Gemini Live Hook
   // ========================================
@@ -328,8 +331,25 @@ export function useCheckIn(
     },
     onDisconnected: (reason) => {
       console.log("[useCheckIn] Disconnected:", reason)
-      if (data.state !== "complete" && data.state !== "error") {
+      const currentState = stateRef.current
+
+      // Only auto-complete if we were in an active state (user had chance to speak)
+      const activeStates: CheckInState[] = [
+        "ready",
+        "listening",
+        "user_speaking",
+        "processing",
+        "assistant_speaking",
+      ]
+
+      if (activeStates.includes(currentState)) {
         dispatch({ type: "SET_COMPLETE" })
+      } else if (currentState !== "complete" && currentState !== "error") {
+        // Disconnected during initialization - show error
+        dispatch({
+          type: "SET_ERROR",
+          error: reason || "Connection failed during initialization",
+        })
       }
     },
     onError: (error) => {
@@ -382,6 +402,11 @@ export function useCheckIn(
   useEffect(() => {
     dispatch({ type: "SET_CONNECTION_STATE", state: gemini.state })
   }, [gemini.state])
+
+  // Sync stateRef with current state (for use in callbacks)
+  useEffect(() => {
+    stateRef.current = data.state
+  }, [data.state])
 
   // ========================================
   // Audio Playback Hook

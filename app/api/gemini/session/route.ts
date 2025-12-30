@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { GoogleGenAI, Modality } from "@google/genai"
+import { GoogleGenAI, Modality, ApiError } from "@google/genai"
 
 // Model for conversational check-in with native audio
 const LIVE_API_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
@@ -112,18 +112,26 @@ export async function POST(request: NextRequest): Promise<NextResponse<SessionRe
       .replace(/access_token[=:]\s*[^\s&]+/gi, "access_token=[REDACTED]")
     console.error("[Gemini Session] Error:", sanitizedMessage)
 
-    // Handle rate limiting
-    if (error instanceof Error && error.message.includes("429")) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again later.", code: "RATE_LIMIT" as const },
-        { status: 429 }
-      )
+    // Handle ApiError from @google/genai SDK (has status as number)
+    if (error instanceof ApiError) {
+      if (error.status === 429) {
+        return NextResponse.json(
+          { error: "Rate limit exceeded. Please try again later.", code: "RATE_LIMIT" as const },
+          { status: 429 }
+        )
+      }
+      if (error.status === 401 || error.status === 403) {
+        return NextResponse.json(
+          { error: "API key invalid or lacks access to Gemini Live API.", code: "UNAUTHORIZED" as const },
+          { status: 401 }
+        )
+      }
     }
 
-    // Handle auth errors
-    if (error instanceof Error && error.message.includes("401")) {
+    // Check message for auth errors (fallback for "unregistered callers" error)
+    if (errorMessage.includes("unregistered callers") || errorMessage.includes("API Key")) {
       return NextResponse.json(
-        { error: "API key invalid or expired", code: "UNAUTHORIZED" as const },
+        { error: "API key lacks access to Gemini Live API ephemeral tokens.", code: "UNAUTHORIZED" as const },
         { status: 401 }
       )
     }

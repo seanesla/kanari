@@ -242,9 +242,9 @@ export function CheckInDialog({
                 <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
                   <MicOff className="w-8 h-8 text-red-500" />
                 </div>
-                <div className="text-center">
+                <div className="text-center max-w-sm">
                   <p className="font-medium text-red-500">Connection Error</p>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm text-muted-foreground mt-1 break-words">
                     {checkIn.error || "Failed to connect. Please try again."}
                   </p>
                 </div>
