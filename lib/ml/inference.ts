@@ -4,7 +4,7 @@ import type {
   StressLevel,
   FatigueLevel,
 } from "@/lib/types"
-import { STRESS, FATIGUE, SCORE_LEVELS, CONFIDENCE, WEIGHTS, VALIDATION } from "./thresholds"
+import { STRESS, FATIGUE, SCORE_LEVELS, CONFIDENCE, SCORING_WEIGHTS, VALIDATION } from "./thresholds"
 
 /**
  * Heuristic-based stress and fatigue classification
@@ -29,46 +29,46 @@ function calculateStressScore(features: AudioFeatures): number {
 
   // Speech rate (stressed people speak faster)
   if (features.speechRate > STRESS.SPEECH_RATE_HIGH) {
-    score += WEIGHTS.SPEECH_RATE
-    weight += WEIGHTS.SPEECH_RATE
+    score += SCORING_WEIGHTS.SPEECH_RATE
+    weight += SCORING_WEIGHTS.SPEECH_RATE
   } else if (features.speechRate > STRESS.SPEECH_RATE_MODERATE) {
-    score += WEIGHTS.MODERATE_INDICATOR
-    weight += WEIGHTS.SPEECH_RATE
+    score += SCORING_WEIGHTS.MODERATE_INDICATOR
+    weight += SCORING_WEIGHTS.SPEECH_RATE
   } else {
-    weight += WEIGHTS.SPEECH_RATE
+    weight += SCORING_WEIGHTS.SPEECH_RATE
   }
 
   // RMS energy (stressed: higher and more variable)
   if (features.rms > STRESS.RMS_HIGH) {
-    score += WEIGHTS.RMS_ENERGY
-    weight += WEIGHTS.RMS_ENERGY
+    score += SCORING_WEIGHTS.RMS_ENERGY
+    weight += SCORING_WEIGHTS.RMS_ENERGY
   } else if (features.rms > STRESS.RMS_MODERATE) {
-    score += WEIGHTS.MODERATE_SECONDARY
-    weight += WEIGHTS.RMS_ENERGY
+    score += SCORING_WEIGHTS.MODERATE_SECONDARY
+    weight += SCORING_WEIGHTS.RMS_ENERGY
   } else {
-    weight += WEIGHTS.RMS_ENERGY
+    weight += SCORING_WEIGHTS.RMS_ENERGY
   }
 
   // Spectral flux (stressed: more rapid spectral changes)
   if (features.spectralFlux > STRESS.SPECTRAL_FLUX_HIGH) {
-    score += WEIGHTS.SPECTRAL_FLUX
-    weight += WEIGHTS.SPECTRAL_FLUX
+    score += SCORING_WEIGHTS.SPECTRAL_FLUX
+    weight += SCORING_WEIGHTS.SPECTRAL_FLUX
   } else if (features.spectralFlux > STRESS.SPECTRAL_FLUX_MODERATE) {
-    score += WEIGHTS.MODERATE_SECONDARY
-    weight += WEIGHTS.SPECTRAL_FLUX
+    score += SCORING_WEIGHTS.MODERATE_SECONDARY
+    weight += SCORING_WEIGHTS.SPECTRAL_FLUX
   } else {
-    weight += WEIGHTS.SPECTRAL_FLUX
+    weight += SCORING_WEIGHTS.SPECTRAL_FLUX
   }
 
   // Zero crossing rate (stressed: higher ZCR due to tension)
   if (features.zcr > STRESS.ZCR_HIGH) {
-    score += WEIGHTS.ZCR
-    weight += WEIGHTS.ZCR
+    score += SCORING_WEIGHTS.ZCR
+    weight += SCORING_WEIGHTS.ZCR
   } else if (features.zcr > STRESS.ZCR_MODERATE) {
-    score += WEIGHTS.MODERATE_TERTIARY
-    weight += WEIGHTS.ZCR
+    score += SCORING_WEIGHTS.MODERATE_TERTIARY
+    weight += SCORING_WEIGHTS.ZCR
   } else {
-    weight += WEIGHTS.ZCR
+    weight += SCORING_WEIGHTS.ZCR
   }
 
   return weight > 0 ? Math.round((score / weight) * 100) : 0
@@ -84,46 +84,46 @@ function calculateFatigueScore(features: AudioFeatures): number {
 
   // Speech rate (fatigued people speak slower)
   if (features.speechRate < FATIGUE.SPEECH_RATE_LOW) {
-    score += WEIGHTS.SPEECH_RATE
-    weight += WEIGHTS.SPEECH_RATE
+    score += SCORING_WEIGHTS.SPEECH_RATE
+    weight += SCORING_WEIGHTS.SPEECH_RATE
   } else if (features.speechRate < FATIGUE.SPEECH_RATE_MODERATE) {
-    score += WEIGHTS.MODERATE_INDICATOR
-    weight += WEIGHTS.SPEECH_RATE
+    score += SCORING_WEIGHTS.MODERATE_INDICATOR
+    weight += SCORING_WEIGHTS.SPEECH_RATE
   } else {
-    weight += WEIGHTS.SPEECH_RATE
+    weight += SCORING_WEIGHTS.SPEECH_RATE
   }
 
   // RMS energy (fatigued: lower energy/volume)
   if (features.rms < FATIGUE.RMS_LOW) {
-    score += WEIGHTS.RMS_ENERGY
-    weight += WEIGHTS.RMS_ENERGY
+    score += SCORING_WEIGHTS.RMS_ENERGY
+    weight += SCORING_WEIGHTS.RMS_ENERGY
   } else if (features.rms < FATIGUE.RMS_MODERATE) {
-    score += WEIGHTS.MODERATE_SECONDARY
-    weight += WEIGHTS.RMS_ENERGY
+    score += SCORING_WEIGHTS.MODERATE_SECONDARY
+    weight += SCORING_WEIGHTS.RMS_ENERGY
   } else {
-    weight += WEIGHTS.RMS_ENERGY
+    weight += SCORING_WEIGHTS.RMS_ENERGY
   }
 
   // Pause ratio (fatigued: more pauses)
   if (features.pauseRatio > FATIGUE.PAUSE_RATIO_HIGH) {
-    score += WEIGHTS.PAUSE_RATIO
-    weight += WEIGHTS.PAUSE_RATIO
+    score += SCORING_WEIGHTS.PAUSE_RATIO
+    weight += SCORING_WEIGHTS.PAUSE_RATIO
   } else if (features.pauseRatio > FATIGUE.PAUSE_RATIO_MODERATE) {
-    score += WEIGHTS.MODERATE_SECONDARY
-    weight += WEIGHTS.PAUSE_RATIO
+    score += SCORING_WEIGHTS.MODERATE_SECONDARY
+    weight += SCORING_WEIGHTS.PAUSE_RATIO
   } else {
-    weight += WEIGHTS.PAUSE_RATIO
+    weight += SCORING_WEIGHTS.PAUSE_RATIO
   }
 
   // Spectral centroid (fatigued: lower, less bright voice)
   if (features.spectralCentroid < FATIGUE.SPECTRAL_CENTROID_LOW) {
-    score += WEIGHTS.SPECTRAL_CENTROID
-    weight += WEIGHTS.SPECTRAL_CENTROID
+    score += SCORING_WEIGHTS.SPECTRAL_CENTROID
+    weight += SCORING_WEIGHTS.SPECTRAL_CENTROID
   } else if (features.spectralCentroid < FATIGUE.SPECTRAL_CENTROID_MODERATE) {
-    score += WEIGHTS.MODERATE_TERTIARY
-    weight += WEIGHTS.SPECTRAL_CENTROID
+    score += SCORING_WEIGHTS.MODERATE_TERTIARY
+    weight += SCORING_WEIGHTS.SPECTRAL_CENTROID
   } else {
-    weight += WEIGHTS.SPECTRAL_CENTROID
+    weight += SCORING_WEIGHTS.SPECTRAL_CENTROID
   }
 
   return weight > 0 ? Math.round((score / weight) * 100) : 0

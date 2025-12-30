@@ -164,11 +164,11 @@ export const FORECASTING = {
 } as const
 
 // ============================================
-// Feature Weights
+// Scoring Weights (for stress/fatigue calculation)
 // ============================================
 
-export const WEIGHTS = {
-  /** Score weights for stress/fatigue calculation */
+export const SCORING_WEIGHTS = {
+  /** Feature contribution weights */
   SPEECH_RATE: 30,
   RMS_ENERGY: 25,
   SPECTRAL_FLUX: 25,
@@ -183,12 +183,30 @@ export const WEIGHTS = {
   MODERATE_SECONDARY: 12,
   HIGH_TERTIARY: 20,
   MODERATE_TERTIARY: 10,
+} as const
 
-  /** Risk calculation weights */
-  RISK_RECENT_AVERAGE: 0.4,
-  RISK_UPWARD_TREND_MAX: 30,
-  RISK_VOLATILITY_MAX: 20,
-  RISK_RECENT_WORSE: 10,
+// ============================================
+// Risk Calculation Weights (for burnout forecasting)
+// ============================================
+
+export const RISK_WEIGHTS = {
+  /** Weight for recent average in risk score */
+  RECENT_AVERAGE: 0.4,
+  /** Max points from upward trend */
+  UPWARD_TREND_MAX: 30,
+  /** Max points from volatility */
+  VOLATILITY_MAX: 20,
+  /** Points when recent is worse than overall */
+  RECENT_WORSE: 10,
+} as const
+
+/** @deprecated Use SCORING_WEIGHTS and RISK_WEIGHTS instead */
+export const WEIGHTS = {
+  ...SCORING_WEIGHTS,
+  RISK_RECENT_AVERAGE: RISK_WEIGHTS.RECENT_AVERAGE,
+  RISK_UPWARD_TREND_MAX: RISK_WEIGHTS.UPWARD_TREND_MAX,
+  RISK_VOLATILITY_MAX: RISK_WEIGHTS.VOLATILITY_MAX,
+  RISK_RECENT_WORSE: RISK_WEIGHTS.RECENT_WORSE,
 } as const
 
 // ============================================

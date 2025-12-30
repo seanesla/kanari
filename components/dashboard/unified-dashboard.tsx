@@ -131,7 +131,7 @@ export function UnifiedDashboard() {
             isSidebarSheetOpen={isSidebarSheetOpen}
             setIsSidebarSheetOpen={setIsSidebarSheetOpen}
             pendingCount={pendingCount}
-            showEmptyState={scheduledSuggestions.length === 0 && pendingCount === 0}
+            showEmptyState={!suggestionsLoading && scheduledSuggestions.length === 0 && pendingCount === 0}
             sidebar={
               <PendingSidebar
                 suggestions={suggestions}

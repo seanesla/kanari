@@ -1,5 +1,5 @@
 import type { TrendData, BurnoutPrediction, TrendDirection } from "@/lib/types"
-import { FORECASTING, WEIGHTS } from "./thresholds"
+import { FORECASTING, RISK_WEIGHTS } from "./thresholds"
 
 /**
  * Burnout prediction using trend analysis
@@ -86,22 +86,22 @@ function calculateRiskScore(analysis: TrendAnalysis): number {
   let risk = 0
 
   // Factor 1: Recent average score (40% weight)
-  risk += analysis.recentAverage * WEIGHTS.RISK_RECENT_AVERAGE
+  risk += analysis.recentAverage * RISK_WEIGHTS.RECENT_AVERAGE
 
   // Factor 2: Upward trend (30% weight)
   // Positive slope means worsening condition
   if (analysis.slope > 0) {
-    risk += Math.min(analysis.slope * 3, WEIGHTS.RISK_UPWARD_TREND_MAX)
+    risk += Math.min(analysis.slope * 3, RISK_WEIGHTS.UPWARD_TREND_MAX)
   }
 
   // Factor 3: High volatility (20% weight)
   // Unstable patterns suggest poor regulation
-  risk += Math.min(analysis.volatility * 0.3, WEIGHTS.RISK_VOLATILITY_MAX)
+  risk += Math.min(analysis.volatility * 0.3, RISK_WEIGHTS.VOLATILITY_MAX)
 
   // Factor 4: Recent vs overall comparison (10% weight)
   // Recent significantly worse than historical average = risk
   if (analysis.recentAverage > analysis.overallAverage + FORECASTING.RECENT_VS_OVERALL_DIFF) {
-    risk += WEIGHTS.RISK_RECENT_WORSE
+    risk += RISK_WEIGHTS.RECENT_WORSE
   }
 
   return Math.min(100, Math.max(0, Math.round(risk)))
