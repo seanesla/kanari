@@ -61,7 +61,12 @@ export function CheckInTrigger({
         variant={variant}
         size={size}
         className={cn("gap-2", className)}
-        onClick={() => setDialogOpen(true)}
+        onClick={(event) => {
+          // Avoid leaving focus on the trigger while the dialog applies `aria-hidden` to the page.
+          // See: docs/error-patterns/aria-hidden-focused-descendant.md
+          event.currentTarget.blur()
+          setDialogOpen(true)
+        }}
         {...props}
       >
         {showIcon && <MessageSquare className="h-4 w-4" />}
@@ -98,7 +103,12 @@ export function CheckInFab({
           "fixed bottom-6 right-6 z-50",
           className
         )}
-        onClick={() => setDialogOpen(true)}
+        onClick={(event) => {
+          // Avoid leaving focus on the trigger while the dialog applies `aria-hidden` to the page.
+          // See: docs/error-patterns/aria-hidden-focused-descendant.md
+          event.currentTarget.blur()
+          setDialogOpen(true)
+        }}
       >
         <Mic className="h-6 w-6" />
         <span className="sr-only">Start check-in</span>
@@ -182,7 +192,16 @@ export function PostRecordingPrompt({
           <Button variant="ghost" size="sm" onClick={onDismiss}>
             Not now
           </Button>
-          <Button variant="default" size="sm" onClick={handleStartCheckIn}>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={(event) => {
+              // Avoid leaving focus on the trigger while the dialog applies `aria-hidden` to the page.
+              // See: docs/error-patterns/aria-hidden-focused-descendant.md
+              event.currentTarget.blur()
+              handleStartCheckIn()
+            }}
+          >
             Let's talk
           </Button>
         </div>

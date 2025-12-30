@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { validateAPIKey, getAPIKeyFromRequest } from "@/lib/gemini/client"
+import { callGeminiAPI, validateAPIKey, getAPIKeyFromRequest } from "@/lib/gemini/client"
 import {
   CHECK_IN_CONTEXT_SUMMARY_PROMPT,
   CHECK_IN_CONTEXT_SUMMARY_SCHEMA,
@@ -18,6 +18,9 @@ import {
 } from "@/lib/gemini/prompts"
 import { parseGeminiJson } from "@/lib/gemini/json"
 import type { TimeContext, VoiceTrends } from "@/lib/gemini/check-in-context"
+
+export const dynamic = "force-dynamic"
+export const runtime = "nodejs"
 
 // ============================================
 // Types
@@ -138,12 +141,17 @@ Return ONLY the JSON object with patternSummary, keyObservations, suggestedOpene
 // API Handler
 // ============================================
 
+function sanitizeErrorMessage(message: string): string {
+  return message
+    .replace(/AIza[0-9A-Za-z\-_]{10,}/g, "AIza[REDACTED]")
+    .replace(/key[=:]\s*[^\s&]+/gi, "key=[REDACTED]")
+    .replace(/token[=:]\s*[^\s&]+/gi, "token=[REDACTED]")
+}
+
 async function generateContextSummary(
   apiKey: string,
   context: CheckInContextRequest
 ): Promise<CheckInContextSummaryResponse> {
-  const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
-
   const userPrompt = generateUserPrompt(context)
 
   const request = {
@@ -166,35 +174,7 @@ async function generateContextSummary(
     },
   }
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 30_000) // 30s timeout
-
-  let response: Response
-  try {
-    response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify(request),
-      signal: controller.signal,
-    })
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Gemini API request timed out after 30s")
-    }
-    throw error
-  } finally {
-    clearTimeout(timeoutId)
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Gemini API error (${response.status}): ${errorText}`)
-  }
-
-  const data = await response.json()
+  const data = await callGeminiAPI(apiKey, request, 30_000)
 
   if (!data.candidates || data.candidates.length === 0) {
     throw new Error("No response from Gemini API")
@@ -245,10 +225,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ summary })
   } catch (error) {
-    console.error("Check-in context generation error:", error)
+    const message = error instanceof Error ? sanitizeErrorMessage(error.message) : "Unknown error"
+    console.error("Check-in context generation error:", message)
 
     if (error instanceof Error) {
-      if (error.message.includes("API key")) {
+      if (message.includes("API key")) {
         return NextResponse.json(
           { error: "API key configuration error. Please add your Gemini API key in Settings." },
           { status: 401 }
@@ -256,11 +237,31 @@ export async function POST(request: NextRequest) {
       }
 
       if (
-        error.message.includes("Gemini API error") ||
-        error.message.includes("Gemini response parse error")
+        message.includes("Gemini API error") ||
+        message.includes("Gemini response parse error")
       ) {
         return NextResponse.json(
-          { error: "External API error", details: error.message },
+          { error: "External API error", details: message },
+          { status: 502 }
+        )
+      }
+
+      // Timeouts and connection errors often surface as generic fetch failures.
+      if (message.toLowerCase().includes("timed out") || message.toLowerCase().includes("timeout")) {
+        return NextResponse.json(
+          { error: "Gemini API request timed out", details: message },
+          { status: 504 }
+        )
+      }
+
+      if (
+        message.toLowerCase().includes("fetch failed") ||
+        message.includes("ECONN") ||
+        message.includes("ENOTFOUND") ||
+        message.includes("EAI_AGAIN")
+      ) {
+        return NextResponse.json(
+          { error: "Unable to reach Gemini API", details: message },
           { status: 502 }
         )
       }

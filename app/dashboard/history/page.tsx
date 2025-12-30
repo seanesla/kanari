@@ -15,7 +15,7 @@
 
 "use client"
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
+import { Suspense, useCallback, useEffect, useMemo, useState, type MouseEvent } from "react"
 import { useSearchParams } from "next/navigation"
 import { Clock, Plus, Mic, MessageSquare } from "lucide-react"
 import { useDashboardAnimation } from "../layout"
@@ -178,9 +178,16 @@ function HistoryPageContent() {
   }, [])
 
   // Open check-in drawer
-  const handleOpenCheckInDrawer = useCallback(() => {
-    setCheckInDrawerOpen(true)
-  }, [])
+  const handleOpenCheckInDrawer = useCallback(
+    (event?: MouseEvent<HTMLElement>) => {
+      // Prevent Chrome from blocking `aria-hidden` application when the drawer opens
+      // while the trigger button retains focus.
+      // See: docs/error-patterns/aria-hidden-focused-descendant.md
+      event?.currentTarget.blur()
+      setCheckInDrawerOpen(true)
+    },
+    []
+  )
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
