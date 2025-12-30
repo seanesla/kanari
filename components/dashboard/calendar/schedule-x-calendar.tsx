@@ -122,9 +122,10 @@ function ScheduleXWeekCalendarInner({
     views: [createViewWeek()],
     defaultView: 'week',
     isDark: true,
+    // Source: Context7 - /schedule-x/schedule-x docs - "dayBoundaries configuration"
     dayBoundaries: {
-      start: '08:00',
-      end: '21:00',
+      start: '00:00',
+      end: '24:00',
     },
     weekOptions: {
       gridHeight: 600,
@@ -288,14 +289,14 @@ function ScheduleXWeekCalendarInner({
     if (dayIndex < 0 || dayIndex > 6) return null
 
     // Calculate the hour based on y position
-    // Grid covers 08:00-21:00 (13 hours)
+    // Grid covers 00:00-24:00 (24 hours)
     const gridHeight = rect.height
-    const hourHeight = gridHeight / 13
+    const hourHeight = gridHeight / 24
     const relativeHour = y / hourHeight
-    const hour = Math.floor(8 + relativeHour)
+    const hour = Math.floor(relativeHour)
     const minute = Math.round((relativeHour % 1) * 60 / 15) * 15 // Snap to 15 min
 
-    if (hour < 8 || hour >= 21) return null
+    if (hour < 0 || hour >= 24) return null
 
     // Calculate the date for this day column
     const today = new Date()

@@ -122,7 +122,7 @@ export function PendingSidebar({
       </div>
 
       {/* Pending List */}
-      <ScrollArea className="flex-1 -mx-1 px-1">
+      <ScrollArea className="flex-1 min-h-0 -mx-1 px-1">
         <div className="space-y-2">
           <AnimatePresence mode="popLayout">
             {displayedPending.map((suggestion, index) => (
