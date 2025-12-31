@@ -52,7 +52,9 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
             <div
               className="w-[480px] pointer-events-auto"
               style={{
-                transform: isActive ? "scale(1)" : "scale(0.95)",
+                // iOS Safari can mis-hit-test inputs inside nested transforms.
+                // Avoid setting a no-op transform on the active panel.
+                transform: isActive ? "none" : "scale(0.95)",
                 transition: "transform 0.5s ease-out",
               }}
             >
