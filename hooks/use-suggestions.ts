@@ -255,19 +255,21 @@ export function useSuggestions(): UseSuggestionsResult {
 
           case "new":
             // Add new suggestion
-            const newSuggestion: Suggestion = {
-              id: diffSuggestion.id,
-              content: diffSuggestion.content,
-              rationale: diffSuggestion.rationale,
-              duration: diffSuggestion.duration,
-              category: diffSuggestion.category,
-              status: "pending",
-              createdAt: now,
-              version: 1,
-              lastDecision: "new",
+            {
+              const newSuggestion: Suggestion = {
+                id: diffSuggestion.id,
+                content: diffSuggestion.content,
+                rationale: diffSuggestion.rationale,
+                duration: diffSuggestion.duration,
+                category: diffSuggestion.category,
+                status: "pending",
+                createdAt: now,
+                version: 1,
+                lastDecision: "new",
+              }
+              await addSuggestion(newSuggestion)
+              break
             }
-            await addSuggestion(newSuggestion)
-            break
         }
       }
 

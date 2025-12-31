@@ -47,14 +47,14 @@ export function TruthCore({ scrollProgressRef, mode }: TruthCoreProps) {
     if (innerRef.current) {
       innerRef.current.rotation.x = t * 0.4
       innerRef.current.rotation.z = t * 0.3
-      // @ts-ignore
-      if (innerRef.current.material) innerRef.current.material.opacity = opacityRef.current
+      const material = innerRef.current.material
+      if (material && !Array.isArray(material)) material.opacity = opacityRef.current
     }
     if (middleRef.current) {
       middleRef.current.rotation.y = -t * 0.2
       middleRef.current.rotation.x = t * 0.15
-      // @ts-ignore
-      if (middleRef.current.material) middleRef.current.material.opacity = opacityRef.current * 0.6
+      const material = middleRef.current.material
+      if (material && !Array.isArray(material)) material.opacity = opacityRef.current * 0.6
     }
     if (outerRef.current) {
       outerRef.current.rotation.z = t * 0.08

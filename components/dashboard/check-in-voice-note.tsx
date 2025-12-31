@@ -29,17 +29,16 @@ import { toast } from "sonner"
 import { Mic, Square, CheckCircle, AlertCircle, Loader2, Lightbulb, RotateCcw } from "lucide-react"
 import { cn, getGeminiApiKey } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { useRecording } from "@/hooks/use-recording"
-import { useRecordingActions, useTrendDataActions } from "@/hooks/use-storage"
-import { analyzeVoiceMetrics } from "@/lib/ml/inference"
+import { useVoiceRecording } from "@/hooks/use-voice-recording"
+import { useRecordingActions } from "@/hooks/use-storage"
 import { RecordingWaveform, AudioLevelMeter } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
 import { PostRecordingPrompt, EmotionTimeline } from "@/components/check-in"
 import { featuresToPatterns } from "@/lib/gemini/mismatch-detector"
 import { float32ToWavBase64 } from "@/lib/audio"
-import type { Recording, AudioFeatures, GeminiSemanticAnalysis } from "@/lib/types"
+import type { Recording, GeminiSemanticAnalysis } from "@/lib/types"
 
-interface VoiceNoteContentProps {
+interface CheckInVoiceNoteProps {
   /** Called when a recording is successfully saved to IndexedDB */
   onRecordingComplete?: (recording: Recording) => void
   /** Called when user clicks "Done" - parent should close the drawer */
@@ -52,15 +51,10 @@ export function VoiceNoteContent({
   onRecordingComplete,
   onClose,
   onSessionChange,
-}: VoiceNoteContentProps) {
+}: CheckInVoiceNoteProps) {
   // ============================================
   // Component State
   // ============================================
-  const [isSaved, setIsSaved] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [playheadPosition, setPlayheadPosition] = useState(0)
-  const [showCheckInPrompt, setShowCheckInPrompt] = useState(false)
   const savedRecordingRef = useRef<Recording | null>(null)
 
   // Emotion detection state - tracks background Gemini API call
@@ -68,9 +62,8 @@ export function VoiceNoteContent({
   const [isAnalyzingEmotion, setIsAnalyzingEmotion] = useState(false)
   const [emotionAnalysis, setEmotionAnalysis] = useState<GeminiSemanticAnalysis | null>(null)
 
-  // Storage hooks for IndexedDB operations
-  const { addRecording, updateRecording } = useRecordingActions()
-  const { addTrendData } = useTrendDataActions()
+  // Storage hooks for IndexedDB operations (emotion analysis updates)
+  const { updateRecording } = useRecordingActions()
 
   /**
    * Analyze audio for emotion detection using Gemini API
@@ -160,173 +153,51 @@ export function VoiceNoteContent({
     } finally {
       setIsAnalyzingEmotion(false)
     }
-  }, [updateRecording])
+	  }, [updateRecording])
 
-  /**
-   * Save recording to IndexedDB and trigger emotion analysis
-   *
-   * This is the main save function called when recording completes.
-   * It performs the following steps:
-   * 1. Compute stress/fatigue metrics from acoustic features (client-side ML)
-   * 2. Save the recording to IndexedDB immediately
-   * 3. Update trend data for the dashboard charts
-   * 4. Trigger background emotion analysis via Gemini API
-   * 5. Show check-in prompt if stress/fatigue is elevated
-   *
-   * @param audioData - Raw audio samples as Float32Array
-   * @param processingDuration - Duration of the processed audio in seconds
-   * @param extractedFeatures - Acoustic features extracted by Meyda
-   */
-  const saveRecording = useCallback(async (
-    audioData: Float32Array,
-    processingDuration: number,
-    extractedFeatures: AudioFeatures
-  ) => {
-    setIsSaving(true)
-    setSaveError(null)
-    try {
-      // Compute stress/fatigue metrics using client-side ML inference
-      // This uses threshold-based analysis of acoustic features
-      const metrics = analyzeVoiceMetrics(extractedFeatures)
-
-      // Create recording object with all metadata
-      const recording: Recording = {
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-        duration: processingDuration,
-        status: "complete",
-        features: extractedFeatures,
-        metrics,
-        // Store raw audio for playback and potential re-analysis
-        audioData: Array.from(audioData),
-        sampleRate: 16000,
-        // semanticAnalysis will be added by background emotion detection
-      }
-
-      // Save to IndexedDB immediately - don't wait for emotion analysis
-      await addRecording(recording)
-
-      // Update trend data for dashboard stress/fatigue charts
-      await addTrendData({
-        date: new Date().toISOString().split("T")[0],
-        stressScore: metrics.stressScore,
-        fatigueScore: metrics.fatigueScore,
-      })
-
-      savedRecordingRef.current = recording
-      setIsSaved(true)
-
-      // Show check-in prompt for elevated stress or fatigue
-      // Threshold of 50 indicates moderate to high levels
-      if (metrics.stressScore > 50 || metrics.fatigueScore > 50) {
-        setShowCheckInPrompt(true)
-      }
-
-      // Notify parent component that recording is complete
-      onRecordingComplete?.(recording)
-
-      // Trigger emotion analysis in background (non-blocking)
-      // This calls Gemini API to detect emotions from speech content
-      analyzeEmotionInBackground(recording.id, audioData, 16000)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to save recording"
-      setSaveError(errorMessage)
-      toast.error("Save failed", {
-        description: errorMessage,
-      })
-    } finally {
-      setIsSaving(false)
-    }
-  }, [addRecording, addTrendData, onRecordingComplete, analyzeEmotionInBackground])
-
-  // Use recording hook
-  const [recordingData, recordingControls] = useRecording({
-    enableVAD: true,
-    autoProcess: true,
-    onError: (error) => {
-      toast.error("Recording failed", {
-        description: error.message || "An error occurred during recording",
-      })
-    },
-  })
-
-  const { state, duration, audioLevel, features, processingResult, error, audioData } = recordingData
-  const { startRecording, stopRecording, reset: resetRecording } = recordingControls
-
-  const isRecording = state === "recording"
-  const isProcessing = state === "processing"
-  const isComplete = state === "complete"
-  const hasError = state === "error"
-  const isIdle = state === "idle"
+	  const {
+	    duration,
+	    audioLevel,
+	    features,
+	    processingResult,
+	    error,
+	    audioData,
+	    isRecording,
+	    isProcessing,
+	    isComplete,
+	    hasError,
+	    isIdle,
+	    isSaved,
+	    isSaving,
+	    saveError,
+	    playheadPosition,
+	    showCheckInPrompt,
+	    setShowCheckInPrompt,
+	    formatTime,
+	    handleStartRecording,
+	    handleStopRecording,
+	    handleReset,
+	    handleRetrySave,
+	    handleTimeUpdate,
+	    handleSeek,
+	  } = useVoiceRecording({
+	    onRecordingComplete,
+	    savedRecordingRef,
+	    onRecordingSaved: ({ recording, audioData: floatAudio, sampleRate }) => {
+	      // Trigger emotion analysis in background (non-blocking)
+	      // This calls Gemini API to detect emotions from speech content
+	      analyzeEmotionInBackground(recording.id, floatAudio, sampleRate)
+	    },
+	  })
 
   // Notify parent of session state changes
   useEffect(() => {
     onSessionChange?.(isRecording || isProcessing)
   }, [isRecording, isProcessing, onSessionChange])
 
-  // Track if we've attempted to save this recording
-  const saveAttemptedRef = useRef(false)
-
-  // Auto-save when recording completes
-  useEffect(() => {
-    if (isComplete && audioData && features && !isSaved && !isSaving && !saveAttemptedRef.current) {
-      saveAttemptedRef.current = true
-      saveRecording(audioData, duration, features)
-    }
-  }, [isComplete, audioData, features, duration, isSaved, isSaving, saveRecording])
-
-  // Reset save attempted flag when starting a new recording
-  useEffect(() => {
-    if (state === "idle" || state === "recording") {
-      saveAttemptedRef.current = false
-    }
-  }, [state])
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
-  const handleStartRecording = async () => {
-    await startRecording()
-  }
-
-  const handleStopRecording = async () => {
-    await stopRecording()
-  }
-
-  const handleReset = () => {
-    resetRecording()
-    setIsSaved(false)
-    setIsSaving(false)
-    setSaveError(null)
-    setPlayheadPosition(0)
-    setShowCheckInPrompt(false)
-    savedRecordingRef.current = null
-  }
-
-  const handleRetrySave = useCallback(() => {
-    if (audioData && features) {
-      saveAttemptedRef.current = false
-      setSaveError(null)
-      saveRecording(audioData, duration, features)
-    }
-  }, [audioData, features, duration, saveRecording])
-
-  const handleTimeUpdate = useCallback((currentTime: number) => {
-    if (duration > 0) {
-      setPlayheadPosition(currentTime / duration)
-    }
-  }, [duration])
-
-  const handleSeek = useCallback((position: number) => {
-    setPlayheadPosition(position)
-  }, [])
-
-  const handleClose = () => {
-    onClose?.()
-  }
+	  const handleClose = () => {
+	    onClose?.()
+	  }
 
   return (
     <div className="flex flex-col h-full overflow-y-auto px-6 py-6 space-y-6">
@@ -381,10 +252,10 @@ export function VoiceNoteContent({
           <div className="flex justify-center">
             {isRecording ? (
               <AudioLevelMeter level={audioLevel} barCount={30} />
-            ) : isComplete && recordingData.audioData ? (
+            ) : isComplete && audioData ? (
               <RecordingWaveform
                 mode="static"
-                audioData={recordingData.audioData}
+                audioData={audioData}
                 width={320}
                 height={60}
                 playheadPosition={playheadPosition}
@@ -394,10 +265,10 @@ export function VoiceNoteContent({
             ) : null}
           </div>
           {/* Audio Player */}
-          {isComplete && recordingData.audioData && (
+          {isComplete && audioData && (
             <div className="max-w-sm mx-auto">
               <AudioPlayer
-                audioData={recordingData.audioData}
+                audioData={audioData}
                 sampleRate={16000}
                 duration={duration}
                 onTimeUpdate={handleTimeUpdate}

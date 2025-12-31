@@ -8,6 +8,7 @@
 
 import { db, toCheckInSession, toTrendData } from "@/lib/storage/db"
 import type { CheckInSession, TrendData } from "@/lib/types"
+import { calculateAverage } from "@/lib/math/statistics"
 
 // ============================================
 // Types
@@ -93,8 +94,8 @@ function calculateTrend(scores: number[]): TrendDirection | null {
   const firstHalf = scores.slice(0, mid)
   const secondHalf = scores.slice(mid)
 
-  const firstAvg = firstHalf.reduce((a, b) => a + b, 0) / firstHalf.length
-  const secondAvg = secondHalf.reduce((a, b) => a + b, 0) / secondHalf.length
+  const firstAvg = calculateAverage(firstHalf)
+  const secondAvg = calculateAverage(secondHalf)
 
   const diff = secondAvg - firstAvg
   const threshold = 5 // 5 points difference to be considered a change
@@ -170,10 +171,10 @@ export async function fetchCheckInContext(): Promise<CheckInContextData> {
     stressTrend: calculateTrend(stressScores),
     fatigueTrend: calculateTrend(fatigueScores),
     averageStressLastWeek: stressScores.length > 0
-      ? Math.round(stressScores.reduce((a, b) => a + b, 0) / stressScores.length)
+      ? Math.round(calculateAverage(stressScores))
       : null,
     averageFatigueLastWeek: fatigueScores.length > 0
-      ? Math.round(fatigueScores.reduce((a, b) => a + b, 0) / fatigueScores.length)
+      ? Math.round(calculateAverage(fatigueScores))
       : null,
   }
 

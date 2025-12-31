@@ -100,7 +100,6 @@ export function UnifiedDashboard() {
 
     return () => clearTimeout(timer)
     // Only run once when cooldown allows, not on every recording change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cooldownAllowsCheck, canGenerateAchievements])
 
   // Burnout prediction

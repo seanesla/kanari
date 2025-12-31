@@ -7,14 +7,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 let useCheckIn: typeof import("../use-check-in").useCheckIn
 type GeminiLiveCallbacks = {
+  onConnected?: () => void
   onDisconnected?: (reason: string) => void
   onTurnComplete?: () => void
+  onUserSpeechStart?: () => void
+  onUserSpeechEnd?: () => void
   onUserTranscript?: (text: string, isFinal: boolean) => void
 }
 
 let geminiCallbacks: GeminiLiveCallbacks | null = null
 let stopMock: ReturnType<typeof vi.fn>
 let getUserMediaMock: ReturnType<typeof vi.fn>
+let sendAudioMock: ReturnType<typeof vi.fn>
+let audioTrack: { stop: () => void; readyState: "live" | "ended"; kind: "audio"; enabled: boolean } | null = null
+let lastWorklet: { port: { onmessage: ((event: { data: unknown }) => void) | null } } | null = null
+let audioWorkletAddModuleMock: ReturnType<typeof vi.fn>
 
 const connectMock = vi.fn(async () => {})
 const disconnectMock = vi.fn()
@@ -30,20 +37,20 @@ beforeEach(async () => {
   disconnectMock.mockClear()
   playbackInitialize.mockClear()
   playbackCleanup.mockClear()
+  sendAudioMock = vi.fn()
+  audioTrack = null
+  lastWorklet = null
+  audioWorkletAddModuleMock = vi.fn().mockResolvedValue(undefined)
 
   stopMock = vi.fn()
 
-  const track: {
-    stop: () => void
-    readyState: "live" | "ended"
-    kind: "audio"
-    enabled: boolean
-  } = {
+  const track = {
     stop: () => {},
     readyState: "live",
     kind: "audio",
     enabled: true,
-  }
+  } satisfies { stop: () => void; readyState: "live" | "ended"; kind: "audio"; enabled: boolean }
+  audioTrack = track
 
   stopMock = vi.fn(() => {
     track.readyState = "ended"
@@ -63,7 +70,7 @@ beforeEach(async () => {
 
   class MockAudioContext {
     state = "running" as const
-    audioWorklet = { addModule: vi.fn().mockResolvedValue(undefined) }
+    audioWorklet = { addModule: audioWorkletAddModuleMock }
     destination = {}
     resume = vi.fn().mockResolvedValue(undefined)
     close = vi.fn().mockResolvedValue(undefined)
@@ -72,7 +79,10 @@ beforeEach(async () => {
 
   class MockAudioWorkletNode {
     port = { onmessage: null as ((event: { data: unknown }) => void) | null, postMessage: vi.fn() }
-    constructor(public context: unknown, public name: string) {}
+    constructor(public context: unknown, public name: string) {
+      // Expose the most recently created instance for tests to drive onmessage.
+      lastWorklet = { port: this.port }
+    }
     connect = vi.fn()
     disconnect = vi.fn()
   }
@@ -107,7 +117,7 @@ beforeEach(async () => {
         {
           connect: connectMock,
           disconnect: disconnectMock,
-          sendAudio: vi.fn(),
+          sendAudio: sendAudioMock,
           sendText: vi.fn(),
           injectContext: vi.fn(),
           endAudioStream: vi.fn(),
@@ -218,5 +228,106 @@ describe("useCheckIn microphone lifecycle", () => {
     expect(userMessages).toHaveLength(2)
     expect(userMessages[0]?.content).toContain("What do you mean")
     expect(userMessages[1]?.content).toContain("Pretty normal")
+  })
+})
+
+describe("useCheckIn audio capture", () => {
+  it("toggles mute by disabling and re-enabling the audio track", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    expect(audioTrack).not.toBeNull()
+    expect(audioTrack?.enabled).toBe(true)
+    expect(result.current[0].isMuted).toBe(false)
+
+    act(() => {
+      result.current[1].toggleMute()
+    })
+
+    expect(audioTrack?.enabled).toBe(false)
+    expect(result.current[0].isMuted).toBe(true)
+
+    act(() => {
+      result.current[1].toggleMute()
+    })
+
+    expect(audioTrack?.enabled).toBe(true)
+    expect(result.current[0].isMuted).toBe(false)
+  })
+
+  it("cleans up microphone tracks on unmount", async () => {
+    const { result, unmount } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    stopMock.mockClear()
+    unmount()
+    expect(stopMock).toHaveBeenCalled()
+  })
+
+  it("streams audio chunks from the capture worklet to Gemini", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    expect(lastWorklet?.port.onmessage).toEqual(expect.any(Function))
+
+    const pcm = new Int16Array([0, 1000, -1000, 0])
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "audio", pcm: pcm.buffer } })
+    })
+
+    expect(sendAudioMock).toHaveBeenCalledWith("base64audiodata==")
+  })
+
+  it("updates input audio levels from capture worklet audio", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    expect(result.current[0].audioLevels.input).toBe(0)
+
+    const pcm = new Int16Array([0, 2000, -2000, 0])
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "audio", pcm: pcm.buffer } })
+    })
+
+    expect(result.current[0].audioLevels.input).toBeGreaterThan(0)
+  })
+
+  it("handles microphone permission denied errors gracefully", async () => {
+    getUserMediaMock.mockRejectedValueOnce(new Error("NotAllowedError"))
+
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    expect(result.current[0].state).toBe("error")
+    expect(result.current[0].error).toContain("Failed to initialize audio capture")
+  })
+
+  it("handles audio worklet module load errors gracefully", async () => {
+    audioWorkletAddModuleMock.mockRejectedValueOnce(new Error("module load failed"))
+
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    expect(result.current[0].state).toBe("error")
+    expect(result.current[0].error).toContain("Failed to initialize audio capture")
+    expect(result.current[0].error).toContain("module load failed")
   })
 })

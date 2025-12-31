@@ -51,7 +51,7 @@ import {
 } from "@/lib/gemini/preserved-session"
 import type { CheckInSession, VoicePatterns } from "@/lib/types"
 
-interface AIChatContentProps {
+interface CheckInAIChatProps {
   /** Called when session ends - parent should close the drawer */
   onClose?: () => void
   /** Called when chat state changes - parent uses this to disable tab switching */
@@ -78,7 +78,7 @@ export function AIChatContent({
   onSessionComplete,
   requestDiscard,
   onDiscardComplete,
-}: AIChatContentProps) {
+}: CheckInAIChatProps) {
   // Hook to save completed sessions to IndexedDB
   const { addCheckInSession } = useCheckInSessionActions()
 

@@ -425,7 +425,7 @@ describe("geminiReducer", () => {
     })
 
     test("Unknown action returns state unchanged", () => {
-      const result = geminiReducer(state, { type: "UNKNOWN" } as any)
+      const result = geminiReducer(state, { type: "UNKNOWN" } as unknown as GeminiAction)
       expect(result).toEqual(state)
     })
 

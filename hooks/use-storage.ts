@@ -263,7 +263,7 @@ export function useDashboardStats(): DashboardStats {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     let currentStreak = 0
-    let checkDate = new Date(today)
+    const checkDate = new Date(today)
 
     while (true) {
       const dayStart = new Date(checkDate)

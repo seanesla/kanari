@@ -17,8 +17,6 @@ import { STRESS, FATIGUE, SCORE_LEVELS, CONFIDENCE, SCORING_WEIGHTS, VALIDATION 
  * - Fatigue: ↓ RMS energy, ↓ speech rate, ↑ pause duration, ↓ spectral centroid
  */
 
-interface InferenceResult extends VoiceMetrics {}
-
 /**
  * Calculate stress score from audio features
  * Range: 0-100 (higher = more stressed)
@@ -170,7 +168,7 @@ function calculateConfidence(features: AudioFeatures): number {
  * Main inference function
  * Analyzes audio features and returns stress/fatigue metrics
  */
-export function analyzeVoiceMetrics(features: AudioFeatures): InferenceResult {
+export function analyzeVoiceMetrics(features: AudioFeatures): VoiceMetrics {
   const stressScore = calculateStressScore(features)
   const fatigueScore = calculateFatigueScore(features)
   const confidence = calculateConfidence(features)
@@ -219,4 +217,3 @@ export function validateFeatures(features: AudioFeatures): boolean {
 
   return true
 }
-

@@ -1,4 +1,5 @@
 import type { TrendData, BurnoutPrediction, TrendDirection } from "@/lib/types"
+import { calculateAverage, calculateSlope, calculateStdDev } from "@/lib/math/statistics"
 import { FORECASTING, RISK_WEIGHTS } from "./thresholds"
 
 /**
@@ -16,40 +17,6 @@ interface TrendAnalysis {
 }
 
 /**
- * Calculate linear regression slope for trend direction
- */
-function calculateSlope(data: number[]): number {
-  const n = data.length
-  if (n < 2) return 0
-
-  const xMean = (n - 1) / 2
-  const yMean = data.reduce((sum, val) => sum + val, 0) / n
-
-  let numerator = 0
-  let denominator = 0
-
-  for (let i = 0; i < n; i++) {
-    numerator += (i - xMean) * (data[i] - yMean)
-    denominator += (i - xMean) ** 2
-  }
-
-  return denominator === 0 ? 0 : numerator / denominator
-}
-
-/**
- * Calculate standard deviation (measure of volatility)
- */
-function calculateStdDev(data: number[]): number {
-  if (data.length < 2) return 0
-
-  const mean = data.reduce((sum, val) => sum + val, 0) / data.length
-  const squaredDiffs = data.map((val) => (val - mean) ** 2)
-  const variance = squaredDiffs.reduce((sum, val) => sum + val, 0) / data.length
-
-  return Math.sqrt(variance)
-}
-
-/**
  * Analyze stress/fatigue trends from historical data
  */
 function analyzeTrend(trendData: TrendData[]): TrendAnalysis {
@@ -62,10 +29,10 @@ function analyzeTrend(trendData: TrendData[]): TrendAnalysis {
   // Recent average (last 3 days or all if less)
   const recentCount = Math.min(3, combinedScores.length)
   const recentScores = combinedScores.slice(-recentCount)
-  const recentAverage = recentScores.reduce((sum, val) => sum + val, 0) / recentCount
+  const recentAverage = calculateAverage(recentScores)
 
   // Overall average
-  const overallAverage = combinedScores.reduce((sum, val) => sum + val, 0) / combinedScores.length
+  const overallAverage = calculateAverage(combinedScores)
 
   return { slope, volatility, recentAverage, overallAverage }
 }

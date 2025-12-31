@@ -74,6 +74,13 @@ Gemini API keys are user-provided via Settings UI and sent to server routes via 
 - `lib/gemini/prompts.ts` and `live-prompts.ts` contain all system prompts
 - Tests in `__tests__/` directories alongside source files
 
+## Error Handling
+
+- Prefer `KanariError` (`lib/errors.ts`) when an error needs a stable `code` and optional structured `context`.
+- Hooks: avoid throwing; use `logError()` and dispatch error state.
+- API routes: return structured JSON errors with appropriate HTTP status codes.
+- Utilities: throw `Error`/`KanariError` with clear, actionable messages.
+
 ## Config Notes
 
 - `next.config.mjs`: `ignoreBuildErrors: true` (dev convenience)

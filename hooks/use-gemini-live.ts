@@ -175,7 +175,7 @@ export function geminiReducer(state: GeminiLiveData, action: GeminiAction): Gemi
         userTranscript: action.text,
       }
 
-    case "MODEL_TRANSCRIPT":
+    case "MODEL_TRANSCRIPT": {
       // Append to current model transcript with max length check
       const MAX_TRANSCRIPT_LENGTH = 10000
       const newTranscript = state.modelTranscript + action.text
@@ -185,6 +185,7 @@ export function geminiReducer(state: GeminiLiveData, action: GeminiAction): Gemi
           ? newTranscript.slice(-MAX_TRANSCRIPT_LENGTH)
           : newTranscript,
       }
+    }
 
     case "CLEAR_TRANSCRIPTS":
       return {

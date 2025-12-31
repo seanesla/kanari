@@ -1,21 +1,19 @@
 "use client"
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { Link } from "next-view-transitions"
 import { toast } from "sonner"
 import { Mic, Square, CheckCircle, AlertCircle, Loader2, Lightbulb, RotateCcw, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { useRecording } from "@/hooks/use-recording"
-import { useRecordingActions, useTrendDataActions } from "@/hooks/use-storage"
-import { analyzeVoiceMetrics } from "@/lib/ml/inference"
+import { useVoiceRecording } from "@/hooks/use-voice-recording"
 import { RecordingWaveform, AudioLevelMeter } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
 import { PostRecordingPrompt } from "@/components/check-in"
 import { featuresToPatterns } from "@/lib/gemini/mismatch-detector"
-import type { Recording, AudioFeatures } from "@/lib/types"
+import type { Recording } from "@/lib/types"
 
-interface RecordingDrawerContentProps {
+interface RecordingDrawerProps {
   onRecordingComplete?: (recording: Recording) => void
   onClose?: () => void
   onRecordingStateChange?: (isRecording: boolean) => void
@@ -25,156 +23,43 @@ export function RecordingDrawerContent({
   onRecordingComplete,
   onClose,
   onRecordingStateChange,
-}: RecordingDrawerContentProps) {
-  const [isSaved, setIsSaved] = useState(false)
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
-  const [playheadPosition, setPlayheadPosition] = useState(0)
-  const [showCheckInPrompt, setShowCheckInPrompt] = useState(false)
+}: RecordingDrawerProps) {
   const savedRecordingRef = useRef<Recording | null>(null)
 
-  // Storage hooks
-  const { addRecording } = useRecordingActions()
-  const { addTrendData } = useTrendDataActions()
-
-  // Save recording to IndexedDB
-  const saveRecording = useCallback(async (
-    audioData: Float32Array,
-    processingDuration: number,
-    extractedFeatures: AudioFeatures
-  ) => {
-    setIsSaving(true)
-    setSaveError(null)
-    try {
-      // Compute metrics using ML inference
-      const metrics = analyzeVoiceMetrics(extractedFeatures)
-
-      // Create recording object
-      const recording: Recording = {
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-        duration: processingDuration,
-        status: "complete",
-        features: extractedFeatures,
-        metrics,
-        audioData: Array.from(audioData),
-        sampleRate: 16000,
-      }
-
-      // Save to IndexedDB
-      await addRecording(recording)
-
-      // Update trend data for dashboard
-      await addTrendData({
-        date: new Date().toISOString().split("T")[0],
-        stressScore: metrics.stressScore,
-        fatigueScore: metrics.fatigueScore,
-      })
-
-      savedRecordingRef.current = recording
-      setIsSaved(true)
-
-      // Show check-in prompt for elevated stress or fatigue
-      if (metrics.stressScore > 50 || metrics.fatigueScore > 50) {
-        setShowCheckInPrompt(true)
-      }
-
-      onRecordingComplete?.(recording)
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to save recording"
-      setSaveError(errorMessage)
-      toast.error("Save failed", {
-        description: errorMessage,
-      })
-    } finally {
-      setIsSaving(false)
-    }
-  }, [addRecording, addTrendData, onRecordingComplete])
-
-  // Use recording hook
-  const [recordingData, recordingControls] = useRecording({
-    enableVAD: true,
-    autoProcess: true,
-    onError: (error) => {
-      toast.error("Recording failed", {
-        description: error.message || "An error occurred during recording",
-      })
-    },
+  const {
+    duration,
+    audioLevel,
+    features,
+    processingResult,
+    error,
+    audioData,
+    isRecording,
+    isProcessing,
+    isComplete,
+    hasError,
+    isIdle,
+    isSaved,
+    isSaving,
+    saveError,
+    playheadPosition,
+    showCheckInPrompt,
+    setShowCheckInPrompt,
+    formatTime,
+    handleStartRecording,
+    handleStopRecording,
+    handleReset,
+    handleRetrySave,
+    handleTimeUpdate,
+    handleSeek,
+  } = useVoiceRecording({
+    onRecordingComplete,
+    savedRecordingRef,
   })
-
-  const { state, duration, audioLevel, features, processingResult, error, audioData } = recordingData
-  const { startRecording, stopRecording, reset: resetRecording } = recordingControls
-
-  const isRecording = state === "recording"
-  const isProcessing = state === "processing"
-  const isComplete = state === "complete"
-  const hasError = state === "error"
-  const isIdle = state === "idle"
 
   // Notify parent of recording state changes
   useEffect(() => {
     onRecordingStateChange?.(isRecording || isProcessing)
   }, [isRecording, isProcessing, onRecordingStateChange])
-
-  // Track if we've attempted to save this recording
-  const saveAttemptedRef = useRef(false)
-
-  // Auto-save when recording completes
-  useEffect(() => {
-    if (isComplete && audioData && features && !isSaved && !isSaving && !saveAttemptedRef.current) {
-      saveAttemptedRef.current = true
-      saveRecording(audioData, duration, features)
-    }
-  }, [isComplete, audioData, features, duration, isSaved, isSaving, saveRecording])
-
-  // Reset save attempted flag when starting a new recording
-  useEffect(() => {
-    if (state === "idle" || state === "recording") {
-      saveAttemptedRef.current = false
-    }
-  }, [state])
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = Math.floor(seconds % 60)
-    return `${mins}:${secs.toString().padStart(2, "0")}`
-  }
-
-  const handleStartRecording = async () => {
-    await startRecording()
-  }
-
-  const handleStopRecording = async () => {
-    await stopRecording()
-  }
-
-  const handleReset = () => {
-    resetRecording()
-    setIsSaved(false)
-    setIsSaving(false)
-    setSaveError(null)
-    setPlayheadPosition(0)
-    setShowCheckInPrompt(false)
-    savedRecordingRef.current = null
-  }
-
-  const handleRetrySave = useCallback(() => {
-    if (audioData && features) {
-      saveAttemptedRef.current = false
-      setSaveError(null)
-      saveRecording(audioData, duration, features)
-    }
-  }, [audioData, features, duration, saveRecording])
-
-  const handleTimeUpdate = useCallback((currentTime: number) => {
-    if (duration > 0) {
-      setPlayheadPosition(currentTime / duration)
-    }
-  }, [duration])
-
-  const handleSeek = useCallback((position: number) => {
-    setPlayheadPosition(position)
-  }, [])
 
   const handleClose = () => {
     onClose?.()
@@ -248,10 +133,10 @@ export function RecordingDrawerContent({
             <div className="flex justify-center">
               {isRecording ? (
                 <AudioLevelMeter level={audioLevel} barCount={30} />
-              ) : isComplete && recordingData.audioData ? (
+              ) : isComplete && audioData ? (
                 <RecordingWaveform
                   mode="static"
-                  audioData={recordingData.audioData}
+                  audioData={audioData}
                   width={320}
                   height={60}
                   playheadPosition={playheadPosition}
@@ -261,10 +146,10 @@ export function RecordingDrawerContent({
               ) : null}
             </div>
             {/* Audio Player */}
-            {isComplete && recordingData.audioData && (
+            {isComplete && audioData && (
               <div className="max-w-sm mx-auto">
                 <AudioPlayer
-                  audioData={recordingData.audioData}
+                  audioData={audioData}
                   sampleRate={16000}
                   duration={duration}
                   onTimeUpdate={handleTimeUpdate}

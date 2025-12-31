@@ -23,6 +23,10 @@ import {
 } from "@/components/ui/select"
 import type { Suggestion, SuggestionCategory } from "@/lib/types"
 
+type DatePickerInstance = ReturnType<typeof createDatePicker> & {
+  destroy?: () => void
+}
+
 const categoryIcons: Record<SuggestionCategory, typeof Coffee> = {
   break: Coffee,
   exercise: Dumbbell,
@@ -89,7 +93,7 @@ export function ScheduleTimeDialog({
   const [selectedHour, setSelectedHour] = useState<string>("9")
   const [selectedMinute, setSelectedMinute] = useState<string>("0")
   const datePickerRef = useRef<HTMLDivElement>(null)
-  const datePickerInstanceRef = useRef<any>(null)
+  const datePickerInstanceRef = useRef<DatePickerInstance | null>(null)
 
   // Initialize Schedule-X date picker
   useEffect(() => {
