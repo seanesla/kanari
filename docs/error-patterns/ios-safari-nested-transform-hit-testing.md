@@ -8,17 +8,20 @@
 ## Why it happens
 The onboarding UI is rendered inside `@react-three/drei`’s `Html` with `transform`, which uses a `matrix3d(...)` CSS transform to match 3D perspective.
 
-iOS Safari has long-standing bugs with pointer hit-testing and text selection when interactive elements are nested under multiple CSS transforms (even “no-op” transforms like `scale(1)`). In our case, the panel wrapper applied `transform: scale(1)` even when active.
+iOS Safari has long-standing bugs with pointer hit-testing and text selection when interactive elements are nested under multiple CSS transforms (especially CSS3D `matrix3d(...)`). In our case, the active onboarding panel contained interactive inputs inside the `matrix3d(...)` transform tree.
 
 ## Fix
-Avoid applying a no-op transform on the active panel wrapper.
+Prefer rendering the active, interactive panel without CSS3D transforms.
 
 In `components/onboarding/floating-panel.tsx`, set:
-- active: `transform: none`
-- inactive: `transform: scale(0.95)`
+- `Html` should use `transform={false}` when the panel is active (and keep `transform={true}` for inactive panels so they still look like they live in 3D space).
+- active wrapper: `transform: none` (avoid `scale(1)`)
+- inactive wrapper: `transform: scale(0.95)`
 
-This preserves the floating panel effect while reducing nested-transform depth for the interactive step.
+This keeps the “floating panel” aesthetic while making hit-testing and paste/selection UI more reliable on mobile browsers.
 
 ## How to detect it automatically
-- Unit test: render `FloatingPanel` and assert the active wrapper’s inline style uses `transform: none` (not `scale(1)`).
-- Code scan: look for patterns like `transform: isActive ? "scale(1)" : ...` around interactive onboarding UI.
+- Unit test: render `FloatingPanel` and assert:
+  - the active panel passes `transform={false}` to `Html`
+  - the active wrapper’s inline style uses `transform: none` (not `scale(1)`)
+- Code scan: look for inputs rendered inside CSS3D `matrix3d(...)` trees and patterns like `transform: isActive ? "scale(1)" : ...`.

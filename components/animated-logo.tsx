@@ -2,7 +2,7 @@
 
 import { motion, useAnimation } from "framer-motion"
 import { useEffect, useId, useMemo } from "react"
-import { LOGO_PATH } from "./logo"
+import { LOGO_PATHS } from "./logo"
 import { useSceneMode } from "@/lib/scene-context"
 import { generateLightVariant, generateDarkVariant } from "@/lib/color-utils"
 
@@ -35,9 +35,10 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
     sequence()
   }, [controls, onComplete])
 
+  // New aspect ratio: 210:297 (height is 1.414x width)
   return (
-    <div className="relative" style={{ width: size, height: size * 1.1 }}>
-      <svg viewBox="0 0 185 203" className="w-full h-full">
+    <div className="relative" style={{ width: size, height: size * 1.414 }}>
+      <svg viewBox="0 0 210 297" className="w-full h-full">
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={gradientColors.light} />
@@ -46,52 +47,58 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
           </linearGradient>
         </defs>
 
-        <g transform="translate(-9.9154, -51.1603)">
-          {/* Fill layer - fades in after stroke completes */}
-          <motion.path
-            d={LOGO_PATH}
-            fill={`url(#${gradientId})`}
-            initial={{ fillOpacity: 0 }}
-            animate={controls}
-            variants={{
-              drawing: { fillOpacity: 0 },
-              filling: {
-                fillOpacity: 1,
-                transition: { duration: 1, ease: "easeOut" },
-              },
-              complete: { fillOpacity: 1 },
-            }}
-          />
-
-          {/* Stroke layer - draws then fades out */}
-          <motion.path
-            d={LOGO_PATH}
-            fill="transparent"
-            stroke={gradientColors.base}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            initial={{ pathLength: 0, opacity: 0 }}
-            animate={controls}
-            variants={{
-              drawing: {
-                pathLength: 1,
-                opacity: 1,
-                transition: {
-                  pathLength: { duration: 1.5, ease: "easeInOut" },
-                  opacity: { duration: 0.3 },
+        <g transform="translate(-6.3331403, 2.3106634)">
+          {/* Fill layers - fade in after stroke completes */}
+          {LOGO_PATHS.map((path, index) => (
+            <motion.path
+              key={`fill-${index}`}
+              d={path}
+              fill={`url(#${gradientId})`}
+              initial={{ fillOpacity: 0 }}
+              animate={controls}
+              variants={{
+                drawing: { fillOpacity: 0 },
+                filling: {
+                  fillOpacity: 1,
+                  transition: { duration: 1, ease: "easeOut" },
                 },
-              },
-              filling: {
-                opacity: 1,
-                transition: { duration: 0.5 },
-              },
-              complete: {
-                opacity: 0,
-                transition: { duration: 0.4, ease: "easeOut" },
-              },
-            }}
-          />
+                complete: { fillOpacity: 1 },
+              }}
+            />
+          ))}
+
+          {/* Stroke layers - draw then fade out */}
+          {LOGO_PATHS.map((path, index) => (
+            <motion.path
+              key={`stroke-${index}`}
+              d={path}
+              fill="transparent"
+              stroke={gradientColors.base}
+              strokeWidth={2}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              initial={{ pathLength: 0, opacity: 0 }}
+              animate={controls}
+              variants={{
+                drawing: {
+                  pathLength: 1,
+                  opacity: 1,
+                  transition: {
+                    pathLength: { duration: 1.5, ease: "easeInOut" },
+                    opacity: { duration: 0.3 },
+                  },
+                },
+                filling: {
+                  opacity: 1,
+                  transition: { duration: 0.5 },
+                },
+                complete: {
+                  opacity: 0,
+                  transition: { duration: 0.4, ease: "easeOut" },
+                },
+              }}
+            />
+          ))}
         </g>
       </svg>
     </div>

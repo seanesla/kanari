@@ -39,10 +39,16 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
       <group position={position}>
         {/* React content floats freely - no solid background planes */}
         <Html
-          transform
+          // Inputs/selection UI are fragile inside CSS3D `matrix3d(...)` transforms (e.g. iOS Safari paste).
+          // Render the active, interactive panel in 2D (no CSS3D transform) to keep hit-testing stable.
+          transform={!isActive}
+          center
           distanceFactor={1.15}
           position={[0, 0, 0.01]}
+          pointerEvents={isActive ? "auto" : "none"}
           style={{
+            // `pointerEvents` prop only affects the internal wrapper in `transform` mode.
+            // Keep `style.pointerEvents` too so it applies in non-transform mode.
             pointerEvents: isActive ? "auto" : "none",
             opacity: isActive ? 1 : 0.15,
             transition: "opacity 0.5s ease-out",

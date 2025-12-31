@@ -6,12 +6,57 @@ import { render } from "@testing-library/react"
 import { FloatingPanel } from "../floating-panel"
 
 vi.mock("@react-three/drei", () => ({
-  Html: ({ children }: { children: React.ReactNode }) => <div data-testid="html">{children}</div>,
+  Html: ({
+    children,
+    transform,
+    center,
+    pointerEvents,
+  }: {
+    children: React.ReactNode
+    transform?: boolean
+    center?: boolean
+    pointerEvents?: string
+  }) => (
+    <div
+      data-testid="html"
+      data-transform={String(Boolean(transform))}
+      data-center={String(Boolean(center))}
+      data-pointer-events={pointerEvents ?? ""}
+    >
+      {children}
+    </div>
+  ),
   Float: ({ children }: { children: React.ReactNode }) => <div data-testid="float">{children}</div>,
   useContextBridge: () => ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 describe("FloatingPanel", () => {
+  it("renders the active panel without CSS3D transforms", () => {
+    const { getByTestId } = render(
+      <FloatingPanel position={[0, 0, 0]} isActive>
+        <div>Content</div>
+      </FloatingPanel>
+    )
+
+    const html = getByTestId("html")
+    expect(html.dataset.transform).toBe("false")
+    expect(html.dataset.center).toBe("true")
+    expect(html.dataset.pointerEvents).toBe("auto")
+  })
+
+  it("renders inactive panels with CSS3D transforms disabled for interaction", () => {
+    const { getByTestId } = render(
+      <FloatingPanel position={[0, 0, 0]} isActive={false}>
+        <div>Content</div>
+      </FloatingPanel>
+    )
+
+    const html = getByTestId("html")
+    expect(html.dataset.transform).toBe("true")
+    expect(html.dataset.center).toBe("true")
+    expect(html.dataset.pointerEvents).toBe("none")
+  })
+
   it("avoids a no-op transform on the active panel wrapper", () => {
     const { getByText } = render(
       <FloatingPanel position={[0, 0, 0]} isActive>
