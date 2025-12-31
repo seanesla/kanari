@@ -60,6 +60,17 @@ describe("FloatingPanel", () => {
     expect(getByTestId("float").dataset.position).toBe("1,2,3")
   })
 
+  it("uses a responsive wrapper width for small screens", () => {
+    const { getByText } = render(
+      <FloatingPanel position={[0, 0, 0]} isActive>
+        <div>Content</div>
+      </FloatingPanel>
+    )
+
+    const inner = getByText("Content")
+    expect(inner.parentElement?.className).toContain("w-[min(480px,calc(100vw-2rem))]")
+  })
+
   it("freezes the float motion while focused within", () => {
     const { getByLabelText, getByTestId } = render(
       <FloatingPanel position={[0, 0, 0]} isActive>

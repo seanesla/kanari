@@ -102,7 +102,7 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
             onPointerDownCapture={handlePointerDownCapture}
             onPointerUpCapture={handlePointerUpOrCancelCapture}
             onPointerCancelCapture={handlePointerUpOrCancelCapture}
-            className="w-[480px] pointer-events-auto"
+            className="w-[min(480px,calc(100vw-2rem))] max-h-[calc(100svh-4rem)] overflow-y-auto overflow-x-hidden pointer-events-auto"
             style={{
               // iOS Safari can mis-hit-test inputs inside nested transforms.
               // Avoid setting a no-op transform on the active panel.
