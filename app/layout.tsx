@@ -1,4 +1,4 @@
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import {
   // Current fonts (defaults)
   Instrument_Sans,
@@ -101,6 +101,12 @@ export const metadata: Metadata = {
   title: "kanari",
   description: "Your metrics are lying to you.",
   generator: "v0.app",
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 }
 
 export default function RootLayout({
