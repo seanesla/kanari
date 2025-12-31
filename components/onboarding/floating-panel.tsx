@@ -14,6 +14,7 @@
  * This is a separate bridge from the one wrapping the Canvas.
  *
  * Bug pattern: docs/error-patterns/portal-children-context.md
+ * Bug pattern: docs/error-patterns/float-orbiting-by-parent-rotation.md
  * Source: Context7 - /pmndrs/drei docs - "Html transform", "Float", "useContextBridge"
  */
 
@@ -69,49 +70,50 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
 
   return (
     <Float
+      position={position}
       speed={isActive && isInteracting ? 0 : isActive ? 0.6 : 0.3}
       rotationIntensity={isActive ? 0.03 : 0.01}
       floatIntensity={isActive ? 0.25 : 0.1}
     >
-      <group position={position}>
-        {/* React content floats freely - no solid background planes */}
-        <Html
-          // Inputs/selection UI are fragile inside CSS3D `matrix3d(...)` transforms (e.g. iOS Safari paste).
-          // Render the active, interactive panel in 2D (no CSS3D transform) to keep hit-testing stable.
-          transform={!isActive}
-          center
-          distanceFactor={1.15}
-          position={[0, 0, 0.01]}
-          pointerEvents={isActive ? "auto" : "none"}
-          style={{
-            // `pointerEvents` prop only affects the internal wrapper in `transform` mode.
-            // Keep `style.pointerEvents` too so it applies in non-transform mode.
-            pointerEvents: isActive ? "auto" : "none",
-            opacity: isActive ? 1 : 0.15,
-            transition: "opacity 0.5s ease-out",
-          }}
-        >
-          <ContextBridge>
-            <div
-              ref={wrapperRef}
-              onFocusCapture={handleFocusCapture}
-              onBlurCapture={handleBlurCapture}
-              onPointerDownCapture={handlePointerDownCapture}
-              onPointerUpCapture={handlePointerUpOrCancelCapture}
-              onPointerCancelCapture={handlePointerUpOrCancelCapture}
-              className="w-[480px] pointer-events-auto"
-              style={{
-                // iOS Safari can mis-hit-test inputs inside nested transforms.
-                // Avoid setting a no-op transform on the active panel.
-                transform: isActive ? "none" : "scale(0.95)",
-                transition: "transform 0.5s ease-out",
-              }}
-            >
-              {children}
-            </div>
-          </ContextBridge>
-        </Html>
-      </group>
+      {/* React content floats freely - no solid background planes */}
+      <Html
+        // Inputs/selection UI are fragile inside CSS3D `matrix3d(...)` transforms (e.g. iOS Safari paste).
+        // Render the active, interactive panel in 2D (no CSS3D transform) to keep hit-testing stable.
+        transform={!isActive}
+        center
+        // In non-transform mode, Drei scales the element by `objectScale * distanceFactor`.
+        // 1.15 is tuned for transform mode; bump it for the active panel so it doesn't appear "far away".
+        distanceFactor={isActive ? 3.25 : 1.15}
+        position={[0, 0, 0.01]}
+        pointerEvents={isActive ? "auto" : "none"}
+        style={{
+          // `pointerEvents` prop only affects the internal wrapper in `transform` mode.
+          // Keep `style.pointerEvents` too so it applies in non-transform mode.
+          pointerEvents: isActive ? "auto" : "none",
+          opacity: isActive ? 1 : 0.15,
+          transition: "opacity 0.5s ease-out",
+        }}
+      >
+        <ContextBridge>
+          <div
+            ref={wrapperRef}
+            onFocusCapture={handleFocusCapture}
+            onBlurCapture={handleBlurCapture}
+            onPointerDownCapture={handlePointerDownCapture}
+            onPointerUpCapture={handlePointerUpOrCancelCapture}
+            onPointerCancelCapture={handlePointerUpOrCancelCapture}
+            className="w-[480px] pointer-events-auto"
+            style={{
+              // iOS Safari can mis-hit-test inputs inside nested transforms.
+              // Avoid setting a no-op transform on the active panel.
+              transform: isActive ? "none" : "scale(0.95)",
+              transition: "transform 0.5s ease-out",
+            }}
+          >
+            {children}
+          </div>
+        </ContextBridge>
+      </Html>
     </Float>
   )
 }

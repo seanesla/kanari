@@ -10,17 +10,20 @@ vi.mock("@react-three/drei", () => ({
     children,
     transform,
     center,
+    distanceFactor,
     pointerEvents,
   }: {
     children: React.ReactNode
     transform?: boolean
     center?: boolean
+    distanceFactor?: number
     pointerEvents?: string
   }) => (
     <div
       data-testid="html"
       data-transform={String(Boolean(transform))}
       data-center={String(Boolean(center))}
+      data-distance-factor={distanceFactor === undefined ? "" : String(distanceFactor)}
       data-pointer-events={pointerEvents ?? ""}
     >
       {children}
@@ -29,11 +32,17 @@ vi.mock("@react-three/drei", () => ({
   Float: ({
     children,
     speed,
+    position,
   }: {
     children: React.ReactNode
     speed?: number
+    position?: [number, number, number]
   }) => (
-    <div data-testid="float" data-speed={speed === undefined ? "" : String(speed)}>
+    <div
+      data-testid="float"
+      data-speed={speed === undefined ? "" : String(speed)}
+      data-position={position ? position.join(",") : ""}
+    >
       {children}
     </div>
   ),
@@ -41,6 +50,16 @@ vi.mock("@react-three/drei", () => ({
 }))
 
 describe("FloatingPanel", () => {
+  it("anchors Float at the panel position (avoids orbiting around the origin)", () => {
+    const { getByTestId } = render(
+      <FloatingPanel position={[1, 2, 3]} isActive>
+        <div>Content</div>
+      </FloatingPanel>
+    )
+
+    expect(getByTestId("float").dataset.position).toBe("1,2,3")
+  })
+
   it("freezes the float motion while focused within", () => {
     const { getByLabelText, getByTestId } = render(
       <FloatingPanel position={[0, 0, 0]} isActive>
@@ -65,6 +84,7 @@ describe("FloatingPanel", () => {
     const html = getByTestId("html")
     expect(html.dataset.transform).toBe("false")
     expect(html.dataset.center).toBe("true")
+    expect(html.dataset.distanceFactor).toBe("3.25")
     expect(html.dataset.pointerEvents).toBe("auto")
   })
 
@@ -78,6 +98,7 @@ describe("FloatingPanel", () => {
     const html = getByTestId("html")
     expect(html.dataset.transform).toBe("true")
     expect(html.dataset.center).toBe("true")
+    expect(html.dataset.distanceFactor).toBe("1.15")
     expect(html.dataset.pointerEvents).toBe("none")
   })
 

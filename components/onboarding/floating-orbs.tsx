@@ -138,11 +138,12 @@ export function FloatingGeometry({ accentColor }: { accentColor: string }) {
       {shapes.map((shape, i) => (
         <Float
           key={i}
+          position={shape.pos}
           speed={0.4} // Consistent slow speed for all shapes
           rotationIntensity={0.15}
           floatIntensity={0.3}
         >
-          <mesh position={shape.pos} scale={shape.scale}>
+          <mesh scale={shape.scale}>
             {shape.type === "octahedron" && <octahedronGeometry args={[1, 0]} />}
             {shape.type === "icosahedron" && <icosahedronGeometry args={[1, 0]} />}
             {shape.type === "tetrahedron" && <tetrahedronGeometry args={[1, 0]} />}

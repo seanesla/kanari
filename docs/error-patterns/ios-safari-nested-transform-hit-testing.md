@@ -17,6 +17,7 @@ In `components/onboarding/floating-panel.tsx`, set:
 - `Html` should use `transform={false}` when the panel is active (and keep `transform={true}` for inactive panels so they still look like they live in 3D space).
 - active wrapper: `transform: none` (avoid `scale(1)`)
 - inactive wrapper: `transform: scale(0.95)`
+- when `transform={false}`, increase `distanceFactor` so the active panel doesn’t appear tiny
 - freeze the active panel’s float motion while focused within (avoid the DOM element moving during selection/paste UI)
 
 This keeps the “floating panel” aesthetic while making hit-testing and paste/selection UI more reliable on mobile browsers.
