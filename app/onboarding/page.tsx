@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation"
 import { useOnboarding } from "@/hooks/use-onboarding"
 import { useNavbar, TOTAL_ONBOARDING_STEPS } from "@/lib/navbar-context"
 import { Onboarding3DScene } from "@/components/onboarding/onboarding-3d-scene"
+import { Onboarding2DScene } from "@/components/onboarding/onboarding-2d-scene"
 import {
   StepWelcome,
   StepTheme,
@@ -20,6 +21,7 @@ import {
   StepPreferences,
   StepComplete,
 } from "@/components/onboarding"
+import { usePrefer2DOnboarding } from "@/hooks/use-prefer-2d-onboarding"
 import type { UserSettings } from "@/lib/types"
 
 export default function OnboardingPage() {
@@ -27,6 +29,7 @@ export default function OnboardingPage() {
   const { isLoading, hasCompletedOnboarding, settings, updateSettings, completeOnboarding } =
     useOnboarding()
   const { onboardingStep, setOnboardingStep } = useNavbar()
+  const prefer2D = usePrefer2DOnboarding()
 
   const [pendingSettings, setPendingSettings] = useState<Partial<UserSettings>>({})
 
@@ -77,32 +80,41 @@ export default function OnboardingPage() {
     return null
   }
 
+  const steps = [
+    <StepWelcome key="welcome" onNext={goNext} />,
+    <StepTheme key="theme" onNext={goNext} onBack={goBack} />,
+    <StepApiKey
+      key="apiKey"
+      initialApiKey={settings?.geminiApiKey || pendingSettings.geminiApiKey || ""}
+      onNext={handleApiKeySubmit}
+      onBack={goBack}
+      isActive={onboardingStep === 2}
+    />,
+    <StepPreferences
+      key="preferences"
+      initialSettings={{ ...settings, ...pendingSettings }}
+      onNext={handlePreferencesSubmit}
+      onBack={goBack}
+    />,
+    <StepComplete
+      key="complete"
+      onComplete={handleComplete}
+      onNavigate={() => router.push("/dashboard")}
+    />,
+  ]
+
   // All step components are passed as children - they'll be placed in 3D panels
+  if (prefer2D) {
+    return (
+      <Onboarding2DScene currentStep={onboardingStep}>
+        {steps}
+      </Onboarding2DScene>
+    )
+  }
+
   return (
     <Onboarding3DScene currentStep={onboardingStep} totalSteps={TOTAL_ONBOARDING_STEPS}>
-      {/* Panel 0: Welcome */}
-      <StepWelcome onNext={goNext} />
-
-      {/* Panel 1: Theme */}
-      <StepTheme onNext={goNext} onBack={goBack} />
-
-      {/* Panel 2: API Key */}
-      <StepApiKey
-        initialApiKey={settings?.geminiApiKey || pendingSettings.geminiApiKey || ""}
-        onNext={handleApiKeySubmit}
-        onBack={goBack}
-        isActive={onboardingStep === 2}
-      />
-
-      {/* Panel 3: Preferences */}
-      <StepPreferences
-        initialSettings={{ ...settings, ...pendingSettings }}
-        onNext={handlePreferencesSubmit}
-        onBack={goBack}
-      />
-
-      {/* Panel 4: Complete */}
-      <StepComplete onComplete={handleComplete} onNavigate={() => router.push("/dashboard")} />
+      {steps}
     </Onboarding3DScene>
   )
 }
