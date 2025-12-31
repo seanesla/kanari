@@ -22,6 +22,7 @@ import {
   StepComplete,
 } from "@/components/onboarding"
 import { usePrefer2DOnboarding } from "@/hooks/use-prefer-2d-onboarding"
+import { useSceneMode } from "@/lib/scene-context"
 import type { UserSettings } from "@/lib/types"
 
 export default function OnboardingPage() {
@@ -30,6 +31,7 @@ export default function OnboardingPage() {
     useOnboarding()
   const { onboardingStep, setOnboardingStep } = useNavbar()
   const prefer2D = usePrefer2DOnboarding()
+  const { setMode } = useSceneMode()
 
   const [pendingSettings, setPendingSettings] = useState<Partial<UserSettings>>({})
 
@@ -39,6 +41,11 @@ export default function OnboardingPage() {
       router.replace("/dashboard")
     }
   }, [isLoading, hasCompletedOnboarding, router])
+
+  // Hide landing background elements while onboarding (TruthCore, section accents, etc).
+  useEffect(() => {
+    setMode("dashboard")
+  }, [setMode])
 
   // Memoized navigation functions - MUST be before early returns
   // to satisfy React's Rules of Hooks (same order every render)
