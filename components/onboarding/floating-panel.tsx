@@ -43,11 +43,6 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
   // Error pattern: docs/error-patterns/ios-drei-html-transform-inputs.md
   const useTransform = !isIOS
   const panelScale = isActive ? 1 : 0.95
-  const htmlDistanceFactor = isIOS ? undefined : 1.15
-  const panelTransform = isIOS
-    ? `translate(-50%, -50%) scale(${panelScale})`
-    : `scale(${panelScale})`
-  const panelOpacity = isIOS ? (isActive ? 1 : 0) : isActive ? 1 : 0.15
 
   return (
     <Float
@@ -59,19 +54,19 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
         {/* React content floats freely - no solid background planes */}
         <Html
           transform={useTransform}
-          distanceFactor={htmlDistanceFactor}
+          distanceFactor={1.15}
           position={[0, 0, 0.01]}
           style={{
             pointerEvents: isActive ? "auto" : "none",
-            opacity: panelOpacity,
+            opacity: isActive ? 1 : 0.15,
             transition: "opacity 0.5s ease-out",
           }}
         >
           <ContextBridge>
             <div
-              className="w-[480px] max-w-[calc(100vw-2rem)] pointer-events-auto"
+              className="w-[480px] pointer-events-auto"
               style={{
-                transform: panelTransform,
+                transform: `scale(${panelScale})`,
                 transition: "transform 0.5s ease-out",
               }}
             >

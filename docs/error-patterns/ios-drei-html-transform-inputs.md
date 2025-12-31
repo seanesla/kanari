@@ -15,4 +15,3 @@
 ## Notes
 - The onboarding 3D panels are the primary place where inputs live inside `Html`.
 - The safe fallback is to disable `transform` on iOS (keep the 3D scene, but render DOM without matrix3d transforms).
-- When disabling `transform`, ensure the panel remains usable (e.g., disable `distanceFactor` scaling and re-center the panel wrapper with `translate(-50%, -50%)`).
