@@ -19,6 +19,7 @@ export interface UseVoiceRecordingOptions {
    * Invoked after the recording has been successfully saved (non-blocking).
    * Useful for optional background work (e.g. semantic analysis).
    */
+  onRecordingSaved?: (event: VoiceRecordingSavedEvent) => void | Promise<void>
   /**
    * Audio sample rate stored on the recording object (defaults to 16000).
    */
