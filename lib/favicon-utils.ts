@@ -26,8 +26,8 @@ export function generateFaviconSVG(color: string): string {
   const pathElements = LOGO_PATHS.map(path => `<path fill="${color}" d="${path}" />`).join("\n    ")
   
   return `<?xml version="1.0" encoding="UTF-8"?>
-<svg width="32" height="32" viewBox="0 0 210 297" xmlns="http://www.w3.org/2000/svg">
-  <g transform="translate(-6.3331403, 2.3106634)">
+<svg width="32" height="32" viewBox="0 0 152.65443 173.92413" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(-35.38, -61.87)">
     ${pathElements}
   </g>
 </svg>`

@@ -331,7 +331,7 @@ export function PersistentNavbar() {
             href="/"
             className="flex items-center gap-2 text-accent hover:text-accent-light transition-colors"
           >
-            <Logo className="h-7 w-auto" />
+            <Logo className="h-9 w-auto" />
           </Link>
 
           <div className="flex items-center gap-6">
@@ -364,7 +364,7 @@ export function PersistentNavbar() {
             href="/"
             className="flex items-center gap-2 text-accent hover:text-accent-light transition-colors"
           >
-            <Logo className="h-10 w-auto" />
+            <Logo className="h-[52px] w-auto" />
           </Link>
 
           <button

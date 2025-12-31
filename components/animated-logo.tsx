@@ -24,21 +24,21 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
 
   useEffect(() => {
     const sequence = async () => {
-      // Phase 1: Draw stroke (1.5s)
+      // Phase 1: Draw stroke (1.05s - 30% faster)
       await controls.start("drawing")
-      // Phase 2: Fill in smoothly (1s)
+      // Phase 2: Fill in smoothly (0.7s - 30% faster)
       await controls.start("filling")
-      // Phase 3: Fade out stroke (0.4s)
+      // Phase 3: Complete (0.28s - 30% faster)
       await controls.start("complete")
       onComplete?.()
     }
     sequence()
   }, [controls, onComplete])
 
-  // New aspect ratio: 210:297 (height is 1.414x width)
+  // Aspect ratio: 152.65:173.92 (height is 1.139x width, similar to old 1.1)
   return (
-    <div className="relative" style={{ width: size, height: size * 1.414 }}>
-      <svg viewBox="0 0 210 297" className="w-full h-full">
+    <div className="relative" style={{ width: size, height: size * 1.139 }}>
+      <svg viewBox="0 0 152.65443 173.92413" className="w-full h-full" overflow="visible">
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={gradientColors.light} />
@@ -47,7 +47,7 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
           </linearGradient>
         </defs>
 
-        <g transform="translate(-6.3331403, 2.3106634)">
+        <g transform="translate(-35.38, -61.87)">
           {/* Fill layers - fade in after stroke completes */}
           {LOGO_PATHS.map((path, index) => (
             <motion.path
@@ -60,21 +60,21 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
                 drawing: { fillOpacity: 0 },
                 filling: {
                   fillOpacity: 1,
-                  transition: { duration: 1, ease: "easeOut" },
+                  transition: { duration: 0.7, ease: "easeOut" },
                 },
                 complete: { fillOpacity: 1 },
               }}
             />
           ))}
 
-          {/* Stroke layers - draw then fade out */}
+          {/* Stroke layers - draw then disappear */}
           {LOGO_PATHS.map((path, index) => (
             <motion.path
               key={`stroke-${index}`}
               d={path}
               fill="transparent"
               stroke={gradientColors.base}
-              strokeWidth={2}
+              strokeWidth={1.5}
               strokeLinecap="round"
               strokeLinejoin="round"
               initial={{ pathLength: 0, opacity: 0 }}
@@ -84,18 +84,15 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
                   pathLength: 1,
                   opacity: 1,
                   transition: {
-                    pathLength: { duration: 1.5, ease: "easeInOut" },
-                    opacity: { duration: 0.3 },
+                    pathLength: { duration: 1.05, ease: "easeInOut" },
+                    opacity: { duration: 0.2 },
                   },
                 },
                 filling: {
-                  opacity: 1,
-                  transition: { duration: 0.5 },
-                },
-                complete: {
                   opacity: 0,
-                  transition: { duration: 0.4, ease: "easeOut" },
+                  transition: { duration: 0.1 },
                 },
+                complete: { opacity: 0 },
               }}
             />
           ))}
