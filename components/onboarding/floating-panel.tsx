@@ -18,6 +18,8 @@
  */
 
 import { Html, Float, useContextBridge } from "@react-three/drei"
+import { useCallback, useRef, useState } from "react"
+import type { FocusEvent } from "react"
 import { SceneContext } from "@/lib/scene-context"
 
 interface FloatingPanelProps {
@@ -29,10 +31,45 @@ interface FloatingPanelProps {
 export function FloatingPanel({ position, children, isActive }: FloatingPanelProps) {
   // Bridge context INTO the Html portal (separate from Canvas bridge)
   const ContextBridge = useContextBridge(SceneContext)
+  const wrapperRef = useRef<HTMLDivElement | null>(null)
+  const [isInteracting, setIsInteracting] = useState(false)
+
+  const isActiveElementInside = useCallback(() => {
+    const wrapper = wrapperRef.current
+    if (!wrapper) return false
+    const activeEl = document.activeElement
+    return !!(activeEl && wrapper.contains(activeEl))
+  }, [])
+
+  const handleFocusCapture = useCallback(() => {
+    if (isActive) setIsInteracting(true)
+  }, [isActive])
+
+  const handleBlurCapture = useCallback(
+    (e: FocusEvent<HTMLDivElement>) => {
+      if (!isActive) return
+
+      const next = e.relatedTarget as Node | null
+      if (next && wrapperRef.current?.contains(next)) return
+      if (isActiveElementInside()) return
+
+      setIsInteracting(false)
+    },
+    [isActive, isActiveElementInside]
+  )
+
+  const handlePointerDownCapture = useCallback(() => {
+    if (isActive) setIsInteracting(true)
+  }, [isActive])
+
+  const handlePointerUpOrCancelCapture = useCallback(() => {
+    if (!isActive) return
+    if (!isActiveElementInside()) setIsInteracting(false)
+  }, [isActive, isActiveElementInside])
 
   return (
     <Float
-      speed={isActive ? 0.6 : 0.3}
+      speed={isActive && isInteracting ? 0 : isActive ? 0.6 : 0.3}
       rotationIntensity={isActive ? 0.03 : 0.01}
       floatIntensity={isActive ? 0.25 : 0.1}
     >
@@ -56,6 +93,12 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
         >
           <ContextBridge>
             <div
+              ref={wrapperRef}
+              onFocusCapture={handleFocusCapture}
+              onBlurCapture={handleBlurCapture}
+              onPointerDownCapture={handlePointerDownCapture}
+              onPointerUpCapture={handlePointerUpOrCancelCapture}
+              onPointerCancelCapture={handlePointerUpOrCancelCapture}
               className="w-[480px] pointer-events-auto"
               style={{
                 // iOS Safari can mis-hit-test inputs inside nested transforms.

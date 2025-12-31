@@ -2,7 +2,7 @@
 
 import React from "react"
 import { describe, expect, it, vi } from "vitest"
-import { render } from "@testing-library/react"
+import { fireEvent, render } from "@testing-library/react"
 import { FloatingPanel } from "../floating-panel"
 
 vi.mock("@react-three/drei", () => ({
@@ -26,11 +26,35 @@ vi.mock("@react-three/drei", () => ({
       {children}
     </div>
   ),
-  Float: ({ children }: { children: React.ReactNode }) => <div data-testid="float">{children}</div>,
+  Float: ({
+    children,
+    speed,
+  }: {
+    children: React.ReactNode
+    speed?: number
+  }) => (
+    <div data-testid="float" data-speed={speed === undefined ? "" : String(speed)}>
+      {children}
+    </div>
+  ),
   useContextBridge: () => ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 describe("FloatingPanel", () => {
+  it("freezes the float motion while focused within", () => {
+    const { getByLabelText, getByTestId } = render(
+      <FloatingPanel position={[0, 0, 0]} isActive>
+        <input aria-label="api-key" />
+      </FloatingPanel>
+    )
+
+    expect(getByTestId("float").dataset.speed).toBe("0.6")
+
+    fireEvent.focusIn(getByLabelText("api-key"))
+
+    expect(getByTestId("float").dataset.speed).toBe("0")
+  })
+
   it("renders the active panel without CSS3D transforms", () => {
     const { getByTestId } = render(
       <FloatingPanel position={[0, 0, 0]} isActive>
