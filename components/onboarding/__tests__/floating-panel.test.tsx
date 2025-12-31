@@ -73,6 +73,7 @@ describe("FloatingPanel", () => {
 
     await waitFor(() => {
       expect(htmlProps?.transform).toBe(false)
+      expect(htmlProps?.distanceFactor).toBeUndefined()
     })
   })
 
@@ -91,6 +92,7 @@ describe("FloatingPanel", () => {
 
     await waitFor(() => {
       expect(htmlProps?.transform).toBe(true)
+      expect(htmlProps?.distanceFactor).toBe(1.15)
     })
   })
 })
