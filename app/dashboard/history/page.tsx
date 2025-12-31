@@ -546,11 +546,11 @@ function HistoryPageContent() {
   return (
     <div
       className={cn(
-        "min-h-screen bg-transparent transition-all duration-500",
+        "h-svh bg-transparent relative overflow-hidden transition-all duration-500",
         visible ? "opacity-100" : "opacity-0"
       )}
     >
-      <SidebarProvider defaultOpen={true} transparent>
+      <SidebarProvider defaultOpen={true} transparent className="h-full">
         <CheckInsSidebar
           groupedByDate={groupedByDate}
           selectedItemId={selectedItemId}

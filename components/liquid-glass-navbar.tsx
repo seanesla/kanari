@@ -55,6 +55,7 @@ export function LiquidGlassNavbar({ children, className = "" }: LiquidGlassNavba
   const [displacementMap, setDisplacementMap] = useState<string>("")
   const filterRef = useRef<string>(`liquid-glass-${Math.random().toString(36).slice(2, 9)}`)
   const glow = useCursorGlow({ clampToBorder: true })
+  const [isHovering, setIsHovering] = useState(false)
 
   useEffect(() => {
     // Feature detect: Chromium supports SVG filters in backdrop-filter
@@ -120,9 +121,15 @@ export function LiquidGlassNavbar({ children, className = "" }: LiquidGlassNavba
       )}
 
       <nav
-        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl relative group ${className}`}
-        onMouseMove={glow.onMouseMove}
-        onMouseLeave={glow.onMouseLeave}
+        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl ${className}`}
+        onMouseMove={(event) => {
+          glow.onMouseMove(event)
+          setIsHovering(true)
+        }}
+        onMouseLeave={(event) => {
+          glow.onMouseLeave(event)
+          setIsHovering(false)
+        }}
         style={{
           ...glow.style,
           backdropFilter:
@@ -141,9 +148,10 @@ export function LiquidGlassNavbar({ children, className = "" }: LiquidGlassNavba
         }}
       >
         <CursorBorderGlow
-          className="rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          className="rounded-2xl transition-opacity duration-200"
           size={260}
-          borderWidth={2}
+          borderWidth={1}
+          style={{ opacity: isHovering ? 1 : 0 }}
         />
         {/* Inner content with subtle gradient overlay */}
         <div

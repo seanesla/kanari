@@ -76,6 +76,14 @@ export function CheckInListItem({
     e.stopPropagation()
   }
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault()
+      onSelect()
+    }
+  }
+
   return (
     <motion.div
       layout
@@ -84,8 +92,12 @@ export function CheckInListItem({
       transition={{ duration: 0.2 }}
     >
       <SidebarMenuButton
+        asChild
         isActive={isSelected}
         onClick={onSelect}
+        onKeyDown={handleKeyDown}
+        role="button"
+        tabIndex={0}
         className="h-auto py-2.5 px-3 cursor-pointer"
         tooltip={preview}
       >
