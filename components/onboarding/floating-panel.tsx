@@ -17,7 +17,6 @@
  * Source: Context7 - /pmndrs/drei docs - "Html transform", "Float", "useContextBridge"
  */
 
-import { useEffect, useState } from "react"
 import { Html, Float, useContextBridge } from "@react-three/drei"
 import { SceneContext } from "@/lib/scene-context"
 
@@ -30,19 +29,6 @@ interface FloatingPanelProps {
 export function FloatingPanel({ position, children, isActive }: FloatingPanelProps) {
   // Bridge context INTO the Html portal (separate from Canvas bridge)
   const ContextBridge = useContextBridge(SceneContext)
-  const [isIOS, setIsIOS] = useState(false)
-
-  useEffect(() => {
-    if (typeof navigator === "undefined") return
-    const ua = navigator.userAgent || ""
-    const isiOSDevice =
-      /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
-    setIsIOS(isiOSDevice)
-  }, [])
-  // iOS Safari hit-testing/paste crashes with Drei Html matrix3d transforms.
-  // Error pattern: docs/error-patterns/ios-drei-html-transform-inputs.md
-  const useTransform = !isIOS
-  const panelScale = isActive ? 1 : 0.95
 
   return (
     <Float
@@ -53,7 +39,7 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
       <group position={position}>
         {/* React content floats freely - no solid background planes */}
         <Html
-          transform={useTransform}
+          transform
           distanceFactor={1.15}
           position={[0, 0, 0.01]}
           style={{
@@ -66,7 +52,7 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
             <div
               className="w-[480px] pointer-events-auto"
               style={{
-                transform: `scale(${panelScale})`,
+                transform: isActive ? "scale(1)" : "scale(0.95)",
                 transition: "transform 0.5s ease-out",
               }}
             >
