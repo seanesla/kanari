@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
+import { useCursorGlow } from "@/hooks/use-cursor-glow"
+import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
 
 interface LiquidGlassNavbarProps {
   children: React.ReactNode
@@ -52,6 +54,7 @@ export function LiquidGlassNavbar({ children, className = "" }: LiquidGlassNavba
   const [supportsFilter, setSupportsFilter] = useState(false)
   const [displacementMap, setDisplacementMap] = useState<string>("")
   const filterRef = useRef<string>(`liquid-glass-${Math.random().toString(36).slice(2, 9)}`)
+  const glow = useCursorGlow({ clampToBorder: true })
 
   useEffect(() => {
     // Feature detect: Chromium supports SVG filters in backdrop-filter
@@ -117,8 +120,11 @@ export function LiquidGlassNavbar({ children, className = "" }: LiquidGlassNavba
       )}
 
       <nav
-        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl ${className}`}
+        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl relative group ${className}`}
+        onMouseMove={glow.onMouseMove}
+        onMouseLeave={glow.onMouseLeave}
         style={{
+          ...glow.style,
           backdropFilter:
             supportsFilter && displacementMap
               ? `url(#${filterId}) blur(16px) saturate(200%)`
@@ -134,6 +140,11 @@ export function LiquidGlassNavbar({ children, className = "" }: LiquidGlassNavba
           `,
         }}
       >
+        <CursorBorderGlow
+          className="rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          size={260}
+          borderWidth={2}
+        />
         {/* Inner content with subtle gradient overlay */}
         <div
           className="relative px-6 py-3 flex items-center gap-8"

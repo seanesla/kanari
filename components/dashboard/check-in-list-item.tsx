@@ -10,6 +10,7 @@
 import { Mic, MessageSquare } from "lucide-react"
 import { motion } from "framer-motion"
 import { SidebarMenuButton } from "@/components/ui/sidebar"
+import { Checkbox } from "@/components/ui/checkbox"
 import { formatTime } from "@/lib/date-utils"
 import type { HistoryItem } from "@/lib/types"
 
@@ -17,6 +18,12 @@ interface CheckInListItemProps {
   item: HistoryItem
   isSelected: boolean
   onSelect: () => void
+  /** Show checkbox for multi-select mode */
+  showCheckbox?: boolean
+  /** Whether this item is checked */
+  isChecked?: boolean
+  /** Callback when checkbox state changes */
+  onCheckChange?: (checked: boolean) => void
 }
 
 /**
@@ -52,10 +59,22 @@ function getTimestamp(item: HistoryItem): string {
   return formatTime(dateStr)
 }
 
-export function CheckInListItem({ item, isSelected, onSelect }: CheckInListItemProps) {
+export function CheckInListItem({
+  item,
+  isSelected,
+  onSelect,
+  showCheckbox = false,
+  isChecked = false,
+  onCheckChange,
+}: CheckInListItemProps) {
   const Icon = item.type === "voice_note" ? Mic : MessageSquare
   const preview = getPreviewText(item)
   const time = getTimestamp(item)
+
+  // Handle checkbox click without triggering item selection
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+  }
 
   return (
     <motion.div
@@ -71,6 +90,16 @@ export function CheckInListItem({ item, isSelected, onSelect }: CheckInListItemP
         tooltip={preview}
       >
         <div className="flex items-start gap-2.5 w-full min-w-0">
+          {/* Checkbox for multi-select */}
+          {showCheckbox && (
+            <div onClick={handleCheckboxClick} className="shrink-0 pt-0.5">
+              <Checkbox
+                checked={isChecked}
+                onCheckedChange={(checked) => onCheckChange?.(checked === true)}
+                className="data-[state=checked]:bg-accent data-[state=checked]:border-accent"
+              />
+            </div>
+          )}
           <Icon className="h-4 w-4 mt-0.5 shrink-0 text-muted-foreground" />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">

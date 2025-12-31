@@ -77,7 +77,7 @@ export function VoiceNoteDetailView({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-accent/30">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-full bg-accent/10">
             <Mic className="h-5 w-5 text-accent" />
@@ -111,7 +111,10 @@ export function VoiceNoteDetailView({
 
           {/* Waveform visualization */}
           {audioDataArray && (
-            <div className="rounded-lg border border-border/50 bg-card/30 p-4">
+            <div
+              className="rounded-lg border border-accent/30 bg-foreground/5 backdrop-blur-xl p-4"
+              style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--accent) 15%, transparent)' }}
+            >
               <div className="flex justify-center mb-4">
                 <RecordingWaveform
                   mode="static"
@@ -139,7 +142,10 @@ export function VoiceNoteDetailView({
 
           {/* Metrics */}
           {recording.metrics && (
-            <div className="rounded-lg border border-border/50 bg-card/30 p-4">
+            <div
+              className="rounded-lg border border-accent/30 bg-foreground/5 backdrop-blur-xl p-4"
+              style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--accent) 15%, transparent)' }}
+            >
               <h3 className="text-sm font-medium mb-3">Voice Analysis</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
@@ -168,7 +174,10 @@ export function VoiceNoteDetailView({
 
           {/* Semantic analysis / emotional summary */}
           {recording.semanticAnalysis?.summary && (
-            <div className="rounded-lg border border-border/50 bg-card/30 p-4">
+            <div
+              className="rounded-lg border border-accent/30 bg-foreground/5 backdrop-blur-xl p-4"
+              style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--accent) 15%, transparent)' }}
+            >
               <h3 className="text-sm font-medium mb-2">Emotional Summary</h3>
               <p className="text-sm text-muted-foreground italic">
                 {recording.semanticAnalysis.summary}
@@ -178,7 +187,10 @@ export function VoiceNoteDetailView({
 
           {/* Status indicators */}
           {!recording.metrics && recording.status === "complete" && (
-            <div className="rounded-lg border border-border/50 bg-card/30 p-4">
+            <div
+              className="rounded-lg border border-accent/30 bg-foreground/5 backdrop-blur-xl p-4"
+              style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--accent) 15%, transparent)' }}
+            >
               <p className="text-sm text-muted-foreground">Analysis pending...</p>
             </div>
           )}
@@ -197,7 +209,8 @@ export function VoiceNoteDetailView({
           {linkedChatSessionId && (
             <button
               onClick={() => onOpenLinkedChat?.(linkedChatSessionId)}
-              className="flex items-center gap-2 w-full p-3 rounded-lg border border-border/50 bg-card/30 text-sm text-muted-foreground hover:text-accent hover:border-accent/50 transition-colors"
+              className="flex items-center gap-2 w-full p-3 rounded-lg border border-accent/30 bg-foreground/5 backdrop-blur-xl text-sm text-muted-foreground hover:text-accent hover:border-accent/50 transition-colors"
+              style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--accent) 15%, transparent)' }}
             >
               <MessageSquare className="h-4 w-4" />
               <span>View follow-up AI chat</span>

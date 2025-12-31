@@ -17,7 +17,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Clock, Plus, Mic, MessageSquare, Sparkles } from "lucide-react"
+import { Clock, Plus, Mic, MessageSquare, Sparkles, CheckSquare } from "lucide-react"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -46,6 +46,10 @@ import { CheckInInputBar } from "@/components/dashboard/check-in-input-bar"
 import { VoiceNoteContent } from "@/components/dashboard/check-in-voice-note"
 import { AIChatContent } from "@/components/dashboard/check-in-ai-chat"
 import { getDateKey, getDateLabel } from "@/lib/date-utils"
+import { SelectionActionBar } from "@/components/dashboard/selection-action-bar"
+import { BatchDeleteConfirmDialog } from "@/components/dashboard/batch-delete-confirm-dialog"
+import { useCursorGlow } from "@/hooks/use-cursor-glow"
+import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
 import type { Recording, HistoryItem, CheckInSession } from "@/lib/types"
 
 /** Filter options for the check-ins list */
@@ -65,6 +69,10 @@ function CheckInsSidebar({
   onFilterChange,
   onNewCheckIn,
   historyItems,
+  isSelectMode,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectMode,
 }: {
   groupedByDate: { dateKey: string; dateLabel: string; items: HistoryItem[] }[]
   selectedItemId: string | null
@@ -73,8 +81,13 @@ function CheckInsSidebar({
   onFilterChange: (filter: FilterType) => void
   onNewCheckIn: () => void
   historyItems: HistoryItem[]
+  isSelectMode: boolean
+  selectedIds: Set<string>
+  onToggleSelect: (id: string, checked: boolean) => void
+  onToggleSelectMode: () => void
 }) {
   const { setOpenMobile, isMobile } = useSidebar()
+  const glow = useCursorGlow({ clampToBorder: true })
 
   const handleSelectItem = useCallback(
     (item: HistoryItem) => {
@@ -88,16 +101,47 @@ function CheckInsSidebar({
   )
 
   return (
-    <Sidebar collapsible="offcanvas" className="border-r border-border/50">
-      {/* Header with New Check-in button */}
-      <SidebarHeader className="px-4 py-4 border-b border-border/50">
-        <Button
-          onClick={onNewCheckIn}
-          className="w-full bg-accent text-accent-foreground hover:bg-accent/90 gap-2"
-        >
-          <Sparkles className="h-4 w-4" />
-          New Check-in
-        </Button>
+    <Sidebar
+      collapsible="offcanvas"
+      transparent
+      className="border-r border-transparent p-3"
+    >
+      <div
+        className="relative h-full w-full rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 flex flex-col group"
+        onMouseMove={glow.onMouseMove}
+        onMouseLeave={glow.onMouseLeave}
+        style={{
+          ...glow.style,
+          boxShadow:
+            "inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)",
+        }}
+      >
+        <CursorBorderGlow
+          className="rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          size={300}
+          borderWidth={2}
+        />
+      {/* Header with New Check-in button and select mode toggle */}
+      <SidebarHeader className="px-4 py-4 border-b border-border/30">
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={onNewCheckIn}
+            className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 gap-2"
+          >
+            <Sparkles className="h-4 w-4" />
+            New Check-in
+          </Button>
+          {historyItems.length > 0 && (
+            <Button
+              variant={isSelectMode ? "secondary" : "ghost"}
+              size="icon"
+              onClick={onToggleSelectMode}
+              title={isSelectMode ? "Cancel selection" : "Select items"}
+            >
+              <CheckSquare className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </SidebarHeader>
 
       {/* Check-in list */}
@@ -127,6 +171,9 @@ function CheckInsSidebar({
                       item={item}
                       isSelected={selectedItemId === item.id}
                       onSelect={() => handleSelectItem(item)}
+                      showCheckbox={isSelectMode}
+                      isChecked={selectedIds.has(item.id)}
+                      onCheckChange={(checked) => onToggleSelect(item.id, checked)}
                     />
                   </SidebarMenuItem>
                 ))}
@@ -137,7 +184,7 @@ function CheckInsSidebar({
       </SidebarContent>
 
       {/* Footer with filter toggle */}
-      <SidebarFooter className="px-4 py-3 border-t border-border/50">
+      <SidebarFooter className="px-4 py-3 border-t border-border/30">
         <div className="flex items-center gap-1">
           <button
             onClick={() => onFilterChange("all")}
@@ -176,6 +223,7 @@ function CheckInsSidebar({
           </button>
         </div>
       </SidebarFooter>
+      </div>
     </Sidebar>
   )
 }
@@ -203,7 +251,7 @@ function NewCheckInContent({
   return (
     <div className="flex flex-col h-full">
       {/* Header with mode tabs */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-accent/30">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-full bg-accent/10">
             <Sparkles className="h-5 w-5 text-accent" />
@@ -218,7 +266,7 @@ function NewCheckInContent({
       </div>
 
       {/* Mode toggle tabs */}
-      <div className="px-6 py-3 border-b border-border/50">
+      <div className="px-6 py-3 border-b border-accent/30">
         <Tabs value={mode} onValueChange={(v) => onModeChange(v as CheckInMode)}>
           <TabsList className="w-full">
             <TabsTrigger value="voice-note" className="flex-1" disabled={isSessionActive}>
@@ -272,6 +320,11 @@ function HistoryPageContent() {
 
   // Filter state
   const [filter, setFilter] = useState<FilterType>("all")
+
+  // Multi-select state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isSelectMode, setIsSelectMode] = useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Fetch unified history timeline
   const historyItems = useHistory()
@@ -369,6 +422,34 @@ function HistoryPageContent() {
     setIsCreatingNew(false)
   }, [])
 
+  // Multi-select handlers
+  const handleToggleSelect = useCallback((id: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (checked) {
+        next.add(id)
+      } else {
+        next.delete(id)
+      }
+      return next
+    })
+  }, [])
+
+  const handleSelectAll = useCallback(() => {
+    setSelectedIds(new Set(filteredItems.map((item) => item.id)))
+  }, [filteredItems])
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds(new Set())
+  }, [])
+
+  const handleToggleSelectMode = useCallback(() => {
+    setIsSelectMode((prev) => !prev)
+    if (isSelectMode) {
+      setSelectedIds(new Set())
+    }
+  }, [isSelectMode])
+
   // Handle delete
   const handleDeleteRecording = useCallback(
     (recordingId: string) => {
@@ -389,6 +470,26 @@ function HistoryPageContent() {
     },
     [deleteCheckInSession, selectedItemId]
   )
+
+  // Handle batch delete
+  const handleBatchDelete = useCallback(async () => {
+    for (const id of selectedIds) {
+      const item = historyItems.find((h) => h.id === id)
+      if (item) {
+        if (item.type === "voice_note") {
+          await deleteRecording(item.recording.id)
+        } else {
+          await deleteCheckInSession(item.session.id)
+        }
+      }
+    }
+    setSelectedIds(new Set())
+    setShowDeleteConfirm(false)
+    setIsSelectMode(false)
+    if (selectedItemId && selectedIds.has(selectedItemId)) {
+      setSelectedItemId(null)
+    }
+  }, [selectedIds, historyItems, deleteRecording, deleteCheckInSession, selectedItemId])
 
   // Handle new recording/session completion
   const handleRecordingComplete = useCallback((recording: Recording) => {
@@ -445,11 +546,11 @@ function HistoryPageContent() {
   return (
     <div
       className={cn(
-        "min-h-screen transition-all duration-500",
+        "min-h-screen bg-transparent transition-all duration-500",
         visible ? "opacity-100" : "opacity-0"
       )}
     >
-      <SidebarProvider defaultOpen={true}>
+      <SidebarProvider defaultOpen={true} transparent>
         <CheckInsSidebar
           groupedByDate={groupedByDate}
           selectedItemId={selectedItemId}
@@ -458,11 +559,15 @@ function HistoryPageContent() {
           onFilterChange={setFilter}
           onNewCheckIn={handleStartNewCheckIn}
           historyItems={historyItems}
+          isSelectMode={isSelectMode}
+          selectedIds={selectedIds}
+          onToggleSelect={handleToggleSelect}
+          onToggleSelectMode={handleToggleSelectMode}
         />
 
-        <SidebarInset className="flex flex-col">
+        <SidebarInset transparent className="flex flex-col bg-transparent pb-3">
           {/* Header */}
-          <header className="flex items-center gap-2 px-4 py-3 border-b border-border/50 md:hidden">
+          <header className="flex items-center gap-2 px-4 py-3 border-b border-accent/30 md:hidden">
             <SidebarTrigger className="-ml-1" />
             <h1 className="text-sm font-medium">Check-ins</h1>
           </header>
@@ -556,6 +661,23 @@ function HistoryPageContent() {
           {!isCreatingNew && <CheckInInputBar onStartNewCheckIn={handleStartNewCheckIn} />}
         </SidebarInset>
       </SidebarProvider>
+
+      {/* Selection action bar (floating at bottom) */}
+      <SelectionActionBar
+        selectedCount={selectedIds.size}
+        totalCount={filteredItems.length}
+        onSelectAll={handleSelectAll}
+        onClearSelection={handleClearSelection}
+        onDeleteSelected={() => setShowDeleteConfirm(true)}
+      />
+
+      {/* Delete confirmation dialog */}
+      <BatchDeleteConfirmDialog
+        open={showDeleteConfirm}
+        onOpenChange={setShowDeleteConfirm}
+        selectedCount={selectedIds.size}
+        onConfirm={handleBatchDelete}
+      />
     </div>
   )
 }

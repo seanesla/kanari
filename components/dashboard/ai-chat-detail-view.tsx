@@ -37,7 +37,7 @@ export function AIChatDetailView({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-border/50">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-accent/30">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-full bg-accent/10">
             <MessageSquare className="h-5 w-5 text-accent" />
@@ -61,7 +61,10 @@ export function AIChatDetailView({
       </div>
 
       {/* Session info bar */}
-      <div className="px-6 py-3 border-b border-border/50 bg-muted/20 space-y-2">
+      <div
+        className="px-6 py-3 border-b border-accent/30 bg-foreground/5 backdrop-blur-xl space-y-2"
+        style={{ boxShadow: '0 0 10px color-mix(in srgb, var(--accent) 10%, transparent)' }}
+      >
         {/* Date */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Calendar className="h-4 w-4" />
