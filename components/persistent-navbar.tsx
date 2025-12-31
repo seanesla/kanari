@@ -21,7 +21,7 @@ const landingLinks = [
 // "Overview" not "Dashboard" for /dashboard route (see CLAUDE.md)
 const dashboardLinks = [
   { id: "overview", href: "/dashboard", label: "Overview", exact: true },
-  { id: "history", href: "/dashboard/history", label: "Sessions", exact: false },
+  { id: "history", href: "/dashboard/history", label: "Check-ins", exact: false },
   { id: "analytics", href: "/dashboard/analytics", label: "Analytics", exact: false },
   { id: "achievements", href: "/dashboard/achievements", label: "Achievements", exact: true },
   { id: "settings", href: "/dashboard/settings", label: "Settings", exact: true },

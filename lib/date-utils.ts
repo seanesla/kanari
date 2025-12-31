@@ -69,6 +69,17 @@ export function formatDate(dateStr: string): string {
 }
 
 /**
+ * Format time only (e.g., "3:45 PM")
+ */
+export function formatTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  })
+}
+
+/**
  * Get a consistent date key for grouping (YYYY-MM-DD format)
  */
 export function getDateKey(dateStr: string): string {
