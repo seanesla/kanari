@@ -1,0 +1,414 @@
+"use client"
+
+import { useCallback, useEffect, useRef } from "react"
+import type { Dispatch, MutableRefObject } from "react"
+import { processAudio } from "@/lib/audio/processor"
+import {
+  detectMismatch,
+  featuresToPatterns,
+  shouldRunMismatchDetection,
+} from "@/lib/gemini/mismatch-detector"
+import { buildMismatchContext, buildVoicePatternContext } from "@/lib/gemini/context-builder"
+import { mergeTranscriptUpdate } from "@/lib/gemini/transcript-merge"
+import { analyzeVoiceMetrics } from "@/lib/ml/inference"
+import type { CheckInMessage } from "@/lib/types"
+import type { CheckInAction, CheckInData, CheckInMessagesCallbacks } from "../state"
+import { generateId } from "../ids"
+
+export interface CheckInMessagesGeminiHandlers {
+  onUserSpeechStart: () => void
+  onUserSpeechEnd: () => void
+  onUserTranscript: (text: string, finished: boolean) => void
+  onModelTranscript: (text: string, finished: boolean) => void
+  onModelThinking: (text: string) => void
+  onAudioChunk: (base64Audio: string) => void
+  onTurnComplete: () => void
+  onInterrupted: () => void
+  onSilenceChosen: (reason: string) => void
+}
+
+export interface UseCheckInMessagesOptions {
+  data: CheckInData
+  dispatch: Dispatch<CheckInAction>
+  callbacksRef: MutableRefObject<CheckInMessagesCallbacks>
+  sendText: (text: string) => void
+  injectContext: (contextText: string) => void
+  queueAudio: (base64Audio: string) => void
+  clearQueuedAudio: () => void
+  resetAudioChunks: () => void
+  drainAudioChunks: () => Float32Array[]
+}
+
+export interface UseCheckInMessagesResult {
+  addUserTextMessage: (content: string) => void
+  sendTextMessage: (text: string) => void
+  handlers: CheckInMessagesGeminiHandlers
+}
+
+export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheckInMessagesResult {
+  const {
+    data,
+    dispatch,
+    callbacksRef,
+    sendText,
+    injectContext,
+    queueAudio,
+    clearQueuedAudio,
+    resetAudioChunks,
+    drainAudioChunks,
+  } = options
+
+  // Track the last user message ID for updating with features
+  const lastUserMessageIdRef = useRef<string | null>(null)
+
+  // When VAD "speech start" events are missing, user transcript updates can keep
+  // appending into the previous bubble. We treat the end of an assistant turn
+  // (returning to listening) as a boundary for the next user utterance.
+  // Pattern doc: docs/error-patterns/voice-transcript-utterance-boundary-missing.md
+  const pendingUserUtteranceResetRef = useRef(false)
+
+  // Prevent double-handling utterance end (Gemini may emit both "speech end" and a final transcript)
+  const userSpeechEndHandledRef = useRef(false)
+
+  // Simple transcript accumulation (no complex state tracking needed)
+  // Assistant UI handles rendering, we just need to track current content
+  const currentTranscriptRef = useRef("")
+  const currentThinkingRef = useRef("")
+
+  // Track current user transcript for use in callbacks (avoid stale closures)
+  const userTranscriptRef = useRef<string>("")
+
+  // Track when user started speaking (for correct message timestamp ordering)
+  const userSpeechStartRef = useRef<string | null>(null)
+
+  // Sync userTranscriptRef with current user transcript (for use in callbacks)
+  useEffect(() => {
+    userTranscriptRef.current = data.currentUserTranscript
+  }, [data.currentUserTranscript])
+
+  const addUserTextMessage = useCallback(
+    (content: string) => {
+      const trimmed = content.trim()
+      if (!trimmed) return
+
+      const message: CheckInMessage = {
+        id: generateId(),
+        role: "user",
+        content: trimmed,
+        timestamp: new Date().toISOString(),
+      }
+
+      dispatch({ type: "ADD_MESSAGE", message })
+      callbacksRef.current.onMessage?.(message)
+    },
+    [dispatch, callbacksRef]
+  )
+
+  const processUserUtterance = useCallback(async () => {
+    const chunks = drainAudioChunks()
+    if (chunks.length === 0) return
+
+    // Get the message ID we need to update - captured at time of message creation
+    const messageIdToUpdate = lastUserMessageIdRef.current
+
+    try {
+      // Concatenate audio chunks
+      const totalLength = chunks.reduce((sum, c) => sum + c.length, 0)
+      const audioData = new Float32Array(totalLength)
+      let offset = 0
+      for (const chunk of chunks) {
+        audioData.set(chunk, offset)
+        offset += chunk.length
+      }
+
+      // Extract features
+      const result = await processAudio(audioData, {
+        sampleRate: 16000,
+        enableVAD: false, // Already VAD-filtered by capture
+      })
+
+      // Compute metrics
+      const metrics = analyzeVoiceMetrics(result.features)
+
+      // Check for mismatch
+      if (shouldRunMismatchDetection(data.currentUserTranscript, result.features)) {
+        const mismatchResult = detectMismatch(data.currentUserTranscript, result.features, metrics)
+
+        dispatch({ type: "SET_MISMATCH", result: mismatchResult })
+
+        if (mismatchResult.detected) {
+          // Inject context into Gemini conversation
+          const context = buildMismatchContext(mismatchResult)
+          injectContext(context)
+          callbacksRef.current.onMismatch?.(mismatchResult)
+        }
+
+        // Also periodically inject voice pattern context
+        const patterns = featuresToPatterns(result.features)
+        const patternContext = buildVoicePatternContext(patterns, metrics)
+        injectContext(patternContext)
+
+        // Update the user message with features and metrics using dispatch
+        // This properly updates React state instead of mutating directly
+        if (messageIdToUpdate) {
+          dispatch({
+            type: "UPDATE_MESSAGE_FEATURES",
+            messageId: messageIdToUpdate,
+            features: result.features,
+            metrics,
+            mismatch: mismatchResult,
+          })
+        }
+      }
+    } catch (error) {
+      console.error("[useCheckIn] Failed to process utterance:", error)
+    }
+  }, [callbacksRef, data.currentUserTranscript, dispatch, drainAudioChunks, injectContext])
+
+  const onUserSpeechStart = useCallback(() => {
+    dispatch({ type: "SET_USER_SPEAKING" })
+    resetAudioChunks() // Start collecting audio for this utterance
+    userTranscriptRef.current = "" // Reset accumulated transcript for new utterance
+    dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
+    // Clear the active voice message ID for this new utterance
+    lastUserMessageIdRef.current = null
+    pendingUserUtteranceResetRef.current = false
+    userSpeechEndHandledRef.current = false
+    userSpeechStartRef.current = new Date().toISOString() // Capture timestamp when user STARTS speaking
+  }, [dispatch, resetAudioChunks])
+
+  const onUserSpeechEnd = useCallback(() => {
+    // Guard against double-handling (some SDKs send both a final transcript and a speech-end event)
+    if (userSpeechEndHandledRef.current) return
+    userSpeechEndHandledRef.current = true
+
+    dispatch({ type: "SET_PROCESSING" })
+
+    const transcript = userTranscriptRef.current.trim()
+    const messageId = lastUserMessageIdRef.current
+
+    if (transcript) {
+      if (!messageId) {
+        const newMessageId = generateId()
+        const message: CheckInMessage = {
+          id: newMessageId,
+          role: "user",
+          content: transcript,
+          timestamp: userSpeechStartRef.current || new Date().toISOString(),
+        }
+
+        // Reset the captured timestamp for the next utterance
+        userSpeechStartRef.current = null
+
+        lastUserMessageIdRef.current = newMessageId
+        dispatch({ type: "ADD_MESSAGE", message })
+        callbacksRef.current.onMessage?.(message)
+      } else {
+        // Ensure the in-flight message is finalized and contains the latest transcript
+        dispatch({ type: "UPDATE_MESSAGE_CONTENT", messageId, content: transcript })
+        dispatch({ type: "SET_MESSAGE_STREAMING", messageId, isStreaming: false })
+      }
+    } else if (messageId) {
+      // No transcript text, but finalize any in-flight message so it doesn't look stuck
+      dispatch({ type: "SET_MESSAGE_STREAMING", messageId, isStreaming: false })
+    }
+
+    // Process collected audio for mismatch detection
+    void processUserUtterance()
+  }, [callbacksRef, dispatch, processUserUtterance])
+
+  const onUserTranscript = useCallback(
+    (text: string, finished: boolean) => {
+      // If the previous turn ended and we never received a VAD "speech start" for
+      // this utterance, ensure we don't keep appending into the last user bubble.
+      if (pendingUserUtteranceResetRef.current && text.trim()) {
+        pendingUserUtteranceResetRef.current = false
+        resetAudioChunks()
+        userTranscriptRef.current = ""
+        dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
+        lastUserMessageIdRef.current = null
+        userSpeechEndHandledRef.current = false
+        userSpeechStartRef.current = null
+      }
+
+      // Capture timestamp on FIRST chunk of user speech
+      // (VAD signals may not fire, so capture here as fallback)
+      if (userTranscriptRef.current === "" && text.trim() && !userSpeechStartRef.current) {
+        userSpeechStartRef.current = new Date().toISOString()
+      }
+
+      // Accumulate transcript chunks (Gemini sends word-by-word without finished flag)
+      userTranscriptRef.current = mergeTranscriptUpdate(userTranscriptRef.current, text).next
+
+      // Update transcript preview with accumulated text (used for mismatch detection and UI fallbacks)
+      dispatch({ type: "SET_USER_TRANSCRIPT", text: userTranscriptRef.current })
+
+      const transcript = userTranscriptRef.current.trim()
+      if (!transcript) return
+
+      // Ensure there's a message bubble immediately (don't wait for model audio).
+      // Pattern doc: docs/error-patterns/voice-transcript-message-commit-late.md
+      // If we already have a voice message for this utterance, update it in-place.
+      const messageId = lastUserMessageIdRef.current
+      if (!messageId) {
+        const newMessageId = generateId()
+        const message: CheckInMessage = {
+          id: newMessageId,
+          role: "user",
+          content: transcript,
+          timestamp: userSpeechStartRef.current || new Date().toISOString(),
+          // Treat as streaming until speech end is observed (prevents animation flicker)
+          isStreaming: !userSpeechEndHandledRef.current,
+        }
+
+        // Reset the captured timestamp for the next utterance
+        userSpeechStartRef.current = null
+
+        lastUserMessageIdRef.current = newMessageId
+        dispatch({ type: "ADD_MESSAGE", message })
+        callbacksRef.current.onMessage?.(message)
+      } else {
+        dispatch({ type: "UPDATE_MESSAGE_CONTENT", messageId, content: transcript })
+      }
+
+      // finished flag is rarely sent by Gemini, but handle it if it comes
+      if (finished && !userSpeechEndHandledRef.current) {
+        userSpeechEndHandledRef.current = true
+        dispatch({
+          type: "SET_MESSAGE_STREAMING",
+          messageId: lastUserMessageIdRef.current!,
+          isStreaming: false,
+        })
+        dispatch({ type: "SET_PROCESSING" })
+        void processUserUtterance()
+      }
+    },
+    [dispatch, processUserUtterance, resetAudioChunks]
+  )
+
+  const onModelTranscript = useCallback(
+    (text: string, finished: boolean) => {
+      if (!text) return
+
+      // On FIRST chunk, add streaming message to array (single element approach)
+      if (currentTranscriptRef.current === "") {
+        const streamingMessage: CheckInMessage = {
+          id: generateId(),
+          role: "assistant",
+          content: text,
+          isStreaming: true,
+          timestamp: new Date().toISOString(),
+        }
+        dispatch({ type: "ADD_MESSAGE", message: streamingMessage })
+        currentTranscriptRef.current = text
+      } else {
+        // Subsequent chunks: update the existing message in place.
+        // The Live API may emit either delta chunks or cumulative transcript snapshots,
+        // so we merge carefully to avoid duplication/concatenation artifacts.
+        const merged = mergeTranscriptUpdate(currentTranscriptRef.current, text)
+        currentTranscriptRef.current = merged.next
+        if (merged.delta) {
+          dispatch({ type: "UPDATE_STREAMING_MESSAGE", text: merged.delta })
+        }
+      }
+
+      // Some sessions may send transcription completion without a `turnComplete` signal.
+      // Use `finished` as an additional boundary so the next turn doesn't append into the
+      // previous bubble.
+      if (finished) {
+        dispatch({ type: "FINALIZE_STREAMING_MESSAGE" })
+        currentTranscriptRef.current = ""
+      }
+    },
+    [dispatch]
+  )
+
+  const onModelThinking = useCallback(
+    (text: string) => {
+      // Simple: just accumulate thinking text
+      currentThinkingRef.current += text
+      dispatch({ type: "APPEND_ASSISTANT_THINKING", text })
+    },
+    [dispatch]
+  )
+
+  const onAudioChunk = useCallback(
+    (base64Audio: string) => {
+      // If the model starts speaking and we still have a streaming user message,
+      // finalize it so it doesn't look "in-progress" throughout the reply.
+      const messageId = lastUserMessageIdRef.current
+      if (messageId) {
+        dispatch({ type: "SET_MESSAGE_STREAMING", messageId, isStreaming: false })
+      }
+      dispatch({ type: "SET_ASSISTANT_SPEAKING" })
+      queueAudio(base64Audio)
+    },
+    [dispatch, queueAudio]
+  )
+
+  const onTurnComplete = useCallback(() => {
+    // Finalize the streaming message (just removes isStreaming flag - no DOM change)
+    dispatch({ type: "FINALIZE_STREAMING_MESSAGE" })
+    // Reset refs for next response
+    currentTranscriptRef.current = ""
+    currentThinkingRef.current = ""
+    // Transition to listening - this handles both AI greeting and regular responses
+    dispatch({ type: "SET_LISTENING" })
+    pendingUserUtteranceResetRef.current = true
+  }, [dispatch])
+
+  const onInterrupted = useCallback(() => {
+    // User barged in - clear playback and reset for next response
+    clearQueuedAudio()
+    currentTranscriptRef.current = ""
+    currentThinkingRef.current = ""
+    dispatch({ type: "CLEAR_CURRENT_TRANSCRIPTS" })
+    dispatch({ type: "SET_USER_SPEAKING" })
+  }, [clearQueuedAudio, dispatch])
+
+  const onSilenceChosen = useCallback(
+    (reason: string) => {
+      // Model chose to stay silent - don't play audio, transition to listening
+      console.log("[useCheckIn] AI chose silence:", reason)
+      dispatch({ type: "SET_LISTENING" })
+      pendingUserUtteranceResetRef.current = true
+    },
+    [dispatch]
+  )
+
+  const sendTextMessage = useCallback(
+    (text: string) => {
+      const trimmed = text.trim()
+      if (!trimmed) return
+
+      // Add user message to conversation
+      addUserTextMessage(trimmed)
+
+      // Set state to processing
+      dispatch({ type: "SET_PROCESSING" })
+
+      // Send to Gemini
+      sendText(trimmed)
+    },
+    [addUserTextMessage, dispatch, sendText]
+  )
+
+  const handlers: CheckInMessagesGeminiHandlers = {
+    onUserSpeechStart,
+    onUserSpeechEnd,
+    onUserTranscript,
+    onModelTranscript,
+    onModelThinking,
+    onAudioChunk,
+    onTurnComplete,
+    onInterrupted,
+    onSilenceChosen,
+  }
+
+  return {
+    addUserTextMessage,
+    sendTextMessage,
+    handlers,
+  }
+}
+
