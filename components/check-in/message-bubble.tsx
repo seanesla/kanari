@@ -10,7 +10,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { User, Sparkles, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react"
+import { User, Sparkles, AlertTriangle, ChevronDown, ChevronRight, VolumeX } from "lucide-react"
 import type { CheckInMessage } from "@/lib/types"
 
 interface MessageBubbleProps {
@@ -30,6 +30,7 @@ export function MessageBubble({
   const isAssistant = message.role === "assistant"
   const hasMismatch = message.mismatch?.detected
   const hasThinking = isAssistant && message.thinking
+  const wasSkipped = isUser && message.silenceTriggered
 
   // State for expandable thinking section
   const [showThinking, setShowThinking] = useState(false)
@@ -72,7 +73,9 @@ export function MessageBubble({
             "rounded-2xl px-4 py-2.5 text-sm",
             isUser
               ? "bg-accent text-accent-foreground rounded-tr-sm"
-              : "bg-muted rounded-tl-sm"
+              : "bg-muted rounded-tl-sm",
+            // Darken message when AI chose to skip responding
+            wasSkipped && "opacity-60"
           )}
         >
           <p className="whitespace-pre-wrap">{message.content}</p>
@@ -119,6 +122,14 @@ export function MessageBubble({
           )}
         >
           <span>{time}</span>
+
+          {/* Skipped indicator - AI chose not to respond */}
+          {wasSkipped && (
+            <div className="flex items-center gap-1 text-muted-foreground/70">
+              <VolumeX className="w-3 h-3" />
+              <span>skipped</span>
+            </div>
+          )}
 
           {/* Mismatch indicator */}
           {showMismatchIndicator && hasMismatch && (

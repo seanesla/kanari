@@ -10,11 +10,14 @@
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
 import type { CheckInState } from "@/lib/types"
+import type { InitPhase } from "@/hooks/check-in/state"
 
 interface VoiceIndicatorProps {
   state: CheckInState
   audioLevel?: number // 0-1
   className?: string
+  /** Current initialization phase for enhanced feedback during startup */
+  initPhase?: InitPhase
 }
 
 const stateConfig: Record<CheckInState, { color: string; pulseDelay: number }> = {
@@ -120,10 +123,12 @@ export function VoiceIndicatorLarge({
   state,
   audioLevel = 0,
   className,
+  initPhase,
 }: VoiceIndicatorProps) {
   const config = stateConfig[state]
   const isActive = ["listening", "user_speaking", "ai_greeting", "assistant_speaking"].includes(state)
   const isPulsing = ["connecting", "processing"].includes(state)
+  const isInitializing = ["initializing", "connecting"].includes(state)
 
   const stateLabels: Record<CheckInState, string> = {
     idle: "Ready",
@@ -149,21 +154,45 @@ export function VoiceIndicatorLarge({
     <div className={cn("flex flex-col items-center gap-4", className)}>
       {/* Main indicator circle with bars */}
       <div className="relative">
-        {/* Outer glow */}
-        {isActive && (
+        {/* Outer glow - show during init or active states */}
+        {(isActive || isInitializing) && (
           <motion.div
             className={cn(
-              "absolute inset-[-20px] rounded-full blur-2xl opacity-20",
+              "absolute inset-[-20px] rounded-full blur-2xl",
               config.color
             )}
-            animate={{
-              scale: [1, 1.3, 1],
-              opacity: [0.1, 0.3, 0.1],
-            }}
+            animate={
+              isInitializing
+                ? {
+                    scale: [1, 1.4, 1],
+                    opacity: [0.15, 0.35, 0.15],
+                  }
+                : {
+                    scale: [1, 1.3, 1],
+                    opacity: [0.1, 0.3, 0.1],
+                  }
+            }
             transition={{
-              duration: 2,
+              duration: isInitializing ? 1.5 : 2,
               repeat: Infinity,
               ease: "easeInOut",
+            }}
+          />
+        )}
+
+        {/* Secondary shimmer ring during initialization */}
+        {isInitializing && (
+          <motion.div
+            className="absolute inset-[-10px] rounded-full border-2 border-accent/30"
+            animate={{
+              scale: [1, 1.15, 1],
+              opacity: [0.3, 0.6, 0.3],
+              rotate: [0, 180, 360],
+            }}
+            transition={{
+              duration: 3,
+              repeat: Infinity,
+              ease: "linear",
             }}
           />
         )}
@@ -172,19 +201,24 @@ export function VoiceIndicatorLarge({
         <motion.div
           className={cn(
             "relative flex items-center justify-center w-32 h-32 rounded-full border-2 transition-colors duration-300",
-            isActive ? "border-current" : "border-muted",
+            isActive ? "border-current" : isInitializing ? "border-accent/50" : "border-muted",
             config.color.replace("bg-", "text-")
           )}
           animate={
-            isPulsing
+            isInitializing
               ? {
-                  scale: [1, 1.05, 1],
-                  opacity: [0.8, 1, 0.8],
+                  scale: [1, 1.03, 1],
+                  opacity: [0.9, 1, 0.9],
                 }
-              : {}
+              : isPulsing
+                ? {
+                    scale: [1, 1.05, 1],
+                    opacity: [0.8, 1, 0.8],
+                  }
+                : {}
           }
           transition={{
-            duration: 1,
+            duration: isInitializing ? 0.8 : 1,
             repeat: Infinity,
             ease: "easeInOut",
           }}
@@ -207,41 +241,47 @@ export function VoiceIndicatorLarge({
                           `${height * 100}%`,
                         ],
                       }
-                    : isPulsing
+                    : isInitializing
                       ? {
-                          height: ["25%", "50%", "25%"],
+                          // Wave-like animation during init - bars move in sequence
+                          height: ["20%", "45%", "20%"],
                         }
-                      : { height: "20%" }
+                      : isPulsing
+                        ? {
+                            height: ["25%", "50%", "25%"],
+                          }
+                        : { height: "20%" }
                 }
                 transition={
-                  isActive || isPulsing
+                  isActive
                     ? {
                         duration: 0.4 + i * 0.05,
                         repeat: Infinity,
                         ease: "easeInOut",
                         delay: i * 0.05,
                       }
-                    : { duration: 0.2 }
+                    : isInitializing
+                      ? {
+                          // Staggered wave effect - each bar slightly delayed
+                          duration: 0.6,
+                          repeat: Infinity,
+                          ease: "easeInOut",
+                          delay: i * 0.08,
+                        }
+                      : isPulsing
+                        ? {
+                            duration: 0.4 + i * 0.05,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                            delay: i * 0.05,
+                          }
+                        : { duration: 0.2 }
                 }
               />
             ))}
           </div>
         </motion.div>
       </div>
-
-      {/* State label */}
-      <motion.span
-        className={cn(
-          "text-sm font-medium transition-colors duration-300",
-          config.color.replace("bg-", "text-")
-        )}
-        key={state}
-        initial={{ opacity: 0, y: 5 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -5 }}
-      >
-        {stateLabels[state]}
-      </motion.span>
     </div>
   )
 }

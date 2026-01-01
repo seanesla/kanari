@@ -5,6 +5,7 @@
  *
  * Text input with slash command detection and tool picker integration.
  * Supports both typing messages and triggering tools.
+ * Styled with glass effect and cursor-following glow to match check-in-input-bar.
  */
 
 import { useState, useRef, useCallback, useEffect } from "react"
@@ -12,10 +13,12 @@ import { Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
+import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
 import { ToolCommandMenu } from "./tool-command-menu"
 import { ToolPickerButton } from "./tool-picker-button"
 import { ToolArgumentForm } from "./tool-argument-form"
 import { findToolBySlashCommand, type ManualToolConfig } from "@/lib/gemini/manual-tools"
+import { useCursorGlow } from "@/hooks/use-cursor-glow"
 
 interface ChatInputProps {
   /** Called when user sends a text message */
@@ -31,6 +34,7 @@ export function ChatInput({ onSendText, onTriggerTool, disabled }: ChatInputProp
   const [showCommandMenu, setShowCommandMenu] = useState(false)
   const [selectedTool, setSelectedTool] = useState<ManualToolConfig | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const glow = useCursorGlow({ clampToBorder: true })
 
   // Detect "/" for slash commands
   useEffect(() => {
@@ -130,47 +134,63 @@ export function ChatInput({ onSendText, onTriggerTool, disabled }: ChatInputProp
 
   return (
     <div className="px-4 py-3">
-      <Popover open={showCommandMenu} onOpenChange={setShowCommandMenu}>
-        <div className="flex items-center gap-2">
-          {/* Tool picker button */}
-          <ToolPickerButton onSelect={handleToolSelect} disabled={disabled} />
+      <div
+        className="relative rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 group"
+        onMouseMove={glow.onMouseMove}
+        onMouseLeave={glow.onMouseLeave}
+        style={{
+          ...glow.style,
+          boxShadow:
+            "inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)",
+        }}
+      >
+        <CursorBorderGlow
+          className="rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+          size={260}
+          borderWidth={2}
+        />
+        <Popover open={showCommandMenu} onOpenChange={setShowCommandMenu}>
+          <div className="flex items-center gap-2 p-3">
+            {/* Tool picker button */}
+            <ToolPickerButton onSelect={handleToolSelect} disabled={disabled} />
 
-          {/* Input field with popover anchor */}
-          <PopoverAnchor asChild>
-            <Input
-              ref={inputRef}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Type a message or / for tools..."
-              disabled={disabled}
-              className="flex-1"
-            />
-          </PopoverAnchor>
+            {/* Input field with popover anchor */}
+            <PopoverAnchor asChild>
+              <Input
+                ref={inputRef}
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message or / for tools..."
+                disabled={disabled}
+                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+              />
+            </PopoverAnchor>
 
-          {/* Send button */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-9 w-9 shrink-0"
-            onClick={handleSend}
-            disabled={disabled || !value.trim() || value.startsWith("/")}
+            {/* Send button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 shrink-0 hover:bg-white/5"
+              onClick={handleSend}
+              disabled={disabled || !value.trim() || value.startsWith("/")}
+            >
+              <Send className="h-4 w-4" />
+              <span className="sr-only">Send message</span>
+            </Button>
+          </div>
+
+          {/* Command menu popup */}
+          <PopoverContent
+            side="top"
+            align="start"
+            className="p-0 w-[300px]"
+            onOpenAutoFocus={(e) => e.preventDefault()}
           >
-            <Send className="h-4 w-4" />
-            <span className="sr-only">Send message</span>
-          </Button>
-        </div>
-
-        {/* Command menu popup */}
-        <PopoverContent
-          side="top"
-          align="start"
-          className="p-0 w-[300px]"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <ToolCommandMenu searchValue={searchValue} onSelect={handleToolSelect} />
-        </PopoverContent>
-      </Popover>
+            <ToolCommandMenu searchValue={searchValue} onSelect={handleToolSelect} />
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   )
 }

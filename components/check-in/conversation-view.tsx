@@ -15,15 +15,17 @@ import { AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import {
   MessageBubble,
-  TypingIndicator,
   TranscriptPreview,
 } from "./message-bubble"
+import { ThinkingDisplay } from "./thinking-display"
 import type { CheckInState, CheckInMessage } from "@/lib/types"
 
 interface ConversationViewProps {
   state: CheckInState
   messages: CheckInMessage[]
   currentUserTranscript?: string
+  /** Current assistant thinking/chain-of-thought (streamed during processing) */
+  currentAssistantThinking?: string
   className?: string
 }
 
@@ -31,6 +33,7 @@ export function ConversationView({
   state,
   messages,
   currentUserTranscript = "",
+  currentAssistantThinking = "",
   className,
 }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -104,9 +107,11 @@ export function ConversationView({
         )}
       </AnimatePresence>
 
-      {/* Processing indicator */}
+      {/* Processing indicator with thinking display */}
       <AnimatePresence>
-        {isProcessing && <TypingIndicator />}
+        {isProcessing && (
+          <ThinkingDisplay thinkingText={currentAssistantThinking} />
+        )}
       </AnimatePresence>
 
       {/* Scroll anchor */}

@@ -77,4 +77,40 @@ describe("mergeTranscriptUpdate", () => {
     expect(result.next).toBe(incoming)
     expect(result.kind).toBe("replace")
   })
+
+  // Tests for short message restart detection (garbled greeting bug)
+  // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
+  describe("short message restart detection", () => {
+    it("replaces when a short greeting restarts with different opening", () => {
+      const previous = "How are you doing today"
+      const incoming = "Happy New Year! How are you feeling"
+      const result = mergeTranscriptUpdate(previous, incoming)
+      expect(result.next).toBe(incoming)
+      expect(result.kind).toBe("replace")
+    })
+
+    it("replaces when incoming starts with capital letter mid-flow", () => {
+      const previous = "Hey, checking in. I noticed your energy"
+      const incoming = "Happy New Year! I noticed your energy has been"
+      const result = mergeTranscriptUpdate(previous, incoming)
+      expect(result.next).toBe(incoming)
+      expect(result.kind).toBe("replace")
+    })
+
+    it("replaces when model restarts greeting with shared context words", () => {
+      const previous = "I know your energy has been getting lower this week"
+      const incoming = "Happy New Year! Your energy levels seemed to be dipping"
+      const result = mergeTranscriptUpdate(previous, incoming)
+      expect(result.next).toBe(incoming)
+      expect(result.kind).toBe("replace")
+    })
+
+    it("still detects cumulative for short messages that extend naturally", () => {
+      const previous = "Hello! How are"
+      const incoming = "Hello! How are you doing today?"
+      const result = mergeTranscriptUpdate(previous, incoming)
+      expect(result.next).toBe(incoming)
+      expect(result.kind).toBe("cumulative")
+    })
+  })
 })

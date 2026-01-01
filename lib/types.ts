@@ -482,6 +482,9 @@ export interface CheckInMessage {
   audioDuration?: number
   // True while message is being streamed (assistant messages only)
   isStreaming?: boolean
+  // True if this user message triggered AI silence (via mute_audio_response tool)
+  // Used to show visual feedback that AI chose not to respond
+  silenceTriggered?: boolean
 }
 
 export interface CheckInSummary {

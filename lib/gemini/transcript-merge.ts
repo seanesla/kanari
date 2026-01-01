@@ -181,6 +181,33 @@ export function mergeTranscriptUpdate(previous: string, incoming: string): Trans
   const previousTokens = tokenize(previous)
   const incomingTokens = tokenize(incoming)
 
+  // Detect greeting restart: incoming starts with capital and looks like a new sentence.
+  // This catches cases where the model restarts with a different greeting variant.
+  // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
+  const incomingTrimmed = incoming.trim()
+  const incomingStartsCapital = /^[A-Z]/.test(incomingTrimmed)
+  const previousEndsIncomplete = !/[.!?]$/.test(previous.trim())
+
+  if (incomingStartsCapital && previousEndsIncomplete) {
+    // Check boundary overlap - if no overlap at previous/incoming boundary, it's a restart
+    const boundaryOverlap = findOverlapCount(previousTokens, incomingTokens)
+
+    if (boundaryOverlap === 0) {
+      // No boundary overlap means incoming doesn't continue from where previous left off
+      // Check if they share ANY words (including stopwords) - different from meaningfulTokenSet
+      const prevAllWords = new Set(previousTokens.map((t) => t.norm))
+      const incAllWords = new Set(incomingTokens.map((t) => t.norm))
+      const sharedAnyCount = intersectionSize(prevAllWords, incAllWords)
+
+      // If there's word overlap (shared vocabulary) but no boundary overlap, replace
+      // This catches restarts like "How are you doing" → "Happy New Year! How are you feeling"
+      // where "how", "are", "you" are shared but aren't at the boundary
+      if (sharedAnyCount >= 2 || (previousTokens.length >= 3 && incomingTokens.length >= 3)) {
+        return { next: incoming, delta: "", kind: "replace" }
+      }
+    }
+  }
+
   // Detect corrected cumulative snapshots that revise earlier words.
   // These can share a long prefix or have high token overlap, but won't
   // pass strict prefix checks. In these cases, replacing avoids duplicated

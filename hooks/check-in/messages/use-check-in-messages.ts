@@ -368,38 +368,31 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
         currentTranscriptRef.current = text
         lastAssistantMessageIdRef.current = streamingMessage.id
       } else {
-        // Subsequent chunks: update the existing message in place.
-        // The Live API may emit either delta chunks or cumulative transcript snapshots,
-        // so we merge carefully to avoid duplication/concatenation artifacts.
-        const merged = mergeTranscriptUpdate(currentTranscriptRef.current, text)
-        if (debugTranscriptMergeRef.current) {
-          logDebug("TranscriptMerge", "assistant", {
-            prevLength: currentTranscriptRef.current.length,
-            incomingLength: text.length,
-            nextLength: merged.next.length,
-            kind: merged.kind,
-            deltaLength: merged.delta.length,
-          })
-        }
-        currentTranscriptRef.current = merged.next
-        if (merged.kind === "replace" && lastAssistantMessageIdRef.current) {
+        // Subsequent chunks: Gemini's outputAudioTranscription sends CUMULATIVE snapshots
+        // (the full transcript so far), not deltas. Always replace the message content.
+        // Previous merge detection logic was causing garbled/interleaved text when it
+        // incorrectly classified cumulative updates as deltas and appended them.
+        currentTranscriptRef.current = text
+        if (lastAssistantMessageIdRef.current) {
           dispatch({
             type: "UPDATE_MESSAGE_CONTENT",
             messageId: lastAssistantMessageIdRef.current,
-            content: merged.next,
+            content: text,
           })
-        } else if (merged.delta) {
-          dispatch({ type: "UPDATE_STREAMING_MESSAGE", text: merged.delta })
         }
       }
 
-      // Some sessions may send transcription completion without a `turnComplete` signal.
-      // Use `finished` as an additional boundary so the next turn doesn't append into the
-      // previous bubble.
-      if (finished) {
-        dispatch({ type: "FINALIZE_STREAMING_MESSAGE" })
-        currentTranscriptRef.current = ""
-        lastAssistantMessageIdRef.current = null
+      // NOTE: finished: true means this transcription CHUNK is finalized, NOT that the turn is done.
+      // The Gemini Live API can send multiple transcription segments with finished: true before
+      // the actual turnComplete event. Do NOT reset refs here - only onTurnComplete should reset.
+      // Premature reset causes multiple message bubbles when more transcript chunks arrive.
+      // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
+      if (finished && lastAssistantMessageIdRef.current) {
+        dispatch({
+          type: "SET_MESSAGE_STREAMING",
+          messageId: lastAssistantMessageIdRef.current,
+          isStreaming: false,
+        })
       }
     },
     [dispatch]
@@ -422,7 +415,11 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       if (messageId) {
         dispatch({ type: "SET_MESSAGE_STREAMING", messageId, isStreaming: false })
       }
-      dispatch({ type: "SET_ASSISTANT_SPEAKING" })
+      // NOTE: Don't dispatch SET_ASSISTANT_SPEAKING here!
+      // The state transition happens in onPlaybackStart (use-check-in.ts)
+      // when audio actually starts playing. This allows the "processing" state
+      // to persist while audio is being queued/buffered, giving the UI time
+      // to show thinking indicators.
       queueAudio(base64Audio)
     },
     [dispatch, queueAudio]
@@ -454,6 +451,14 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     (reason: string) => {
       // Model chose to stay silent - don't play audio, transition to listening
       console.log("[useCheckIn] AI chose silence:", reason)
+
+      // Mark the last user message as having triggered silence
+      // This provides visual feedback that AI intentionally chose not to respond
+      const messageIdToMark = lastUserMessageIdRef.current
+      if (messageIdToMark) {
+        dispatch({ type: "SET_MESSAGE_SILENCE_TRIGGERED", messageId: messageIdToMark })
+      }
+
       dispatch({ type: "SET_LISTENING" })
       pendingUserUtteranceResetRef.current = true
       lastAssistantMessageIdRef.current = null

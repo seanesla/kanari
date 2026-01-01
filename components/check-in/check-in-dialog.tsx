@@ -33,6 +33,27 @@ import {
 } from "./widgets"
 import { ChatInput } from "./chat-input"
 import type { CheckInSession } from "@/lib/types"
+import type { InitPhase } from "@/hooks/check-in/state"
+
+/**
+ * Get user-friendly label for initialization phase
+ */
+function getInitPhaseLabel(phase: InitPhase): string {
+  switch (phase) {
+    case "fetching_context":
+      return "Loading your history..."
+    case "init_audio_playback":
+      return "Setting up audio..."
+    case "init_audio_capture":
+      return "Requesting microphone..."
+    case "connecting_gemini":
+      return "Connecting to kanari..."
+    case "waiting_ai_response":
+      return "Waiting for kanari to start..."
+    default:
+      return "Setting up..."
+  }
+}
 
 interface CheckInDialogProps {
   open: boolean
@@ -164,12 +185,18 @@ export function CheckInDialog({
                 <VoiceIndicatorLarge
                   state={checkIn.state}
                   audioLevel={0}
+                  initPhase={checkIn.initPhase}
                 />
-                <p className="text-sm text-muted-foreground text-center">
-                  {checkIn.state === "connecting"
-                    ? "Connecting to kanari..."
-                    : "Setting up voice conversation..."}
-                </p>
+                <motion.p
+                  key={checkIn.initPhase || "default"}
+                  className="text-sm text-muted-foreground text-center"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {getInitPhaseLabel(checkIn.initPhase)}
+                </motion.p>
               </motion.div>
             )}
 
@@ -233,6 +260,7 @@ export function CheckInDialog({
                   state={checkIn.state}
                   messages={checkIn.messages}
                   currentUserTranscript={checkIn.currentUserTranscript}
+                  currentAssistantThinking={checkIn.currentAssistantThinking}
                 />
 
                 {/* Gemini-triggered widgets */}

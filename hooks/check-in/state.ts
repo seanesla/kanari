@@ -13,9 +13,23 @@ import type {
 // Types
 // ============================================
 
+/**
+ * Initialization phases during check-in startup
+ * These represent real events from the system, not hardcoded timers
+ */
+export type InitPhase =
+  | "fetching_context"     // Fetching context from IndexedDB + optional Gemini API
+  | "init_audio_playback"  // Setting up AudioContext + worklet for playback
+  | "init_audio_capture"   // getUserMedia + worklet for mic input
+  | "connecting_gemini"    // WebSocket connection to Gemini Live API
+  | "waiting_ai_response"  // Connected, waiting for AI to generate first response
+  | null                   // Not in init phase
+
 export interface CheckInData {
   /** Current check-in state */
   state: CheckInState
+  /** Current initialization phase (null when not initializing) */
+  initPhase: InitPhase
   /** True when ready for voice conversation */
   isActive: boolean
   /** Current session */
@@ -60,6 +74,7 @@ export interface CheckInMessagesCallbacks {
 
 export type CheckInAction =
   | { type: "START_INITIALIZING" }
+  | { type: "SET_INIT_PHASE"; phase: InitPhase }
   | { type: "SET_CONNECTING" }
   | { type: "SET_READY" }
   | { type: "SET_AI_GREETING" }
@@ -73,6 +88,7 @@ export type CheckInAction =
   | { type: "ADD_MESSAGE"; message: CheckInMessage }
   | { type: "UPDATE_MESSAGE_CONTENT"; messageId: string; content: string }
   | { type: "SET_MESSAGE_STREAMING"; messageId: string; isStreaming: boolean }
+  | { type: "SET_MESSAGE_SILENCE_TRIGGERED"; messageId: string }
   | {
       type: "UPDATE_MESSAGE_FEATURES"
       messageId: string
@@ -105,6 +121,7 @@ export type CheckInAction =
 
 export const initialState: CheckInData = {
   state: "idle",
+  initPhase: null,
   isActive: false,
   session: null,
   messages: [],
@@ -124,19 +141,22 @@ export const initialState: CheckInData = {
 export function checkInReducer(state: CheckInData, action: CheckInAction): CheckInData {
   switch (action.type) {
     case "START_INITIALIZING":
-      return { ...initialState, state: "initializing" }
+      return { ...initialState, state: "initializing", initPhase: "fetching_context" }
+
+    case "SET_INIT_PHASE":
+      return { ...state, initPhase: action.phase }
 
     case "SET_CONNECTING":
       return { ...state, state: "connecting" }
 
     case "SET_READY":
-      return { ...state, state: "ready", isActive: true }
+      return { ...state, state: "ready", initPhase: null, isActive: true }
 
     case "SET_AI_GREETING":
-      return { ...state, state: "ai_greeting" }
+      return { ...state, state: "ai_greeting", initPhase: null }
 
     case "SET_LISTENING":
-      return { ...state, state: "listening" }
+      return { ...state, state: "listening", initPhase: null }
 
     case "SET_USER_SPEAKING":
       return { ...state, state: "user_speaking" }
@@ -201,6 +221,17 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
         ...state,
         messages: updatedMessages,
         currentStreamingMessageId,
+        session: state.session ? { ...state.session, messages: updatedMessages } : null,
+      }
+    }
+
+    case "SET_MESSAGE_SILENCE_TRIGGERED": {
+      const updatedMessages = state.messages.map((msg) =>
+        msg.id === action.messageId ? { ...msg, silenceTriggered: true } : msg
+      )
+      return {
+        ...state,
+        messages: updatedMessages,
         session: state.session ? { ...state.session, messages: updatedMessages } : null,
       }
     }

@@ -152,14 +152,17 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         }
 
         // Initialize playback first (needs user gesture context)
+        dispatch({ type: "SET_INIT_PHASE", phase: "init_audio_playback" })
         await playbackControls.initialize()
         playbackInitialized = true
 
         // Initialize audio capture AFTER playback to avoid worklet loading race
         // Some browsers can only load one AudioWorklet module at a time
+        dispatch({ type: "SET_INIT_PHASE", phase: "init_audio_capture" })
         await audio.initializeAudioCapture()
         captureInitialized = true
 
+        dispatch({ type: "SET_INIT_PHASE", phase: "connecting_gemini" })
         dispatch({ type: "SET_CONNECTING" })
 
         // Connect to Gemini with session context for AI-initiated greeting
@@ -419,6 +422,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
   const onConnected = useCallback(() => {
     dispatch({ type: "SET_READY" })
+    dispatch({ type: "SET_INIT_PHASE", phase: "waiting_ai_response" })
     dispatch({ type: "SET_AI_GREETING" })
 
     // Trigger AI to speak first by sending the conversation start signal.
