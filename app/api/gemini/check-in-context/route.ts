@@ -136,8 +136,8 @@ NO PREVIOUS CHECK-IN HISTORY - This is the user's first check-in. Generate a war
 
   prompt += `
 
-Based on this context, generate a warm, personalized opening for the AI to start the conversation.
-Return ONLY the JSON object with patternSummary, keyObservations, suggestedOpener, and contextNotes.`
+Based on this context, generate a summary that the AI can use to craft a warm, personalized greeting.
+Return ONLY the JSON object with patternSummary, keyObservations, and contextNotes.`
 
   return prompt
 }
@@ -196,7 +196,6 @@ async function generateContextSummary(
   if (
     typeof parsed.patternSummary !== "string" ||
     !Array.isArray(parsed.keyObservations) ||
-    typeof parsed.suggestedOpener !== "string" ||
     typeof parsed.contextNotes !== "string"
   ) {
     throw new Error("Gemini response parse error: Invalid response structure")

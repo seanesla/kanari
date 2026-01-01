@@ -7,7 +7,7 @@ import {
   type SystemContextSummary,
   type SystemTimeContext,
 } from "@/lib/gemini/live-prompts"
-import { buildHistoricalContext, buildPostRecordingContext } from "@/lib/gemini/context-builder"
+import { buildHistoricalContext } from "@/lib/gemini/context-builder"
 import { fetchCheckInContext } from "@/lib/gemini/check-in-context"
 import { computeContextFingerprint } from "@/lib/gemini/context-fingerprint"
 import {
@@ -84,9 +84,6 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
   const sessionStartRef = useRef<string | null>(null)
 
-  // Post-recording context ref
-  const postRecordingContextRef = useRef<string | null>(null)
-
   // Session context for AI-initiated conversations (passed to Gemini connect)
   const sessionContextRef = useRef<SessionContext | null>(null)
 
@@ -118,12 +115,6 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         // Compute context fingerprint for session preservation
         // This allows us to detect if data changed while session was preserved
         contextFingerprintRef.current = await computeContextFingerprint()
-
-        // Generate post-recording context if applicable
-        if (startOptions?.recordingContext) {
-          const { stressScore, fatigueScore, patterns } = startOptions.recordingContext
-          postRecordingContextRef.current = buildPostRecordingContext(stressScore, fatigueScore, patterns)
-        }
 
         // Fetch context for AI-initiated conversation
         let sessionContext: SessionContext | undefined
@@ -165,6 +156,15 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
               "[useCheckIn] Context summary request errored, using time-only context:",
               summaryError
             )
+          }
+
+          // Add post-recording context if this session was triggered after a voice recording
+          if (startOptions?.recordingContext) {
+            sessionContext.postRecordingContext = {
+              stressScore: startOptions.recordingContext.stressScore,
+              fatigueScore: startOptions.recordingContext.fatigueScore,
+              patterns: startOptions.recordingContext.patterns,
+            }
           }
 
           sessionContextRef.current = sessionContext
@@ -413,19 +413,9 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
     dispatch({ type: "SET_AI_GREETING" })
 
     // Trigger AI to speak first by sending the conversation start signal
-    // The system instruction tells the AI to greet the user when it receives this
+    // The system instruction (which now includes post-recording context if applicable)
+    // tells the AI to greet the user when it receives this
     gemini.sendText("[START_CONVERSATION]")
-
-    // If post-recording context was provided, inject it after a brief delay
-    // to let the greeting start first
-    if (postRecordingContextRef.current) {
-      setTimeout(() => {
-        if (postRecordingContextRef.current) {
-          gemini.sendText(postRecordingContextRef.current)
-          postRecordingContextRef.current = null
-        }
-      }, 500)
-    }
   }, [dispatch, gemini])
 
   const onDisconnected = useCallback(

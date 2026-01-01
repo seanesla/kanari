@@ -165,7 +165,6 @@ beforeEach(async () => {
         summary: {
           patternSummary: "stub",
           keyObservations: [],
-          suggestedOpener: "stub",
           contextNotes: "stub",
         },
       }),

@@ -149,7 +149,6 @@ describe("POST /api/gemini/check-in-context", () => {
     const summary = {
       patternSummary: "Afternoon check-in, first session.",
       keyObservations: [],
-      suggestedOpener: "Hey! How are you doing this afternoon?",
       contextNotes: "Keep it warm and low-pressure.",
     }
 

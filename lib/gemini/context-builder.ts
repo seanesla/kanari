@@ -1,7 +1,6 @@
 import {
   buildCheckInSystemInstruction,
   generateMismatchContext,
-  generatePostRecordingContext,
   generateVoicePatternContext,
   type SystemContextSummary,
   type SystemTimeContext,
@@ -27,13 +26,5 @@ export function buildMismatchContext(result: MismatchResult): string {
 
 export function buildVoicePatternContext(patterns: VoicePatterns, metrics: VoiceMetrics): string {
   return generateVoicePatternContext(patterns, metrics)
-}
-
-export function buildPostRecordingContext(
-  stressScore: number,
-  fatigueScore: number,
-  patterns: VoicePatterns
-): string {
-  return generatePostRecordingContext(stressScore, fatigueScore, patterns)
 }
 
