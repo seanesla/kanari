@@ -71,16 +71,15 @@ export function CheckInListItem({
   const preview = getPreviewText(item)
   const time = getTimestamp(item)
 
-  // Handle checkbox click without triggering item selection
-  const handleCheckboxClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-  }
-
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.target !== e.currentTarget) return
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault()
-      onSelect()
+      if (showCheckbox) {
+        onCheckChange?.(!isChecked)
+      } else {
+        onSelect()
+      }
     }
   }
 
@@ -94,7 +93,7 @@ export function CheckInListItem({
       <SidebarMenuButton
         asChild
         isActive={isSelected}
-        onClick={onSelect}
+        onClick={showCheckbox ? () => onCheckChange?.(!isChecked) : onSelect}
         onKeyDown={handleKeyDown}
         role="button"
         tabIndex={0}
@@ -104,11 +103,11 @@ export function CheckInListItem({
         <div className="flex items-start gap-2.5 w-full min-w-0">
           {/* Checkbox for multi-select */}
           {showCheckbox && (
-            <div onClick={handleCheckboxClick} className="shrink-0 pt-0.5">
+            <div className="shrink-0 pt-0.5">
               <Checkbox
                 checked={isChecked}
                 onCheckedChange={(checked) => onCheckChange?.(checked === true)}
-                className="data-[state=checked]:bg-accent data-[state=checked]:border-accent"
+                className="border-muted-foreground/50 data-[state=checked]:bg-accent data-[state=checked]:border-accent"
               />
             </div>
           )}

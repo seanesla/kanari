@@ -126,8 +126,8 @@ export function LiquidGlassNavbar({ children, className = "" }: LiquidGlassNavba
           glow.onMouseMove(event)
           setIsHovering(true)
         }}
-        onMouseLeave={(event) => {
-          glow.onMouseLeave(event)
+        onMouseLeave={() => {
+          glow.onMouseLeave()
           setIsHovering(false)
         }}
         style={{
