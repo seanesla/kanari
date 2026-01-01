@@ -87,7 +87,7 @@ function CheckInsSidebar({
   onToggleSelectMode: () => void
 }) {
   const { setOpenMobile, isMobile } = useSidebar()
-  const glow = useCursorGlow({ clampToBorder: true })
+  const glow = useCursorGlow({ clampToBorder: true, distanceIntensity: true })
 
   const handleSelectItem = useCallback(
     (item: HistoryItem) => {

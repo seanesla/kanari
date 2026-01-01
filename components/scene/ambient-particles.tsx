@@ -25,21 +25,32 @@ export function AmbientParticles({ scrollProgressRef, mode }: AmbientParticlesPr
   const targetCount = mode === "dashboard" ? PARTICLES.dashboard : PARTICLES.landing
 
   const particles = useMemo(() => {
-    const arr = Array.from({ length: PARTICLES.landing }, (_, i) => ({
-      position: new THREE.Vector3(
-        (Math.random() - 0.5) * 30,
-        (Math.random() - 0.5) * 30,
-        (Math.random() - 0.5) * 20 - 10
-      ),
-      basePosition: new THREE.Vector3(
-        (Math.random() - 0.5) * 30,
-        (Math.random() - 0.5) * 30,
-        (Math.random() - 0.5) * 20 - 10
-      ),
-      speed: Math.random() * 0.3 + 0.1,
-      offset: Math.random() * Math.PI * 2,
-      scale: 0.03 + Math.random() * 0.05,
-    }))
+    // Stratified grid distribution for even spacing
+    const count = PARTICLES.landing
+    const gridSize = Math.ceil(Math.cbrt(count))
+    const cellSizeX = 30 / gridSize
+    const cellSizeY = 30 / gridSize
+    const cellSizeZ = 20 / gridSize
+
+    const arr = Array.from({ length: count }, (_, i) => {
+      // Calculate grid cell position
+      const gridX = (i % gridSize) - gridSize / 2
+      const gridY = (Math.floor(i / gridSize) % gridSize) - gridSize / 2
+      const gridZ = Math.floor(i / (gridSize * gridSize)) - gridSize / 2
+
+      // Position with jitter within cell for organic feel
+      const x = (gridX + Math.random()) * cellSizeX
+      const y = (gridY + Math.random()) * cellSizeY
+      const z = (gridZ + Math.random()) * cellSizeZ - 10
+
+      return {
+        position: new THREE.Vector3(x, y, z),
+        basePosition: new THREE.Vector3(x, y, z),
+        speed: Math.random() * 0.3 + 0.1,
+        offset: Math.random() * Math.PI * 2,
+        scale: 0.03 + Math.random() * 0.05,
+      }
+    })
     velocitiesRef.current = arr.map(() => new THREE.Vector3(0, 0, 0))
     scaleMultipliersRef.current = arr.map(() => 1)
     return arr

@@ -24,7 +24,8 @@ export function CursorBorderGlow({
   const traceRing = Math.max(2, borderWidth)
   const blurPx = Math.max(22, Math.round(glowRing * 1.25))
 
-  const gradient = `radial-gradient(var(--glow-rx, ${size}px) var(--glow-ry, ${size}px) at var(--glow-x, 50%) var(--glow-y, 50%), color-mix(in srgb, var(--accent) 60%, transparent) 0%, color-mix(in srgb, var(--accent) 30%, transparent) 45%, transparent 100%)`
+  // Intensity modulates the glow brightness based on distance from edge
+  const gradient = `radial-gradient(var(--glow-rx, ${size}px) var(--glow-ry, ${size}px) at var(--glow-x, 50%) var(--glow-y, 50%), color-mix(in srgb, var(--accent) calc(60% * var(--glow-intensity, 1)), transparent) 0%, color-mix(in srgb, var(--accent) calc(30% * var(--glow-intensity, 1)), transparent) 45%, transparent 100%)`
   const ringMask = "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)"
 
   return (
