@@ -32,6 +32,12 @@ export function MessageBubble({
   const hasThinking = isAssistant && message.thinking
   const wasSkipped = isUser && message.silenceTriggered
 
+  // Hide broken AI transcript during streaming (Gemini Live API bug)
+  // The API sends interleaved chunks from parallel streams, producing gibberish.
+  // Audio plays correctly, so just show "Speaking..." until turn completes.
+  // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
+  const isAssistantStreaming = isAssistant && message.isStreaming
+
   // State for expandable thinking section
   const [showThinking, setShowThinking] = useState(false)
 
@@ -78,7 +84,13 @@ export function MessageBubble({
             wasSkipped && "opacity-60"
           )}
         >
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          {isAssistantStreaming ? (
+            <p className="whitespace-pre-wrap text-muted-foreground italic">
+              Speaking...
+            </p>
+          ) : (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          )}
         </div>
 
         {/* Expandable thinking/COT section (assistant only) */}

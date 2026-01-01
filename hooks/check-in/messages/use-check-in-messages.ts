@@ -368,16 +368,17 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
         currentTranscriptRef.current = text
         lastAssistantMessageIdRef.current = streamingMessage.id
       } else {
-        // Subsequent chunks: Gemini's outputAudioTranscription sends CUMULATIVE snapshots
-        // (the full transcript so far), not deltas. Always replace the message content.
-        // Previous merge detection logic was causing garbled/interleaved text when it
-        // incorrectly classified cumulative updates as deltas and appended them.
-        currentTranscriptRef.current = text
+        // Simple append - Gemini Live sends truly out-of-order chunks from
+        // multiple parallel transcript streams, which cannot be fixed client-side.
+        // Using mergeTranscriptUpdate() makes it worse by falsely detecting "restarts".
+        // Known limitation: docs/error-patterns/transcript-stream-duplication.md
+        currentTranscriptRef.current = currentTranscriptRef.current + text
+
         if (lastAssistantMessageIdRef.current) {
           dispatch({
             type: "UPDATE_MESSAGE_CONTENT",
             messageId: lastAssistantMessageIdRef.current,
-            content: text,
+            content: currentTranscriptRef.current,
           })
         }
       }
