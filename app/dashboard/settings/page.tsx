@@ -34,7 +34,7 @@ export default function SettingsPage() {
               Settings
             </h1>
             <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
-              Configure recording preferences, notifications, calendar integration, and privacy settings.
+              Configure check-in preferences, notifications, calendar integration, and privacy settings.
             </p>
           </div>
         </div>

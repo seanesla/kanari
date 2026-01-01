@@ -211,7 +211,7 @@ export function SuggestionDetailDialog({
                     {history.fatigueChange === "stable" && <Minus className="h-3 w-3 text-muted-foreground" />}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Based on {history.recordingCount} recordings over {history.daysOfData} days
+                    Based on {history.recordingCount} check-ins over {history.daysOfData} days
                   </p>
                 </div>
               </div>

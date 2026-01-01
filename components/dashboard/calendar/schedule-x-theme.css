@@ -113,7 +113,7 @@
 }
 
 /* ============================================
-   Recording Event Styles
+   Check-in Event Styles
    ============================================ */
 
 /*
@@ -131,11 +131,10 @@
  * This is intentional tech debt for the sake of visual customization.
  */
 
-/* Recording events - let the custom component handle all styling */
-.sx__event[data-calendar-id="recording"] {
+/* Check-in events - let the custom component handle all styling */
+.sx__event[data-calendar-id="checkin"] {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
 }
-

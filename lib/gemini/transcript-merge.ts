@@ -1,4 +1,4 @@
-export type TranscriptUpdateKind = "delta" | "cumulative"
+export type TranscriptUpdateKind = "delta" | "cumulative" | "replace"
 
 export interface TranscriptUpdate {
   /**
@@ -13,6 +13,119 @@ export interface TranscriptUpdate {
   kind: TranscriptUpdateKind
 }
 
+const STOPWORDS = new Set([
+  "a",
+  "an",
+  "and",
+  "are",
+  "as",
+  "at",
+  "be",
+  "but",
+  "by",
+  "for",
+  "from",
+  "how",
+  "i",
+  "in",
+  "is",
+  "it",
+  "of",
+  "on",
+  "or",
+  "that",
+  "the",
+  "this",
+  "to",
+  "we",
+  "with",
+  "you",
+])
+
+function normalizeForCompare(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/(\p{L})['’](\p{L})/gu, "$1$2")
+    .replace(/[^\p{L}\p{N}\s]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function normalizeToken(token: string): string {
+  return token
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "")
+}
+
+type Token = { norm: string; start: number; end: number }
+
+function tokenize(text: string): Token[] {
+  const tokens: Token[] = []
+  const regex = /\S+/g
+  let match: RegExpExecArray | null
+
+  while ((match = regex.exec(text)) !== null) {
+    const raw = match[0]
+    const norm = normalizeToken(raw)
+    if (!norm) continue
+    tokens.push({ norm, start: match.index, end: match.index + raw.length })
+  }
+
+  return tokens
+}
+
+function countCommonPrefixTokens(previousTokens: Token[], incomingTokens: Token[]): number {
+  const max = Math.min(previousTokens.length, incomingTokens.length)
+  let count = 0
+  for (let i = 0; i < max; i++) {
+    if (previousTokens[i]?.norm !== incomingTokens[i]?.norm) break
+    count++
+  }
+  return count
+}
+
+function meaningfulTokenSet(tokens: Token[]): Set<string> {
+  const set = new Set<string>()
+  for (const token of tokens) {
+    if (!token.norm) continue
+    if (token.norm.length < 2) continue
+    if (STOPWORDS.has(token.norm)) continue
+    set.add(token.norm)
+  }
+  return set
+}
+
+function intersectionSize(a: Set<string>, b: Set<string>): number {
+  let count = 0
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a]
+  for (const value of small) {
+    if (large.has(value)) count++
+  }
+  return count
+}
+
+function shouldAcceptSingleTokenOverlap(token: string): boolean {
+  return token.length >= 3 && !STOPWORDS.has(token)
+}
+
+function findOverlapCount(previousTokens: Token[], incomingTokens: Token[]): number {
+  const maxOverlap = Math.min(previousTokens.length, incomingTokens.length)
+  for (let count = maxOverlap; count >= 1; count--) {
+    let matches = true
+    for (let i = 0; i < count; i++) {
+      const prevToken = previousTokens[previousTokens.length - count + i]
+      const nextToken = incomingTokens[i]
+      if (!prevToken || !nextToken || prevToken.norm !== nextToken.norm) {
+        matches = false
+        break
+      }
+    }
+    if (matches) return count
+  }
+  return 0
+}
+
 /**
  * Merge an incoming transcription update into the prior transcript.
  *
@@ -20,20 +133,95 @@ export interface TranscriptUpdate {
  * - **delta** updates (only the new text since the last event), or
  * - **cumulative** updates (the full transcript-so-far on every event).
  *
- * This helper detects cumulative updates via prefix matching and returns both:
- * - `next`: the updated full transcript
- * - `delta`: the minimal string to append to reach `next` (may be empty)
+ * This helper detects cumulative updates via prefix matching, overlap
+ * heuristics, and replacement handling to avoid duplicated phrases.
+ *
+ * Pattern doc: docs/error-patterns/transcript-stream-duplication.md
  */
 export function mergeTranscriptUpdate(previous: string, incoming: string): TranscriptUpdate {
   if (!incoming) {
     return { next: previous, delta: "", kind: "delta" }
   }
 
-  if (incoming.startsWith(previous)) {
+  if (!previous) {
+    return { next: incoming, delta: incoming, kind: "delta" }
+  }
+
+  const normalizedPrevious = normalizeForCompare(previous)
+  const normalizedIncoming = normalizeForCompare(incoming)
+
+  if (!normalizedIncoming) {
+    return { next: previous, delta: "", kind: "delta" }
+  }
+
+  if (normalizedIncoming.startsWith(normalizedPrevious)) {
+    if (incoming.startsWith(previous)) {
+      return {
+        next: incoming,
+        delta: incoming.slice(previous.length),
+        kind: "cumulative",
+      }
+    }
+
     return {
       next: incoming,
-      delta: incoming.slice(previous.length),
-      kind: "cumulative",
+      delta: "",
+      kind: "replace",
+    }
+  }
+
+  if (normalizedPrevious.startsWith(normalizedIncoming)) {
+    return {
+      next: incoming,
+      delta: "",
+      kind: "replace",
+    }
+  }
+
+  const previousTokens = tokenize(previous)
+  const incomingTokens = tokenize(incoming)
+
+  // Detect corrected cumulative snapshots that revise earlier words.
+  // These can share a long prefix or have high token overlap, but won't
+  // pass strict prefix checks. In these cases, replacing avoids duplicated
+  // "restart" phrases in the UI.
+  const previousMeaning = meaningfulTokenSet(previousTokens)
+  const incomingMeaning = meaningfulTokenSet(incomingTokens)
+  if (previousMeaning.size >= 8 && incomingMeaning.size >= 8) {
+    const commonPrefix = countCommonPrefixTokens(previousTokens, incomingTokens)
+    const overlap = intersectionSize(previousMeaning, incomingMeaning)
+    const overlapMin = overlap / Math.min(previousMeaning.size, incomingMeaning.size)
+    const overlapPrev = overlap / previousMeaning.size
+    const overlapInc = overlap / incomingMeaning.size
+
+    const shouldReplace =
+      commonPrefix >= 5 ||
+      overlapMin >= 0.85 ||
+      ((overlapPrev >= 0.75 || overlapInc >= 0.75) && overlapMin >= 0.7)
+
+    if (shouldReplace) {
+      return {
+        next: incoming,
+        delta: "",
+        kind: "replace",
+      }
+    }
+  }
+
+  const overlapCount = findOverlapCount(previousTokens, incomingTokens)
+
+  if (overlapCount > 0) {
+    const lastOverlapToken = incomingTokens[overlapCount - 1]
+    const allowOverlap =
+      overlapCount >= 2 || (lastOverlapToken && shouldAcceptSingleTokenOverlap(lastOverlapToken.norm))
+
+    if (allowOverlap) {
+      const delta = incoming.slice(lastOverlapToken.end)
+      return {
+        next: previous + delta,
+        delta,
+        kind: "delta",
+      }
     }
   }
 
@@ -43,4 +231,3 @@ export function mergeTranscriptUpdate(previous: string, incoming: string): Trans
     kind: "delta",
   }
 }
-

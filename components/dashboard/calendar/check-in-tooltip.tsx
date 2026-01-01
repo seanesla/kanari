@@ -16,10 +16,10 @@ import { Mic, Clock, TrendingUp, ArrowRight, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDuration } from '@/lib/date-utils'
-import type { Recording } from '@/lib/types'
+import type { CheckInSession } from '@/lib/types'
 
-interface RecordingTooltipProps {
-  recording: Recording | null
+interface CheckInTooltipProps {
+  session: CheckInSession | null
   open: boolean
   onOpenChange: (open: boolean) => void
   anchorPosition: { x: number; y: number } | null
@@ -48,12 +48,12 @@ function getScoreLabel(score: number | undefined): string {
   return 'High'
 }
 
-export function RecordingTooltip({
-  recording,
+export function CheckInTooltip({
+  session,
   open,
   onOpenChange,
   anchorPosition,
-}: RecordingTooltipProps) {
+}: CheckInTooltipProps) {
   const router = useRouter()
   const [positionReady, setPositionReady] = useState(false)
 
@@ -106,14 +106,14 @@ export function RecordingTooltip({
   const { getFloatingProps } = useInteractions([dismiss, role])
 
   // Defensive check - don't render until position is ready to prevent scroll jump
-  if (!recording?.id || !open || !anchorPosition || !positionReady) return null
+  if (!session?.id || !open || !anchorPosition || !positionReady) return null
 
-  const stressScore = recording.metrics?.stressScore
-  const fatigueScore = recording.metrics?.fatigueScore
+  const stressScore = session.acousticMetrics?.stressScore
+  const fatigueScore = session.acousticMetrics?.fatigueScore
 
-  const handleViewRecording = () => {
+  const handleViewCheckIn = () => {
     onOpenChange(false)
-    router.push(`/dashboard/history?highlight=${recording.id}`)
+    router.push(`/dashboard/history?highlight=${session.id}`)
   }
 
   return (
@@ -130,14 +130,14 @@ export function RecordingTooltip({
               <div className="p-1.5 rounded-full bg-accent/10">
                 <Mic className="h-3.5 w-3.5 text-accent" />
               </div>
-              <span className="text-sm font-medium">Recording</span>
+              <span className="text-sm font-medium">Check-in</span>
             </div>
             <Button
               variant="ghost"
               size="icon"
               className="h-6 w-6"
               onClick={() => onOpenChange(false)}
-              aria-label="Close recording details"
+              aria-label="Close check-in details"
             >
               <X className="h-3.5 w-3.5" />
             </Button>
@@ -148,16 +148,16 @@ export function RecordingTooltip({
             {/* Time & Duration */}
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
-                {formatDate(recording.createdAt)}
+                {formatDate(session.startedAt)}
               </span>
               <div className="flex items-center gap-1 text-muted-foreground">
                 <Clock className="h-3 w-3" />
-                <span>{formatDuration(recording.duration)}</span>
+                <span>{formatDuration(session.duration ?? 0)}</span>
               </div>
             </div>
 
             {/* Metrics */}
-            {recording.metrics ? (
+            {session.acousticMetrics ? (
               <div className="space-y-2">
                 {/* Stress Score */}
                 <div className="space-y-1">
@@ -193,7 +193,7 @@ export function RecordingTooltip({
               </div>
             ) : (
               <div className="text-sm text-muted-foreground text-center py-2">
-                {recording.status === 'processing' ? 'Processing...' : 'No metrics available'}
+                No metrics available
               </div>
             )}
           </div>
@@ -204,10 +204,10 @@ export function RecordingTooltip({
               variant="outline"
               size="sm"
               className="w-full gap-2 text-accent border-accent/30 hover:bg-accent/10"
-              onClick={handleViewRecording}
+              onClick={handleViewCheckIn}
             >
               <TrendingUp className="h-3.5 w-3.5" />
-              View Recording
+              View Check-in
               <ArrowRight className="h-3.5 w-3.5 ml-auto" />
             </Button>
           </div>

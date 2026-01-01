@@ -10,14 +10,11 @@ import { cn } from '@/lib/utils'
 import { logDebug } from '@/lib/logger'
 import { useSceneMode } from '@/lib/scene-context'
 import { generateDarkVariant, generateLightVariant } from '@/lib/color-utils'
-import { RecordingMarker } from './recording-marker'
-import { RecordingTooltip } from './recording-tooltip'
-import type { Suggestion, Recording } from '@/lib/types'
+import { CheckInMarker } from './check-in-marker'
+import { CheckInTooltip } from './check-in-tooltip'
+import type { Suggestion, CheckInSession } from '@/lib/types'
 import '@schedule-x/theme-default/dist/index.css'
 import './schedule-x-theme.css'
-
-// Event type enum to distinguish between different event sources
-type EventType = 'suggestion' | 'recording'
 
 // Extended event type with custom suggestion data
 // Source: Context7 - schedule-x/schedule-x docs - CalendarEvent allows [key: string]: any
@@ -27,21 +24,21 @@ interface SuggestionEvent extends CalendarEvent {
   _isCompleted?: boolean
 }
 
-// Extended event type for recording markers
-interface RecordingEvent extends CalendarEvent {
-  _type: 'recording'
-  _recording: Recording
+// Extended event type for check-in markers
+interface CheckInEvent extends CalendarEvent {
+  _type: 'checkin'
+  _session: CheckInSession
 }
 
 // Union type for all custom events
-type CustomCalendarEvent = SuggestionEvent | RecordingEvent
+type CustomCalendarEvent = SuggestionEvent | CheckInEvent
 
 interface ScheduleXWeekCalendarProps {
   scheduledSuggestions: Suggestion[]
   completedSuggestions?: Suggestion[]
-  recordings?: Recording[]
+  checkInSessions?: CheckInSession[]
   onEventClick?: (suggestion: Suggestion) => void
-  onRecordingClick?: (recording: Recording) => void
+  onCheckInClick?: (session: CheckInSession) => void
   onTimeSlotClick?: (date: Date, hour: number) => void
   onEventUpdate?: (suggestion: Suggestion, newScheduledFor: string) => void
   onExternalDrop?: (suggestionId: string, date: Date, hour: number, minute: number) => void
@@ -108,31 +105,31 @@ function completedToEvent(suggestion: Suggestion): SuggestionEvent | null {
   }
 }
 
-// Helper to map Recording to Schedule-X event format (as marker)
-function recordingToEvent(recording: Recording): RecordingEvent | null {
-  if (!recording.createdAt) return null
+// Helper to map check-ins to Schedule-X event format (as marker)
+function checkInToEvent(session: CheckInSession): CheckInEvent | null {
+  if (!session.startedAt) return null
 
   // Source: Context7 - schedule-x/schedule-x docs - "Timed Event Example"
   const timeZone = Temporal.Now.timeZoneId()
-  const instant = Temporal.Instant.from(recording.createdAt)
+  const instant = Temporal.Instant.from(session.startedAt)
   const startDateTime = instant.toZonedDateTimeISO(timeZone)
   // 20-min duration gives enough height for a proper pill-shaped event (~33px)
   const endDateTime = startDateTime.add({ minutes: 20 })
 
-  const stressScore = recording.metrics?.stressScore
-  const fatigueScore = recording.metrics?.fatigueScore
+  const stressScore = session.acousticMetrics?.stressScore
+  const fatigueScore = session.acousticMetrics?.fatigueScore
   const title = stressScore !== undefined
     ? `S:${stressScore} F:${fatigueScore ?? '?'}`
-    : 'Recording'
+    : 'Check-in'
 
   return {
-    id: `recording-${recording.id}`,
+    id: `checkin-${session.id}`,
     title,
     start: startDateTime,
     end: endDateTime,
-    calendarId: 'recording',
-    _type: 'recording',
-    _recording: recording,
+    calendarId: 'checkin',
+    _type: 'checkin',
+    _session: session,
   }
 }
 
@@ -146,9 +143,9 @@ export function ScheduleXWeekCalendar(props: ScheduleXWeekCalendarProps) {
 function ScheduleXWeekCalendarInner({
   scheduledSuggestions,
   completedSuggestions = [],
-  recordings = [],
+  checkInSessions = [],
   onEventClick,
-  onRecordingClick,
+  onCheckInClick,
   onTimeSlotClick,
   onEventUpdate,
   onExternalDrop,
@@ -160,8 +157,8 @@ function ScheduleXWeekCalendarInner({
   const containerRef = useRef<HTMLDivElement>(null)
   const eventsService = useMemo(() => createEventsServicePlugin(), [])
 
-  // Tooltip state for recording markers
-  const [selectedRecording, setSelectedRecording] = useState<Recording | null>(null)
+  // Tooltip state for check-in markers
+  const [selectedCheckIn, setSelectedCheckIn] = useState<CheckInSession | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
   const [tooltipOpen, setTooltipOpen] = useState(false)
 
@@ -267,8 +264,8 @@ function ScheduleXWeekCalendarInner({
           onContainer: '#9ca3af',
         },
       },
-      recording: {
-        colorName: 'recording',
+      checkin: {
+        colorName: 'checkin',
         lightColors: {
           main: '#f59e0b',
           container: '#fef3c7',
@@ -287,8 +284,8 @@ function ScheduleXWeekCalendarInner({
       onEventClick(calendarEvent, e) {
         const event = calendarEvent as CustomCalendarEvent
 
-        // Handle recording events - open tooltip
-        if (event._type === 'recording') {
+        // Handle check-in events - open tooltip
+        if (event._type === 'checkin') {
           // Fix 10: Stop propagation to prevent Schedule-X internal handling
           e.stopPropagation()
           // Find the Schedule-X event wrapper element, not just the clicked child
@@ -298,13 +295,13 @@ function ScheduleXWeekCalendarInner({
           const element = eventWrapper ?? target
           if (!element) return
           const rect = element.getBoundingClientRect()
-          setSelectedRecording(event._recording)
+          setSelectedCheckIn(event._session)
           setTooltipPosition({
             x: rect.left,
             y: rect.top + rect.height / 2
           })
           setTooltipOpen(true)
-          onRecordingClick?.(event._recording)
+          onCheckInClick?.(event._session)
           return
         }
 
@@ -334,7 +331,7 @@ function ScheduleXWeekCalendarInner({
     },
   })
 
-  // Sync events when scheduledSuggestions or recordings change
+  // Sync events when scheduledSuggestions or check-ins change
   // Source: Context7 - schedule-x/schedule-x docs - "EventsService Plugin"
   // The plugin needs the calendar to be mounted before calling .set()
   useEffect(() => {
@@ -349,14 +346,14 @@ function ScheduleXWeekCalendarInner({
       .map(completedToEvent)
       .filter((event): event is SuggestionEvent => event !== null)
 
-    const recordingEvents = recordings
-      .map(recordingToEvent)
-      .filter((event): event is RecordingEvent => event !== null)
+    const checkInEvents = checkInSessions
+      .map(checkInToEvent)
+      .filter((event): event is CheckInEvent => event !== null)
 
     const allEvents: CustomCalendarEvent[] = [
       ...scheduledEvents,
       ...completedEvents,
-      ...recordingEvents,
+      ...checkInEvents,
     ]
 
     // Use try-catch as the plugin may not be fully initialized on first render
@@ -366,7 +363,7 @@ function ScheduleXWeekCalendarInner({
       // Calendar not fully mounted yet, will retry on next render
       logDebug("ScheduleXCalendar", "Events service not ready:", error)
     }
-  }, [scheduledSuggestions, completedSuggestions, recordings, eventsService, calendar])
+  }, [scheduledSuggestions, completedSuggestions, checkInSessions, eventsService, calendar])
 
   // Calculate drop target time from mouse position
   const calculateDropTime = useCallback((e: React.DragEvent): { date: Date; hour: number; minute: number } | null => {
@@ -439,12 +436,12 @@ function ScheduleXWeekCalendarInner({
   }, [onExternalDrop, calculateDropTime])
 
   // Fix 4: Handler to open tooltip (used for both click and keyboard)
-  const openRecordingTooltip = useCallback((recording: Recording, position: { x: number; y: number }) => {
-    setSelectedRecording(recording)
+  const openCheckInTooltip = useCallback((session: CheckInSession, position: { x: number; y: number }) => {
+    setSelectedCheckIn(session)
     setTooltipPosition(position)
     setTooltipOpen(true)
-    onRecordingClick?.(recording)
-  }, [onRecordingClick])
+    onCheckInClick?.(session)
+  }, [onCheckInClick])
 
   // Custom component renderer for time grid events
   // Source: Context7 - schedule-x/schedule-x docs - "Customize Event Modal Content in React"
@@ -453,8 +450,8 @@ function ScheduleXWeekCalendarInner({
     timeGridEvent: ({ calendarEvent }: { calendarEvent: CalendarEvent }) => {
       const event = calendarEvent as CustomCalendarEvent
 
-      // Render recording as a compact pill event with keyboard support
-      if (event._type === 'recording') {
+      // Render check-in as a compact pill event with keyboard support
+      if (event._type === 'checkin') {
         return (
           <div
             onKeyDown={(e) => {
@@ -467,7 +464,7 @@ function ScheduleXWeekCalendarInner({
                 const element = eventWrapper ?? e.currentTarget
                 if (!element) return
                 const rect = element.getBoundingClientRect()
-                openRecordingTooltip(event._recording, {
+                openCheckInTooltip(event._session, {
                   x: rect.left,
                   y: rect.top + rect.height / 2,
                 })
@@ -475,7 +472,7 @@ function ScheduleXWeekCalendarInner({
             }}
             className="h-full w-full"
           >
-            <RecordingMarker recording={event._recording} />
+            <CheckInMarker session={event._session} />
           </div>
         )
       }
@@ -499,7 +496,7 @@ function ScheduleXWeekCalendarInner({
         </div>
       )
     },
-  }), [openRecordingTooltip])
+  }), [openCheckInTooltip])
 
   return (
     <div
@@ -523,9 +520,9 @@ function ScheduleXWeekCalendarInner({
         </div>
       )}
 
-      {/* Recording Tooltip */}
-      <RecordingTooltip
-        recording={selectedRecording}
+      {/* Check-in Tooltip */}
+      <CheckInTooltip
+        session={selectedCheckIn}
         open={tooltipOpen}
         onOpenChange={setTooltipOpen}
         anchorPosition={tooltipPosition}

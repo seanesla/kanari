@@ -82,7 +82,7 @@ export function SettingsAccountSection({ isSaving }: SettingsAccountSectionProps
               <Label className="text-base font-sans">Modify Onboarding</Label>
             </div>
             <p className="text-sm text-muted-foreground mb-3 font-sans">
-              Go through the onboarding steps again without losing your recordings or data.
+              Go through the onboarding steps again without losing your check-ins or data.
             </p>
             <Button
               variant="outline"
@@ -102,7 +102,7 @@ export function SettingsAccountSection({ isSaving }: SettingsAccountSectionProps
               <Label className="text-base font-sans text-destructive">Reset All Data</Label>
             </div>
             <p className="text-sm text-muted-foreground mb-3 font-sans">
-              Permanently delete all your recordings, suggestions, and settings. This cannot be undone.
+              Permanently delete all your check-ins, suggestions, and settings. This cannot be undone.
             </p>
             <Button
               variant="outline"
@@ -132,7 +132,7 @@ export function SettingsAccountSection({ isSaving }: SettingsAccountSectionProps
           <AlertDialogHeader>
             <AlertDialogTitle>Reset All Data?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete all your recordings, suggestions, trends, and settings.
+              This will permanently delete all your check-ins, suggestions, trends, and settings.
               You&apos;ll be taken through the onboarding process again as a new user.
               This action cannot be undone.
             </AlertDialogDescription>
@@ -159,4 +159,3 @@ export function SettingsAccountSection({ isSaving }: SettingsAccountSectionProps
     </>
   )
 }
-

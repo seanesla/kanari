@@ -9,6 +9,7 @@ import {
   type FeatureAccumulator,
 } from "@/lib/audio/feature-aggregator"
 import { processAudio } from "@/lib/audio/processor"
+import { logDebug } from "@/lib/logger"
 import {
   detectMismatch,
   featuresToPatterns,
@@ -66,6 +67,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
   // Track the last user message ID for updating with features
   const lastUserMessageIdRef = useRef<string | null>(null)
+  const lastAssistantMessageIdRef = useRef<string | null>(null)
 
   // When VAD "speech start" events are missing, user transcript updates can keep
   // appending into the previous bubble. We treat the end of an assistant turn
@@ -90,6 +92,17 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
   // Accumulate session-level audio features across utterances
   const sessionFeatureAccumulatorRef = useRef<FeatureAccumulator | null>(null)
   const lastSessionIdRef = useRef<string | null>(null)
+
+  // Dev-only: enable with localStorage.setItem("kanari.debugTranscriptMerge", "1")
+  const debugTranscriptMergeRef = useRef(false)
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    try {
+      debugTranscriptMergeRef.current = window.localStorage.getItem("kanari.debugTranscriptMerge") === "1"
+    } catch {
+      // ignore
+    }
+  }, [])
 
   // Sync userTranscriptRef with current user transcript (for use in callbacks)
   useEffect(() => {
@@ -280,7 +293,17 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       }
 
       // Accumulate transcript chunks (Gemini sends word-by-word without finished flag)
-      userTranscriptRef.current = mergeTranscriptUpdate(userTranscriptRef.current, text).next
+      const mergedUser = mergeTranscriptUpdate(userTranscriptRef.current, text)
+      if (debugTranscriptMergeRef.current) {
+        logDebug("TranscriptMerge", "user", {
+          prevLength: userTranscriptRef.current.length,
+          incomingLength: text.length,
+          nextLength: mergedUser.next.length,
+          kind: mergedUser.kind,
+          deltaLength: mergedUser.delta.length,
+        })
+      }
+      userTranscriptRef.current = mergedUser.next
 
       // Update transcript preview with accumulated text (used for mismatch detection and UI fallbacks)
       dispatch({ type: "SET_USER_TRANSCRIPT", text: userTranscriptRef.current })
@@ -343,13 +366,29 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
         }
         dispatch({ type: "ADD_MESSAGE", message: streamingMessage })
         currentTranscriptRef.current = text
+        lastAssistantMessageIdRef.current = streamingMessage.id
       } else {
         // Subsequent chunks: update the existing message in place.
         // The Live API may emit either delta chunks or cumulative transcript snapshots,
         // so we merge carefully to avoid duplication/concatenation artifacts.
         const merged = mergeTranscriptUpdate(currentTranscriptRef.current, text)
+        if (debugTranscriptMergeRef.current) {
+          logDebug("TranscriptMerge", "assistant", {
+            prevLength: currentTranscriptRef.current.length,
+            incomingLength: text.length,
+            nextLength: merged.next.length,
+            kind: merged.kind,
+            deltaLength: merged.delta.length,
+          })
+        }
         currentTranscriptRef.current = merged.next
-        if (merged.delta) {
+        if (merged.kind === "replace" && lastAssistantMessageIdRef.current) {
+          dispatch({
+            type: "UPDATE_MESSAGE_CONTENT",
+            messageId: lastAssistantMessageIdRef.current,
+            content: merged.next,
+          })
+        } else if (merged.delta) {
           dispatch({ type: "UPDATE_STREAMING_MESSAGE", text: merged.delta })
         }
       }
@@ -360,6 +399,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       if (finished) {
         dispatch({ type: "FINALIZE_STREAMING_MESSAGE" })
         currentTranscriptRef.current = ""
+        lastAssistantMessageIdRef.current = null
       }
     },
     [dispatch]
@@ -394,6 +434,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     // Reset refs for next response
     currentTranscriptRef.current = ""
     currentThinkingRef.current = ""
+    lastAssistantMessageIdRef.current = null
     // Transition to listening - this handles both AI greeting and regular responses
     dispatch({ type: "SET_LISTENING" })
     pendingUserUtteranceResetRef.current = true
@@ -404,6 +445,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     clearQueuedAudio()
     currentTranscriptRef.current = ""
     currentThinkingRef.current = ""
+    lastAssistantMessageIdRef.current = null
     dispatch({ type: "CLEAR_CURRENT_TRANSCRIPTS" })
     dispatch({ type: "SET_USER_SPEAKING" })
   }, [clearQueuedAudio, dispatch])
@@ -414,6 +456,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       console.log("[useCheckIn] AI chose silence:", reason)
       dispatch({ type: "SET_LISTENING" })
       pendingUserUtteranceResetRef.current = true
+      lastAssistantMessageIdRef.current = null
     },
     [dispatch]
   )

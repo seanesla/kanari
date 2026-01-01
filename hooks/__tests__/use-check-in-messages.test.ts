@@ -212,6 +212,40 @@ describe("useCheckIn message handling", () => {
     expect(result.current[0].messages[0]?.content).toBe("Hello there")
   })
 
+  it("replaces the streaming assistant transcript when cumulative snapshots diverge", () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    const first =
+      "Hey, happy New Years Eve! It was good to see your mood improve after yesterday morning. How are you"
+    const second =
+      "Hey, happy New Year's Eve! It was good to see your mood improve after yesterday morning. How are you feeling as we head into the new year?"
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.(first, false)
+      geminiCallbacks?.onModelTranscript?.(second, false)
+    })
+
+    expect(result.current[0].messages).toHaveLength(1)
+    expect(result.current[0].messages[0]?.content).toBe(second)
+  })
+
+  it("replaces the streaming assistant transcript when corrected snapshots revise earlier words", () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    const first =
+      "Hey, happy New Year's Eve! It was good to see your mood improve after yesterday morning. How are you feeling tonight?"
+    const second =
+      "Hey, happy New Year's Eve! It was great to see your mood improve after yesterday morning. How are you feeling tonight?"
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.(first, false)
+      geminiCallbacks?.onModelTranscript?.(second, false)
+    })
+
+    expect(result.current[0].messages).toHaveLength(1)
+    expect(result.current[0].messages[0]?.content).toBe(second)
+  })
+
   it("finalizes the streaming assistant message on turn completion", () => {
     const { result } = renderHook(() => useCheckIn())
 
@@ -239,6 +273,18 @@ describe("useCheckIn message handling", () => {
 
     expect(result.current[0].messages).toHaveLength(1)
     expect(result.current[0].messages[0]?.content).toBe("hello world")
+  })
+
+  it("avoids duplicated words when user transcript updates overlap", () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onUserTranscript?.("pretty okay", false)
+      geminiCallbacks?.onUserTranscript?.("okay but normal", false)
+    })
+
+    expect(result.current[0].messages).toHaveLength(1)
+    expect(result.current[0].messages[0]?.content).toBe("pretty okay but normal")
   })
 
   it("runs mismatch detection after user speech ends when audio is available", async () => {

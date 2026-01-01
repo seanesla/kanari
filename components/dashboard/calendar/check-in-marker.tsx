@@ -3,10 +3,10 @@
 import { useMemo } from 'react'
 import { Mic } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { Recording } from '@/lib/types'
+import type { CheckInSession } from '@/lib/types'
 
-interface RecordingMarkerProps {
-  recording: Recording
+interface CheckInMarkerProps {
+  session: CheckInSession
   className?: string
 }
 
@@ -19,15 +19,15 @@ function getScoreColor(score: number | undefined): string {
   return 'bg-rose-500'
 }
 
-export function RecordingMarker({ recording, className }: RecordingMarkerProps) {
-  const stressScore = recording.metrics?.stressScore
-  const fatigueScore = recording.metrics?.fatigueScore
+export function CheckInMarker({ session, className }: CheckInMarkerProps) {
+  const stressScore = session.acousticMetrics?.stressScore
+  const fatigueScore = session.acousticMetrics?.fatigueScore
 
   const stressColor = useMemo(() => getScoreColor(stressScore), [stressScore])
   const fatigueColor = useMemo(() => getScoreColor(fatigueScore), [fatigueScore])
 
   // Fix 4: Build accessible label for screen readers
-  const ariaLabel = `Recording. Stress: ${stressScore ?? 'unknown'}. Fatigue: ${fatigueScore ?? 'unknown'}. Click for details.`
+  const ariaLabel = `Check-in. Stress: ${stressScore ?? 'unknown'}. Fatigue: ${fatigueScore ?? 'unknown'}. Click for details.`
 
   return (
     <div

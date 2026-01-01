@@ -22,6 +22,7 @@ import {
   type GeminiWidgetEvent,
   type SessionContext,
 } from "@/lib/gemini/live-client"
+import { mergeTranscriptUpdate } from "@/lib/gemini/transcript-merge"
 
 // ============================================
 // Types
@@ -176,9 +177,10 @@ export function geminiReducer(state: GeminiLiveData, action: GeminiAction): Gemi
       }
 
     case "MODEL_TRANSCRIPT": {
-      // Append to current model transcript with max length check
+      // Merge transcript updates with max length check
       const MAX_TRANSCRIPT_LENGTH = 10000
-      const newTranscript = state.modelTranscript + action.text
+      const merged = mergeTranscriptUpdate(state.modelTranscript, action.text)
+      const newTranscript = merged.next
       return {
         ...state,
         modelTranscript: newTranscript.length > MAX_TRANSCRIPT_LENGTH

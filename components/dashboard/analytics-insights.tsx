@@ -8,7 +8,6 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible"
 import { Badge } from "@/components/ui/badge"
 import { useAnalyticsInsights } from "@/hooks/use-analytics-insights"
-import { RecordingReferencePopover } from "./recording-reference-popover"
 import type { AnalyticsTimeRange, AggregatedObservation } from "@/lib/types"
 
 const TIME_RANGE_LABELS: Record<AnalyticsTimeRange, string> = {
@@ -215,9 +214,6 @@ function ObservationList({ observations }: { observations: AggregatedObservation
           </Badge>
           <span className="flex-1">
             {obs.observation}
-            {obs.references.map((ref, j) => (
-              <RecordingReferencePopover key={j} reference={ref} index={j} />
-            ))}
           </span>
           {obs.frequency > 1 && (
             <span className="text-xs text-muted-foreground shrink-0">x{obs.frequency}</span>

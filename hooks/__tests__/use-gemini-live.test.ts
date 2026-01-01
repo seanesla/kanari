@@ -227,6 +227,19 @@ describe("geminiReducer", () => {
       expect(result.modelTranscript).toBe("First response")
     })
 
+    test("MODEL_TRANSCRIPT replaces transcript when cumulative snapshots diverge", () => {
+      state.modelTranscript =
+        "Hey, happy New Years Eve! It was good to see your mood improve after yesterday morning. How are you"
+      const action: GeminiAction = {
+        type: "MODEL_TRANSCRIPT",
+        text:
+          "Hey, happy New Year's Eve! It was good to see your mood improve after yesterday morning. How are you feeling as we head into the new year?",
+      }
+      const result = geminiReducer(state, action)
+
+      expect(result.modelTranscript).toBe(action.text)
+    })
+
     test("MODEL_TRANSCRIPT truncates when exceeding MAX_TRANSCRIPT_LENGTH", () => {
       const MAX_TRANSCRIPT_LENGTH = 10000
       // Create transcript that's already at max length
