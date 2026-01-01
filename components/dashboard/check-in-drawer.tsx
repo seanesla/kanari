@@ -3,23 +3,21 @@
 /**
  * Unified Check-in Drawer Component
  *
- * This is the main container that combines the Voice Note and AI Chat features
- * into a single tabbed interface. It replaces the separate recording drawer
- * and check-in dialog with one unified experience.
+ * This is the main container for the AI chat check-in experience.
+ * It replaces the previous recording drawer and check-in dialog
+ * with one unified experience.
  *
  * Features:
- * 1. Tab-based mode selection (Voice note / AI chat) using Shadcn Tabs
+ * 1. Single AI chat experience (voice + live transcription)
  * 2. Microphone permission checking with clear error state
- * 3. Session-aware tab locking (can't switch tabs while recording/chatting)
- * 4. Discard confirmation when closing during active session
- * 5. Browser navigation guard to prevent accidental data loss
+ * 3. Discard confirmation when closing during active session
+ * 4. Browser navigation guard to prevent accidental data loss
  *
  * Component hierarchy:
- * CheckInButton → CheckInDrawer → VoiceNoteContent or AIChatContent
+ * CheckInButton → CheckInDrawer → AIChatContent
  *
  * State flow:
- * - mode: "voice-note" | "ai-chat" - which tab is active
- * - isSessionActive: boolean - whether a recording or chat is in progress
+ * - isSessionActive: boolean - whether a conversation is in progress
  * - micPermission: "granted" | "denied" | "prompt" - browser mic permission state
  */
 
@@ -42,25 +40,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { MicOff, AlertCircle, X } from "lucide-react"
-import { VoiceNoteContent } from "./check-in-voice-note"
 import { AIChatContent } from "./check-in-ai-chat"
-import type { Recording, CheckInSession } from "@/lib/types"
-
-// The two available modes in the unified check-in experience
-type CheckInMode = "voice-note" | "ai-chat"
+import type { CheckInSession } from "@/lib/types"
 
 interface CheckInDrawerProps {
   /** Whether the drawer is open */
   open: boolean
   /** Called when drawer should open/close */
   onOpenChange: (open: boolean) => void
-  /** Which mode to start in (defaults to voice-note) */
-  defaultMode?: CheckInMode
-  /** Called when a voice recording is saved */
-  onRecordingComplete?: (recording: Recording) => void
   /** Called when an AI chat session is saved */
   onSessionComplete?: (session: CheckInSession) => void
 }
@@ -68,14 +57,9 @@ interface CheckInDrawerProps {
 export function CheckInDrawer({
   open,
   onOpenChange,
-  defaultMode = "voice-note",
-  onRecordingComplete,
   onSessionComplete,
 }: CheckInDrawerProps) {
-  // Current selected tab
-  const [mode, setMode] = useState<CheckInMode>(defaultMode)
-
-  // Whether a recording or chat is currently in progress
+  // Whether a conversation is currently in progress
   // Used to disable tab switching and show discard confirmation
   const [isSessionActive, setIsSessionActive] = useState(false)
 
@@ -118,7 +102,7 @@ export function CheckInDrawer({
         }
       })
       .catch(() => {
-        // Permissions API not available, will check when recording starts
+        // Permissions API not available, will check when capture starts
         setMicPermission("prompt")
       })
 
@@ -130,19 +114,18 @@ export function CheckInDrawer({
     }
   }, [open])
 
-  // Reset mode to default when drawer closes
+  // Reset session state when drawer closes
   useEffect(() => {
     if (!open) {
-      setMode(defaultMode)
       setIsSessionActive(false)
       setRequestDiscard(false)
     }
-  }, [open, defaultMode])
+  }, [open])
 
   /**
    * Handle drawer close attempt
    *
-   * If a session is active (recording or chatting), we show a confirmation
+   * If a session is active, we show a confirmation
    * dialog instead of closing immediately. This prevents data loss.
    */
   const handleOpenChange = useCallback((newOpen: boolean) => {
@@ -191,25 +174,12 @@ export function CheckInDrawer({
   /**
    * Handle session state changes from child components
    *
-   * This is called by VoiceNoteContent and AIChatContent when they
-   * start/stop recording or chatting. We use this to:
-   * 1. Disable tab switching during active sessions
-   * 2. Show discard confirmation when closing during active session
+   * This is called by AIChatContent when it starts/stops. We use this to:
+   * 1. Track active sessions for discard confirmation
    */
   const handleSessionChange = useCallback((isActive: boolean) => {
     setIsSessionActive(isActive)
   }, [])
-
-  /**
-   * Handle tab change
-   *
-   * Only allowed when no session is active
-   */
-  const handleModeChange = useCallback((newMode: string) => {
-    if (!isSessionActive) {
-      setMode(newMode as CheckInMode)
-    }
-  }, [isSessionActive])
 
   /**
    * Handle retry microphone permission
@@ -308,56 +278,15 @@ export function CheckInDrawer({
               </Button>
             </div>
           ) : (
-            <>
-              {/*
-                ===== MODE TOGGLE TABS =====
-                Allows switching between Voice note and AI chat modes
-                Disabled when a session is active to prevent data loss
-              */}
-              <div className="px-6 py-3 border-b border-border/50">
-                <Tabs value={mode} onValueChange={handleModeChange}>
-                  <TabsList className="w-full">
-                    <TabsTrigger
-                      value="voice-note"
-                      className="flex-1"
-                      disabled={isSessionActive}
-                    >
-                      Voice note
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="ai-chat"
-                      className="flex-1"
-                      disabled={isSessionActive}
-                    >
-                      AI chat
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
-              </div>
-
-              {/*
-                ===== MODE CONTENT =====
-                Render the appropriate content based on selected mode
-                Only one is rendered at a time to manage resources properly
-              */}
-              <div className="flex-1 overflow-hidden">
-                {mode === "voice-note" ? (
-                  <VoiceNoteContent
-                    onClose={handleClose}
-                    onSessionChange={handleSessionChange}
-                    onRecordingComplete={onRecordingComplete}
-                  />
-                ) : (
-                  <AIChatContent
-                    onClose={handleClose}
-                    onSessionChange={handleSessionChange}
-                    onSessionComplete={onSessionComplete}
-                    requestDiscard={requestDiscard}
-                    onDiscardComplete={handleDiscardComplete}
-                  />
-                )}
-              </div>
-            </>
+            <div className="flex-1 overflow-hidden">
+              <AIChatContent
+                onClose={handleClose}
+                onSessionChange={handleSessionChange}
+                onSessionComplete={onSessionComplete}
+                requestDiscard={requestDiscard}
+                onDiscardComplete={handleDiscardComplete}
+              />
+            </div>
           )}
         </DrawerContent>
       </Drawer>
@@ -372,8 +301,7 @@ export function CheckInDrawer({
           <AlertDialogHeader>
             <AlertDialogTitle>Discard session?</AlertDialogTitle>
             <AlertDialogDescription>
-              You have a {mode === "voice-note" ? "recording" : "conversation"} in progress.
-              Are you sure you want to discard it and close?
+              You have a conversation in progress. Are you sure you want to discard it and close?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -2,8 +2,7 @@
  * Recordings Page Redirect
  *
  * This page has been moved to /dashboard/history
- * This file now redirects to the new unified history page
- * that displays both voice recordings and AI chat sessions.
+ * This file now redirects to the unified check-in history page.
  *
  * This redirect is kept for backwards compatibility with any
  * direct links or bookmarks pointing to the old URL.

@@ -7,10 +7,11 @@
  */
 
 export { CheckInDialog } from "./check-in-dialog"
-export { CheckInTrigger, CheckInFab, PostRecordingPrompt } from "./check-in-trigger"
+export { CheckInTrigger, CheckInFab } from "./check-in-trigger"
 export { ConversationView } from "./conversation-view"
 export { MessageBubble, TypingIndicator, TranscriptPreview } from "./message-bubble"
 export { VoiceIndicator, VoiceIndicatorLarge } from "./voice-indicator"
+export { BiomarkerIndicator } from "./biomarker-indicator"
 export {
   EmotionTimeline,
   EmotionTimelineCompact,

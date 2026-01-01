@@ -80,6 +80,10 @@ export type CheckInAction =
       metrics: VoiceMetrics
       mismatch: MismatchResult
     }
+  | {
+      type: "SET_SESSION_ACOUSTIC_METRICS"
+      metrics: CheckInSession["acousticMetrics"] | null
+    }
   | { type: "SET_USER_TRANSCRIPT"; text: string }
   | { type: "SET_ASSISTANT_TRANSCRIPT"; text: string }
   | { type: "APPEND_ASSISTANT_TRANSCRIPT"; text: string }
@@ -233,6 +237,18 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
       }
     }
 
+    case "SET_SESSION_ACOUSTIC_METRICS": {
+      if (!state.session) return state
+
+      return {
+        ...state,
+        session: {
+          ...state.session,
+          acousticMetrics: action.metrics ?? undefined,
+        },
+      }
+    }
+
     case "SET_USER_TRANSCRIPT":
       return { ...state, currentUserTranscript: action.text }
 
@@ -345,4 +361,3 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
       return state
   }
 }
-

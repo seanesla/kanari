@@ -484,48 +484,6 @@ export const CHECK_IN_OPENING_PROMPT = `Start the conversation with a warm, natu
  */
 export const CHECK_IN_CLOSING_PROMPT = `The user wants to end the conversation. Provide a warm, supportive closing. If appropriate, offer one gentle suggestion for self-care. Keep it brief and encouraging.`
 
-/**
- * Post-recording context prompt
- * Used when check-in is triggered after a recording
- *
- * SECURITY: All values are validated and sanitized
- */
-export function generatePostRecordingContext(
-  stressScore: number,
-  fatigueScore: number,
-  patterns: VoicePatterns
-): string {
-  // Clamp scores to valid range
-  const safeStressScore = Math.max(0, Math.min(100, Math.round(stressScore)))
-  const safeFatigueScore = Math.max(0, Math.min(100, Math.round(fatigueScore)))
-
-  // Validate pattern values
-  const safeSpeechRate = VALID_SPEECH_RATES.includes(patterns.speechRate as (typeof VALID_SPEECH_RATES)[number])
-    ? patterns.speechRate
-    : "normal"
-  const safeEnergyLevel = VALID_ENERGY_LEVELS.includes(patterns.energyLevel as (typeof VALID_ENERGY_LEVELS)[number])
-    ? patterns.energyLevel
-    : "moderate"
-
-  let concernLevel = "fine"
-  if (safeStressScore > 70 || safeFatigueScore > 70) {
-    concernLevel = "concerning"
-  } else if (safeStressScore > 50 || safeFatigueScore > 50) {
-    concernLevel = "moderate"
-  }
-
-  return `[RECORDING CONTEXT]
-The user just completed a voice recording for burnout tracking.
-Their voice patterns show ${concernLevel} levels:
-- Stress: ${safeStressScore}/100
-- Fatigue: ${safeFatigueScore}/100
-- Speech: ${safeSpeechRate}, Energy: ${safeEnergyLevel}
-
-This check-in was triggered because they might benefit from talking.
-Start by acknowledging you noticed they were recording and gently ask how they're feeling.
-[END CONTEXT]`
-}
-
 // ============================================
 // AI-Initiated Conversation System Instruction
 // ============================================
@@ -563,12 +521,7 @@ export interface SystemContextSummary {
  */
 export function buildCheckInSystemInstruction(
   contextSummary?: SystemContextSummary,
-  timeContext?: SystemTimeContext,
-  postRecordingContext?: {
-    stressScore: number
-    fatigueScore: number
-    patterns: VoicePatterns
-  }
+  timeContext?: SystemTimeContext
 ): string {
   let instruction = CHECK_IN_SYSTEM_PROMPT
 
@@ -606,33 +559,6 @@ Things to be aware of:
 ${contextSummary.contextNotes}`
   }
 
-  // Add post-recording context section if this session was triggered after a voice recording
-  if (postRecordingContext) {
-    const concernLevel =
-      postRecordingContext.stressScore > 70 || postRecordingContext.fatigueScore > 70
-        ? "elevated"
-        : postRecordingContext.stressScore > 50 || postRecordingContext.fatigueScore > 50
-          ? "moderate"
-          : "normal"
-
-    instruction += `
-
-═══════════════════════════════════════════════════════════════════════════════
-POST-RECORDING CONTEXT (Session triggered after voice recording)
-═══════════════════════════════════════════════════════════════════════════════
-
-The user just completed a voice recording for burnout tracking.
-Their voice patterns show ${concernLevel} levels:
-- Stress: ${Math.round(postRecordingContext.stressScore)}/100
-- Fatigue: ${Math.round(postRecordingContext.fatigueScore)}/100
-- Speech rate: ${postRecordingContext.patterns.speechRate}
-- Energy level: ${postRecordingContext.patterns.energyLevel}
-
-This check-in was triggered because they might benefit from talking.
-When you greet them, acknowledge you noticed they were recording and gently ask how they're feeling.
-${concernLevel === "elevated" ? "Their metrics suggest they may be stressed - approach with extra care." : ""}`
-  }
-
   // Add AI-initiation instructions
   instruction += `
 
@@ -642,12 +568,7 @@ CONVERSATION INITIATION (CRITICAL - READ CAREFULLY)
 
 YOU MUST START THE CONVERSATION. The user will NOT speak first.
 
-When you receive the message "[START_CONVERSATION]", immediately begin speaking with a warm, personalized greeting.${postRecordingContext ? `
-
-FOR THIS POST-RECORDING SESSION:
-- Acknowledge you noticed they just recorded a voice note
-- Gently ask how they're feeling
-${postRecordingContext.stressScore > 50 || postRecordingContext.fatigueScore > 50 ? "- Their metrics suggest they may need extra care - be warm and supportive" : ""}` : contextSummary ? `
+When you receive the message "[START_CONVERSATION]", immediately begin speaking with a warm, personalized greeting.${contextSummary ? `
 
 USE THE CONTEXT ABOVE to craft a warm, personalized greeting.
 - Reference their recent patterns, mood, or what's happening in their life

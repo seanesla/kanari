@@ -217,15 +217,16 @@ export function useAchievements(): UseAchievementsResult {
  */
 export function useCanGenerateAchievements(
   recordings: Recording[],
+  sessions: CheckInSession[],
   suggestions: Suggestion[]
 ): boolean {
   // Need at least some activity to generate achievements
-  const hasRecordings = recordings.length >= 1
+  const hasVoiceData = recordings.length >= 1 || sessions.some((session) => session.acousticMetrics)
   const hasSuggestionActivity = suggestions.some(
     s => s.status === "completed" || s.status === "accepted" || s.status === "dismissed"
   )
 
-  return hasRecordings || hasSuggestionActivity
+  return hasVoiceData || hasSuggestionActivity
 }
 
 /**

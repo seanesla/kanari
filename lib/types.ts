@@ -499,12 +499,25 @@ export interface CheckInSession {
   messages: CheckInMessage[]
   // Summary generated at end of conversation
   summary?: CheckInSummary
-  // Link to recording if triggered post-recording
+  // Legacy: link to recording if session was started after a recording
   recordingId?: string
   // Total duration of the conversation in seconds
   duration?: number
   // Number of detected mismatches during conversation
   mismatchCount?: number
+  // Session-level acoustic metrics (aggregated from all user speech)
+  acousticMetrics?: {
+    stressScore: number
+    fatigueScore: number
+    stressLevel: StressLevel
+    fatigueLevel: FatigueLevel
+    confidence: number
+    analyzedAt?: string
+    features: AudioFeatures
+  }
+  // Audio data for session playback (user's voice only)
+  audioData?: number[] // Float32Array serialized for IndexedDB storage
+  sampleRate?: number // For playback (default 16000)
 }
 
 // ============================================
@@ -683,17 +696,8 @@ export interface LiveAPITranscription {
 // Unified History Timeline Types
 // ============================================
 
-// Discriminator type to identify which union type we're dealing with
-export type HistoryItemType = "voice_note" | "ai_chat"
-
-// Represents a voice note recording in the history timeline
-export interface VoiceNoteHistoryItem {
-  id: string // Same as recording.id
-  type: "voice_note"
-  timestamp: string // ISO date string (recording.createdAt) for chronological sorting
-  recording: Recording // The full recording object
-  linkedChatSessionId?: string // If a chat session was triggered from this recording
-}
+// Discriminator type to identify which history item we're dealing with
+export type HistoryItemType = "ai_chat"
 
 // Represents an AI chat session in the history timeline
 export interface AIChatHistoryItem {
@@ -701,11 +705,10 @@ export interface AIChatHistoryItem {
   type: "ai_chat"
   timestamp: string // ISO date string (session.startedAt) for chronological sorting
   session: CheckInSession // The full session object
-  linkedRecordingId?: string // If this chat was triggered by a voice note (from session.recordingId)
 }
 
-// Discriminated union type: a history item is either a voice note or an AI chat
-export type HistoryItem = VoiceNoteHistoryItem | AIChatHistoryItem
+// History item type (AI chat only)
+export type HistoryItem = AIChatHistoryItem
 
 // Re-export SceneMode for convenience
 export type { SceneMode } from "./scene-context"

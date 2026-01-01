@@ -217,3 +217,20 @@ export function recordingsToTrendData(recordings: Array<{
       fatigueScore: r.metrics!.fatigueScore,
     }))
 }
+
+/**
+ * Helper to convert CheckInSession[] to TrendData[]
+ * Uses session-level acoustic metrics captured during AI chat.
+ */
+export function sessionsToTrendData(sessions: Array<{
+  startedAt: string
+  acousticMetrics?: { stressScore: number; fatigueScore: number }
+}>): TrendData[] {
+  return sessions
+    .filter((s) => s.acousticMetrics)
+    .map((s) => ({
+      date: s.startedAt.split("T")[0],
+      stressScore: s.acousticMetrics!.stressScore,
+      fatigueScore: s.acousticMetrics!.fatigueScore,
+    }))
+}

@@ -27,10 +27,9 @@ Note: Gemini API keys are entered by the user in the Settings UI (no server env 
 **Stack**: Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4
 
 ### Data Flow
-1. **Voice Note mode**: `AudioRecorder` → VAD → Meyda features → IndexedDB → Gemini Flash analysis
-2. **AI Chat mode**: Real-time voice via `use-gemini-live.ts` → WebSocket → Gemini Live API
-3. `lib/ml/forecasting.ts` predicts 3-7 day burnout risk from acoustic trends
-4. Gemini generates recovery suggestions → user schedules via Google Calendar
+1. **AI Chat check-in**: `use-check-in` captures mic audio → Meyda features (client-side) → Gemini Live API (real-time) → IndexedDB session storage
+2. `lib/ml/forecasting.ts` predicts 3-7 day burnout risk from check-in acoustic trends
+3. Gemini generates recovery suggestions → user schedules via Google Calendar
 
 ### Key Directories
 - `app/api/gemini/live/` - Gemini Live streaming routes (WebSocket proxy)
@@ -44,7 +43,7 @@ Note: Gemini API keys are entered by the user in the Settings UI (no server env 
 ### State Management
 - `SceneProvider` - Scene mode, accent color, loading
 - `NavbarProvider` - Navigation state
-- Domain hooks: `use-check-in` (orchestrates Voice Note/AI Chat modes), `use-gemini-live` (WebSocket session)
+- Domain hooks: `use-check-in` (orchestrates AI chat + biomarker capture), `use-gemini-live` (WebSocket session)
 
 ### APIs
 - **Gemini Flash**: REST API for async analysis

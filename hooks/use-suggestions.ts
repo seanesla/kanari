@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback } from "react"
 import { logError } from "@/lib/logger"
 import type {
   Suggestion,
   VoiceMetrics,
   TrendDirection,
   SuggestionStatus,
-  Recording,
+  CheckInSession,
   AudioFeatures,
   VoicePatterns,
   HistoricalContext,
@@ -18,7 +18,7 @@ import type {
 } from "@/lib/types"
 import { useAllSuggestions, useSuggestionActions } from "./use-storage"
 import { useSuggestionMemory } from "./use-suggestion-memory"
-import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
+import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
 import { createGeminiHeaders } from "@/lib/utils"
 
 /**
@@ -34,7 +34,7 @@ import { createGeminiHeaders } from "@/lib/utils"
  * const { suggestions, loading, error, regenerateWithDiff, updateSuggestion } = useSuggestions()
  *
  * // Regenerate suggestions with diff-aware mode (reviews existing, makes decisions)
- * await regenerateWithDiff(metrics, trend, allRecordings)
+ * await regenerateWithDiff(metrics, trend, sessions)
  *
  * // Update suggestion status (persisted to IndexedDB)
  * updateSuggestion(suggestionId, "completed")
@@ -57,7 +57,7 @@ interface UseSuggestionsResult {
   lastDiffSummary: DiffSummary | null
   clearUpdateError: () => void
   clearDiffSummary: () => void
-  regenerateWithDiff: (metrics: VoiceMetrics, trend: TrendDirection, allRecordings?: Recording[]) => Promise<void>
+  regenerateWithDiff: (metrics: VoiceMetrics, trend: TrendDirection, sessions?: CheckInSession[]) => Promise<void>
   updateSuggestion: (id: string, status: SuggestionStatus) => Promise<boolean>
   // Kanban-specific actions
   moveSuggestion: (id: string, newStatus: SuggestionStatus, scheduledFor?: string) => Promise<boolean>
@@ -88,23 +88,23 @@ export function featuresToVoicePatterns(features?: AudioFeatures): VoicePatterns
 }
 
 /**
- * Compute historical context from recordings
+ * Compute historical context from check-in sessions
  */
-export function computeHistoricalContext(recordings: Recording[]): HistoricalContext {
-  const validRecordings = recordings.filter(r => r.metrics)
+export function computeHistoricalContext(sessions: CheckInSession[]): HistoricalContext {
+  const validSessions = sessions.filter(s => s.acousticMetrics)
 
-  if (validRecordings.length === 0) {
+  if (validSessions.length === 0) {
     return { recordingCount: 0, daysOfData: 0, averageStress: 0, averageFatigue: 0, stressChange: "stable", fatigueChange: "stable" }
   }
 
-  const avgStress = validRecordings.reduce((sum, r) => sum + (r.metrics?.stressScore || 0), 0) / validRecordings.length
-  const avgFatigue = validRecordings.reduce((sum, r) => sum + (r.metrics?.fatigueScore || 0), 0) / validRecordings.length
+  const avgStress = validSessions.reduce((sum, s) => sum + (s.acousticMetrics?.stressScore || 0), 0) / validSessions.length
+  const avgFatigue = validSessions.reduce((sum, s) => sum + (s.acousticMetrics?.fatigueScore || 0), 0) / validSessions.length
 
   // Calculate unique days
-  const uniqueDays = new Set(validRecordings.map(r => r.createdAt.split("T")[0]))
+  const uniqueDays = new Set(validSessions.map(s => s.startedAt.split("T")[0]))
 
   // Calculate change from baseline (compare latest to average)
-  const latest = validRecordings[0]?.metrics
+  const latest = validSessions[0]?.acousticMetrics
   const stressDiff = latest ? latest.stressScore - avgStress : 0
   const fatigueDiff = latest ? latest.fatigueScore - avgFatigue : 0
 
@@ -115,7 +115,7 @@ export function computeHistoricalContext(recordings: Recording[]): HistoricalCon
   }
 
   return {
-    recordingCount: validRecordings.length,
+    recordingCount: validSessions.length,
     daysOfData: uniqueDays.size,
     averageStress: Math.round(avgStress),
     averageFatigue: Math.round(avgFatigue),
@@ -150,7 +150,7 @@ export function useSuggestions(): UseSuggestionsResult {
   const regenerateWithDiff = useCallback(async (
     metrics: VoiceMetrics,
     trend: TrendDirection,
-    allRecordings?: Recording[]
+    sessions?: CheckInSession[]
   ) => {
     setLoading(true)
     setError(null)
@@ -162,22 +162,22 @@ export function useSuggestions(): UseSuggestionsResult {
       let history: HistoricalContext | undefined
       let burnoutPrediction: BurnoutPrediction | undefined
 
-      if (allRecordings && allRecordings.length > 0) {
-        // Get the latest recording
-        const sortedRecordings = [...allRecordings].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      if (sessions && sessions.length > 0) {
+        // Get the latest session
+        const sortedSessions = [...sessions].sort(
+          (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
         )
-        const latestRecording = sortedRecordings[0]
+        const latestSession = sortedSessions[0]
 
-        // Extract voice patterns from latest recording
-        voicePatterns = featuresToVoicePatterns(latestRecording?.features)
+        // Extract voice patterns from latest session
+        voicePatterns = featuresToVoicePatterns(latestSession?.acousticMetrics?.features)
 
         // Compute historical context
-        history = computeHistoricalContext(allRecordings)
+        history = computeHistoricalContext(sortedSessions)
 
         // Predict burnout risk if we have enough data
-        if (allRecordings.length >= 2) {
-          const trendData = recordingsToTrendData(allRecordings)
+        if (sessions.length >= 2) {
+          const trendData = sessionsToTrendData(sessions)
           burnoutPrediction = predictBurnoutRisk(trendData)
         }
       }

@@ -24,20 +24,15 @@ import {
   type CheckInMessagesCallbacks,
   useCheckInMessages,
 } from "./use-check-in-messages"
-import {
-  type CheckInSessionCallbacks,
-  type StartSessionOptions,
-  useCheckInSession,
-} from "./use-check-in-session"
+import { type CheckInSessionCallbacks, useCheckInSession } from "./use-check-in-session"
 import { useCheckInWidgets } from "./use-check-in-widgets"
 
 export type { CheckInAction, CheckInData } from "./use-check-in-messages"
 export { checkInReducer, initialState } from "./use-check-in-messages"
-export type { StartSessionOptions } from "./use-check-in-session"
 
 export interface CheckInControls {
   /** Start a new check-in session */
-  startSession: (options?: StartSessionOptions) => Promise<void>
+  startSession: () => Promise<void>
   /** End the current session */
   endSession: () => Promise<void>
   /** Cancel session without saving */

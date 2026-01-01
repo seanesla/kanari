@@ -60,7 +60,7 @@ export function EnterButton({ className, variant = "hero", children }: EnterButt
         className
       )}
     >
-      {children || "Start recording"}
+      {children || "Start check-in"}
       <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
     </button>
   )

@@ -19,7 +19,7 @@ const features = [
   {
     icon: Mic,
     title: "Voice Analysis",
-    description: "Record 30-second check-ins to track your wellness",
+    description: "Do 30-second check-ins to track your wellness",
   },
   {
     icon: Brain,

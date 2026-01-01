@@ -162,7 +162,7 @@ export default function LandingPage() {
               {[
                 {
                   num: "01",
-                  title: "Record",
+                  title: "Check in",
                   desc: "Speak naturally for 30-60 seconds about your day. No scripts, no prompts—just talk. Your voice carries the signal.",
                 },
                 {

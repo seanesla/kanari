@@ -42,7 +42,6 @@ vi.mock("@/lib/gemini/mismatch-detector", () => ({
 vi.mock("@/lib/gemini/live-prompts", () => ({
   generateMismatchContext: vi.fn(() => "Mismatch context"),
   generateVoicePatternContext: vi.fn(() => "Voice pattern context"),
-  generatePostRecordingContext: vi.fn(() => "Post-recording context"),
   buildCheckInSystemInstruction: vi.fn(() => "Check-in system instruction"),
   // Used by the server-side Live session manager.
   GEMINI_TOOLS: [],

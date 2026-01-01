@@ -2,6 +2,7 @@
 
 import { useCallback, useRef } from "react"
 import type { Dispatch, MutableRefObject } from "react"
+import { processAudio } from "@/lib/audio/processor"
 import { createGeminiHeaders } from "@/lib/utils"
 import {
   type SystemContextSummary,
@@ -18,19 +19,10 @@ import {
   preserveSession as storePreservedSession,
 } from "@/lib/gemini/preserved-session"
 import type { GeminiLiveClient, SessionContext } from "@/lib/gemini/live-client"
-import type { CheckInSession, CheckInState, VoicePatterns } from "@/lib/types"
+import type { CheckInSession, CheckInState } from "@/lib/types"
+import { analyzeVoiceMetrics } from "@/lib/ml/inference"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 import type { UseCheckInAudioResult } from "./use-check-in-audio"
-
-export interface StartSessionOptions {
-  /** If triggered after a recording, include recording context */
-  recordingContext?: {
-    recordingId: string
-    stressScore: number
-    fatigueScore: number
-    patterns: VoicePatterns
-  }
-}
 
 export interface CheckInSessionCallbacks {
   onSessionStart?: (session: CheckInSession) => void
@@ -68,7 +60,7 @@ export interface UseCheckInSessionOptions {
 }
 
 export interface UseCheckInSessionResult {
-  startSession: (options?: StartSessionOptions) => Promise<void>
+  startSession: () => Promise<void>
   endSession: () => Promise<void>
   cancelSession: () => void
   getSession: () => CheckInSession | null
@@ -84,14 +76,11 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
   const sessionStartRef = useRef<string | null>(null)
 
-  // Session context for AI-initiated conversations (passed to Gemini connect)
-  const sessionContextRef = useRef<SessionContext | null>(null)
-
   // Context fingerprint for session preservation
   const contextFingerprintRef = useRef<string | null>(null)
 
   const startSession = useCallback(
-    async (startOptions?: StartSessionOptions) => {
+    async () => {
       // Track what's been initialized for proper cleanup on failure
       let playbackInitialized = false
       let captureInitialized = false
@@ -107,7 +96,6 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
           id: generateId(),
           startedAt: new Date().toISOString(),
           messages: [],
-          recordingId: startOptions?.recordingContext?.recordingId,
         }
         dispatch({ type: "SET_SESSION", session })
         sessionStartRef.current = session.startedAt
@@ -158,16 +146,6 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
             )
           }
 
-          // Add post-recording context if this session was triggered after a voice recording
-          if (startOptions?.recordingContext) {
-            sessionContext.postRecordingContext = {
-              stressScore: startOptions.recordingContext.stressScore,
-              fatigueScore: startOptions.recordingContext.fatigueScore,
-              patterns: startOptions.recordingContext.patterns,
-            }
-          }
-
-          sessionContextRef.current = sessionContext
         } catch (contextError) {
           // Context generation failed - proceed without it (AI will use default greeting)
           console.warn("[useCheckIn] Context generation failed, using default greeting:", contextError)
@@ -236,6 +214,34 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
     // Clear any preserved session (user explicitly ended, don't preserve)
     clearPreservedSession(false) // false = don't disconnect, we'll do it below
 
+    const sessionAudio = audio.getSessionAudio()
+    const sessionAudioData = sessionAudio ? Array.from(sessionAudio) : undefined
+    const sessionSampleRate = sessionAudio ? 16000 : undefined
+
+    let acousticMetrics = data.session?.acousticMetrics
+    if (!acousticMetrics && sessionAudio) {
+      try {
+        const processed = await processAudio(sessionAudio, {
+          sampleRate: 16000,
+          enableVAD: true,
+        })
+        const metrics = analyzeVoiceMetrics(processed.features)
+        acousticMetrics = {
+          stressScore: metrics.stressScore,
+          fatigueScore: metrics.fatigueScore,
+          stressLevel: metrics.stressLevel,
+          fatigueLevel: metrics.fatigueLevel,
+          confidence: metrics.confidence,
+          analyzedAt: metrics.analyzedAt,
+          features: processed.features,
+        }
+
+        dispatch({ type: "SET_SESSION_ACOUSTIC_METRICS", metrics: acousticMetrics })
+      } catch (error) {
+        console.warn("[useCheckIn] Failed to compute session-level metrics:", error)
+      }
+    }
+
     // Calculate session duration
     const duration = sessionStartRef.current
       ? (Date.now() - new Date(sessionStartRef.current).getTime()) / 1000
@@ -249,6 +255,9 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
           messages: data.messages,
           mismatchCount: data.mismatchCount,
           duration,
+          acousticMetrics: acousticMetrics ?? data.session.acousticMetrics,
+          audioData: sessionAudioData,
+          sampleRate: sessionSampleRate,
         }
       : null
 
@@ -412,9 +421,8 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
     dispatch({ type: "SET_READY" })
     dispatch({ type: "SET_AI_GREETING" })
 
-    // Trigger AI to speak first by sending the conversation start signal
-    // The system instruction (which now includes post-recording context if applicable)
-    // tells the AI to greet the user when it receives this
+    // Trigger AI to speak first by sending the conversation start signal.
+    // The system instruction tells the AI to greet the user when it receives this.
     gemini.sendText("[START_CONVERSATION]")
   }, [dispatch, gemini])
 

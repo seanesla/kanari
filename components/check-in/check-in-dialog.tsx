@@ -19,9 +19,10 @@ import {
 import { Button } from "@/components/ui/button"
 import { X, Phone, PhoneOff, Mic, MicOff } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useCheckIn, type StartSessionOptions } from "@/hooks/use-check-in"
+import { useCheckIn } from "@/hooks/use-check-in"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { VoiceIndicatorLarge } from "./voice-indicator"
+import { BiomarkerIndicator } from "./biomarker-indicator"
 import { ConversationView } from "./conversation-view"
 import {
   BreathingExercise,
@@ -31,18 +32,11 @@ import {
   StressGauge,
 } from "./widgets"
 import { ChatInput } from "./chat-input"
-import type { CheckInSession, VoicePatterns } from "@/lib/types"
+import type { CheckInSession } from "@/lib/types"
 
 interface CheckInDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** If provided, triggers check-in with recording context */
-  recordingContext?: {
-    recordingId: string
-    stressScore: number
-    fatigueScore: number
-    patterns: VoicePatterns
-  }
   /** Called when session completes */
   onSessionComplete?: (session: CheckInSession) => void
 }
@@ -50,7 +44,6 @@ interface CheckInDialogProps {
 export function CheckInDialog({
   open,
   onOpenChange,
-  recordingContext,
   onSessionComplete,
 }: CheckInDialogProps) {
   const { addCheckInSession } = useCheckInSessionActions()
@@ -93,12 +86,9 @@ export function CheckInDialog({
     if (open && checkIn.state === "idle" && !sessionStartedRef.current) {
       // Mark as started immediately to prevent duplicate calls
       sessionStartedRef.current = true
-      const options: StartSessionOptions | undefined = recordingContext
-        ? { recordingContext }
-        : undefined
-      controls.startSession(options)
+      controls.startSession()
     }
-  }, [open, checkIn.state, recordingContext, controls])
+  }, [open, checkIn.state, controls])
 
   // Handle close - always reset state to idle so reopening starts fresh
   const handleClose = useCallback(async () => {
@@ -234,6 +224,10 @@ export function CheckInDialog({
                   )}
                 </motion.div>
 
+                <div className="px-6 py-3 border-b border-border/50 bg-background/40">
+                  <BiomarkerIndicator metrics={checkIn.session?.acousticMetrics} />
+                </div>
+
                 {/* Messages */}
                 <ConversationView
                   state={checkIn.state}
@@ -350,6 +344,11 @@ export function CheckInDialog({
                       ` • ${checkIn.mismatchCount} voice patterns noted`}
                   </p>
                 </div>
+                {checkIn.session?.acousticMetrics && (
+                  <div className="w-full max-w-sm">
+                    <BiomarkerIndicator metrics={checkIn.session.acousticMetrics} compact />
+                  </div>
+                )}
                 <Button onClick={handleClose}>Done</Button>
               </motion.div>
             )}

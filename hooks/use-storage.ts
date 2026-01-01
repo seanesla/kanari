@@ -249,13 +249,32 @@ export function useSuggestionActions() {
 export function useDashboardStats(): DashboardStats {
   const stats = useLiveQuery(async () => {
     const recordings = await db.recordings.toArray()
+    const sessions = await db.checkInSessions.toArray()
     const suggestions = await db.suggestions.toArray()
     const recoveryBlocks = await db.recoveryBlocks.toArray()
 
-    // Calculate total recordings and minutes
-    const totalRecordings = recordings.length
-    const totalMinutesRecorded = recordings.reduce(
-      (sum, r) => sum + r.duration / 60,
+    const voiceEntries = [
+      ...recordings.map((r) => ({
+        date: r.createdAt,
+        duration: r.duration,
+        metrics: r.metrics,
+      })),
+      ...sessions.map((s) => ({
+        date: s.startedAt,
+        duration: s.duration ?? 0,
+        metrics: s.acousticMetrics
+          ? {
+              stressScore: s.acousticMetrics.stressScore,
+              fatigueScore: s.acousticMetrics.fatigueScore,
+            }
+          : undefined,
+      })),
+    ]
+
+    // Calculate total recordings/check-ins and minutes
+    const totalRecordings = voiceEntries.length
+    const totalMinutesRecorded = voiceEntries.reduce(
+      (sum, entry) => sum + entry.duration / 60,
       0
     )
 
@@ -270,9 +289,9 @@ export function useDashboardStats(): DashboardStats {
       const dayEnd = new Date(checkDate)
       dayEnd.setDate(dayEnd.getDate() + 1)
 
-      const hasRecording = recordings.some((r) => {
-        const recordingDate = r.createdAt
-        return recordingDate >= dayStart && recordingDate < dayEnd
+      const hasRecording = voiceEntries.some((entry) => {
+        const entryDate = entry.date
+        return entryDate >= dayStart && entryDate < dayEnd
       })
 
       if (hasRecording) {
@@ -284,20 +303,16 @@ export function useDashboardStats(): DashboardStats {
     }
 
     // Calculate average stress/fatigue
-    const recordingsWithMetrics = recordings.filter((r) => r.metrics)
+    const recordingsWithMetrics = voiceEntries.filter((entry) => entry.metrics)
     const averageStress =
       recordingsWithMetrics.length > 0
-        ? recordingsWithMetrics.reduce(
-            (sum, r) => sum + (r.metrics?.stressScore ?? 0),
-            0
-          ) / recordingsWithMetrics.length
+        ? recordingsWithMetrics.reduce((sum, entry) => sum + (entry.metrics?.stressScore ?? 0), 0) /
+          recordingsWithMetrics.length
         : 0
     const averageFatigue =
       recordingsWithMetrics.length > 0
-        ? recordingsWithMetrics.reduce(
-            (sum, r) => sum + (r.metrics?.fatigueScore ?? 0),
-            0
-          ) / recordingsWithMetrics.length
+        ? recordingsWithMetrics.reduce((sum, entry) => sum + (entry.metrics?.fatigueScore ?? 0), 0) /
+          recordingsWithMetrics.length
         : 0
 
     // Count accepted suggestions and scheduled recovery blocks
@@ -309,9 +324,9 @@ export function useDashboardStats(): DashboardStats {
     // Calculate weekly recordings (Mon-Sun)
     const weekStart = getWeekStart()
     const weekEnd = getWeekEnd()
-    const weeklyRecordings = recordings.filter((r) => {
-      const recordingDate = r.createdAt
-      return recordingDate >= weekStart && recordingDate <= weekEnd
+    const weeklyRecordings = voiceEntries.filter((entry) => {
+      const entryDate = entry.date
+      return entryDate >= weekStart && entryDate <= weekEnd
     }).length
 
     return {
@@ -383,6 +398,33 @@ export function useCheckInSessionsByRecording(recordingId: string | undefined) {
 export function useCheckInSessionActions() {
   const addCheckInSession = useCallback(async (session: CheckInSession) => {
     await db.checkInSessions.add(fromCheckInSession(session))
+
+    if (session.acousticMetrics) {
+      const date = session.startedAt.split("T")[0]
+      const existing = await db.trendData.get(date)
+      if (existing) {
+        const count = (existing.recordingCount || 1) + 1
+        const newStress =
+          ((existing.stressScore * (count - 1)) + session.acousticMetrics.stressScore) / count
+        const newFatigue =
+          ((existing.fatigueScore * (count - 1)) + session.acousticMetrics.fatigueScore) / count
+
+        await db.trendData.update(date, {
+          stressScore: Math.round(newStress),
+          fatigueScore: Math.round(newFatigue),
+          recordingCount: count,
+        })
+      } else {
+        await db.trendData.put({
+          id: date,
+          date: new Date(date),
+          stressScore: session.acousticMetrics.stressScore,
+          fatigueScore: session.acousticMetrics.fatigueScore,
+          recordingCount: 1,
+        })
+      }
+    }
+
     return session.id
   }, [])
 

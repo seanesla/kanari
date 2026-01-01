@@ -91,7 +91,7 @@ export function StepComplete({ onComplete, onNavigate }: StepCompleteProps) {
         </div>
         <ul className="space-y-3 text-sm text-muted-foreground">
           {[
-            "Record daily check-ins at roughly the same time for best results",
+            "Do daily check-ins at roughly the same time for best results",
             "Speak naturally about your day—no need for scripts or prompts",
             "Review your suggestions and schedule recovery blocks to prevent burnout",
           ].map((tip, i) => (

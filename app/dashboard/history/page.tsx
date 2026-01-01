@@ -2,13 +2,13 @@
  * Check-ins Page (formerly Sessions)
  *
  * ChatGPT-style layout with sidebar for check-in history and inline content display.
- * Voice notes and AI chats are shown in a unified sidebar list.
+ * AI chat sessions are shown in a unified sidebar list.
  *
  * Features:
  * - Sidebar with chronological check-in list (grouped by date)
  * - Main content area shows selected item details inline
- * - New check-in mode with Voice Note / AI Chat tabs
- * - Filter toggle (All / Voice Notes / AI Chats)
+ * - New check-in mode (AI chat)
+ * - Filter toggle (All / AI Chats)
  * - Mobile: sidebar becomes a Sheet
  */
 
@@ -17,7 +17,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Clock, Plus, Mic, MessageSquare, Sparkles, CheckSquare } from "lucide-react"
+import { Clock, Plus, MessageSquare, Sparkles, CheckSquare } from "lucide-react"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -36,27 +36,21 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useHistory } from "@/hooks/use-history"
-import { useRecordingActions, useCheckInSessionActions } from "@/hooks/use-storage"
+import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { CheckInListItem } from "@/components/dashboard/check-in-list-item"
-import { VoiceNoteDetailView } from "@/components/dashboard/voice-note-detail-view"
 import { AIChatDetailView } from "@/components/dashboard/ai-chat-detail-view"
 import { CheckInInputBar } from "@/components/dashboard/check-in-input-bar"
-import { VoiceNoteContent } from "@/components/dashboard/check-in-voice-note"
 import { AIChatContent } from "@/components/dashboard/check-in-ai-chat"
 import { getDateKey, getDateLabel } from "@/lib/date-utils"
 import { SelectionActionBar } from "@/components/dashboard/selection-action-bar"
 import { BatchDeleteConfirmDialog } from "@/components/dashboard/batch-delete-confirm-dialog"
 import { useCursorGlow } from "@/hooks/use-cursor-glow"
 import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
-import type { Recording, HistoryItem, CheckInSession } from "@/lib/types"
+import type { HistoryItem, CheckInSession } from "@/lib/types"
 
 /** Filter options for the check-ins list */
-type FilterType = "all" | "voice_note" | "ai_chat"
-
-/** Check-in creation mode */
-type CheckInMode = "voice-note" | "ai-chat"
+type FilterType = "all" | "ai_chat"
 
 /**
  * Main sidebar content component
@@ -200,18 +194,6 @@ function CheckInsSidebar({
               All
             </button>
             <button
-              onClick={() => onFilterChange("voice_note")}
-              className={cn(
-                "flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1",
-                filter === "voice_note"
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <Mic className="h-3 w-3" />
-              Voice
-            </button>
-            <button
               onClick={() => onFilterChange("ai_chat")}
               className={cn(
                 "flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1",
@@ -231,28 +213,22 @@ function CheckInsSidebar({
 }
 
 /**
- * New Check-in inline content with mode tabs
+ * New Check-in inline content (AI chat only)
  */
 function NewCheckInContent({
-  mode,
-  onModeChange,
   onClose,
-  onRecordingComplete,
   onSessionComplete,
   isSessionActive,
   onSessionChange,
 }: {
-  mode: CheckInMode
-  onModeChange: (mode: CheckInMode) => void
   onClose: () => void
-  onRecordingComplete?: (recording: Recording) => void
   onSessionComplete?: (session: CheckInSession) => void
   isSessionActive: boolean
   onSessionChange: (active: boolean) => void
 }) {
   return (
     <div className="flex flex-col h-full">
-      {/* Header with mode tabs */}
+      {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-accent/30">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-full bg-accent/10">
@@ -267,35 +243,12 @@ function NewCheckInContent({
         )}
       </div>
 
-      {/* Mode toggle tabs */}
-      <div className="px-6 py-3 border-b border-accent/30">
-        <Tabs value={mode} onValueChange={(v) => onModeChange(v as CheckInMode)}>
-          <TabsList className="w-full">
-            <TabsTrigger value="voice-note" className="flex-1" disabled={isSessionActive}>
-              Voice note
-            </TabsTrigger>
-            <TabsTrigger value="ai-chat" className="flex-1" disabled={isSessionActive}>
-              AI chat
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
-      {/* Content based on mode */}
       <div className="flex-1 overflow-hidden">
-        {mode === "voice-note" ? (
-          <VoiceNoteContent
-            onClose={onClose}
-            onSessionChange={onSessionChange}
-            onRecordingComplete={onRecordingComplete}
-          />
-        ) : (
-          <AIChatContent
-            onClose={onClose}
-            onSessionChange={onSessionChange}
-            onSessionComplete={onSessionComplete}
-          />
-        )}
+        <AIChatContent
+          onClose={onClose}
+          onSessionChange={onSessionChange}
+          onSessionComplete={onSessionComplete}
+        />
       </div>
     </div>
   )
@@ -314,7 +267,6 @@ function HistoryPageContent() {
   // Selection and creation state
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [isCreatingNew, setIsCreatingNew] = useState(false)
-  const [newCheckInMode, setNewCheckInMode] = useState<CheckInMode>("voice-note")
   const [isSessionActive, setIsSessionActive] = useState(false)
 
   // Highlight state for newly created items
@@ -343,7 +295,7 @@ function HistoryPageContent() {
     let currentDateKey: string | null = null
 
     for (const item of filteredItems) {
-      const itemDate = item.type === "voice_note" ? item.recording.createdAt : item.session.startedAt
+      const itemDate = item.timestamp
       const dateKey = getDateKey(itemDate)
 
       if (dateKey !== currentDateKey) {
@@ -362,7 +314,6 @@ function HistoryPageContent() {
   }, [filteredItems])
 
   // Get delete actions
-  const { deleteRecording } = useRecordingActions()
   const { deleteCheckInSession, deleteIncompleteSessions } = useCheckInSessionActions()
 
   // Derive selected item
@@ -452,17 +403,6 @@ function HistoryPageContent() {
     }
   }, [isSelectMode])
 
-  // Handle delete
-  const handleDeleteRecording = useCallback(
-    (recordingId: string) => {
-      deleteRecording(recordingId)
-      if (selectedItemId === recordingId) {
-        setSelectedItemId(null)
-      }
-    },
-    [deleteRecording, selectedItemId]
-  )
-
   const handleDeleteSession = useCallback(
     (sessionId: string) => {
       deleteCheckInSession(sessionId)
@@ -478,11 +418,7 @@ function HistoryPageContent() {
     for (const id of selectedIds) {
       const item = historyItems.find((h) => h.id === id)
       if (item) {
-        if (item.type === "voice_note") {
-          await deleteRecording(item.recording.id)
-        } else {
-          await deleteCheckInSession(item.session.id)
-        }
+        await deleteCheckInSession(item.session.id)
       }
     }
     setSelectedIds(new Set())
@@ -491,15 +427,7 @@ function HistoryPageContent() {
     if (selectedItemId && selectedIds.has(selectedItemId)) {
       setSelectedItemId(null)
     }
-  }, [selectedIds, historyItems, deleteRecording, deleteCheckInSession, selectedItemId])
-
-  // Handle new recording/session completion
-  const handleRecordingComplete = useCallback((recording: Recording) => {
-    setHighlightedItemId(recording.id)
-    setSelectedItemId(recording.id)
-    setIsCreatingNew(false)
-    setIsSessionActive(false)
-  }, [])
+  }, [selectedIds, historyItems, deleteCheckInSession, selectedItemId])
 
   const handleSessionComplete = useCallback((session: CheckInSession) => {
     setHighlightedItemId(session.id)
@@ -519,31 +447,6 @@ function HistoryPageContent() {
     setIsCreatingNew(false)
     setIsSessionActive(false)
   }, [])
-
-  // Handle opening linked items
-  const handleOpenLinkedChat = useCallback(
-    (sessionId: string) => {
-      const chatItem = historyItems.find(
-        (h) => h.type === "ai_chat" && h.session.id === sessionId
-      )
-      if (chatItem) {
-        setSelectedItemId(chatItem.id)
-      }
-    },
-    [historyItems]
-  )
-
-  const handleOpenLinkedRecording = useCallback(
-    (recordingId: string) => {
-      const recordingItem = historyItems.find(
-        (h) => h.type === "voice_note" && h.recording.id === recordingId
-      )
-      if (recordingItem) {
-        setSelectedItemId(recordingItem.id)
-      }
-    },
-    [historyItems]
-  )
 
   return (
     <div
@@ -600,10 +503,7 @@ function HistoryPageContent() {
                   className="h-full"
                 >
                   <NewCheckInContent
-                    mode={newCheckInMode}
-                    onModeChange={setNewCheckInMode}
                     onClose={handleCloseNewCheckIn}
-                    onRecordingComplete={handleRecordingComplete}
                     onSessionComplete={handleSessionComplete}
                     isSessionActive={isSessionActive}
                     onSessionChange={setIsSessionActive}
@@ -618,21 +518,10 @@ function HistoryPageContent() {
                   transition={{ duration: 0.3 }}
                   className="h-full"
                 >
-                  {selectedItem.type === "voice_note" ? (
-                    <VoiceNoteDetailView
-                      recording={selectedItem.recording}
-                      onDelete={() => handleDeleteRecording(selectedItem.recording.id)}
-                      onOpenLinkedChat={handleOpenLinkedChat}
-                      linkedChatSessionId={selectedItem.linkedChatSessionId}
-                    />
-                  ) : (
-                    <AIChatDetailView
-                      session={selectedItem.session}
-                      onDelete={() => handleDeleteSession(selectedItem.session.id)}
-                      linkedRecordingId={selectedItem.linkedRecordingId}
-                      onOpenLinkedRecording={handleOpenLinkedRecording}
-                    />
-                  )}
+                  <AIChatDetailView
+                    session={selectedItem.session}
+                    onDelete={() => handleDeleteSession(selectedItem.session.id)}
+                  />
                 </motion.div>
               ) : (
                 <motion.div
@@ -655,7 +544,7 @@ function HistoryPageContent() {
                       </EmptyTitle>
                       <EmptyDescription>
                         {historyItems.length === 0
-                          ? "Record a voice note or start an AI chat to track your stress and energy levels."
+                          ? "Start an AI check-in to track your stress and energy levels."
                           : "Choose a check-in from the sidebar to view its details, or start a new one."}
                       </EmptyDescription>
                     </EmptyHeader>

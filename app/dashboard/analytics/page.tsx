@@ -12,7 +12,7 @@ import {
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { predictBurnoutRisk } from "@/lib/ml/forecasting"
-import { useDashboardStats, useTrendData, useRecordings } from "@/hooks/use-storage"
+import { useDashboardStats, useTrendData, useRecordings, useCheckInSessions } from "@/hooks/use-storage"
 import { StressFatigueChart } from "@/components/dashboard/stress-fatigue-chart"
 import { EngagementTracker } from "@/components/dashboard/engagement-tracker"
 import { AnalyticsInsightsSection } from "@/components/dashboard/analytics-insights"
@@ -57,6 +57,7 @@ export default function AnalyticsPage() {
   const dashboardStats = useDashboardStats()
   const storedTrendData = useTrendData(7)
   const allRecordings = useRecordings()
+  const allSessions = useCheckInSessions()
 
   const stats = {
     totalRecordings: dashboardStats.totalRecordings,
@@ -139,17 +140,26 @@ export default function AnalyticsPage() {
 
   // Aggregate AudioFeatures from last 7 days for biomarker analysis
   const aggregatedFeatures = useMemo(() => {
-    if (!allRecordings || allRecordings.length === 0) return null
+    const entries = [
+      ...(allRecordings || [])
+        .filter(r => r.features)
+        .map(r => ({ date: r.createdAt, features: r.features! })),
+      ...(allSessions || [])
+        .filter(s => s.acousticMetrics?.features)
+        .map(s => ({ date: s.startedAt, features: s.acousticMetrics!.features })),
+    ]
+
+    if (entries.length === 0) return null
 
     const sevenDaysAgo = new Date()
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
 
-    const recentRecordings = allRecordings.filter(r => {
-      const recordingDate = new Date(r.createdAt)
-      return recordingDate >= sevenDaysAgo && r.features
+    const recentEntries = entries.filter(entry => {
+      const entryDate = new Date(entry.date)
+      return entryDate >= sevenDaysAgo
     })
 
-    if (recentRecordings.length === 0) return null
+    if (recentEntries.length === 0) return null
 
     const avg = {
       speechRate: 0,
@@ -160,22 +170,22 @@ export default function AnalyticsPage() {
       zcr: 0,
     }
 
-    recentRecordings.forEach(r => {
-      avg.speechRate += r.features!.speechRate
-      avg.rms += r.features!.rms
-      avg.pauseRatio += r.features!.pauseRatio
-      avg.spectralCentroid += r.features!.spectralCentroid
-      avg.spectralFlux += r.features!.spectralFlux
-      avg.zcr += r.features!.zcr
+    recentEntries.forEach(entry => {
+      avg.speechRate += entry.features.speechRate
+      avg.rms += entry.features.rms
+      avg.pauseRatio += entry.features.pauseRatio
+      avg.spectralCentroid += entry.features.spectralCentroid
+      avg.spectralFlux += entry.features.spectralFlux
+      avg.zcr += entry.features.zcr
     })
 
-    const count = recentRecordings.length
+    const count = recentEntries.length
     Object.keys(avg).forEach(key => {
       avg[key as keyof typeof avg] /= count
     })
 
     return avg
-  }, [allRecordings])
+  }, [allRecordings, allSessions])
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
@@ -357,7 +367,7 @@ export default function AnalyticsPage() {
                     <div className="text-center">
                       <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
                       <p className="text-muted-foreground">No data yet</p>
-                      <p className="text-sm text-muted-foreground/70 mt-1">Record to calculate your score</p>
+                      <p className="text-sm text-muted-foreground/70 mt-1">Check in to calculate your score</p>
                     </div>
                   </div>
                 ) : (
@@ -390,7 +400,7 @@ export default function AnalyticsPage() {
                 )}
                 <p className="text-center text-xs text-muted-foreground mt-4">
                   {stats.totalRecordings === 0
-                    ? "Start recording to see your wellness score"
+                    ? "Start a check-in to see your wellness score"
                     : wellnessScore > 70
                     ? "You're doing great!"
                     : wellnessScore > 40

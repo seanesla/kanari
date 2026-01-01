@@ -17,6 +17,8 @@ export interface UseCheckInAudioResult {
   resetAudioChunks: () => void
   drainAudioChunks: () => Float32Array[]
   resetCleanupRequestedFlag: () => void
+  /** Get all audio accumulated during the session (for playback/final analysis) */
+  getSessionAudio: () => Float32Array | null
 }
 
 export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudioResult {
@@ -27,6 +29,8 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
   const captureWorkletRef = useRef<AudioWorkletNode | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   const audioChunksRef = useRef<Float32Array[]>([])
+  // Session-level audio buffer (accumulates ALL audio for playback/final analysis)
+  const sessionAudioRef = useRef<Float32Array[]>([])
 
   // Flag to handle race condition: if cleanup is requested during async initialization,
   // the stream obtained from getUserMedia should be stopped immediately
@@ -53,6 +57,21 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
     const chunks = audioChunksRef.current
     audioChunksRef.current = []
     return chunks
+  }, [])
+
+  const getSessionAudio = useCallback(() => {
+    const chunks = sessionAudioRef.current
+    if (chunks.length === 0) return null
+
+    // Concatenate all chunks into a single Float32Array
+    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0)
+    const audioData = new Float32Array(totalLength)
+    let offset = 0
+    for (const chunk of chunks) {
+      audioData.set(chunk, offset)
+      offset += chunk.length
+    }
+    return audioData
   }, [])
 
   const resetCleanupRequestedFlag = useCallback(() => {
@@ -168,7 +187,7 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
           const base64Audio = int16ToBase64(int16Data)
           sendAudio(base64Audio)
 
-          // Also store for mismatch detection
+          // Also store for mismatch detection and session-level analysis
           const float32Data = new Float32Array(int16Data.length)
           for (let i = 0; i < int16Data.length; i++) {
             float32Data[i] = int16Data[i] / (int16Data[i] < 0 ? 0x8000 : 0x7fff)
@@ -178,6 +197,8 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
             audioChunksRef.current.shift()
           }
           audioChunksRef.current.push(float32Data)
+          // Also store in session buffer (for playback and final analysis)
+          sessionAudioRef.current.push(float32Data)
 
           // Calculate input level for visualization (throttled to reduce re-renders)
           const now = Date.now()
@@ -240,6 +261,7 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
     audioContextRef.current = null
 
     audioChunksRef.current = []
+    sessionAudioRef.current = []
   }, [])
 
   const toggleMute = useCallback(() => {
@@ -273,5 +295,6 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
     resetAudioChunks,
     drainAudioChunks,
     resetCleanupRequestedFlag,
+    getSessionAudio,
   }
 }

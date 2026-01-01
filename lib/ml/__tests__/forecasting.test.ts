@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest"
-import { predictBurnoutRisk, recordingsToTrendData } from "../forecasting"
+import { predictBurnoutRisk, recordingsToTrendData, sessionsToTrendData } from "../forecasting"
 import type { TrendData } from "@/lib/types"
 
 /**
@@ -295,6 +295,40 @@ describe("recordingsToTrendData", () => {
       { createdAt: "2024-01-01T10:00:00Z", metrics: { stressScore: 42, fatigueScore: 67 } },
     ]
     const result = recordingsToTrendData(recordings)
+    expect(result[0].stressScore).toBe(42)
+    expect(result[0].fatigueScore).toBe(67)
+  })
+})
+
+describe("sessionsToTrendData", () => {
+  it("returns empty array for empty input", () => {
+    const result = sessionsToTrendData([])
+    expect(result).toEqual([])
+  })
+
+  it("filters out sessions without acoustic metrics", () => {
+    const sessions = [
+      { startedAt: "2024-01-01T10:00:00Z", acousticMetrics: { stressScore: 50, fatigueScore: 50 } },
+      { startedAt: "2024-01-02T10:00:00Z" },
+      { startedAt: "2024-01-03T10:00:00Z", acousticMetrics: { stressScore: 60, fatigueScore: 60 } },
+    ]
+    const result = sessionsToTrendData(sessions)
+    expect(result).toHaveLength(2)
+  })
+
+  it("extracts date correctly from ISO string", () => {
+    const sessions = [
+      { startedAt: "2024-01-15T14:30:00.000Z", acousticMetrics: { stressScore: 50, fatigueScore: 50 } },
+    ]
+    const result = sessionsToTrendData(sessions)
+    expect(result[0].date).toBe("2024-01-15")
+  })
+
+  it("preserves stress and fatigue scores", () => {
+    const sessions = [
+      { startedAt: "2024-01-01T10:00:00Z", acousticMetrics: { stressScore: 42, fatigueScore: 67 } },
+    ]
+    const result = sessionsToTrendData(sessions)
     expect(result[0].stressScore).toBe(42)
     expect(result[0].fatigueScore).toBe(67)
   })

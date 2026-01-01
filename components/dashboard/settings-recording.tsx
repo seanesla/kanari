@@ -17,7 +17,7 @@ export function SettingsRecordingSection({
     <div className="rounded-lg border border-border bg-card p-6">
       <div className="flex items-center gap-2 mb-6">
         <Mic className="h-5 w-5 text-accent" />
-        <h2 className="text-lg font-semibold font-serif">Recording Preferences</h2>
+        <h2 className="text-lg font-semibold font-serif">Check-in Preferences</h2>
       </div>
 
       <div className="space-y-6">
@@ -38,7 +38,7 @@ export function SettingsRecordingSection({
         </div>
 
         <div>
-          <Label className="text-base font-sans">Default Recording Duration</Label>
+          <Label className="text-base font-sans">Default Check-in Duration</Label>
           <p className="text-sm text-muted-foreground mb-3 font-sans">
             Recommended duration for voice check-ins
           </p>
@@ -52,4 +52,3 @@ export function SettingsRecordingSection({
     </div>
   )
 }
-

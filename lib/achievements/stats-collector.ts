@@ -8,6 +8,28 @@
 import type { Recording, Suggestion, CheckInSession } from "@/lib/types"
 import type { UserStatsForAchievements, StoredAchievement } from "./types"
 
+function sessionsToVoiceRecordings(sessions: CheckInSession[]): Recording[] {
+  return sessions
+    .filter((session) => session.acousticMetrics)
+    .map((session) => ({
+      id: `session-${session.id}`,
+      createdAt: session.startedAt,
+      duration: session.duration ?? 0,
+      status: "complete",
+      metrics: session.acousticMetrics
+        ? {
+            stressScore: session.acousticMetrics.stressScore,
+            fatigueScore: session.acousticMetrics.fatigueScore,
+            stressLevel: session.acousticMetrics.stressLevel,
+            fatigueLevel: session.acousticMetrics.fatigueLevel,
+            confidence: session.acousticMetrics.confidence,
+            analyzedAt: session.acousticMetrics.analyzedAt ?? session.startedAt,
+          }
+        : undefined,
+      features: session.acousticMetrics?.features,
+    }))
+}
+
 /**
  * Calculate the current recording streak (consecutive days)
  */
@@ -329,8 +351,10 @@ export function collectUserStats(
   sessions: CheckInSession[],
   recentAchievements: StoredAchievement[]
 ): UserStatsForAchievements {
+  const voiceRecordings = [...recordings, ...sessionsToVoiceRecordings(sessions)]
+
   // Sort recordings by date descending (most recent first)
-  const sortedRecordings = [...recordings].sort(
+  const sortedRecordings = [...voiceRecordings].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   )
 
@@ -350,7 +374,7 @@ export function collectUserStats(
 
   return {
     // Recording stats
-    totalRecordings: recordings.length,
+    totalRecordings: voiceRecordings.length,
     recordingsThisWeek: countRecordingsThisWeek(sortedRecordings),
     recordingStreak: calculateStreak(sortedRecordings),
     longestStreak: calculateLongestStreak(sortedRecordings),

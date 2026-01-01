@@ -3,7 +3,7 @@
 import { useMemo } from "react"
 import { Flame, Target, MessageCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useDashboardStats, useCheckInSessions } from "@/hooks/use-storage"
+import { useDashboardStats } from "@/hooks/use-storage"
 
 interface EngagementTrackerProps {
   className?: string
@@ -11,10 +11,9 @@ interface EngagementTrackerProps {
 
 export function EngagementTracker({ className }: EngagementTrackerProps) {
   const stats = useDashboardStats()
-  const checkInSessions = useCheckInSessions()
 
-  // Total check-ins = voice notes + AI chat sessions
-  const totalCheckIns = stats.totalRecordings + checkInSessions.length
+  // Total check-ins
+  const totalCheckIns = stats.totalRecordings
 
   const weeklyProgress = useMemo(() => {
     return Math.min(100, (stats.weeklyRecordings / stats.weeklyGoal) * 100)
@@ -33,7 +32,7 @@ export function EngagementTracker({ className }: EngagementTrackerProps) {
 
   const streakMessage = useMemo(() => {
     if (stats.currentStreak === 0) {
-      return "Record today to start"
+      return "Check in today to start"
     }
     return "Keep it going!"
   }, [stats.currentStreak])
@@ -98,7 +97,7 @@ export function EngagementTracker({ className }: EngagementTrackerProps) {
           <p className="text-xs text-muted-foreground">{streakMessage}</p>
         </div>
 
-        {/* Total Check-ins (voice notes + AI chats) */}
+        {/* Total Check-ins */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-md bg-purple-500/10">
@@ -115,9 +114,7 @@ export function EngagementTracker({ className }: EngagementTrackerProps) {
             <span className="text-sm text-muted-foreground">all time</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            {totalCheckIns === 0
-              ? "Your journey begins here"
-              : `${stats.totalRecordings} voice · ${checkInSessions.length} AI chat`}
+            {totalCheckIns === 0 ? "Your journey begins here" : "Keep building your check-in streak"}
           </p>
         </div>
       </div>

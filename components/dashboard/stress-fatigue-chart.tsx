@@ -160,7 +160,7 @@ export function StressFatigueChart({
   height = 350,
   showLegend = true,
   showTrendIndicator = true,
-  emptyStateMessage = "No recordings yet",
+  emptyStateMessage = "No check-ins yet",
   className,
   expanded = false,
   onExpandChange,
@@ -235,7 +235,7 @@ export function StressFatigueChart({
         <div className="text-center">
           <Mic className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
           <p className="text-muted-foreground">{emptyStateMessage}</p>
-          <p className="text-sm text-muted-foreground/70 mt-1">Start recording to see your trends</p>
+          <p className="text-sm text-muted-foreground/70 mt-1">Start a check-in to see your trends</p>
         </div>
       </div>
     )

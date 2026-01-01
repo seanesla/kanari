@@ -1,13 +1,13 @@
 /**
  * Check-in List Item Component
  *
- * A compact sidebar list item for displaying voice notes and AI chats
+ * A compact sidebar list item for displaying AI chat check-ins
  * in the ChatGPT-style sidebar. Uses shadcn/ui SidebarMenuButton.
  */
 
 "use client"
 
-import { Mic, MessageSquare } from "lucide-react"
+import { MessageSquare } from "lucide-react"
 import { motion } from "framer-motion"
 import { SidebarMenuButton } from "@/components/ui/sidebar"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -30,18 +30,10 @@ interface CheckInListItemProps {
  * Get a preview string for the check-in item
  */
 function getPreviewText(item: HistoryItem): string {
-  if (item.type === "voice_note") {
-    // Use semantic analysis summary if available, otherwise show duration
-    if (item.recording.semanticAnalysis?.summary) {
-      return item.recording.semanticAnalysis.summary
-    }
-    if (item.recording.metrics) {
-      return `Stress: ${item.recording.metrics.stressScore} • Fatigue: ${item.recording.metrics.fatigueScore}`
-    }
-    return "Voice recording"
+  // AI Chat - show metrics or first user message
+  if (item.session.acousticMetrics) {
+    return `Stress: ${item.session.acousticMetrics.stressScore} • Fatigue: ${item.session.acousticMetrics.fatigueScore}`
   }
-
-  // AI Chat - show first user message
   const firstUserMessage = item.session.messages.find((m) => m.role === "user")
   if (firstUserMessage) {
     return firstUserMessage.content
@@ -53,10 +45,7 @@ function getPreviewText(item: HistoryItem): string {
  * Get the timestamp for display
  */
 function getTimestamp(item: HistoryItem): string {
-  const dateStr = item.type === "voice_note"
-    ? item.recording.createdAt
-    : item.session.startedAt
-  return formatTime(dateStr)
+  return formatTime(item.timestamp)
 }
 
 export function CheckInListItem({
@@ -67,7 +56,7 @@ export function CheckInListItem({
   isChecked = false,
   onCheckChange,
 }: CheckInListItemProps) {
-  const Icon = item.type === "voice_note" ? Mic : MessageSquare
+  const Icon = MessageSquare
   const preview = getPreviewText(item)
   const time = getTimestamp(item)
 
@@ -116,7 +105,7 @@ export function CheckInListItem({
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs text-muted-foreground">{time}</span>
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground/70">
-                {item.type === "voice_note" ? "Voice" : "Chat"}
+                Chat
               </span>
             </div>
             <p className="text-sm truncate mt-0.5">{preview}</p>

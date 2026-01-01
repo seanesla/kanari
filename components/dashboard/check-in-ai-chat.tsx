@@ -27,15 +27,16 @@
  * - Has mute functionality to pause microphone input
  */
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import { logDebug, logError } from "@/lib/logger"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Phone, PhoneOff, Mic, MicOff } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { useCheckIn, type StartSessionOptions } from "@/hooks/use-check-in"
+import { useCheckIn } from "@/hooks/use-check-in"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { VoiceIndicatorLarge } from "@/components/check-in/voice-indicator"
+import { BiomarkerIndicator } from "@/components/check-in/biomarker-indicator"
 import { ConversationView } from "@/components/check-in/conversation-view"
 import { ChatInput } from "@/components/check-in/chat-input"
 import {
@@ -49,20 +50,13 @@ import {
   getPreservedFingerprint,
   clearPreservedSession,
 } from "@/lib/gemini/preserved-session"
-import type { CheckInSession, VoicePatterns } from "@/lib/types"
+import type { CheckInSession } from "@/lib/types"
 
 interface CheckInAIChatProps {
   /** Called when session ends - parent should close the drawer */
   onClose?: () => void
   /** Called when chat state changes - parent uses this to disable tab switching */
   onSessionChange?: (isActive: boolean) => void
-  /** Optional context from a prior voice recording to personalize the conversation */
-  recordingContext?: {
-    recordingId: string
-    stressScore: number
-    fatigueScore: number
-    patterns: VoicePatterns
-  }
   /** Called when the conversation session is saved to IndexedDB */
   onSessionComplete?: (session: CheckInSession) => void
   /** When true, parent is requesting to discard the session */
@@ -74,7 +68,6 @@ interface CheckInAIChatProps {
 export function AIChatContent({
   onClose,
   onSessionChange,
-  recordingContext,
   onSessionComplete,
   requestDiscard,
   onDiscardComplete,
@@ -180,15 +173,12 @@ export function AIChatContent({
         }
 
         // Start fresh session
-        const options: StartSessionOptions | undefined = recordingContext
-          ? { recordingContext }
-          : undefined
-        controls.startSession(options)
+        controls.startSession()
       }
 
       initSession()
     }
-  }, [checkIn.state, recordingContext, controls])
+  }, [checkIn.state, controls])
 
   // Handle closing the chat - preserve session for later resumption
   // User can come back and continue where they left off
@@ -343,6 +333,11 @@ export function AIChatContent({
               )}
             </motion.div>
 
+            {/* Real-time biomarker panel */}
+            <div className="px-6 py-3 border-b border-border/50 bg-background/40">
+              <BiomarkerIndicator metrics={checkIn.session?.acousticMetrics} />
+            </div>
+
             {/*
               Message history view
               Shows all exchanged messages with:
@@ -472,6 +467,11 @@ export function AIChatContent({
                   ` • ${checkIn.mismatchCount} voice patterns noted`}
               </p>
             </div>
+            {checkIn.session?.acousticMetrics && (
+              <div className="w-full max-w-sm">
+                <BiomarkerIndicator metrics={checkIn.session.acousticMetrics} compact />
+              </div>
+            )}
             <Button onClick={handleClose}>Done</Button>
           </motion.div>
         )}

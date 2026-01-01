@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils"
 import { useDashboardStats, useTrendData } from "@/hooks/use-storage"
 import { useCalendar } from "@/hooks/use-calendar"
 import { predictBurnoutRisk } from "@/lib/ml/forecasting"
-// Unified check-in button replaces separate Record and Talk buttons
+// Unified check-in button replaces separate entry points
 import { CheckInButton } from "@/components/dashboard/check-in-button"
 import type { BurnoutPrediction } from "@/lib/types"
 
@@ -135,8 +135,7 @@ export function MetricsHeaderBar() {
 
         {/*
           Unified Check-in Button
-          Replaces the separate "Talk" and "Record" buttons with a single
-          entry point that lets users choose between Voice Note and AI Chat modes.
+          Single entry point for AI chat check-ins with live biomarker capture.
           Uses the user's custom accent color from SceneContext.
         */}
         <CheckInButton />

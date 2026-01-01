@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch, MutableRefObject } from "react"
+import {
+  createFeatureAccumulator,
+  getAverageFeatures,
+  updateFeatureAccumulator,
+  type FeatureAccumulator,
+} from "@/lib/audio/feature-aggregator"
 import { processAudio } from "@/lib/audio/processor"
 import {
   detectMismatch,
@@ -81,10 +87,23 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
   // Track when user started speaking (for correct message timestamp ordering)
   const userSpeechStartRef = useRef<string | null>(null)
 
+  // Accumulate session-level audio features across utterances
+  const sessionFeatureAccumulatorRef = useRef<FeatureAccumulator | null>(null)
+  const lastSessionIdRef = useRef<string | null>(null)
+
   // Sync userTranscriptRef with current user transcript (for use in callbacks)
   useEffect(() => {
     userTranscriptRef.current = data.currentUserTranscript
   }, [data.currentUserTranscript])
+
+  // Reset session-level accumulation when session changes
+  useEffect(() => {
+    const sessionId = data.session?.id ?? null
+    if (sessionId !== lastSessionIdRef.current) {
+      sessionFeatureAccumulatorRef.current = null
+      lastSessionIdRef.current = sessionId
+    }
+  }, [data.session?.id])
 
   const addUserTextMessage = useCallback(
     (content: string) => {
@@ -129,6 +148,29 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
       // Compute metrics
       const metrics = analyzeVoiceMetrics(result.features)
+
+      // Update session-level metrics (weighted by audio length)
+      const weight = audioData.length
+      const accumulator = sessionFeatureAccumulatorRef.current
+        ? updateFeatureAccumulator(sessionFeatureAccumulatorRef.current, result.features, weight)
+        : createFeatureAccumulator(result.features, weight)
+      sessionFeatureAccumulatorRef.current = accumulator
+
+      const averagedFeatures = getAverageFeatures(accumulator)
+      const sessionMetrics = analyzeVoiceMetrics(averagedFeatures)
+
+      dispatch({
+        type: "SET_SESSION_ACOUSTIC_METRICS",
+        metrics: {
+          stressScore: sessionMetrics.stressScore,
+          fatigueScore: sessionMetrics.fatigueScore,
+          stressLevel: sessionMetrics.stressLevel,
+          fatigueLevel: sessionMetrics.fatigueLevel,
+          confidence: sessionMetrics.confidence,
+          analyzedAt: sessionMetrics.analyzedAt,
+          features: averagedFeatures,
+        },
+      })
 
       // Check for mismatch
       if (shouldRunMismatchDetection(data.currentUserTranscript, result.features)) {
@@ -411,4 +453,3 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     handlers,
   }
 }
-

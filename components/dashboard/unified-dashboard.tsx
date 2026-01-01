@@ -3,13 +3,13 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/app/dashboard/layout"
-import { useDashboardStats, useTrendData, useScheduledSuggestions, useRecordings, useCheckInSessions } from "@/hooks/use-storage"
+import { useTrendData, useScheduledSuggestions, useRecordings, useCheckInSessions } from "@/hooks/use-storage"
 import { useSuggestions, featuresToVoicePatterns, computeHistoricalContext } from "@/hooks/use-suggestions"
 import { useCalendar } from "@/hooks/use-calendar"
 import { useResponsive } from "@/hooks/use-responsive"
 import { useSuggestionWorkflow } from "@/hooks/use-suggestion-workflow"
 import { useAchievements, useCanGenerateAchievements, useAchievementCooldown } from "@/hooks/use-achievements"
-import { predictBurnoutRisk, recordingsToTrendData } from "@/lib/ml/forecasting"
+import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
 import { DashboardHero } from "./dashboard-hero"
 import { DashboardLayout } from "./dashboard-layout"
 import { MetricsHeaderBar } from "./metrics-header-bar"
@@ -27,7 +27,6 @@ export function UnifiedDashboard() {
   const [isSidebarSheetOpen, setIsSidebarSheetOpen] = useState(false)
 
   // Data hooks
-  const dashboardStats = useDashboardStats()
   const storedTrendData = useTrendData(7)
   const scheduledSuggestions = useScheduledSuggestions()
   const allRecordings = useRecordings(14)
@@ -43,7 +42,7 @@ export function UnifiedDashboard() {
     completeSuggestion,
   } = useSuggestions()
 
-  // Check-in sessions for achievements
+  // Check-in sessions for insights
   const checkInSessions = useCheckInSessions(30)
 
   // Achievements hook
@@ -55,7 +54,7 @@ export function UnifiedDashboard() {
   } = useAchievements()
 
   // Check if user has enough data for achievements
-  const canGenerateAchievements = useCanGenerateAchievements(allRecordings || [], suggestions)
+  const canGenerateAchievements = useCanGenerateAchievements(allRecordings || [], checkInSessions, suggestions)
 
   // 24-hour cooldown for achievement generation
   const { canCheck: cooldownAllowsCheck, markChecked } = useAchievementCooldown()
@@ -89,7 +88,7 @@ export function UnifiedDashboard() {
     // Cooldown check - only allow one API call per 24 hours
     if (!cooldownAllowsCheck) return
     if (!canGenerateAchievements || achievementsLoading) return
-    if (!allRecordings || allRecordings.length === 0) return
+    if ((!allRecordings || allRecordings.length === 0) && checkInSessions.length === 0) return
 
     // Generate achievements after a short delay to avoid blocking initial load
     const timer = setTimeout(async () => {
@@ -110,13 +109,14 @@ export function UnifiedDashboard() {
 
   // Voice patterns for detail dialog
   const voicePatterns = useMemo(() => {
-    return featuresToVoicePatterns(allRecordings?.[0]?.features)
-  }, [allRecordings])
+    const latestSession = checkInSessions[0]
+    return featuresToVoicePatterns(latestSession?.acousticMetrics?.features)
+  }, [checkInSessions])
 
   // Historical context for detail dialog
   const historicalContext = useMemo(() => {
-    return computeHistoricalContext(allRecordings || [])
-  }, [allRecordings])
+    return computeHistoricalContext(checkInSessions || [])
+  }, [checkInSessions])
 
   // Completed suggestions (for calendar display)
   const completedSuggestions = useMemo(() => {
@@ -127,17 +127,25 @@ export function UnifiedDashboard() {
 
   // Handle regenerating suggestions
   const handleRegenerate = useCallback(async () => {
-    const latestRecording = allRecordings?.[0]
-    if (!latestRecording?.metrics) return
+    const latestSession = checkInSessions?.[0]
+    if (!latestSession?.acousticMetrics) return
 
-    const metrics = latestRecording.metrics
-    const trendData = recordingsToTrendData(allRecordings || [])
+    const metrics = {
+      stressScore: latestSession.acousticMetrics.stressScore,
+      stressLevel: latestSession.acousticMetrics.stressLevel,
+      fatigueScore: latestSession.acousticMetrics.fatigueScore,
+      fatigueLevel: latestSession.acousticMetrics.fatigueLevel,
+      confidence: latestSession.acousticMetrics.confidence,
+      analyzedAt: latestSession.acousticMetrics.analyzedAt ?? new Date().toISOString(),
+    }
+
+    const trendData = sessionsToTrendData(checkInSessions || [])
     const trend = trendData.length >= 2
       ? predictBurnoutRisk(trendData).trend
       : "stable"
 
-    await regenerateWithDiff(metrics, trend, allRecordings || [])
-  }, [allRecordings, regenerateWithDiff])
+    await regenerateWithDiff(metrics, trend, checkInSessions || [])
+  }, [checkInSessions, regenerateWithDiff])
 
   const pendingCount = suggestions.filter(s => s.status === "pending").length
 

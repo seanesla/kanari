@@ -2,7 +2,7 @@
  * Check-in Input Bar
  *
  * A bottom input bar for starting new check-ins.
- * Styled like a text input but clicking it opens the Voice Note vs AI Chat mode selector.
+ * Styled like a text input but clicking it opens the AI check-in flow.
  */
 
 "use client"

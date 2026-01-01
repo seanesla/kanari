@@ -34,7 +34,6 @@ import type {
   QuickActionsToolArgs,
   ScheduleActivityToolArgs,
   StressGaugeToolArgs,
-  VoicePatterns,
 } from "@/lib/types"
 import type {
   SystemContextSummary,
@@ -45,18 +44,10 @@ import type { Session } from "@google/genai"
 // Gemini Live model (Dec 2025 native audio preview)
 const LIVE_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
 
-// Post-recording context for sessions triggered after voice recordings
-export interface PostRecordingContext {
-  stressScore: number
-  fatigueScore: number
-  patterns: VoicePatterns
-}
-
 // Context for AI-initiated conversations
 export interface SessionContext {
   contextSummary?: SystemContextSummary
   timeContext?: SystemTimeContext
-  postRecordingContext?: PostRecordingContext
 }
 
 export type GeminiWidgetEvent =
@@ -332,8 +323,7 @@ export class GeminiLiveClient {
 
       const systemInstruction = buildCheckInSystemInstruction(
         context?.contextSummary,
-        context?.timeContext,
-        context?.postRecordingContext
+        context?.timeContext
       )
 
       const ai = new GoogleGenAI({ apiKey })

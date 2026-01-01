@@ -60,7 +60,7 @@ export function AnalyticsInsightsSection() {
         <div className="text-center py-8 text-muted-foreground">
           <Info className="h-8 w-8 mx-auto mb-2 opacity-50" />
           <p className="text-sm">No AI analysis data in {TIME_RANGE_LABELS[timeRange].toLowerCase()}</p>
-          <p className="text-xs mt-1">Record voice notes with AI analysis enabled to see insights</p>
+          <p className="text-xs mt-1">Complete a check-in to see insights</p>
         </div>
       )}
 
@@ -71,7 +71,7 @@ export function AnalyticsInsightsSection() {
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
                 <span className="font-medium text-foreground">{totalObservations}</span> observations across{" "}
-                <span className="font-medium text-foreground">{insights.recordingCount}</span> recordings.
+                <span className="font-medium text-foreground">{insights.recordingCount}</span> check-ins.
                 {insights.patterns.length > 0 && (
                   <> <span className="font-medium text-foreground">{insights.patterns.length}</span> patterns detected.</>
                 )}
@@ -182,7 +182,7 @@ export function AnalyticsInsightsSection() {
                             <span className="text-accent">•</span>
                             {pattern.description}
                             <span className="text-xs text-muted-foreground">
-                              ({pattern.affectedRecordingIds.length} recordings)
+                              ({pattern.affectedRecordingIds.length} check-ins)
                             </span>
                           </li>
                         ))}

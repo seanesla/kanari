@@ -8,31 +8,58 @@
 
 "use client"
 
-import { MessageSquare, Calendar, AlertCircle, Trash2, Mic } from "lucide-react"
+import { useCallback, useMemo, useState } from "react"
+import { MessageSquare, Calendar, AlertCircle, Trash2, Clock, TrendingUp, TrendingDown, Minus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MessageBubble } from "@/components/check-in/message-bubble"
+import { RecordingWaveform } from "@/components/dashboard/recording-waveform"
+import { AudioPlayer } from "@/components/dashboard/audio-player"
 import { formatDate, formatDurationWithUnits } from "@/lib/date-utils"
 import type { CheckInSession } from "@/lib/types"
 
 interface AIChatDetailViewProps {
   session: CheckInSession
   onDelete: () => void
-  linkedRecordingId?: string
-  onOpenLinkedRecording?: (recordingId: string) => void
 }
 
 export function AIChatDetailView({
   session,
   onDelete,
-  linkedRecordingId,
-  onOpenLinkedRecording,
 }: AIChatDetailViewProps) {
   // Calculate session duration
   const duration = session.duration ? formatDurationWithUnits(session.duration) : null
 
   // Determine if there were voice mismatches detected
   const hasMismatches = (session.mismatchCount ?? 0) > 0
+
+  const [playheadPosition, setPlayheadPosition] = useState(0)
+  const [seekPosition, setSeekPosition] = useState<number | undefined>(undefined)
+
+  const audioDataArray = useMemo(() => {
+    if (!session.audioData || session.audioData.length === 0) return null
+    return new Float32Array(session.audioData)
+  }, [session.audioData])
+
+  const handleTimeUpdate = useCallback(
+    (currentTime: number) => {
+      if ((session.duration ?? 0) > 0) {
+        setPlayheadPosition(currentTime / (session.duration ?? 1))
+      }
+    },
+    [session.duration]
+  )
+
+  const handleSeek = useCallback((position: number) => {
+    setPlayheadPosition(position)
+    setSeekPosition(position)
+  }, [])
+
+  const StressIcon = session.acousticMetrics?.stressLevel
+    ? session.acousticMetrics.stressLevel === "low" || session.acousticMetrics.stressLevel === "moderate"
+      ? TrendingDown
+      : TrendingUp
+    : Minus
 
   return (
     <div className="flex flex-col h-full">
@@ -79,17 +106,6 @@ export function AIChatDetailView({
           </div>
         )}
 
-        {/* Linked recording indicator */}
-        {linkedRecordingId && (
-          <button
-            onClick={() => onOpenLinkedRecording?.(linkedRecordingId)}
-            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-accent transition-colors"
-          >
-            <Mic className="h-4 w-4" />
-            <span>From voice note</span>
-          </button>
-        )}
-
         {/* Session summary if available */}
         {session.summary && session.summary.positiveNotes.length > 0 && (
           <p className="text-sm text-muted-foreground italic border-t border-border/30 pt-2 mt-2">
@@ -100,14 +116,71 @@ export function AIChatDetailView({
 
       {/* Messages scroll area */}
       <ScrollArea className="flex-1 min-h-0">
-        <div className="px-6 py-6 space-y-4">
+        <div className="px-6 py-6 space-y-6">
+          {session.acousticMetrics && (
+            <div
+              className="rounded-lg border border-accent/30 bg-foreground/5 backdrop-blur-xl p-4"
+              style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--accent) 15%, transparent)' }}
+            >
+              <h3 className="text-sm font-medium mb-3">Voice Analysis</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
+                  <StressIcon className="h-5 w-5 text-destructive" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Stress Level</p>
+                    <p className="text-lg font-semibold">{session.acousticMetrics.stressScore}</p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {session.acousticMetrics.stressLevel}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
+                  <Clock className="h-5 w-5 text-accent" />
+                  <div>
+                    <p className="text-xs text-muted-foreground">Fatigue Level</p>
+                    <p className="text-lg font-semibold">{session.acousticMetrics.fatigueScore}</p>
+                    <p className="text-xs text-muted-foreground capitalize">
+                      {session.acousticMetrics.fatigueLevel}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {audioDataArray && (
+            <div
+              className="rounded-lg border border-accent/30 bg-foreground/5 backdrop-blur-xl p-4"
+              style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--accent) 15%, transparent)' }}
+            >
+              <div className="flex justify-center mb-4">
+                <RecordingWaveform
+                  mode="static"
+                  audioData={audioDataArray}
+                  width={400}
+                  height={80}
+                  playheadPosition={playheadPosition}
+                  onSeek={handleSeek}
+                  className="border border-border/30 bg-background/50"
+                />
+              </div>
+              <div className="max-w-md mx-auto">
+                <AudioPlayer
+                  audioData={audioDataArray}
+                  sampleRate={session.sampleRate || 16000}
+                  duration={session.duration ?? audioDataArray.length / 16000}
+                  onTimeUpdate={handleTimeUpdate}
+                  seekPosition={seekPosition}
+                />
+              </div>
+            </div>
+          )}
+
           {session.messages.length === 0 ? (
-            // Empty state (should rarely happen)
             <div className="flex items-center justify-center py-12">
               <p className="text-sm text-muted-foreground">No messages in this session</p>
             </div>
           ) : (
-            // Message list - use existing MessageBubble component
             session.messages.map((message) => (
               <MessageBubble key={message.id} message={message} skipAnimation />
             ))

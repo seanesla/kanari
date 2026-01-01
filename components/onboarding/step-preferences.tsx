@@ -83,7 +83,7 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        {/* Recording duration */}
+        {/* Check-in duration */}
         <motion.div
           className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm space-y-3 transition-colors hover:border-accent/30"
           initial={{ opacity: 0, y: 20, boxShadow: "0 0 0px transparent" }}
@@ -100,7 +100,7 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
               <Clock className="h-5 w-5 text-accent" />
             </motion.div>
             <div className="flex-1">
-              <Label htmlFor="duration">Default Recording Duration</Label>
+              <Label htmlFor="duration">Default Check-in Duration</Label>
               <p className="text-sm text-muted-foreground">
                 How long each voice check-in should be
               </p>
@@ -136,7 +136,7 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
                 <Mic className="h-5 w-5 text-accent" />
               </motion.div>
               <div>
-                <Label htmlFor="vad">Smart Recording</Label>
+                <Label htmlFor="vad">Smart Capture</Label>
                 <p className="text-sm text-muted-foreground">
                   Automatically detect when you start/stop speaking
                 </p>
