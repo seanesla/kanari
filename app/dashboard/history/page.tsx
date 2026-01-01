@@ -60,6 +60,7 @@ type CheckInMode = "voice-note" | "ai-chat"
 
 /**
  * Main sidebar content component
+ * Uses offcanvas collapsible - fully hides when collapsed
  */
 function CheckInsSidebar({
   groupedByDate,
@@ -121,108 +122,109 @@ function CheckInsSidebar({
           size={300}
           borderWidth={2}
         />
-      {/* Header with New Check-in button and select mode toggle */}
-      <SidebarHeader className="px-4 py-4 border-b border-border/30">
-        <div className="flex items-center gap-2">
-          <Button
-            onClick={onNewCheckIn}
-            className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 gap-2"
-          >
-            <Sparkles className="h-4 w-4" />
-            New Check-in
-          </Button>
-          {historyItems.length > 0 && (
+
+        {/* Header with New Check-in button and select mode toggle */}
+        <SidebarHeader className="px-4 py-4 border-b border-border/30">
+          <div className="flex items-center gap-2">
             <Button
-              variant={isSelectMode ? "secondary" : "ghost"}
-              size="icon"
-              onClick={onToggleSelectMode}
-              title={isSelectMode ? "Cancel selection" : "Select items"}
+              onClick={onNewCheckIn}
+              className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 gap-2"
             >
-              <CheckSquare className="h-4 w-4" />
+              <Sparkles className="h-4 w-4" />
+              New Check-in
             </Button>
+            {historyItems.length > 0 && (
+              <Button
+                variant={isSelectMode ? "secondary" : "ghost"}
+                size="icon"
+                onClick={onToggleSelectMode}
+                title={isSelectMode ? "Cancel selection" : "Select items"}
+              >
+                <CheckSquare className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </SidebarHeader>
+
+        {/* Check-in list */}
+        <SidebarContent className="px-2">
+          {historyItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <Clock className="h-8 w-8 text-muted-foreground/50 mb-3" />
+              <p className="text-sm text-muted-foreground">No check-ins yet</p>
+              <p className="text-xs text-muted-foreground/70 mt-1">
+                Start your first check-in above
+              </p>
+            </div>
+          ) : groupedByDate.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+              <p className="text-sm text-muted-foreground">No matching check-ins</p>
+            </div>
+          ) : (
+            groupedByDate.map((group) => (
+              <SidebarGroup key={group.dateKey}>
+                <SidebarGroupLabel className="text-xs text-muted-foreground/70">
+                  {group.dateLabel}
+                </SidebarGroupLabel>
+                <SidebarMenu>
+                  {group.items.map((item) => (
+                    <SidebarMenuItem key={item.id}>
+                      <CheckInListItem
+                        item={item}
+                        isSelected={selectedItemId === item.id}
+                        onSelect={() => handleSelectItem(item)}
+                        showCheckbox={isSelectMode}
+                        isChecked={selectedIds.has(item.id)}
+                        onCheckChange={(checked) => onToggleSelect(item.id, checked)}
+                      />
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroup>
+            ))
           )}
-        </div>
-      </SidebarHeader>
+        </SidebarContent>
 
-      {/* Check-in list */}
-      <SidebarContent className="px-2">
-        {historyItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <Clock className="h-8 w-8 text-muted-foreground/50 mb-3" />
-            <p className="text-sm text-muted-foreground">No check-ins yet</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">
-              Start your first check-in above
-            </p>
+        {/* Footer with filter toggle */}
+        <SidebarFooter className="px-4 py-3 border-t border-border/30">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onFilterChange("all")}
+              className={cn(
+                "flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
+                filter === "all"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              All
+            </button>
+            <button
+              onClick={() => onFilterChange("voice_note")}
+              className={cn(
+                "flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1",
+                filter === "voice_note"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Mic className="h-3 w-3" />
+              Voice
+            </button>
+            <button
+              onClick={() => onFilterChange("ai_chat")}
+              className={cn(
+                "flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1",
+                filter === "ai_chat"
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <MessageSquare className="h-3 w-3" />
+              Chat
+            </button>
           </div>
-        ) : groupedByDate.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-            <p className="text-sm text-muted-foreground">No matching check-ins</p>
-          </div>
-        ) : (
-          groupedByDate.map((group) => (
-            <SidebarGroup key={group.dateKey}>
-              <SidebarGroupLabel className="text-xs text-muted-foreground/70">
-                {group.dateLabel}
-              </SidebarGroupLabel>
-              <SidebarMenu>
-                {group.items.map((item) => (
-                  <SidebarMenuItem key={item.id}>
-                    <CheckInListItem
-                      item={item}
-                      isSelected={selectedItemId === item.id}
-                      onSelect={() => handleSelectItem(item)}
-                      showCheckbox={isSelectMode}
-                      isChecked={selectedIds.has(item.id)}
-                      onCheckChange={(checked) => onToggleSelect(item.id, checked)}
-                    />
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroup>
-          ))
-        )}
-      </SidebarContent>
-
-      {/* Footer with filter toggle */}
-      <SidebarFooter className="px-4 py-3 border-t border-border/30">
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => onFilterChange("all")}
-            className={cn(
-              "flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all",
-              filter === "all"
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            All
-          </button>
-          <button
-            onClick={() => onFilterChange("voice_note")}
-            className={cn(
-              "flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1",
-              filter === "voice_note"
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <Mic className="h-3 w-3" />
-            Voice
-          </button>
-          <button
-            onClick={() => onFilterChange("ai_chat")}
-            className={cn(
-              "flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-all flex items-center justify-center gap-1",
-              filter === "ai_chat"
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <MessageSquare className="h-3 w-3" />
-            Chat
-          </button>
-        </div>
-      </SidebarFooter>
+        </SidebarFooter>
       </div>
     </Sidebar>
   )
@@ -566,11 +568,24 @@ function HistoryPageContent() {
         />
 
         <SidebarInset transparent className="flex flex-col bg-transparent pb-3">
-          {/* Header */}
-          <header className="flex items-center gap-2 px-4 py-3 border-b border-accent/30 md:hidden">
+          {/* Header - mobile shows full header, desktop shows glassmorphic trigger */}
+          <header className="md:hidden flex items-center gap-2 px-4 py-3 border-b border-accent/30">
             <SidebarTrigger className="-ml-1" />
             <h1 className="text-sm font-medium">Check-ins</h1>
           </header>
+
+          {/* Desktop: Glassmorphic trigger button aligned with sidebar top */}
+          <div className="hidden md:block absolute top-3 left-3 z-10">
+            <div
+              className="flex items-center justify-center rounded-xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200"
+              style={{
+                boxShadow:
+                  "inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)",
+              }}
+            >
+              <SidebarTrigger className="h-10 w-10 hover:bg-accent/10" />
+            </div>
+          </div>
 
           {/* Main content area */}
           <main className="flex-1 min-h-0 overflow-hidden">
