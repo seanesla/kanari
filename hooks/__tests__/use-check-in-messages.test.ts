@@ -317,6 +317,38 @@ describe("useCheckIn message handling", () => {
     })
   })
 
+  it("keeps assistant message streaming until onTurnComplete (prevents premature placeholder removal)", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    // Simulate multiple transcript chunks with finished: true
+    // (Gemini Live API can send multiple finished chunks before turnComplete)
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("Hello ", true)
+    })
+
+    expect(result.current[0].messages[0]?.isStreaming).toBe(true)
+    expect(result.current[0].messages[0]?.content).toBe("Hello ")
+
+    // Second chunk with finished: true - should keep isStreaming: true
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("there", true)
+    })
+
+    expect(result.current[0].messages[0]?.isStreaming).toBe(true)
+    expect(result.current[0].messages[0]?.content).toBe("Hello there")
+
+    // Only turnComplete should finalize
+    act(() => {
+      geminiCallbacks?.onTurnComplete?.()
+    })
+
+    expect(result.current[0].messages[0]?.isStreaming).toBe(false)
+  })
+
   it("injects mismatch context into Gemini when a mismatch is detected", async () => {
     const { result } = renderHook(() => useCheckIn())
 

@@ -208,6 +208,10 @@ export function useAudioPlayback(
   const workletNodeRef = useRef<AudioWorkletNode | null>(null)
   const isPlayingRef = useRef(false)
 
+  // Track instance lifecycle to prevent stale callbacks from being executed
+  // if another instance was created (e.g., rapid open/close of dialog)
+  const instanceRef = useRef<object>({})
+
   // Store callbacks in refs
   const callbacksRef = useRef({ onPlaybackStart, onPlaybackEnd, onAudioLevel })
   useEffect(() => {
@@ -256,8 +260,15 @@ export function useAudioPlayback(
       workletNode.connect(audioContext.destination)
 
       // Handle messages from worklet
+      const currentInstance = instanceRef.current
       workletNode.port.onmessage = (event) => {
         const { type, queueLength, bufferedSamples } = event.data
+
+        // Only process messages if this instance is still active
+        // This prevents stale callbacks when multiple hook instances exist
+        if (instanceRef.current !== currentInstance) {
+          return
+        }
 
         switch (type) {
           case "queueStatus":
@@ -307,8 +318,18 @@ export function useAudioPlayback(
    */
   const queueAudio = useCallback((base64Audio: string) => {
     const worklet = workletNodeRef.current
+    const audioContext = audioContextRef.current
+
+    // Check if worklet is initialized
     if (!worklet) {
       console.warn("[useAudioPlayback] Not initialized, cannot queue audio")
+      return
+    }
+
+    // Check if AudioContext is still open
+    // Web Audio API spec includes "closed" state: https://webaudio.github.io/web-audio-api/#dom-audiocontextstate
+    if (!audioContext || (audioContext.state as string) === "closed") {
+      console.warn("[useAudioPlayback] AudioContext closed, cannot queue audio")
       return
     }
 
@@ -331,13 +352,18 @@ export function useAudioPlayback(
 
   /**
    * Clear the playback queue (for barge-in)
+   * Immediately stops any playing audio and clears the queue
    */
   const clearQueue = useCallback(() => {
     const worklet = workletNodeRef.current
     if (!worklet) return
 
-    worklet.port.postMessage({ type: "clear" })
+    // Immediately set playing to false to prevent onPlaybackStart from being called
+    // if buffered audio finishes before the worklet processes the clear message
     isPlayingRef.current = false
+
+    // Send clear command to the worklet
+    worklet.port.postMessage({ type: "clear" })
   }, [])
 
   /**
@@ -366,6 +392,10 @@ export function useAudioPlayback(
    * Clean up resources
    */
   const cleanup = useCallback(() => {
+    // Invalidate this instance so stale worklet messages are ignored
+    const oldInstance = instanceRef.current
+    instanceRef.current = {}
+
     // Clear message handler to prevent memory leaks
     if (workletNodeRef.current) {
       workletNodeRef.current.port.onmessage = null

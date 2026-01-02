@@ -40,6 +40,7 @@ export interface UseCheckInMessagesOptions {
   callbacksRef: MutableRefObject<CheckInMessagesCallbacks>
   sendText: (text: string) => void
   injectContext: (contextText: string) => void
+  generateAndSendFlashResponse?: (text: string) => Promise<void>
   queueAudio: (base64Audio: string) => void
   clearQueuedAudio: () => void
   resetAudioChunks: () => void
@@ -385,16 +386,11 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
       // NOTE: finished: true means this transcription CHUNK is finalized, NOT that the turn is done.
       // The Gemini Live API can send multiple transcription segments with finished: true before
-      // the actual turnComplete event. Do NOT reset refs here - only onTurnComplete should reset.
-      // Premature reset causes multiple message bubbles when more transcript chunks arrive.
+      // the actual turnComplete event. Do NOT set isStreaming: false here - only onTurnComplete should.
+      // Setting isStreaming: false prematurely removes the "Speaking..." placeholder and shows the
+      // jumbled content when more transcript chunks arrive.
       // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
-      if (finished && lastAssistantMessageIdRef.current) {
-        dispatch({
-          type: "SET_MESSAGE_STREAMING",
-          messageId: lastAssistantMessageIdRef.current,
-          isStreaming: false,
-        })
-      }
+      // REMOVED: if (finished && lastAssistantMessageIdRef.current) { ... }
     },
     [dispatch]
   )

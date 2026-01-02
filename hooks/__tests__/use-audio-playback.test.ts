@@ -189,4 +189,122 @@ describe("useAudioPlayback", () => {
     expect(result.current[0].isReady).toBe(false)
     expect(result.current[0].error).toBe("INITIALIZATION_ABORTED")
   })
+
+  it("prevents multiple onPlaybackStart callbacks when audio queue receives updates rapidly", async () => {
+    vi.resetModules()
+    vi.unmock("@/hooks/use-audio-playback")
+    const { useAudioPlayback } = await import("@/hooks/use-audio-playback")
+
+    const onPlaybackStart = vi.fn()
+    const onPlaybackEnd = vi.fn()
+
+    const { result } = renderHook(() =>
+      useAudioPlayback({ onPlaybackStart, onPlaybackEnd })
+    )
+
+    await act(async () => {
+      await result.current[1].initialize()
+    })
+
+    // Simulate rapid queue status messages (simulating multiple audio chunks arriving)
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "queueStatus", queueLength: 1, bufferedSamples: 5000 } })
+    })
+    expect(onPlaybackStart).toHaveBeenCalledTimes(1)
+
+    // More queue status messages shouldn't trigger another onPlaybackStart
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "queueStatus", queueLength: 2, bufferedSamples: 10000 } })
+    })
+    expect(onPlaybackStart).toHaveBeenCalledTimes(1)
+
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "queueStatus", queueLength: 3, bufferedSamples: 15000 } })
+    })
+    expect(onPlaybackStart).toHaveBeenCalledTimes(1)
+
+    // Buffer empty should trigger onPlaybackEnd
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "bufferEmpty" } })
+    })
+    expect(onPlaybackEnd).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not queue audio when AudioContext is closed", async () => {
+    vi.resetModules()
+    vi.unmock("@/hooks/use-audio-playback")
+    const { useAudioPlayback } = await import("@/hooks/use-audio-playback")
+
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+
+    const { result } = renderHook(() => useAudioPlayback())
+
+    await act(async () => {
+      await result.current[1].initialize()
+    })
+
+    // Close the audio context
+    await act(async () => {
+      result.current[1].cleanup()
+    })
+
+    // Try to queue audio - should silently fail or warn
+    act(() => {
+      result.current[1].queueAudio("base64==")
+    })
+
+    // Should not post message to a null worklet
+    expect(lastWorklet?.port.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "audio" }),
+      expect.anything()
+    )
+  })
+
+  it("clears all queued audio on barge-in and prevents overlap", async () => {
+    vi.resetModules()
+    vi.unmock("@/hooks/use-audio-playback")
+    const { useAudioPlayback } = await import("@/hooks/use-audio-playback")
+
+    const onPlaybackStart = vi.fn()
+    const onPlaybackEnd = vi.fn()
+
+    const { result } = renderHook(() =>
+      useAudioPlayback({ onPlaybackStart, onPlaybackEnd })
+    )
+
+    await act(async () => {
+      await result.current[1].initialize()
+    })
+
+    // Start playback with queued audio
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "queueStatus", queueLength: 1, bufferedSamples: 5000 } })
+    })
+    expect(onPlaybackStart).toHaveBeenCalledTimes(1)
+
+    // Simulate barge-in - clear queue
+    act(() => {
+      result.current[1].clearQueue()
+    })
+    expect(lastWorklet?.port.postMessage).toHaveBeenCalledWith({ type: "clear" })
+
+    // Worklet confirms cleared
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "cleared" } })
+    })
+    expect(result.current[0].isPlaying).toBe(false)
+
+    // Now queue new audio for the user's response
+    act(() => {
+      result.current[1].queueAudio("newAudio==")
+    })
+
+    // This should eventually trigger onPlaybackStart again (for the new response)
+    // But it should have happened cleanly without audio overlap
+    expect(lastWorklet?.port.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "audio" }),
+      expect.anything()
+    )
+  })
 })
