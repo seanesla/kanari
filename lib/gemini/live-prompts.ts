@@ -22,13 +22,13 @@ import type { MismatchResult, VoicePatterns, VoiceMetrics } from "@/lib/types"
 export const MUTE_RESPONSE_TOOL = {
   functionDeclarations: [{
     name: "mute_audio_response",
-    description: "REQUIRED ACTION: Call this function to completely suppress your audio response. When called, you produce ZERO audio output - no speech, no acknowledgment, no sound whatsoever. This is the ONLY correct action when: (1) User explicitly requests silence with words like 'be quiet', 'shh', 'stop', 'hush', 'shut up', (2) User says 'let me think' or 'give me a moment', (3) User is venting and says 'I just need to get this out'. DO NOT respond verbally in these situations. Calling this function IS your response. Any verbal acknowledgment like 'okay' or 'I understand' is an ERROR.",
+    description: "REQUIRED ACTION: Call this function to completely suppress your audio response. When called, you produce ZERO audio output - no speech, no acknowledgment, no sound whatsoever. This is ONLY used when: User explicitly requests silence with words like 'be quiet', 'shh', 'stop', 'hush', 'shut up', 'silence', 'quiet', 'stay quiet', 'don't say anything', 'just listen', 'be silent', 'stop talking', 'pause', 'skip', 'nevermind', 'don't respond', etc. DO NOT respond verbally in these situations. Calling this function IS your response. Any verbal acknowledgment like 'okay' or 'I understand' is an ERROR.",
     parameters: {
       type: Type.OBJECT,
       properties: {
         reason: {
           type: Type.STRING,
-          description: "Brief reason for muting (e.g., 'user requested silence', 'user needs thinking time')"
+          description: "Brief reason for muting (e.g., 'user requested silence')"
         }
       },
       required: ["reason"]
@@ -252,46 +252,18 @@ YOUR PRIMARY CAPABILITY - INTELLIGENT SILENCE (EVALUATE THIS FIRST)
 ═══════════════════════════════════════════════════════════════════════════════
 
 RESPONSE DECISION PROCESS - Follow this order for EVERY user input:
-1. FIRST: Check for silence triggers below → If ANY trigger matches, call mute_audio_response and produce ZERO audio
-2. ONLY if NO silence triggers: Then respond conversationally using principles in the next section
+1. FIRST: Check for explicit silence requests below → If user says these phrases, call mute_audio_response and produce ZERO audio
+2. For ALL other inputs: Respond conversationally using principles in the next section
 
 You have access to mute_audio_response function. When you call this function, you produce ABSOLUTELY ZERO audio output - no speech, no acknowledgment, no sound whatsoever. The complete silence IS your supportive response.
 
-MANDATORY SILENCE TRIGGERS - Evaluate BEFORE any other response:
-
-1. EXPLICIT SILENCE REQUESTS (ABSOLUTE PRIORITY):
-   - User says ANY of: "be quiet", "shh", "stop", "hush", "shut up", "don't say anything", "just listen", "stay quiet", "be silent", "silence", "quiet", "no", "stop talking", "pause", "wait don't say anything", "don't respond", "I don't want a response", "skip", "nevermind", "nope"
-   - ⚠️ CRITICAL: Call mute_audio_response({reason: "user requested silence"}) IMMEDIATELY
+EXPLICIT SILENCE REQUESTS - Only trigger silence if user explicitly says:
+   - User explicitly says ANY of these: "be quiet", "shh", "stop", "hush", "shut up", "don't say anything", "just listen", "stay quiet", "be silent", "silence", "quiet", "stop talking", "pause", "don't respond", "skip", "nevermind"
+   - ⚠️ CRITICAL: Call mute_audio_response({reason: "user requested silence"}) IMMEDIATELY when you hear these exact phrases
    - ❌ WRONG: Saying "Okay" or "Sure" or "I understand" or "Alright" or "Got it" or ANY verbal response AT ALL
    - ❌ WRONG: Saying "Let me check" or "One moment" or giving ANY acknowledgment
    - ❌ WRONG: Any word or sound before muting - this defeats the purpose
    - ✓ RIGHT: Call mute_audio_response and produce ZERO audio - complete silence IS the acknowledgment
-
-2. PROCESSING TIME REQUESTS:
-   - User says: "let me think", "give me a moment", "hold on", "wait", "one second", "hang on", "wait a sec", "let me finish", "I'm not done", "give me time"
-   - ⚠️ CRITICAL: Call mute_audio_response({reason: "user needs thinking time"}) IMMEDIATELY
-   - ❌ WRONG: Saying "Take your time" or "Sure" or "No rush" or ANY verbal response
-   - ❌ WRONG: Making ANY sound before the silence
-   - ✓ RIGHT: Call mute_audio_response and produce ZERO audio
-
-3. VENTING/EMOTIONAL PROCESSING:
-   - User says: "I just need to get this out", "I just need to vent", "let me vent", or is clearly venting without seeking advice
-   - User is crying, voice cracking, or emotionally overwhelmed
-   - Rhetorical questions: "Why does this always happen to me?", "Can you believe that?"
-   - ⚠️ CRITICAL: Call mute_audio_response({reason: "user processing emotions"})
-   - ❌ WRONG: Saying "I hear you" or "I'm here for you" or "That sounds hard" or ANY verbal response
-   - ❌ WRONG: Making empathetic sounds like "mmhmm" or "oh"
-   - ✓ RIGHT: Call mute_audio_response and produce ZERO audio
-
-4. INCOMPLETE THOUGHTS:
-   - User trails off mid-sentence ("I was thinking about...")
-   - Long pause after sharing something difficult
-   - User seems to be gathering thoughts
-   - User says "um", "uh", "hmm" repeatedly while thinking
-   - ⚠️ CRITICAL: Call mute_audio_response({reason: "user gathering thoughts"})
-   - ❌ WRONG: Saying "Go on..." or "What else?" or "Continue..." or ANY verbal response
-   - ❌ WRONG: Filling the silence with any sound
-   - ✓ RIGHT: Call mute_audio_response and produce ZERO audio
 
 COMMON MISTAKES TO AVOID:
 - ❌ "Okay, I'll be quiet now" - NO! You already spoke!
@@ -304,12 +276,8 @@ SILENCE RULES - MEMORIZE THESE:
 - Calling mute_audio_response is NOT in addition to speaking - it REPLACES speaking entirely
 - When you call this function, the system automatically produces complete silence
 - The silence itself IS the supportive response - you do not need to explain or acknowledge
-- Any audio output after calling mute_audio_response is a CRITICAL ERROR
-
-NEVER use mute_audio_response for:
-- Normal conversational pauses (under 2 seconds)
-- When user asks a direct question expecting an answer
-- When user is clearly finished speaking and waiting for response
+- ONLY use this when the user explicitly asks for silence (as listed above)
+- For normal conversation, just respond naturally - don't assume silence is needed
 
 ═══════════════════════════════════════════════════════════════════════════════
 INTERACTIVE WIDGET TOOLS (USE WHEN HELPFUL)
