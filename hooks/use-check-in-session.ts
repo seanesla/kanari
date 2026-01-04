@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch, MutableRefObject } from "react"
 import { processAudio } from "@/lib/audio/processor"
 import { computeContextFingerprint } from "@/lib/gemini/context-fingerprint"
+import { logWarn } from "@/lib/logger"
 import {
   consumePreservedSession,
   clearPreservedSession,
@@ -77,7 +78,7 @@ export interface UseCheckInSessionOptions {
 }
 
 export interface UseCheckInSessionResult {
-  startSession: () => Promise<void>
+  startSession: (options?: { userGesture?: boolean }) => Promise<void>
   endSession: () => Promise<void>
   cancelSession: () => void
   getSession: () => CheckInSession | null
@@ -106,6 +107,10 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
   const unmountedRef = useRef(false)
 
   useEffect(() => {
+    // React StrictMode (dev) may run effect cleanups and then re-run effects
+    // while preserving refs. Reset this flag on (re)mount so sessions can start.
+    // Pattern doc: docs/error-patterns/strictmode-effect-cleanup-preserves-refs.md
+    unmountedRef.current = false
     return () => {
       unmountedRef.current = true
       startSessionAbortRef.current = true
@@ -115,7 +120,8 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
   }, [])
 
   const startSession = useCallback(
-    async () => {
+    async (options?: { userGesture?: boolean }) => {
+      logWarn("useCheckIn", "startSession invoked")
       // Track what's been initialized for proper cleanup on failure
       let playbackInitialized = false
       let captureInitialized = false
@@ -153,12 +159,13 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         dispatch({ type: "SET_SESSION", session })
         sessionStartRef.current = session.startedAt
 
-        // Yield once so React unmount/cleanup (e.g., StrictMode) can abort initialization
-        // before we start allocating AudioContexts or loading worklets.
-        // This keeps "unmount during startup" behavior deterministic without reintroducing
-        // heavy preflight work.
-        await Promise.resolve()
-        ensureActive()
+        // If this startSession isn't called within a user activation (e.g., auto-start in a useEffect),
+        // yield once so React unmount/cleanup (StrictMode) can abort before we allocate AudioContexts/worklets.
+        // When called from a click/tap handler, avoid yielding before audio init to satisfy autoplay policies.
+        if (!options?.userGesture) {
+          await Promise.resolve()
+          ensureActive()
+        }
 
         // Compute context fingerprint in the background (never block startup).
         // This is used only for session preservation/resumption.
@@ -422,8 +429,19 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
       audio.resetCleanupRequestedFlag()
 
       // Initialize audio resources
-      await playbackControls.initialize()
-      await audio.initializeAudioCapture()
+      dispatch({ type: "SET_INIT_PHASE", phase: "init_audio_playback" })
+      await withTimeout(
+        playbackControls.initialize(),
+        20_000,
+        "Audio setup timed out. If you’re on Safari/iOS, tap the screen once and try again."
+      )
+
+      dispatch({ type: "SET_INIT_PHASE", phase: "init_audio_capture" })
+      await withTimeout(
+        audio.initializeAudioCapture(),
+        60_000,
+        "Microphone setup timed out. Check your browser mic permissions and try again."
+      )
 
       // Reattach to the existing Gemini client
       gemini.reattachToClient(preserved.client)

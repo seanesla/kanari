@@ -321,6 +321,10 @@ export function useGeminiLive(
 
   // Cleanup on unmount
   useEffect(() => {
+    // React StrictMode (dev) may run effect cleanups and then re-run effects
+    // while preserving refs. Mark as mounted on (re)mount so connect() works.
+    // Pattern doc: docs/error-patterns/strictmode-effect-cleanup-preserves-refs.md
+    mountedRef.current = true
     return () => {
       mountedRef.current = false
       if (clientRef.current) {

@@ -15,6 +15,7 @@
 
 import { useReducer, useRef, useCallback, useEffect } from "react"
 import { base64ToInt16 } from "@/lib/audio/pcm-converter"
+import { logWarn } from "@/lib/logger"
 
 // ============================================
 // Types
@@ -258,13 +259,16 @@ export function useAudioPlayback(
       assertNotAborted()
 
       // Create AudioContext at 24kHz (Gemini output rate)
+      logWarn("useAudioPlayback", "Creating AudioContext")
       const audioContext = new AudioContext({ sampleRate })
       audioContextRef.current = audioContext
 
       // Ensure context is running (may be suspended on page load)
       if (audioContext.state === "suspended") {
+        logWarn("useAudioPlayback", "AudioContext suspended; attempting resume")
         await audioContext.resume()
       }
+      logWarn("useAudioPlayback", `AudioContext state: ${audioContext.state}`)
       assertNotAborted()
 
       // Abort if context was closed during resume (e.g., React StrictMode unmount)
@@ -276,7 +280,9 @@ export function useAudioPlayback(
       }
 
       // Load the playback worklet
+      logWarn("useAudioPlayback", "Loading playback worklet /playback.worklet.js")
       await audioContext.audioWorklet.addModule("/playback.worklet.js")
+      logWarn("useAudioPlayback", "Playback worklet loaded")
       assertNotAborted()
 
       // Abort if context was closed during module loading
@@ -286,6 +292,7 @@ export function useAudioPlayback(
       }
 
       // Create worklet node
+      logWarn("useAudioPlayback", "Creating AudioWorkletNode playback-processor")
       const workletNode = new AudioWorkletNode(audioContext, "playback-processor", {
         outputChannelCount: [1], // Mono output
       })
@@ -454,6 +461,10 @@ export function useAudioPlayback(
 
   // Cleanup on unmount - use the cleanup function to avoid duplication
   useEffect(() => {
+    // React StrictMode (dev) may run effect cleanups and then re-run effects
+    // while preserving refs. Ensure we mark this instance as mounted on (re)mount.
+    // Pattern doc: docs/error-patterns/strictmode-effect-cleanup-preserves-refs.md
+    mountedRef.current = true
     return () => {
       mountedRef.current = false
       cleanup()

@@ -32,7 +32,7 @@ export { checkInReducer, initialState } from "./use-check-in-messages"
 
 export interface CheckInControls {
   /** Start a new check-in session */
-  startSession: () => Promise<void>
+  startSession: (options?: { userGesture?: boolean }) => Promise<void>
   /** End the current session */
   endSession: () => Promise<void>
   /** Cancel session without saving */

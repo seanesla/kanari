@@ -18,7 +18,7 @@
  * Key differences from the original check-in-dialog.tsx:
  * - Removed Dialog wrapper (now lives inside Drawer)
  * - Added onSessionChange callback to notify parent when chat is active
- * - Auto-starts session when component mounts
+ * - Session starts only after explicit user action (Start button)
  *
  * Technical notes:
  * - Uses Server-Sent Events (SSE) to receive Gemini audio at 24kHz
@@ -27,13 +27,14 @@
  * - Has mute functionality to pause microphone input
  */
 
-import { useCallback, useEffect, useRef } from "react"
-import { logDebug, logError } from "@/lib/logger"
+import { useCallback, useEffect } from "react"
+import { logDebug, logError, logWarn } from "@/lib/logger"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Phone, PhoneOff, Mic, MicOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
+import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { VoiceIndicatorLarge } from "@/components/check-in/voice-indicator"
 import { BiomarkerIndicator } from "@/components/check-in/biomarker-indicator"
@@ -93,9 +94,9 @@ export function AIChatContent({
   // Hook to save completed sessions to IndexedDB
   const { addCheckInSession } = useCheckInSessionActions()
 
-  // Prevent duplicate session starts from React StrictMode double-mounting
-  // or rapid tab switching
-  const sessionStartedRef = useRef(false)
+  // Avoid "Start click did nothing" in React StrictMode (dev) where the first mount
+  // is intentionally torn down: only allow Start once the component is stable.
+  const canStart = useStrictModeReady(true)
 
   // Main check-in hook that manages the Gemini Live connection
   // This hook handles all the complex WebSocket, audio capture, and playback logic
@@ -135,68 +136,46 @@ export function AIChatContent({
 
   // Handle discard request from parent (drawer)
   // When requestDiscard becomes true, cancel the session and signal back
-  // IMPORTANT: Set sessionStartedRef.current = true BEFORE cancelSession()
-  // to prevent the auto-start effect from starting a new session when
-  // cancelSession() resets state to "idle"
   useEffect(() => {
     if (requestDiscard) {
-      sessionStartedRef.current = true  // Prevent auto-start
       controls.cancelSession()
       onDiscardComplete?.()
     }
   }, [requestDiscard, controls, onDiscardComplete])
 
-  // Reset the started flag when session completes, errors, or resets to idle
-  // This allows retry after errors and fresh start after completion
-  // Also reset on "idle" to handle StrictMode's double-mount - when first mount
-  // aborts with INITIALIZATION_ABORTED and dispatches RESET, the second mount
-  // needs sessionStartedRef to be false so auto-start can fire again
-  useEffect(() => {
-    if (checkIn.state === "idle" || checkIn.state === "complete" || checkIn.state === "error") {
-      sessionStartedRef.current = false
-    }
-  }, [checkIn.state])
+  const startOrResume = useCallback(async () => {
+    logWarn("AIChatContent", "Start pressed")
 
-  // Auto-start the session when component mounts (tab is selected)
-  // Checks for preserved session first, comparing fingerprints to detect data changes
-  useEffect(() => {
-    if (checkIn.state === "idle" && !sessionStartedRef.current) {
-      // Mark as started immediately to prevent duplicate calls
-      sessionStartedRef.current = true
+    try {
+      const hasPreserved = controls.hasPreservedSession()
 
-      // Check if we have a preserved session to resume
-      const initSession = async () => {
-        const hasPreserved = controls.hasPreservedSession()
+      if (hasPreserved) {
+        // Only resume if local context hasn't changed.
+        // If fingerprint can't be computed quickly, fail closed and start fresh.
+        const preservedFingerprint = getPreservedFingerprint()
 
-        if (hasPreserved) {
-          // Compare fingerprints to detect if context has changed
-          const preservedFingerprint = getPreservedFingerprint()
-          const currentFingerprint = await controls.getContextFingerprint()
+        const currentFingerprint = await Promise.race<string | null>([
+          controls.getContextFingerprint().catch(() => null),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 2500)),
+        ])
 
-          if (preservedFingerprint === currentFingerprint) {
-            // Context unchanged - resume preserved session
-            logDebug("AIChatContent", "Resuming preserved session")
-            try {
-              await controls.resumePreservedSession()
-              return
-            } catch (error) {
-              logError("AIChatContent", "Failed to resume preserved session:", error)
-              // Fall through to start fresh
-            }
-          } else {
-            // Context changed - clear preserved and start fresh
-            logDebug("AIChatContent", "Context changed, starting fresh session")
-            clearPreservedSession()
-          }
+        if (preservedFingerprint && currentFingerprint && preservedFingerprint === currentFingerprint) {
+          logDebug("AIChatContent", "Resuming preserved session")
+          await controls.resumePreservedSession()
+          return
         }
 
-        // Start fresh session
-        controls.startSession()
+        logDebug("AIChatContent", "Preserved session context changed; starting fresh")
+        clearPreservedSession()
       }
-
-      initSession()
+    } catch (error) {
+      logError("AIChatContent", "Failed to resume preserved session:", error)
+      clearPreservedSession()
+      // Fall through to start fresh.
     }
-  }, [checkIn.state, controls])
+
+    await controls.startSession({ userGesture: true })
+  }, [controls])
 
   // Handle closing the chat - preserve session for later resumption
   // User can come back and continue where they left off
@@ -266,8 +245,11 @@ export function AIChatContent({
           >
             <VoiceIndicatorLarge state="idle" audioLevel={0} />
             <p className="text-sm text-muted-foreground text-center">
-              Starting AI check-in...
+              Start a voice check-in when you’re ready.
             </p>
+            <Button onClick={startOrResume} disabled={!canStart}>
+              {canStart ? "Start" : "Preparing..."}
+            </Button>
           </motion.div>
         )}
 
@@ -453,10 +435,7 @@ export function AIChatContent({
               </p>
             </div>
             {/* Retry button resets and restarts the session */}
-            <Button onClick={() => {
-              sessionStartedRef.current = false
-              controls.startSession()
-            }}>
+            <Button onClick={startOrResume} disabled={!canStart}>
               Try Again
             </Button>
           </motion.div>

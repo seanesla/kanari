@@ -7,7 +7,7 @@
  * Coordinates the full voice conversation experience.
  */
 
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback } from "react"
 import { logDebug, logError } from "@/lib/logger"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { X, Phone, PhoneOff, Mic, MicOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
+import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { VoiceIndicatorLarge } from "./voice-indicator"
 import { BiomarkerIndicator } from "./biomarker-indicator"
@@ -69,8 +70,7 @@ export function CheckInDialog({
 }: CheckInDialogProps) {
   const { addCheckInSession } = useCheckInSessionActions()
 
-  // Prevent duplicate session starts from rapid React renders (StrictMode, fast open/close)
-  const sessionStartedRef = useRef(false)
+  const canStart = useStrictModeReady(open)
 
   const [checkIn, controls] = useCheckIn({
     onSessionEnd: async (session) => {
@@ -94,22 +94,6 @@ export function CheckInDialog({
       console.error("[CheckInDialog] Error:", error)
     },
   })
-
-  // Reset session started flag when dialog closes
-  useEffect(() => {
-    if (!open) {
-      sessionStartedRef.current = false
-    }
-  }, [open])
-
-  // Start session when dialog opens
-  useEffect(() => {
-    if (open && checkIn.state === "idle" && !sessionStartedRef.current) {
-      // Mark as started immediately to prevent duplicate calls
-      sessionStartedRef.current = true
-      controls.startSession()
-    }
-  }, [open, checkIn.state, controls])
 
   // Handle close - always reset state to idle so reopening starts fresh
   const handleClose = useCallback(async () => {
@@ -174,6 +158,30 @@ export function CheckInDialog({
         {/* Main content area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           <AnimatePresence mode="wait">
+            {/* Idle state */}
+            {checkIn.state === "idle" && (
+              <motion.div
+                key="idle"
+                className="flex-1 flex flex-col items-center justify-center gap-6 p-8"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <VoiceIndicatorLarge state="idle" audioLevel={0} initPhase={null} />
+                <p className="text-sm text-muted-foreground text-center">
+                  Tap start to begin your voice check-in.
+                </p>
+                <Button
+                  onClick={async () => {
+                    await controls.startSession({ userGesture: true })
+                  }}
+                  disabled={!canStart}
+                >
+                  {canStart ? "Start" : "Preparing..."}
+                </Button>
+              </motion.div>
+            )}
+
             {/* Initializing state */}
             {showInitializing && (
               <motion.div
@@ -347,7 +355,7 @@ export function CheckInDialog({
                     {checkIn.error || "Failed to connect. Please try again."}
                   </p>
                 </div>
-                <Button onClick={() => controls.startSession()}>
+                <Button onClick={() => controls.startSession({ userGesture: true })}>
                   Try Again
                 </Button>
               </motion.div>
