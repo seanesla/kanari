@@ -130,6 +130,7 @@ export function CheckInDialog({
   // Determine if we should show the conversation or initialization
   const showConversation = [
     "ready",
+    "ai_greeting",
     "listening",
     "user_speaking",
     "processing",

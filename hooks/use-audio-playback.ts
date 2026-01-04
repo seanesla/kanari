@@ -208,6 +208,12 @@ export function useAudioPlayback(
   const workletNodeRef = useRef<AudioWorkletNode | null>(null)
   const isPlayingRef = useRef(false)
 
+  // Initialization / teardown coordination (handles StrictMode + rapid open/close).
+  // Pattern doc: docs/error-patterns/audioplayback-init-after-unmount.md
+  const mountedRef = useRef(true)
+  const cleanupRequestedRef = useRef(false)
+  const initializationIdRef = useRef(0)
+
   // Track instance lifecycle to prevent stale callbacks from being executed
   // if another instance was created (e.g., rapid open/close of dialog)
   const instanceRef = useRef<object>({})
@@ -222,8 +228,34 @@ export function useAudioPlayback(
    * Initialize audio context and worklet
    */
   const initialize = useCallback(async () => {
+    // Idempotent: avoid creating multiple AudioContexts for the same hook instance.
+    if (
+      audioContextRef.current &&
+      (audioContextRef.current.state as string) !== "closed" &&
+      workletNodeRef.current
+    ) {
+      return
+    }
+
+    if (!mountedRef.current) {
+      throw new Error("INITIALIZATION_ABORTED")
+    }
+
+    const currentInitId = ++initializationIdRef.current
+    cleanupRequestedRef.current = false
+
+    const assertNotAborted = () => {
+      if (!mountedRef.current || cleanupRequestedRef.current) {
+        throw new Error("INITIALIZATION_ABORTED")
+      }
+      if (initializationIdRef.current !== currentInitId) {
+        throw new Error("INITIALIZATION_ABORTED")
+      }
+    }
+
     try {
       dispatch({ type: "START_INITIALIZING" })
+      assertNotAborted()
 
       // Create AudioContext at 24kHz (Gemini output rate)
       const audioContext = new AudioContext({ sampleRate })
@@ -233,6 +265,7 @@ export function useAudioPlayback(
       if (audioContext.state === "suspended") {
         await audioContext.resume()
       }
+      assertNotAborted()
 
       // Abort if context was closed during resume (e.g., React StrictMode unmount)
       // Note: TypeScript's AudioContextState type is outdated and doesn't include "closed",
@@ -244,6 +277,7 @@ export function useAudioPlayback(
 
       // Load the playback worklet
       await audioContext.audioWorklet.addModule("/playback.worklet.js")
+      assertNotAborted()
 
       // Abort if context was closed during module loading
       if ((audioContext.state as string) === "closed") {
@@ -307,6 +341,7 @@ export function useAudioPlayback(
       workletNodeRef.current = workletNode
       dispatch({ type: "INITIALIZED" })
     } catch (error) {
+      cleanupRequestedRef.current = true
       const err = error instanceof Error ? error : new Error("Failed to initialize audio playback")
       dispatch({ type: "ERROR", error: err.message })
       throw err
@@ -392,6 +427,9 @@ export function useAudioPlayback(
    * Clean up resources
    */
   const cleanup = useCallback(() => {
+    cleanupRequestedRef.current = true
+    initializationIdRef.current += 1
+
     // Invalidate this instance so stale worklet messages are ignored
     const oldInstance = instanceRef.current
     instanceRef.current = {}
@@ -417,6 +455,7 @@ export function useAudioPlayback(
   // Cleanup on unmount - use the cleanup function to avoid duplication
   useEffect(() => {
     return () => {
+      mountedRef.current = false
       cleanup()
     }
   }, [cleanup])

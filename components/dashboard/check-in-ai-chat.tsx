@@ -51,6 +51,24 @@ import {
   clearPreservedSession,
 } from "@/lib/gemini/preserved-session"
 import type { CheckInSession } from "@/lib/types"
+import type { InitPhase } from "@/hooks/check-in/state"
+
+function getInitPhaseLabel(phase: InitPhase): string {
+  switch (phase) {
+    case "fetching_context":
+      return "Loading your history..."
+    case "init_audio_playback":
+      return "Setting up audio..."
+    case "init_audio_capture":
+      return "Requesting microphone..."
+    case "connecting_gemini":
+      return "Connecting to kanari..."
+    case "waiting_ai_response":
+      return "Waiting for kanari to start..."
+    default:
+      return "Setting up voice conversation..."
+  }
+}
 
 interface CheckInAIChatProps {
   /** Called when session ends - parent should close the drawer */
@@ -211,6 +229,7 @@ export function AIChatContent({
   // These states come from the useCheckIn hook's state machine
   const showConversation = [
     "ready",           // Connected, waiting for user to speak
+    "ai_greeting",     // Connected, waiting for the AI to start
     "listening",       // Actively listening for speech
     "user_speaking",   // User is currently talking
     "processing",      // AI is thinking about response
@@ -268,9 +287,7 @@ export function AIChatContent({
               audioLevel={0}
             />
             <p className="text-sm text-muted-foreground text-center">
-              {checkIn.state === "connecting"
-                ? "Connecting to kanari..."
-                : "Setting up voice conversation..."}
+              {checkIn.initPhase ? getInitPhaseLabel(checkIn.initPhase) : "Setting up voice conversation..."}
             </p>
           </motion.div>
         )}

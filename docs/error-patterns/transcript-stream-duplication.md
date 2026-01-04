@@ -76,13 +76,13 @@ full transcript-so-far on each event). But `outputTranscription` can include tru
 
 ### Implemented fix (preferred path)
 Instead of relying on `outputTranscription` for the assistant transcript, the app
-requests **TEXT output** from the Live API and uses the ordered text parts from
-`modelTurn.parts[].text` for the UI transcript. The assistant bubble renders this
-in real time (with a subtle cursor while streaming).
+prefers the ordered text parts from `modelTurn.parts[].text` (when present) for the
+UI transcript. The assistant bubble renders this in real time (with a subtle cursor
+while streaming).
 
 Fallback behavior:
-- If ordered text output is not available for a given turn, the client may fall
-  back to `outputTranscription`.
+- If `modelTurn.parts[].text` isn't present for a given turn, the client falls back
+  to `outputTranscription`.
 
 ### Alternative approaches considered
 1. **File bug with Google** - This is a Gemini Live API issue where

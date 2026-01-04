@@ -198,11 +198,19 @@ export function mergeTranscriptUpdate(previous: string, incoming: string): Trans
       const prevAllWords = new Set(previousTokens.map((t) => t.norm))
       const incAllWords = new Set(incomingTokens.map((t) => t.norm))
       const sharedAnyCount = intersectionSize(prevAllWords, incAllWords)
+      const commonPrefix = countCommonPrefixTokens(previousTokens, incomingTokens)
 
       // If there's word overlap (shared vocabulary) but no boundary overlap, replace
       // This catches restarts like "How are you doing" → "Happy New Year! How are you feeling"
       // where "how", "are", "you" are shared but aren't at the boundary
-      if (sharedAnyCount >= 2 || (previousTokens.length >= 3 && incomingTokens.length >= 3)) {
+      // Also handle short greeting restarts where only the opener overlaps:
+      // e.g. "Hey! I know" → "Hey, happy ..." (parallel-stream interleave).
+      // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
+      if (
+        sharedAnyCount >= 2 ||
+        (previousTokens.length >= 3 && incomingTokens.length >= 3) ||
+        (commonPrefix >= 1 && previousTokens.length >= 3 && incomingTokens.length <= 3)
+      ) {
         return { next: incoming, delta: "", kind: "replace" }
       }
     }

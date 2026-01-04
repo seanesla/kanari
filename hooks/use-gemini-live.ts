@@ -263,6 +263,8 @@ export function useGeminiLive(
   const [data, dispatch] = useReducer(geminiReducer, initialState)
   const clientRef = useRef<GeminiLiveClient | null>(null)
   const isConnectingRef = useRef(false)
+  const connectPromiseRef = useRef<Promise<void> | null>(null)
+  const mountedRef = useRef(true)
 
   // Store callbacks in refs to avoid stale closures
   const callbacksRef = useRef({
@@ -320,6 +322,7 @@ export function useGeminiLive(
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      mountedRef.current = false
       if (clientRef.current) {
         clientRef.current.disconnect()
         clientRef.current = null
@@ -333,100 +336,148 @@ export function useGeminiLive(
    * @param context - Optional context for AI-initiated conversations
    *                  Includes contextSummary and timeContext for personalized greeting
    */
-  const connect = useCallback(async (context?: SessionContext) => {
-    // Prevent concurrent connection attempts
+  const connect = useCallback((context?: SessionContext): Promise<void> => {
+    // Already connected (idempotent).
+    if (clientRef.current?.isReady()) {
+      return Promise.resolve()
+    }
+
+    // Prevent concurrent connection attempts.
+    // IMPORTANT: Return the in-flight promise so callers don't "think" they're connected.
+    // Pattern doc: docs/error-patterns/gemini-live-concurrent-connect-early-resolve.md
     if (isConnectingRef.current) {
       console.warn("[GeminiLive] Connection already in progress")
-      return
+      return connectPromiseRef.current ?? Promise.resolve()
     }
 
-    try {
-      isConnectingRef.current = true
-      dispatch({ type: "START_CONNECTING" })
+    // Stale call (e.g., async startSession continued after unmount).
+    if (!mountedRef.current) {
+      return Promise.resolve()
+    }
 
-      // Create event handlers that use refs to avoid stale closures
-      const events: Partial<LiveClientEvents> = {
-        onConnecting: () => {
-          // Already dispatched START_CONNECTING
-        },
-        onConnected: () => {
-          dispatch({ type: "READY" })
-          callbacksRef.current.onConnected?.()
-        },
-        onDisconnected: (reason) => {
-          dispatch({ type: "DISCONNECTED" })
-          callbacksRef.current.onDisconnected?.(reason)
-        },
-        onError: (error) => {
-          dispatch({ type: "ERROR", error: error.message })
-          callbacksRef.current.onError?.(error)
-        },
-        onAudioChunk: (base64Audio) => {
-          // First audio chunk = model started speaking
-          dispatch({ type: "MODEL_SPEECH_START" })
-          callbacksRef.current.onAudioChunk?.(base64Audio)
-        },
-        onAudioEnd: () => {
-          dispatch({ type: "MODEL_SPEECH_END" })
-          callbacksRef.current.onAudioEnd?.()
-        },
-        onUserTranscript: (text, isFinal) => {
-          dispatch({ type: "USER_TRANSCRIPT", text, isFinal })
-          callbacksRef.current.onUserTranscript?.(text, isFinal)
-        },
-        onModelTranscript: (text, finished) => {
-          dispatch({ type: "MODEL_TRANSCRIPT", text })
-          callbacksRef.current.onModelTranscript?.(text, finished)
-        },
-        onModelThinking: (text) => {
-          callbacksRef.current.onModelThinking?.(text)
-        },
-        onTurnComplete: () => {
-          dispatch({ type: "MODEL_SPEECH_END" })
-          // Note: Don't clear transcripts here - let useCheckIn manage its own state
-          // Clearing here was causing race conditions with save logic
-          callbacksRef.current.onTurnComplete?.()
-        },
-        onInterrupted: () => {
-          dispatch({ type: "MODEL_SPEECH_END" })
-          callbacksRef.current.onInterrupted?.()
-        },
-        onSilenceChosen: (reason) => {
-          dispatch({ type: "MODEL_SPEECH_END" })
-          callbacksRef.current.onSilenceChosen?.(reason)
-        },
-        onUserSpeechStart: () => {
-          dispatch({ type: "USER_SPEECH_START" })
-          callbacksRef.current.onUserSpeechStart?.()
-        },
-        onUserSpeechEnd: () => {
-          dispatch({ type: "USER_SPEECH_END" })
-          callbacksRef.current.onUserSpeechEnd?.()
-        },
-        onWidget: (event) => {
-          callbacksRef.current.onWidget?.(event)
-        },
+    isConnectingRef.current = true
+    dispatch({ type: "START_CONNECTING" })
+
+    const attempt = (async (): Promise<void> => {
+      // Track whether the underlying client already emitted an error callback for this attempt.
+      let didEmitError = false
+
+      try {
+        // Create event handlers that use refs to avoid stale closures.
+        const events: Partial<LiveClientEvents> = {
+          onConnecting: () => {
+            // Already dispatched START_CONNECTING.
+          },
+          onConnected: () => {
+            if (!mountedRef.current) return
+            dispatch({ type: "READY" })
+            callbacksRef.current.onConnected?.()
+          },
+          onDisconnected: (reason) => {
+            if (!mountedRef.current) return
+            dispatch({ type: "DISCONNECTED" })
+            callbacksRef.current.onDisconnected?.(reason)
+          },
+          onError: (error) => {
+            didEmitError = true
+            if (!mountedRef.current) return
+            dispatch({ type: "ERROR", error: error.message })
+            callbacksRef.current.onError?.(error)
+          },
+          onAudioChunk: (base64Audio) => {
+            // First audio chunk = model started speaking.
+            if (!mountedRef.current) return
+            dispatch({ type: "MODEL_SPEECH_START" })
+            callbacksRef.current.onAudioChunk?.(base64Audio)
+          },
+          onAudioEnd: () => {
+            if (!mountedRef.current) return
+            dispatch({ type: "MODEL_SPEECH_END" })
+            callbacksRef.current.onAudioEnd?.()
+          },
+          onUserTranscript: (text, isFinal) => {
+            if (!mountedRef.current) return
+            dispatch({ type: "USER_TRANSCRIPT", text, isFinal })
+            callbacksRef.current.onUserTranscript?.(text, isFinal)
+          },
+          onModelTranscript: (text, finished) => {
+            if (!mountedRef.current) return
+            dispatch({ type: "MODEL_TRANSCRIPT", text })
+            callbacksRef.current.onModelTranscript?.(text, finished)
+          },
+          onModelThinking: (text) => {
+            callbacksRef.current.onModelThinking?.(text)
+          },
+          onTurnComplete: () => {
+            if (!mountedRef.current) return
+            dispatch({ type: "MODEL_SPEECH_END" })
+            // Note: Don't clear transcripts here - let useCheckIn manage its own state.
+            // Clearing here was causing race conditions with save logic.
+            callbacksRef.current.onTurnComplete?.()
+          },
+          onInterrupted: () => {
+            if (!mountedRef.current) return
+            dispatch({ type: "MODEL_SPEECH_END" })
+            callbacksRef.current.onInterrupted?.()
+          },
+          onSilenceChosen: (reason) => {
+            if (!mountedRef.current) return
+            dispatch({ type: "MODEL_SPEECH_END" })
+            callbacksRef.current.onSilenceChosen?.(reason)
+          },
+          onUserSpeechStart: () => {
+            if (!mountedRef.current) return
+            dispatch({ type: "USER_SPEECH_START" })
+            callbacksRef.current.onUserSpeechStart?.()
+          },
+          onUserSpeechEnd: () => {
+            if (!mountedRef.current) return
+            dispatch({ type: "USER_SPEECH_END" })
+            callbacksRef.current.onUserSpeechEnd?.()
+          },
+          onWidget: (event) => {
+            callbacksRef.current.onWidget?.(event)
+          },
+        }
+
+        // Create client config.
+        const config: LiveClientConfig = { events }
+
+        // Create and connect client.
+        const client = createLiveClient(config)
+        clientRef.current = client
+
+        // Pass context for AI-initiated conversations (builds personalized system instruction).
+        await client.connect(context)
+
+        // If the hook unmounted while connect() was in-flight, tear down immediately.
+        if (!mountedRef.current) {
+          client.disconnect()
+          clientRef.current = null
+          return
+        }
+
+        dispatch({ type: "CONNECTED" })
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error("Connection failed")
+        if (mountedRef.current) {
+          dispatch({ type: "ERROR", error: err.message })
+          if (!didEmitError) {
+            callbacksRef.current.onError?.(err)
+          }
+        }
+        throw err
       }
+    })()
 
-      // Create client config (simplified - server handles session creation)
-      const config: LiveClientConfig = {
-        events,
+    connectPromiseRef.current = attempt
+
+    return attempt.finally(() => {
+      if (connectPromiseRef.current === attempt) {
+        connectPromiseRef.current = null
       }
-
-      // Create and connect client
-      const client = createLiveClient(config)
-      clientRef.current = client
-
-      // Pass context for AI-initiated conversations (builds personalized system instruction)
-      await client.connect(context)
-      dispatch({ type: "CONNECTED" })
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error("Connection failed")
-      dispatch({ type: "ERROR", error: err.message })
-      callbacksRef.current.onError?.(err)
-    } finally {
       isConnectingRef.current = false
-    }
+    })
   }, [])
 
   /**
@@ -489,6 +540,10 @@ export function useGeminiLive(
    * an existing GeminiLiveClient and reattaches event handlers.
    */
   const reattachToClient = useCallback((client: GeminiLiveClient) => {
+    if (!mountedRef.current) {
+      return
+    }
+
     // Set the client reference
     clientRef.current = client
 
@@ -498,30 +553,37 @@ export function useGeminiLive(
         // Already connected
       },
       onConnected: () => {
+        if (!mountedRef.current) return
         dispatch({ type: "READY" })
         callbacksRef.current.onConnected?.()
       },
       onDisconnected: (reason) => {
+        if (!mountedRef.current) return
         dispatch({ type: "DISCONNECTED" })
         callbacksRef.current.onDisconnected?.(reason)
       },
       onError: (error) => {
+        if (!mountedRef.current) return
         dispatch({ type: "ERROR", error: error.message })
         callbacksRef.current.onError?.(error)
       },
       onAudioChunk: (base64Audio) => {
+        if (!mountedRef.current) return
         dispatch({ type: "MODEL_SPEECH_START" })
         callbacksRef.current.onAudioChunk?.(base64Audio)
       },
       onAudioEnd: () => {
+        if (!mountedRef.current) return
         dispatch({ type: "MODEL_SPEECH_END" })
         callbacksRef.current.onAudioEnd?.()
       },
       onUserTranscript: (text, isFinal) => {
+        if (!mountedRef.current) return
         dispatch({ type: "USER_TRANSCRIPT", text, isFinal })
         callbacksRef.current.onUserTranscript?.(text, isFinal)
       },
       onModelTranscript: (text, finished) => {
+        if (!mountedRef.current) return
         dispatch({ type: "MODEL_TRANSCRIPT", text })
         callbacksRef.current.onModelTranscript?.(text, finished)
       },
@@ -529,22 +591,27 @@ export function useGeminiLive(
         callbacksRef.current.onModelThinking?.(text)
       },
       onTurnComplete: () => {
+        if (!mountedRef.current) return
         dispatch({ type: "MODEL_SPEECH_END" })
         callbacksRef.current.onTurnComplete?.()
       },
       onInterrupted: () => {
+        if (!mountedRef.current) return
         dispatch({ type: "MODEL_SPEECH_END" })
         callbacksRef.current.onInterrupted?.()
       },
       onSilenceChosen: (reason) => {
+        if (!mountedRef.current) return
         dispatch({ type: "MODEL_SPEECH_END" })
         callbacksRef.current.onSilenceChosen?.(reason)
       },
       onUserSpeechStart: () => {
+        if (!mountedRef.current) return
         dispatch({ type: "USER_SPEECH_START" })
         callbacksRef.current.onUserSpeechStart?.()
       },
       onUserSpeechEnd: () => {
+        if (!mountedRef.current) return
         dispatch({ type: "USER_SPEECH_END" })
         callbacksRef.current.onUserSpeechEnd?.()
       },

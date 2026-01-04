@@ -141,7 +141,9 @@ export const initialState: CheckInData = {
 export function checkInReducer(state: CheckInData, action: CheckInAction): CheckInData {
   switch (action.type) {
     case "START_INITIALIZING":
-      return { ...initialState, state: "initializing", initPhase: "fetching_context" }
+      // Start with audio setup to avoid blocking the UI on IndexedDB reads.
+      // Context loading is best-effort and should not prevent connecting.
+      return { ...initialState, state: "initializing", initPhase: "init_audio_playback" }
 
     case "SET_INIT_PHASE":
       return { ...state, initPhase: action.phase }

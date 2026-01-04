@@ -58,14 +58,21 @@ export function int16ToFloat32(int16Data: Int16Array): Float32Array {
  * @returns Base64 encoded string
  */
 export function int16ToBase64(int16Data: Int16Array): string {
-  const uint8Array = new Uint8Array(int16Data.buffer)
-  let binary = ""
+  const uint8Array = new Uint8Array(int16Data.buffer, int16Data.byteOffset, int16Data.byteLength)
 
-  for (let i = 0; i < uint8Array.length; i++) {
-    binary += String.fromCharCode(uint8Array[i])
+  if (uint8Array.length === 0) return ""
+
+  // Avoid O(n²) string concatenation in a tight loop.
+  // Chunking keeps stack usage bounded for String.fromCharCode(...).
+  const CHUNK_SIZE = 0x8000
+  const chunks: string[] = []
+
+  for (let i = 0; i < uint8Array.length; i += CHUNK_SIZE) {
+    const slice = uint8Array.subarray(i, i + CHUNK_SIZE)
+    chunks.push(String.fromCharCode(...slice))
   }
 
-  return btoa(binary)
+  return btoa(chunks.join(""))
 }
 
 // Maximum base64 string length to prevent denial of service (1MB of audio)
@@ -254,12 +261,16 @@ export function float32ToWavBase64(audioData: Float32Array, sampleRate: number =
 
   // Convert to base64
   const uint8Array = new Uint8Array(buffer)
-  let binary = ""
-  for (let i = 0; i < uint8Array.length; i++) {
-    binary += String.fromCharCode(uint8Array[i])
+
+  const CHUNK_SIZE = 0x8000
+  const chunks: string[] = []
+
+  for (let i = 0; i < uint8Array.length; i += CHUNK_SIZE) {
+    const slice = uint8Array.subarray(i, i + CHUNK_SIZE)
+    chunks.push(String.fromCharCode(...slice))
   }
 
-  return btoa(binary)
+  return btoa(chunks.join(""))
 }
 
 /**

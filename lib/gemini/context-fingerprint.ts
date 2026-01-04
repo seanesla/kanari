@@ -44,9 +44,14 @@ export async function getContextFingerprintData(): Promise<ContextFingerprintDat
   const recordingCount = await db.recordings.count()
 
   // Get latest completed check-in session (has endedAt)
+  // IMPORTANT: Do NOT load all sessions here.
+  // Check-in sessions can be large (e.g., audio payloads). Pulling the entire table can
+  // stall the UI during check-in initialization and make timers appear "stuck".
+  // Pattern doc: docs/error-patterns/gemini-live-concurrent-connect-early-resolve.md
   const sessions = await db.checkInSessions
     .orderBy("startedAt")
     .reverse()
+    .limit(5)
     .toArray()
 
   // Find the most recent completed session

@@ -1,15 +1,8 @@
 "use client"
 
-import { useCallback, useRef } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch, MutableRefObject } from "react"
 import { processAudio } from "@/lib/audio/processor"
-import { createGeminiHeaders } from "@/lib/utils"
-import {
-  type SystemContextSummary,
-  type SystemTimeContext,
-} from "@/lib/gemini/live-prompts"
-import { buildHistoricalContext } from "@/lib/gemini/context-builder"
-import { fetchCheckInContext } from "@/lib/gemini/check-in-context"
 import { computeContextFingerprint } from "@/lib/gemini/context-fingerprint"
 import {
   consumePreservedSession,
@@ -23,6 +16,30 @@ import type { CheckInSession, CheckInState } from "@/lib/types"
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 import type { UseCheckInAudioResult } from "./use-check-in-audio"
+
+function createTimeoutError(message: string): Error {
+  const err = new Error(message)
+  err.name = "TimeoutError"
+  return err
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(createTimeoutError(timeoutMessage))
+    }, ms)
+  })
+
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+  }
+}
 
 export interface CheckInSessionCallbacks {
   onSessionStart?: (session: CheckInSession) => void
@@ -78,6 +95,24 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
   // Context fingerprint for session preservation
   const contextFingerprintRef = useRef<string | null>(null)
+  const startConversationSentRef = useRef(false)
+
+  // Abort/cleanup coordination for in-flight startSession work.
+  // Without this, async preflight can continue after unmount and spin up
+  // playback/capture resources, leading to leaked AudioContexts and overlapping voices.
+  // Pattern doc: docs/error-patterns/check-in-session-init-after-unmount.md
+  const startSessionRunIdRef = useRef(0)
+  const startSessionAbortRef = useRef(false)
+  const unmountedRef = useRef(false)
+
+  useEffect(() => {
+    return () => {
+      unmountedRef.current = true
+      startSessionAbortRef.current = true
+      // Invalidate any in-flight startSession runs.
+      startSessionRunIdRef.current += 1
+    }
+  }, [])
 
   const startSession = useCallback(
     async () => {
@@ -85,8 +120,26 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
       let playbackInitialized = false
       let captureInitialized = false
 
+      // New startSession run supersedes any previous in-flight run.
+      startSessionRunIdRef.current += 1
+      const runId = startSessionRunIdRef.current
+      startSessionAbortRef.current = false
+
+      const ensureActive = () => {
+        if (unmountedRef.current || startSessionAbortRef.current) {
+          throw new Error("INITIALIZATION_ABORTED")
+        }
+        if (startSessionRunIdRef.current !== runId) {
+          throw new Error("SESSION_SUPERSEDED")
+        }
+      }
+
       try {
+        ensureActive()
         dispatch({ type: "START_INITIALIZING" })
+
+        startConversationSentRef.current = false
+        contextFingerprintRef.current = null
 
         // Reset the cleanup abort flag for this new session
         audio.resetCleanupRequestedFlag()
@@ -100,73 +153,62 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         dispatch({ type: "SET_SESSION", session })
         sessionStartRef.current = session.startedAt
 
-        // Compute context fingerprint for session preservation
-        // This allows us to detect if data changed while session was preserved
-        contextFingerprintRef.current = await computeContextFingerprint()
+        // Yield once so React unmount/cleanup (e.g., StrictMode) can abort initialization
+        // before we start allocating AudioContexts or loading worklets.
+        // This keeps "unmount during startup" behavior deterministic without reintroducing
+        // heavy preflight work.
+        await Promise.resolve()
+        ensureActive()
 
-        // Fetch context for AI-initiated conversation
-        let sessionContext: SessionContext | undefined
-        try {
-          const contextData = await fetchCheckInContext()
-          const formattedContext = buildHistoricalContext(contextData)
-
-          // Always include time context in the system instruction (even if context-summary generation fails).
-          sessionContext = {
-            timeContext: {
-              currentTime: contextData.timeContext.currentTime,
-              dayOfWeek: contextData.timeContext.dayOfWeek,
-              timeOfDay: contextData.timeContext.timeOfDay,
-              daysSinceLastCheckIn: contextData.timeContext.daysSinceLastCheckIn,
-            } as SystemTimeContext,
-          }
-
-          // Best-effort: generate a richer context summary using Gemini 3
+        // Compute context fingerprint in the background (never block startup).
+        // This is used only for session preservation/resumption.
+        void (async () => {
           try {
-            const headers = await createGeminiHeaders({
-              "Content-Type": "application/json",
-            })
-
-            const contextResponse = await fetch("/api/gemini/check-in-context", {
-              method: "POST",
-              headers,
-              body: JSON.stringify(formattedContext),
-            })
-
-            if (contextResponse.ok) {
-              const { summary } = await contextResponse.json()
-              sessionContext.contextSummary = summary as SystemContextSummary
-              console.log("[useCheckIn] Context summary prepared for AI-initiated conversation")
-            } else {
-              console.warn("[useCheckIn] Context summary request failed, using time-only context")
-            }
-          } catch (summaryError) {
-            console.warn(
-              "[useCheckIn] Context summary request errored, using time-only context:",
-              summaryError
+            const fingerprint = await withTimeout(
+              computeContextFingerprint(),
+              10_000,
+              "Context fingerprint timed out"
             )
+            // Only store if this startSession run is still active.
+            if (!unmountedRef.current && startSessionRunIdRef.current === runId) {
+              contextFingerprintRef.current = fingerprint
+            }
+          } catch (fingerprintError) {
+            console.warn("[useCheckIn] Context fingerprint failed/timed out:", fingerprintError)
           }
-
-        } catch (contextError) {
-          // Context generation failed - proceed without it (AI will use default greeting)
-          console.warn("[useCheckIn] Context generation failed, using default greeting:", contextError)
-        }
+        })()
 
         // Initialize playback first (needs user gesture context)
         dispatch({ type: "SET_INIT_PHASE", phase: "init_audio_playback" })
-        await playbackControls.initialize()
+        await withTimeout(
+          playbackControls.initialize(),
+          20_000,
+          "Audio setup timed out. If you’re on Safari/iOS, tap the screen once and try again."
+        )
         playbackInitialized = true
+        ensureActive()
 
         // Initialize audio capture AFTER playback to avoid worklet loading race
         // Some browsers can only load one AudioWorklet module at a time
         dispatch({ type: "SET_INIT_PHASE", phase: "init_audio_capture" })
-        await audio.initializeAudioCapture()
+        await withTimeout(
+          audio.initializeAudioCapture(),
+          60_000,
+          "Microphone setup timed out. Check your browser mic permissions and try again."
+        )
         captureInitialized = true
+        ensureActive()
 
         dispatch({ type: "SET_INIT_PHASE", phase: "connecting_gemini" })
         dispatch({ type: "SET_CONNECTING" })
 
-        // Connect to Gemini with session context for AI-initiated greeting
-        await gemini.connect(sessionContext)
+        // Connect to Gemini (context is optional; avoid blocking on IndexedDB history).
+        await withTimeout(
+          gemini.connect(undefined),
+          45_000,
+          "Gemini connection timed out. Check your API key and network, then try again."
+        )
+        ensureActive()
 
         callbacksRef.current.onSessionStart?.(session)
       } catch (error) {
@@ -182,8 +224,10 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
           if (playbackInitialized) {
             playbackControls.cleanup()
           }
-          // Reset to idle so second mount can try again
-          dispatch({ type: "RESET" })
+          // Reset to idle so second mount can try again (avoid setState after unmount)
+          if (!unmountedRef.current) {
+            dispatch({ type: "RESET" })
+          }
           return
         }
 
@@ -298,6 +342,8 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
   }, [audio, callbacksRef, data.messages, data.mismatchCount, data.session, dispatch, gemini, playbackControls])
 
   const cancelSession = useCallback(() => {
+    startSessionAbortRef.current = true
+    startConversationSentRef.current = false
     audio.cleanupAudioCapture()
     playbackControls.cleanup()
     gemini.disconnect()
@@ -427,17 +473,27 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
     // Trigger AI to speak first by sending the conversation start signal.
     // The system instruction tells the AI to greet the user when it receives this.
-    gemini.sendText("[START_CONVERSATION]")
+    if (!startConversationSentRef.current) {
+      startConversationSentRef.current = true
+      gemini.sendText("[START_CONVERSATION]")
+    }
   }, [dispatch, gemini])
 
   const onDisconnected = useCallback(
     (reason: string) => {
       console.log("[useCheckIn] Disconnected:", reason)
       const currentState = stateRef.current
+      const hasUserMessage = data.messages.some((m) => m.role === "user" && m.content.trim().length > 0)
+      const normalizedReason = (reason || "").toLowerCase()
 
       // Always release microphone + playback resources on disconnect.
       audio.cleanupAudioCapture()
       playbackControls.cleanup()
+
+      // Manual disconnects happen during end/cancel flows and should not force the UI into error/complete.
+      if (normalizedReason.includes("manual disconnect")) {
+        return
+      }
 
       // Only auto-complete if we were in an active state (user had chance to interact)
       const activeStates: CheckInState[] = [
@@ -450,7 +506,15 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
       ]
 
       if (activeStates.includes(currentState)) {
-        dispatch({ type: "SET_COMPLETE" })
+        // If the user never spoke, treat disconnects as errors (common on invalid config / auth).
+        if (!hasUserMessage || normalizedReason.includes("invalid argument")) {
+          dispatch({
+            type: "SET_ERROR",
+            error: reason || "Connection lost before you could respond",
+          })
+        } else {
+          dispatch({ type: "SET_COMPLETE" })
+        }
       } else if (currentState !== "complete" && currentState !== "error") {
         // Disconnected during initialization - show error
         dispatch({
@@ -459,7 +523,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         })
       }
     },
-    [audio, dispatch, playbackControls, stateRef]
+    [audio, data.messages, dispatch, playbackControls, stateRef]
   )
 
   const onError = useCallback(

@@ -336,7 +336,8 @@ export class GeminiLiveClient {
       connectPromise = ai.live.connect({
         model: LIVE_MODEL,
         config: {
-          responseModalities: [Modality.AUDIO, Modality.TEXT],
+          responseModalities: [Modality.AUDIO],
+          outputAudioTranscription: {},
           inputAudioTranscription: {},
           systemInstruction,
           tools: GEMINI_TOOLS,
@@ -774,6 +775,7 @@ export class GeminiLiveClient {
     // Check for interruption (barge-in)
     if (content.interrupted) {
       logDebug("GeminiLive", "Interrupted by user")
+      this.hasTextOutputThisTurn = false
       this.config.events.onInterrupted?.()
       return
     }

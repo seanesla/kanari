@@ -116,6 +116,16 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     if (sessionId !== lastSessionIdRef.current) {
       sessionFeatureAccumulatorRef.current = null
       lastSessionIdRef.current = sessionId
+
+      // Reset all per-session message/transcript refs.
+      lastUserMessageIdRef.current = null
+      lastAssistantMessageIdRef.current = null
+      currentTranscriptRef.current = ""
+      currentThinkingRef.current = ""
+      userTranscriptRef.current = ""
+      pendingUserUtteranceResetRef.current = false
+      userSpeechEndHandledRef.current = false
+      userSpeechStartRef.current = null
     }
   }, [data.session?.id])
 

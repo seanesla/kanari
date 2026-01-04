@@ -15,8 +15,8 @@ class CaptureProcessor extends AudioWorkletProcessor {
     super()
 
     // Buffer configuration
-    // ~256ms of audio at 16kHz - good balance of latency and efficiency
-    this.bufferSize = 4096
+    // ~128ms of audio at 16kHz - lower latency for faster live transcription
+    this.bufferSize = 2048
     this.buffer = new Float32Array(this.bufferSize)
     this.bufferIndex = 0
 

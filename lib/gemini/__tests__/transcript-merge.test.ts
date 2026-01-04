@@ -89,6 +89,14 @@ describe("mergeTranscriptUpdate", () => {
       expect(result.kind).toBe("replace")
     })
 
+    it("replaces when only the opener overlaps (parallel-stream greeting interleave)", () => {
+      const previous = "Hey! I know"
+      const incoming = "Hey, happy"
+      const result = mergeTranscriptUpdate(previous, incoming)
+      expect(result.next).toBe(incoming)
+      expect(result.kind).toBe("replace")
+    })
+
     it("replaces when incoming starts with capital letter mid-flow", () => {
       const previous = "Hey, checking in. I noticed your energy"
       const incoming = "Happy New Year! I noticed your energy has been"
