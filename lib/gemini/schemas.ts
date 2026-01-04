@@ -36,10 +36,14 @@ const PartSchema = z.union([
   z.object({
     inlineData: InlineDataSchema,
     text: z.undefined().optional(),
+    thought: z.boolean().optional(),
+    thoughtSignature: z.string().optional(),
   }),
   z.object({
     text: z.string(),
     inlineData: z.undefined().optional(),
+    thought: z.boolean().optional(),
+    thoughtSignature: z.string().optional(),
   }),
 ])
 

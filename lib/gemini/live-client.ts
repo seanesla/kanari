@@ -133,6 +133,10 @@ export class GeminiLiveClient {
   // Silence mode - when model calls mute_audio_response, suppress all audio for current turn
   private silenceMode = false
 
+  // Track whether we've received ordered text output this turn.
+  // When available, prefer this over outputAudioTranscription which can be out-of-order.
+  private hasTextOutputThisTurn = false
+
   // Event deduplication - prevents HMR replay issues
   // Use persistent storage to survive HMR rebuilds
   private readonly DEDUP_STORAGE_KEY = "gemini_live_dedup_hashes"
@@ -296,6 +300,7 @@ export class GeminiLiveClient {
     this.disconnectRequestedDuringConnect = false
     this.pendingMessages = []
     this.isSessionInitialized = false
+    this.hasTextOutputThisTurn = false
 
     if (this.connectionTimeoutId) {
       clearTimeout(this.connectionTimeoutId)
@@ -331,8 +336,7 @@ export class GeminiLiveClient {
       connectPromise = ai.live.connect({
         model: LIVE_MODEL,
         config: {
-          responseModalities: [Modality.AUDIO],
-          outputAudioTranscription: {},
+          responseModalities: [Modality.AUDIO, Modality.TEXT],
           inputAudioTranscription: {},
           systemInstruction,
           tools: GEMINI_TOOLS,
@@ -767,37 +771,10 @@ export class GeminiLiveClient {
       this.config.events.onUserTranscript?.(inputTranscription.text, inputTranscription.finished ?? false)
     }
 
-    // Handle output transcription (what model is ACTUALLY saying)
-    // Source: Context7 - /googleapis/js-genai docs - "outputAudioTranscription"
-    // Note: outputTranscription.finished indicates when transcription is complete
-    // This is INDEPENDENT of turnComplete - they can arrive in any order
-    const outputTranscription = content.outputTranscription as { text?: string; finished?: boolean } | undefined
-    if (outputTranscription?.text) {
-      this.config.events.onModelTranscript?.(
-        outputTranscription.text ?? "",
-        outputTranscription.finished ?? false
-      )
-    }
-
     // Check for interruption (barge-in)
     if (content.interrupted) {
       logDebug("GeminiLive", "Interrupted by user")
       this.config.events.onInterrupted?.()
-      return
-    }
-
-    // Check for turn complete - reset silence mode
-    if (content.turnComplete) {
-      logDebug("GeminiLive", "Turn complete")
-
-      // Reset silence mode for next turn
-      if (this.silenceMode) {
-        logDebug("LiveClient", "Resetting silence mode")
-        this.silenceMode = false
-      }
-
-      this.config.events.onTurnComplete?.()
-      this.config.events.onAudioEnd?.()
       return
     }
 
@@ -818,16 +795,49 @@ export class GeminiLiveClient {
           }
         }
 
-        // Text response (chain-of-thought reasoning)
-        // Note: This is NOT the actual speech - use outputTranscription for that
         if (part.text) {
           // BUG FIX 2: Sanitize control characters from text output
           const sanitizedText = (part.text as string).replace(/<ctrl\d+>/g, "")
           if (sanitizedText.trim()) {
-            this.config.events.onModelThinking?.(sanitizedText)
+            const isThought = Boolean((part as { thought?: unknown }).thought)
+            if (isThought) {
+              this.config.events.onModelThinking?.(sanitizedText)
+            } else {
+              this.hasTextOutputThisTurn = true
+              this.config.events.onModelTranscript?.(sanitizedText, false)
+            }
           }
         }
       }
+    }
+
+    // Handle output transcription (usually derived from output audio).
+    // Prefer ordered text parts when available.
+    // Source: Context7 - /googleapis/js-genai docs - "outputAudioTranscription"
+    // Note: outputTranscription.finished indicates when transcription is complete.
+    // This is INDEPENDENT of turnComplete - they can arrive in any order.
+    const outputTranscription = content.outputTranscription as { text?: string; finished?: boolean } | undefined
+    if (outputTranscription?.text && !this.hasTextOutputThisTurn) {
+      this.config.events.onModelTranscript?.(
+        outputTranscription.text ?? "",
+        outputTranscription.finished ?? false
+      )
+    }
+
+    // Check for turn complete - reset silence mode
+    if (content.turnComplete) {
+      logDebug("GeminiLive", "Turn complete")
+
+      // Reset silence mode for next turn
+      if (this.silenceMode) {
+        logDebug("LiveClient", "Resetting silence mode")
+        this.silenceMode = false
+      }
+
+      this.hasTextOutputThisTurn = false
+      this.config.events.onTurnComplete?.()
+      this.config.events.onAudioEnd?.()
+      return
     }
   }
 

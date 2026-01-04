@@ -356,40 +356,42 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     (text: string, finished: boolean) => {
       if (!text) return
 
+      const mergedAssistant = mergeTranscriptUpdate(currentTranscriptRef.current, text)
+      if (debugTranscriptMergeRef.current) {
+        logDebug("TranscriptMerge", "assistant", {
+          prevLength: currentTranscriptRef.current.length,
+          incomingLength: text.length,
+          nextLength: mergedAssistant.next.length,
+          kind: mergedAssistant.kind,
+          deltaLength: mergedAssistant.delta.length,
+          finished,
+        })
+      }
+
+      currentTranscriptRef.current = mergedAssistant.next
+
       // On FIRST chunk, add streaming message to array (single element approach)
-      if (currentTranscriptRef.current === "") {
+      if (!lastAssistantMessageIdRef.current) {
         const streamingMessage: CheckInMessage = {
           id: generateId(),
           role: "assistant",
-          content: text,
+          content: currentTranscriptRef.current,
           isStreaming: true,
           timestamp: new Date().toISOString(),
         }
         dispatch({ type: "ADD_MESSAGE", message: streamingMessage })
-        currentTranscriptRef.current = text
         lastAssistantMessageIdRef.current = streamingMessage.id
       } else {
-        // Simple append - Gemini Live sends truly out-of-order chunks from
-        // multiple parallel transcript streams, which cannot be fixed client-side.
-        // Using mergeTranscriptUpdate() makes it worse by falsely detecting "restarts".
-        // Known limitation: docs/error-patterns/transcript-stream-duplication.md
-        currentTranscriptRef.current = currentTranscriptRef.current + text
-
-        if (lastAssistantMessageIdRef.current) {
-          dispatch({
-            type: "UPDATE_MESSAGE_CONTENT",
-            messageId: lastAssistantMessageIdRef.current,
-            content: currentTranscriptRef.current,
-          })
-        }
+        dispatch({
+          type: "UPDATE_MESSAGE_CONTENT",
+          messageId: lastAssistantMessageIdRef.current,
+          content: currentTranscriptRef.current,
+        })
       }
 
       // NOTE: finished: true means this transcription CHUNK is finalized, NOT that the turn is done.
       // The Gemini Live API can send multiple transcription segments with finished: true before
       // the actual turnComplete event. Do NOT set isStreaming: false here - only onTurnComplete should.
-      // Setting isStreaming: false prematurely removes the "Speaking..." placeholder and shows the
-      // jumbled content when more transcript chunks arrive.
-      // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
       // REMOVED: if (finished && lastAssistantMessageIdRef.current) { ... }
     },
     [dispatch]

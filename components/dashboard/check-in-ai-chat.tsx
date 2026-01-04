@@ -317,7 +317,7 @@ export function AIChatContent({
                       {checkIn.state === "user_speaking"
                         ? "Listening..."
                         : checkIn.state === "assistant_speaking"
-                          ? "kanari speaking..."
+                          ? "kanari responding..."
                           : checkIn.state === "processing"
                             ? "Thinking..."
                             : "Ready"}

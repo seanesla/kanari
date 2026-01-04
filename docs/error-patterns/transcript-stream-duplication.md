@@ -38,11 +38,11 @@
 const mergedUser = mergeTranscriptUpdate(userTranscriptRef.current, text)
 ```
 
-**Assistant transcripts** use simple append (see "Known Gemini API Issue" below):
+**Assistant transcripts** also use `mergeTranscriptUpdate()` and are rendered live in the chat:
 
 ```typescript
-// Assistant transcripts (use-check-in-messages.ts:385)
-currentTranscriptRef.current = currentTranscriptRef.current + text
+// Assistant transcripts (use-check-in-messages.ts)
+const mergedAssistant = mergeTranscriptUpdate(currentTranscriptRef.current, text)
 ```
 
 Enable debug logging to see merge operations:
@@ -52,8 +52,9 @@ localStorage.setItem("kanari.debugTranscriptMerge", "1")
 
 ## Known Gemini API Issue: Interleaved Parallel Streams
 
-The Gemini Live API `outputTranscription` sends transcript chunks from **multiple
-parallel streams** that arrive interleaved. For example, when the AI says:
+The Gemini Live API `outputAudioTranscription` / `outputTranscription` can send transcript
+chunks from **multiple parallel streams** that arrive interleaved. For example, when the
+AI says:
 
 > "Hey, happy New Year! I know your energy has been dipping..."
 
@@ -68,35 +69,20 @@ The chunks may arrive as:
 This produces jumbled output like:
 > "Hey! I knowHey, happy late it's really..."
 
-### Why `mergeTranscriptUpdate()` doesn't help
-The merge logic was designed for **cumulative snapshots** (where the API sends
-the full transcript-so-far on each event). But Gemini Live sends truly **out-of-order
-delta chunks** from parallel streams, with no sequence numbers or stream IDs.
+### Why `mergeTranscriptUpdate()` doesn't help (for `outputTranscription`)
+The merge logic was designed for **cumulative snapshots** (where the API sends the
+full transcript-so-far on each event). But `outputTranscription` can include truly
+**out-of-order delta chunks** from parallel streams, with no reliable ordering.
 
-Using `mergeTranscriptUpdate()` for assistant transcripts actually makes it **worse**
-because it falsely detects overlapping words as "restarts" and replaces content.
+### Implemented fix (preferred path)
+Instead of relying on `outputTranscription` for the assistant transcript, the app
+requests **TEXT output** from the Live API and uses the ordered text parts from
+`modelTurn.parts[].text` for the UI transcript. The assistant bubble renders this
+in real time (with a subtle cursor while streaming).
 
-### Implemented fix
-The UI now hides the broken transcript during streaming and shows "Speaking..."
-instead. When `isStreaming: true` for an assistant message, `MessageBubble`
-displays a placeholder rather than the jumbled content.
-
-```tsx
-// components/check-in/message-bubble.tsx
-const isAssistantStreaming = isAssistant && message.isStreaming
-// ...
-{isAssistantStreaming ? (
-  <p className="text-muted-foreground italic">Speaking...</p>
-) : (
-  <p>{message.content}</p>
-)}
-```
-
-The AI's spoken audio is correct - only the text transcription was affected.
-Once the turn completes and `isStreaming` becomes false, the final (still
-jumbled) transcript is hidden by the "Speaking..." placeholder being replaced
-with the actual content. Since users primarily rely on audio during the
-conversation, this provides a clean UX.
+Fallback behavior:
+- If ordered text output is not available for a given turn, the client may fall
+  back to `outputTranscription`.
 
 ### Alternative approaches considered
 1. **File bug with Google** - This is a Gemini Live API issue where

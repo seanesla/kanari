@@ -139,7 +139,7 @@ export function VoiceIndicatorLarge({
     listening: "Listening...",
     user_speaking: "Hearing you...",
     processing: "Thinking...",
-    assistant_speaking: "Speaking...",
+    assistant_speaking: "Responding...",
     ending: "Finishing up...",
     complete: "Complete",
     error: "Error",

@@ -65,7 +65,7 @@ vi.mock("@google/genai", () => {
     }
   }
 
-  const Modality = { AUDIO: "AUDIO" }
+  const Modality = { AUDIO: "AUDIO", TEXT: "TEXT" }
   const Type = { OBJECT: "OBJECT", STRING: "STRING", INTEGER: "INTEGER", ARRAY: "ARRAY" }
 
   return { GoogleGenAI, Modality, Type }
@@ -219,5 +219,44 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
     })
 
     expect(config.events.onAudioChunk).not.toHaveBeenCalledWith("suppressed==")
+  })
+
+  test("streams model text parts as transcript and routes thought parts to thinking", async () => {
+    await client.connect()
+
+    getClientInternals(client).handleServerContent({
+      modelTurn: {
+        parts: [
+          { text: "Hello " },
+          { text: "internal", thought: true },
+          { text: "world" },
+        ],
+      },
+    })
+
+    expect(config.events.onModelTranscript).toHaveBeenCalledWith("Hello ", false)
+    expect(config.events.onModelThinking).toHaveBeenCalledWith("internal")
+    expect(config.events.onModelTranscript).toHaveBeenCalledWith("world", false)
+  })
+
+  test("prefers model text output over outputTranscription (fallback after turnComplete)", async () => {
+    await client.connect()
+
+    getClientInternals(client).handleServerContent({
+      modelTurn: { parts: [{ text: "Hi " }] },
+      outputTranscription: { text: "gibberish", finished: false },
+    })
+
+    expect(config.events.onModelTranscript).toHaveBeenCalledWith("Hi ", false)
+    expect(config.events.onModelTranscript).not.toHaveBeenCalledWith("gibberish", false)
+
+    vi.clearAllMocks()
+
+    getClientInternals(client).handleServerContent({ turnComplete: true })
+    getClientInternals(client).handleServerContent({
+      outputTranscription: { text: "audio transcript", finished: true },
+    })
+
+    expect(config.events.onModelTranscript).toHaveBeenCalledWith("audio transcript", true)
   })
 })
