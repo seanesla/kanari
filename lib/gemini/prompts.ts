@@ -770,3 +770,126 @@ export interface CheckInContextSummaryResponse {
   keyObservations: string[]
   contextNotes: string
 }
+
+// ============================================
+// Post-Check-In Synthesis
+// ============================================
+
+/**
+ * System prompt for synthesizing a completed check-in into an evidence-backed narrative.
+ *
+ * Goals:
+ * - Create narrative continuity between the voice conversation and the dashboard
+ * - Keep suggestions minimal (1-2), targeted, and clearly justified
+ * - Make Gemini's work legible via evidence (quotes + voice/journal signals)
+ */
+export const CHECK_IN_SYNTHESIS_PROMPT = `You are kanari's post-check-in synthesizer.
+
+You will receive:
+- A check-in transcript (user + assistant messages)
+- Voice biomarker summary (stress/fatigue scores/levels, mismatch notes)
+- Optional journal entries written during the check-in
+
+YOUR TASK:
+1) Write a short narrative (2-4 sentences) that captures the arc of the check-in.
+2) Extract 2-3 key insights. Each insight MUST include evidence:
+   - At least 1 short direct quote from the transcript or journal (<= 20 words)
+   - At least 1 voice/journal signal in plain language (no raw DSP numbers)
+3) Provide 1-2 targeted suggestions. Each suggestion MUST:
+   - Be linked to one or more insights (by insight index)
+   - Include clear rationale tied to the evidence
+   - Be actionable and non-prescriptive (offer, don't prescribe)
+
+IMPORTANT:
+- Do NOT invent quotes; only use provided text.
+- Keep tone warm, supportive, and non-clinical.
+- Avoid medical advice or diagnosis.
+- Keep output concise; this will be shown to the user.
+
+OUTPUT FORMAT:
+Return ONLY valid JSON matching the schema. Do not wrap in markdown.`
+
+/**
+ * JSON schema for check-in synthesis response (model output).
+ *
+ * Note: IDs and meta are added server-side for determinism and transparency.
+ */
+export const CHECK_IN_SYNTHESIS_SCHEMA = {
+  type: "object",
+  properties: {
+    narrative: {
+      type: "string",
+      description: "2-4 sentence narrative bridging the check-in to the dashboard",
+    },
+    insights: {
+      type: "array",
+      minItems: 2,
+      maxItems: 3,
+      items: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          description: { type: "string" },
+          evidence: {
+            type: "object",
+            properties: {
+              quotes: {
+                type: "array",
+                minItems: 1,
+                maxItems: 3,
+                items: {
+                  type: "object",
+                  properties: {
+                    messageId: { type: "string" },
+                    role: { type: "string", enum: ["user", "assistant", "system"] },
+                    text: { type: "string" },
+                  },
+                  required: ["role", "text"],
+                },
+              },
+              voice: {
+                type: "array",
+                minItems: 0,
+                maxItems: 4,
+                items: { type: "string" },
+              },
+              journal: {
+                type: "array",
+                minItems: 0,
+                maxItems: 3,
+                items: { type: "string" },
+              },
+            },
+            required: ["quotes", "voice", "journal"],
+          },
+        },
+        required: ["title", "description", "evidence"],
+      },
+    },
+    suggestions: {
+      type: "array",
+      minItems: 1,
+      maxItems: 2,
+      items: {
+        type: "object",
+        properties: {
+          content: { type: "string" },
+          rationale: { type: "string" },
+          duration: { type: "number", minimum: 5, maximum: 60 },
+          category: {
+            type: "string",
+            enum: ["break", "exercise", "mindfulness", "social", "rest"],
+          },
+          linkedInsightIndexes: {
+            type: "array",
+            minItems: 1,
+            maxItems: 2,
+            items: { type: "number", minimum: 1, maximum: 3 },
+          },
+        },
+        required: ["content", "rationale", "duration", "category", "linkedInsightIndexes"],
+      },
+    },
+  },
+  required: ["narrative", "insights", "suggestions"],
+}

@@ -12,7 +12,7 @@ import { useSceneMode } from '@/lib/scene-context'
 import { generateDarkVariant, generateLightVariant } from '@/lib/color-utils'
 import { CheckInMarker } from './check-in-marker'
 import { CheckInTooltip } from './check-in-tooltip'
-import type { Suggestion, CheckInSession } from '@/lib/types'
+import type { Suggestion, CheckInSession, RecoveryBlock } from '@/lib/types'
 import '@schedule-x/theme-default/dist/index.css'
 import './schedule-x-theme.css'
 
@@ -22,6 +22,7 @@ interface SuggestionEvent extends CalendarEvent {
   _type: 'suggestion'
   _suggestion: Suggestion
   _isCompleted?: boolean
+  _recoveryBlock?: RecoveryBlock
 }
 
 // Extended event type for check-in markers
@@ -37,6 +38,7 @@ interface ScheduleXWeekCalendarProps {
   scheduledSuggestions: Suggestion[]
   completedSuggestions?: Suggestion[]
   checkInSessions?: CheckInSession[]
+  recoveryBlocks?: RecoveryBlock[]
   onEventClick?: (suggestion: Suggestion) => void
   onCheckInClick?: (session: CheckInSession) => void
   onTimeSlotClick?: (date: Date, hour: number) => void
@@ -51,7 +53,7 @@ interface ScheduleXWeekCalendarInnerProps extends ScheduleXWeekCalendarProps {
 }
 
 // Helper to map Suggestion to Schedule-X event format
-function suggestionToEvent(suggestion: Suggestion): SuggestionEvent | null {
+function suggestionToEvent(suggestion: Suggestion, recoveryBlock?: RecoveryBlock): SuggestionEvent | null {
   if (!suggestion.scheduledFor) return null
 
   // Schedule-X requires ZonedDateTime for timed events (not PlainDateTime)
@@ -76,11 +78,12 @@ function suggestionToEvent(suggestion: Suggestion): SuggestionEvent | null {
     calendarId: suggestion.category,
     _type: 'suggestion',
     _suggestion: suggestion,
+    ...(recoveryBlock ? { _recoveryBlock: recoveryBlock } : {}),
   }
 }
 
 // Helper to map completed suggestion to faded event
-function completedToEvent(suggestion: Suggestion): SuggestionEvent | null {
+function completedToEvent(suggestion: Suggestion, recoveryBlock?: RecoveryBlock): SuggestionEvent | null {
   if (!suggestion.scheduledFor) return null
 
   const timeZone = Temporal.Now.timeZoneId()
@@ -102,6 +105,7 @@ function completedToEvent(suggestion: Suggestion): SuggestionEvent | null {
     _type: 'suggestion',
     _suggestion: suggestion,
     _isCompleted: true,
+    ...(recoveryBlock ? { _recoveryBlock: recoveryBlock } : {}),
   }
 }
 
@@ -144,6 +148,7 @@ function ScheduleXWeekCalendarInner({
   scheduledSuggestions,
   completedSuggestions = [],
   checkInSessions = [],
+  recoveryBlocks = [],
   onEventClick,
   onCheckInClick,
   onTimeSlotClick,
@@ -338,12 +343,25 @@ function ScheduleXWeekCalendarInner({
     // Wait for calendar to be ready before setting events
     if (!calendar) return
 
+    const recoveryBySuggestionId = new Map<string, RecoveryBlock>()
+    for (const block of recoveryBlocks) {
+      // If multiple blocks exist for a suggestion, keep the latest scheduled one.
+      const existing = recoveryBySuggestionId.get(block.suggestionId)
+      if (!existing) {
+        recoveryBySuggestionId.set(block.suggestionId, block)
+        continue
+      }
+      if (new Date(block.scheduledAt).getTime() > new Date(existing.scheduledAt).getTime()) {
+        recoveryBySuggestionId.set(block.suggestionId, block)
+      }
+    }
+
     const scheduledEvents = scheduledSuggestions
-      .map(suggestionToEvent)
+      .map((s) => suggestionToEvent(s, recoveryBySuggestionId.get(s.id)))
       .filter((event): event is SuggestionEvent => event !== null)
 
     const completedEvents = completedSuggestions
-      .map(completedToEvent)
+      .map((s) => completedToEvent(s, recoveryBySuggestionId.get(s.id)))
       .filter((event): event is SuggestionEvent => event !== null)
 
     const checkInEvents = checkInSessions
@@ -363,7 +381,7 @@ function ScheduleXWeekCalendarInner({
       // Calendar not fully mounted yet, will retry on next render
       logDebug("ScheduleXCalendar", "Events service not ready:", error)
     }
-  }, [scheduledSuggestions, completedSuggestions, checkInSessions, eventsService, calendar])
+  }, [scheduledSuggestions, completedSuggestions, checkInSessions, recoveryBlocks, eventsService, calendar])
 
   // Calculate drop target time from mouse position
   const calculateDropTime = useCallback((e: React.DragEvent): { date: Date; hour: number; minute: number } | null => {
@@ -480,6 +498,7 @@ function ScheduleXWeekCalendarInner({
       // Render suggestion events with default-like styling
       // We need to render this ourselves since customComponents replaces the default
       const isCompleted = (event as SuggestionEvent)._isCompleted
+      const isSynced = !!(event as SuggestionEvent)._recoveryBlock
       return (
         <div
           className={cn(
@@ -492,7 +511,17 @@ function ScheduleXWeekCalendarInner({
             // The container element already has the background color set by Schedule-X
           }}
         >
-          <div className="truncate">{calendarEvent.title}</div>
+          <div className="flex items-center gap-1">
+            <div className="truncate">{calendarEvent.title}</div>
+            {isSynced && (
+              <span
+                className="text-[10px] font-medium text-muted-foreground/80"
+                title="Synced to Google Calendar"
+              >
+                GC
+              </span>
+            )}
+          </div>
         </div>
       )
     },

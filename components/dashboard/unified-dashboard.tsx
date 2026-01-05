@@ -3,7 +3,14 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/app/dashboard/layout"
-import { useTrendData, useScheduledSuggestions, useRecordings, useCheckInSessions } from "@/hooks/use-storage"
+import {
+  useTrendData,
+  useScheduledSuggestions,
+  useRecordings,
+  useCheckInSessions,
+  useRecoveryBlocks,
+  useRecoveryBlockActions,
+} from "@/hooks/use-storage"
 import { useSuggestions, featuresToVoicePatterns, computeHistoricalContext } from "@/hooks/use-suggestions"
 import { useCalendar } from "@/hooks/use-calendar"
 import { useResponsive } from "@/hooks/use-responsive"
@@ -13,6 +20,8 @@ import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
 import { DashboardHero } from "./dashboard-hero"
 import { DashboardLayout } from "./dashboard-layout"
 import { MetricsHeaderBar } from "./metrics-header-bar"
+import { InsightsPanel } from "./insights-panel"
+import { JournalEntriesPanel } from "./journal-entries-panel"
 import { PendingSidebar } from "./suggestions/pending-sidebar"
 import { ScheduleXWeekCalendar } from "./calendar"
 import { SuggestionDetailDialog, ScheduleTimeDialog } from "./suggestions"
@@ -31,6 +40,19 @@ export function UnifiedDashboard() {
   const scheduledSuggestions = useScheduledSuggestions()
   const allRecordings = useRecordings(14)
   const { isConnected: isCalendarConnected, scheduleEvent } = useCalendar()
+  const recoveryBlocks = useRecoveryBlocks(100)
+  const { addRecoveryBlock } = useRecoveryBlockActions()
+
+  const scheduleGoogleEventAndPersist = useCallback(
+    async (suggestion: Parameters<typeof scheduleEvent>[0]) => {
+      const block = await scheduleEvent(suggestion)
+      if (block) {
+        await addRecoveryBlock(block)
+      }
+      return block
+    },
+    [scheduleEvent, addRecoveryBlock]
+  )
 
   // Suggestions hook
   const {
@@ -44,6 +66,10 @@ export function UnifiedDashboard() {
 
   // Check-in sessions for insights
   const checkInSessions = useCheckInSessions(30)
+
+  const latestSynthesisSession = useMemo(() => {
+    return checkInSessions.find((s) => !!s.synthesis) ?? null
+  }, [checkInSessions])
 
   // Achievements hook
   const {
@@ -71,7 +97,7 @@ export function UnifiedDashboard() {
     scheduleSuggestion,
     dismissSuggestion,
     completeSuggestion,
-    scheduleGoogleEvent: scheduleEvent,
+    scheduleGoogleEvent: scheduleGoogleEventAndPersist,
     isCalendarConnected,
   })
 
@@ -171,6 +197,11 @@ export function UnifiedDashboard() {
             visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
+          <div className="mb-6 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+            <InsightsPanel session={latestSynthesisSession} />
+            <JournalEntriesPanel />
+          </div>
+
           <DashboardLayout
             isMobile={isMobile}
             isSidebarSheetOpen={isSidebarSheetOpen}
@@ -193,6 +224,7 @@ export function UnifiedDashboard() {
                 scheduledSuggestions={scheduledSuggestions}
                 completedSuggestions={completedSuggestions}
                 checkInSessions={checkInSessions}
+                recoveryBlocks={recoveryBlocks}
                 onEventClick={handlers.handleEventClick}
                 onTimeSlotClick={handlers.handleTimeSlotClick}
                 onExternalDrop={handlers.handleExternalDrop}

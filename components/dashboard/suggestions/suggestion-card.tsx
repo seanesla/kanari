@@ -113,9 +113,14 @@ export function SuggestionCard({ suggestion, onClick, isDragging }: SuggestionCa
 
           {/* Rationale */}
           {suggestion.rationale && (
-            <p className="text-xs text-muted-foreground mt-1 italic line-clamp-1">
-              {suggestion.rationale}
-            </p>
+            <div className="mt-2 space-y-1">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
+                Why
+              </p>
+              <p className="text-xs text-muted-foreground leading-snug whitespace-pre-wrap">
+                {suggestion.rationale}
+              </p>
+            </div>
           )}
 
           {/* Status indicator for scheduled items */}

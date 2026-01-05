@@ -9,11 +9,13 @@ import {
   toRecording,
   toTrendData,
   toSuggestion,
+  toRecoveryBlock,
   toCheckInSession,
   toJournalEntry,
   fromRecording,
   fromTrendData,
   fromSuggestion,
+  fromRecoveryBlock,
   fromCheckInSession,
   fromJournalEntry,
   type DBTrendData,
@@ -23,6 +25,7 @@ import type {
   TrendData,
   DashboardStats,
   Suggestion,
+  RecoveryBlock,
   CheckInSession,
   JournalEntry,
 } from "@/lib/types"
@@ -240,6 +243,61 @@ export function useSuggestionActions() {
   }, [])
 
   return { addSuggestion, addSuggestions, updateSuggestion, deleteSuggestion, deleteSuggestionsByRecording }
+}
+
+// ===========================================
+// Recovery block operations
+// ===========================================
+
+export function useRecoveryBlocks(limit?: number) {
+  const recoveryBlocks = useLiveQuery(async () => {
+    let query = db.recoveryBlocks.orderBy("scheduledAt").reverse()
+    if (limit) {
+      query = query.limit(limit)
+    }
+    const results = await query.toArray()
+    return results.map(toRecoveryBlock)
+  }, [limit])
+
+  return recoveryBlocks ?? []
+}
+
+export function useRecoveryBlocksBySuggestion(suggestionId: string | undefined) {
+  const recoveryBlocks = useLiveQuery(async () => {
+    if (!suggestionId) return []
+    const results = await db.recoveryBlocks.where("suggestionId").equals(suggestionId).toArray()
+    return results.map(toRecoveryBlock).sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime())
+  }, [suggestionId])
+
+  return recoveryBlocks ?? []
+}
+
+export function useRecoveryBlockActions() {
+  const addRecoveryBlock = useCallback(async (block: RecoveryBlock) => {
+    // Upsert by id to avoid duplicate sync writes on retries
+    await db.recoveryBlocks.put(fromRecoveryBlock(block))
+    return block.id
+  }, [])
+
+  const updateRecoveryBlock = useCallback(async (id: string, updates: Partial<RecoveryBlock>) => {
+    const existing = await db.recoveryBlocks.get(id)
+    if (!existing) throw new Error(`RecoveryBlock ${id} not found`)
+
+    await db.recoveryBlocks.update(id, {
+      ...updates,
+      scheduledAt: updates.scheduledAt ? new Date(updates.scheduledAt) : existing.scheduledAt,
+    })
+  }, [])
+
+  const deleteRecoveryBlock = useCallback(async (id: string) => {
+    await db.recoveryBlocks.delete(id)
+  }, [])
+
+  const clearRecoveryBlocks = useCallback(async () => {
+    await db.recoveryBlocks.clear()
+  }, [])
+
+  return { addRecoveryBlock, updateRecoveryBlock, deleteRecoveryBlock, clearRecoveryBlocks }
 }
 
 // ===========================================

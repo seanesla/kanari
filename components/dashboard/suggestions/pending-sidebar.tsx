@@ -46,6 +46,7 @@ export function PendingSidebar({
 }: PendingSidebarProps) {
   const [categoryFilter, setCategoryFilter] = useState<SuggestionCategory | "all">("all")
   const [showAllPending, setShowAllPending] = useState(false)
+  const [otherPendingOpen, setOtherPendingOpen] = useState(false)
   const [completedOpen, setCompletedOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -69,11 +70,18 @@ export function PendingSidebar({
     return pending.filter(s => s.category === categoryFilter)
   }, [pending, categoryFilter])
 
-  // Limit to 5 unless expanded
-  const displayedPending = showAllPending ? filteredPending : filteredPending.slice(0, 5)
-  const hiddenCount = filteredPending.length - 5
+  const { linkedPending, otherPending } = useMemo(() => {
+    const linked = filteredPending.filter((s) => (s.linkedInsightIds?.length ?? 0) > 0 || !!s.checkInSessionId)
+    const other = filteredPending.filter((s) => (s.linkedInsightIds?.length ?? 0) === 0 && !s.checkInSessionId)
+    return { linkedPending: linked, otherPending: other }
+  }, [filteredPending])
+
+  // Limit "other" to 5 unless expanded (linked are always visible to reduce overwhelm)
+  const displayedOtherPending = showAllPending ? otherPending : otherPending.slice(0, 5)
+  const hiddenOtherCount = otherPending.length - 5
 
   const FilterIcon = categoryConfig[categoryFilter].icon
+  const otherSectionOpen = linkedPending.length === 0 ? true : otherPendingOpen
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
@@ -138,24 +146,84 @@ export function PendingSidebar({
       {/* Pending List */}
       <ScrollArea className="flex-1 min-h-0 -mx-1 px-1">
         <div className="space-y-2">
-          <AnimatePresence mode="popLayout">
-            {displayedPending.map((suggestion, index) => (
-              <motion.div
-                key={suggestion.id}
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ delay: index * 0.05 }}
-              >
-                <DraggableSuggestionCard
-                  suggestion={suggestion}
-                  onClick={() => onSuggestionClick(suggestion)}
-                  onDragStart={onDragStart}
-                  onDragEnd={onDragEnd}
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
+          {linkedPending.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide px-1">
+                From your check-in
+              </p>
+              <AnimatePresence mode="popLayout">
+                {linkedPending.map((suggestion, index) => (
+                  <motion.div
+                    key={suggestion.id}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <DraggableSuggestionCard
+                      suggestion={suggestion}
+                      onClick={() => onSuggestionClick(suggestion)}
+                      onDragStart={onDragStart}
+                      onDragEnd={onDragEnd}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          )}
+
+          {otherPending.length > 0 && (
+            <Collapsible open={otherSectionOpen} onOpenChange={setOtherPendingOpen}>
+              <CollapsibleTrigger className="flex items-center justify-between w-full px-1 py-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                <span className="flex items-center gap-2">
+                  Other suggestions ({otherPending.length})
+                </span>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", otherSectionOpen && "rotate-180")} />
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-2 pt-2">
+                  <AnimatePresence mode="popLayout">
+                    {displayedOtherPending.map((suggestion, index) => (
+                      <motion.div
+                        key={suggestion.id}
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ delay: index * 0.03 }}
+                      >
+                        <DraggableSuggestionCard
+                          suggestion={suggestion}
+                          onClick={() => onSuggestionClick(suggestion)}
+                          onDragStart={onDragStart}
+                          onDragEnd={onDragEnd}
+                        />
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+
+                  {/* Show more/less button (other suggestions only) */}
+                  {hiddenOtherCount > 0 && (
+                    <button
+                      onClick={() => setShowAllPending(!showAllPending)}
+                      className="w-full text-center py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      {showAllPending ? (
+                        <>
+                          <ChevronUp className="h-3 w-3 inline mr-1" />
+                          Show less
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3 w-3 inline mr-1" />
+                          Show {hiddenOtherCount} more
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
 
           {filteredPending.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
@@ -169,26 +237,6 @@ export function PendingSidebar({
                 </button>
               )}
             </div>
-          )}
-
-          {/* Show more/less button */}
-          {hiddenCount > 0 && (
-            <button
-              onClick={() => setShowAllPending(!showAllPending)}
-              className="w-full text-center py-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {showAllPending ? (
-                <>
-                  <ChevronUp className="h-3 w-3 inline mr-1" />
-                  Show less
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-3 w-3 inline mr-1" />
-                  Show {hiddenCount} more
-                </>
-              )}
-            </button>
           )}
         </div>
       </ScrollArea>

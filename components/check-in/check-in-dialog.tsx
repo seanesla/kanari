@@ -7,9 +7,10 @@
  * Coordinates the full voice conversation experience.
  */
 
-import { useCallback, useState, useEffect } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { useRouter } from "next/navigation"
 import { logDebug, logError } from "@/lib/logger"
-import { db } from "@/lib/storage/db"
+import { db, fromSuggestion, toJournalEntry } from "@/lib/storage/db"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Dialog,
@@ -18,11 +19,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X, Phone, PhoneOff, MicOff } from "lucide-react"
+import { X, PhoneOff, MicOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
 import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
+import { synthesizeCheckInSession } from "@/lib/gemini/synthesis-client"
+import { SynthesisScreen } from "@/components/check-in/synthesis-screen"
 import { VoiceIndicatorLarge } from "./voice-indicator"
 import { BiomarkerIndicator } from "./biomarker-indicator"
 import { ConversationView } from "./conversation-view"
@@ -35,7 +38,7 @@ import {
 } from "./widgets"
 import { ChatInput } from "./chat-input"
 import { VoicePicker } from "./voice-picker"
-import type { CheckInSession, GeminiVoice } from "@/lib/types"
+import type { CheckInSession, CheckInSynthesis, GeminiVoice, Suggestion } from "@/lib/types"
 import type { InitPhase } from "@/hooks/check-in/state"
 
 /**
@@ -70,7 +73,8 @@ export function CheckInDialog({
   onOpenChange,
   onSessionComplete,
 }: CheckInDialogProps) {
-  const { addCheckInSession } = useCheckInSessionActions()
+  const router = useRouter()
+  const { addCheckInSession, updateCheckInSession } = useCheckInSessionActions()
 
   const canStart = useStrictModeReady(open)
 
@@ -78,11 +82,26 @@ export function CheckInDialog({
   const [hasVoice, setHasVoice] = useState<boolean | null>(null)
   const [isSavingVoice, setIsSavingVoice] = useState(false)
 
+  // Post-check-in synthesis state
+  const [completedSession, setCompletedSession] = useState<CheckInSession | null>(null)
+  const [synthesis, setSynthesis] = useState<CheckInSynthesis | null>(null)
+  const [isSynthesizing, setIsSynthesizing] = useState(false)
+  const [synthesisError, setSynthesisError] = useState<string | null>(null)
+  const synthesisAbortRef = useRef<AbortController | null>(null)
+  const lastSynthesizedSessionIdRef = useRef<string | null>(null)
+
   // Check if user has selected a voice when dialog opens
   useEffect(() => {
     if (!open) {
       // Reset on close so we re-check next time
       setHasVoice(null)
+      setCompletedSession(null)
+      setSynthesis(null)
+      setIsSynthesizing(false)
+      setSynthesisError(null)
+      synthesisAbortRef.current?.abort()
+      synthesisAbortRef.current = null
+      lastSynthesizedSessionIdRef.current = null
       return
     }
 
@@ -123,6 +142,60 @@ export function CheckInDialog({
     }
   }, [])
 
+  const runSynthesis = useCallback(
+    async (session: CheckInSession) => {
+      if (lastSynthesizedSessionIdRef.current === session.id && synthesis && !synthesisError) {
+        return
+      }
+
+      synthesisAbortRef.current?.abort()
+      const controller = new AbortController()
+      synthesisAbortRef.current = controller
+
+      setIsSynthesizing(true)
+      setSynthesisError(null)
+
+      try {
+        const dbEntries = await db.journalEntries.where("checkInSessionId").equals(session.id).toArray()
+        const journalEntries = dbEntries.map(toJournalEntry)
+
+        const nextSynthesis = await synthesizeCheckInSession(session, journalEntries, {
+          signal: controller.signal,
+        })
+
+        lastSynthesizedSessionIdRef.current = session.id
+        setSynthesis(nextSynthesis)
+
+        // Persist synthesis to the saved session (dashboard continuity)
+        await updateCheckInSession(session.id, { synthesis: nextSynthesis })
+
+        // Persist synthesis suggestions as pending suggestions (upsert by deterministic IDs)
+        const createdAt = nextSynthesis.meta.generatedAt
+        for (const s of nextSynthesis.suggestions) {
+          const suggestion: Suggestion = {
+            id: s.id,
+            checkInSessionId: session.id,
+            linkedInsightIds: s.linkedInsightIds,
+            content: s.content,
+            rationale: s.rationale,
+            duration: s.duration,
+            category: s.category,
+            status: "pending",
+            createdAt,
+          }
+          await db.suggestions.put(fromSuggestion(suggestion))
+        }
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") return
+        const message = error instanceof Error ? error.message : "Failed to synthesize check-in"
+        setSynthesisError(message)
+      } finally {
+        setIsSynthesizing(false)
+      }
+    },
+    [synthesis, synthesisError, updateCheckInSession]
+  )
+
   const [checkIn, controls] = useCheckIn({
     onSessionEnd: async (session) => {
       try {
@@ -130,19 +203,24 @@ export function CheckInDialog({
         // With AI-speaks-first, 1 message = just the AI greeting, no user response
         if (session.messages.length <= 1) {
           logDebug("CheckInDialog", "Skipping save - no user participation")
+          setCompletedSession(session)
           return
         }
         await addCheckInSession(session)
+        setCompletedSession(session)
         onSessionComplete?.(session)
+
+        // Kick off post-check-in synthesis (non-blocking for UI)
+        void runSynthesis(session)
       } catch (error) {
         logError("CheckInDialog", "Failed to save check-in session:", error)
       }
     },
     onMismatch: (result) => {
-      console.log("[CheckInDialog] Mismatch detected:", result)
+      logDebug("CheckInDialog", "Mismatch detected:", result)
     },
     onError: (error) => {
-      console.error("[CheckInDialog] Error:", error)
+      logError("CheckInDialog", "Error:", error)
     },
   })
 
@@ -159,8 +237,13 @@ export function CheckInDialog({
   // Handle end call
   const handleEndCall = useCallback(async () => {
     await controls.endSession()
+  }, [controls])
+
+  const handleViewDashboard = useCallback(() => {
+    controls.cancelSession()
     onOpenChange(false)
-  }, [controls, onOpenChange])
+    router.push("/dashboard")
+  }, [controls, onOpenChange, router])
 
   // Determine if we should show the conversation or initialization
   const showConversation = [
@@ -434,28 +517,20 @@ export function CheckInDialog({
             {checkIn.state === "complete" && (
               <motion.div
                 key="complete"
-                className="flex-1 flex flex-col items-center justify-center gap-4 p-8"
+                className="flex-1 flex flex-col overflow-hidden"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <div className="w-16 h-16 rounded-full bg-green-500/10 flex items-center justify-center">
-                  <Phone className="w-8 h-8 text-green-500" />
-                </div>
-                <div className="text-center">
-                  <p className="font-medium">Check-in complete</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {checkIn.messages.length} messages
-                    {checkIn.mismatchCount > 0 &&
-                      ` • ${checkIn.mismatchCount} voice patterns noted`}
-                  </p>
-                </div>
-                {checkIn.session?.acousticMetrics && (
-                  <div className="w-full max-w-sm">
-                    <BiomarkerIndicator metrics={checkIn.session.acousticMetrics} compact />
-                  </div>
-                )}
-                <Button onClick={handleClose}>Done</Button>
+                <SynthesisScreen
+                  session={completedSession ?? checkIn.session ?? null}
+                  synthesis={synthesis}
+                  isLoading={isSynthesizing}
+                  error={synthesisError}
+                  onRetry={completedSession ? () => void runSynthesis(completedSession) : undefined}
+                  onViewDashboard={handleViewDashboard}
+                  onDone={handleClose}
+                />
               </motion.div>
             )}
           </AnimatePresence>
