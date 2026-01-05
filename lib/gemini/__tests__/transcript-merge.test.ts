@@ -34,6 +34,12 @@ describe("mergeTranscriptUpdate", () => {
     expect(result.delta).toBe(" but normal")
   })
 
+  it("appends delta when a new sentence arrives with no overlap", () => {
+    const result = mergeTranscriptUpdate("I hear you", " Let's take a breath.")
+    expect(result.next).toBe("I hear you Let's take a breath.")
+    expect(result.kind).toBe("delta")
+  })
+
   it("replaces transcript when a corrected cumulative snapshot diverges", () => {
     const previous =
       "Hey, happy New Years Eve! It was good to see your mood improve after yesterday morning. How are you"
@@ -43,6 +49,15 @@ describe("mergeTranscriptUpdate", () => {
     const result = mergeTranscriptUpdate(previous, incoming)
     expect(result.next).toBe(incoming)
     expect(result.kind).toBe("replace")
+  })
+
+  it("does not regress when incoming is a shorter prefix", () => {
+    const previous = "Hey, happy New Year's Eve! It was good to see your mood improve after yesterday morning."
+    const incoming = "Hey, happy New Year's Eve! It was good to see your mood"
+
+    const result = mergeTranscriptUpdate(previous, incoming)
+    expect(result.next).toBe(previous)
+    expect(result.delta).toBe("")
   })
 
   it("replaces transcript when a corrected snapshot revises earlier words", () => {

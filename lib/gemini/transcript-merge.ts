@@ -109,6 +109,15 @@ function shouldAcceptSingleTokenOverlap(token: string): boolean {
   return token.length >= 3 && !STOPWORDS.has(token)
 }
 
+function looksLikeGreetingStart(text: string): boolean {
+  const trimmed = text.trim()
+  if (!trimmed) return false
+  if (/^(hi|hey|hello)\b/i.test(trimmed)) return true
+  if (/^good (morning|afternoon|evening)\b/i.test(trimmed)) return true
+  if (/^happy new year(['’]?s)?\b/i.test(trimmed)) return true
+  return false
+}
+
 function findOverlapCount(previousTokens: Token[], incomingTokens: Token[]): number {
   const maxOverlap = Math.min(previousTokens.length, incomingTokens.length)
   for (let count = maxOverlap; count >= 1; count--) {
@@ -171,10 +180,15 @@ export function mergeTranscriptUpdate(previous: string, incoming: string): Trans
   }
 
   if (normalizedPrevious.startsWith(normalizedIncoming)) {
+    // Regressive snapshot: some streaming sources (or out-of-order events) can emit
+    // a shorter "prefix" after we've already accumulated a longer transcript.
+    // Replacing in that case makes the UI look like the assistant message got
+    // chopped off mid-sentence.
+    // Pattern doc: docs/error-patterns/transcript-regression-truncation.md
     return {
-      next: incoming,
+      next: previous,
       delta: "",
-      kind: "replace",
+      kind: "delta",
     }
   }
 
@@ -184,6 +198,7 @@ export function mergeTranscriptUpdate(previous: string, incoming: string): Trans
   // Detect greeting restart: incoming starts with capital and looks like a new sentence.
   // This catches cases where the model restarts with a different greeting variant.
   // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
+  // Guardrail doc: docs/error-patterns/transcript-restart-misclassification.md
   const incomingTrimmed = incoming.trim()
   const incomingStartsCapital = /^[A-Z]/.test(incomingTrimmed)
   const previousEndsIncomplete = !/[.!?]$/.test(previous.trim())
@@ -206,10 +221,13 @@ export function mergeTranscriptUpdate(previous: string, incoming: string): Trans
       // Also handle short greeting restarts where only the opener overlaps:
       // e.g. "Hey! I know" → "Hey, happy ..." (parallel-stream interleave).
       // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
+      const previousIsShort = previousTokens.length <= 6 && previous.trim().length <= 60
+      const incomingLooksGreeting = looksLikeGreetingStart(incomingTrimmed)
+
       if (
         sharedAnyCount >= 2 ||
-        (previousTokens.length >= 3 && incomingTokens.length >= 3) ||
-        (commonPrefix >= 1 && previousTokens.length >= 3 && incomingTokens.length <= 3)
+        (commonPrefix >= 1 && previousTokens.length >= 3 && incomingTokens.length <= 3) ||
+        (incomingLooksGreeting && previousIsShort)
       ) {
         return { next: incoming, delta: "", kind: "replace" }
       }
