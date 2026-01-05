@@ -27,15 +27,16 @@ Note: Gemini API keys are entered by the user in the Settings UI (no server env 
 **Stack**: Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4
 
 ### Data Flow
-1. **AI Chat check-in**: `use-check-in` captures mic audio → Meyda features (client-side) → Gemini Live API (real-time) → IndexedDB session storage
-2. `lib/ml/forecasting.ts` predicts 3-7 day burnout risk from check-in acoustic trends
-3. Gemini generates recovery suggestions → user schedules via Google Calendar
+1. **AI Voice Check-in**: `use-check-in` captures mic audio → Meyda features (client-side) → Gemini Live API (real-time conversation) → IndexedDB session storage
+2. **Synthesis**: Post-check-in API generates insights, journal entries, and recovery suggestions
+3. **Forecasting**: `lib/ml/forecasting.ts` predicts 3-7 day burnout risk from acoustic biomarker trends
+4. **Scheduling**: User schedules recovery suggestions via Google Calendar
 
 ### Key Directories
 - `app/api/gemini/live/` - Gemini Live streaming routes (WebSocket proxy)
 - `app/api/gemini/synthesize/` - Post-check-in synthesis API (insights, journal entries)
 - `components/check-in/` - Check-in dialog, voice picker, synthesis screen, conversation UI
-- `components/dashboard/` - Dashboard UI (recording, charts, kanban, history, insights panel, journal entries panel)
+- `components/dashboard/` - Dashboard UI (metrics, charts, kanban, history, insights panel, journal entries panel)
 - `hooks/` - `use-check-in`, `use-gemini-live`, `use-audio-playback`, `use-recording`, `use-storage`, `use-voice-preview`
 - `lib/audio/` - Web Audio, VAD, Meyda features, PCM conversion
 - `lib/gemini/` - API client, prompts, `live-client.ts` (WebSocket), `synthesis-client.ts`, `voices.ts`, mismatch detection

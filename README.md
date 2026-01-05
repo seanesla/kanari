@@ -1,6 +1,6 @@
 # kanari
 
-**Predict burnout before it happens.** A browser-based early warning system that analyzes your voice, forecasts risk 3-7 days ahead, and schedules recovery time on your calendar.
+**Predict burnout before it happens.** A browser-based early warning system that uses AI voice check-ins to analyze vocal biomarkers, forecast risk 3-7 days ahead, and schedule recovery time on your calendar.
 
 [![Gemini 3 Hackathon](https://img.shields.io/badge/Google%20DeepMind-Gemini%203%20Hackathon-4285F4?style=flat-square&logo=google&logoColor=white)](https://gemini3.devpost.com)
 [![Platform](https://img.shields.io/badge/Platform-Browser-orange?style=flat-square)]()
@@ -11,36 +11,43 @@
 
 ## What is kanari?
 
-kanari helps remote workers and professionals detect early signs of burnout through short daily voice recordings. Speak for 30-60 seconds about your day. The app analyzes vocal biomarkers in your browser, predicts burnout risk for the coming week, and suggests personalized recovery actions.
+kanari helps remote workers and professionals detect early signs of burnout through daily AI voice check-ins. Have a 30-60 second conversation with Gemini about your day. The app analyzes acoustic biomarkers in your browser, predicts burnout risk for the coming week, and suggests personalized recovery actions.
 
-<!-- PLACEHOLDER: Demo GIF - voice recording flow showing microphone activation, waveform visualization, analysis spinner, results display with stress/fatigue scores -->
+Your voice patterns shift days before you consciously feel burnout. kanari detects those signals.
 
 ---
 
 ## Features
 
-- **Voice Analysis**: Detects stress and fatigue from speech patterns, pitch variations, and pause timing
-- **Predictive Forecasting**: Warns you 3-7 days before burnout risk peaks
-- **Personalized Suggestions**: Gemini 3 generates context-aware recovery recommendations
-- **AI Voice Selection**: Choose from 30+ distinct AI voices for your check-in conversations
-- **Check-in Synthesis**: Get summarized insights and journal entries after each check-in
-- **Interruptible AI**: Pause or redirect the AI mid-conversation for natural dialogue
-- **Calendar Integration**: Automatically schedules recovery blocks on Google Calendar
-- **Privacy-First**: Acoustic analysis runs entirely in your browser
-- **Zero Friction**: No app install, no account required
+### Core
+- **AI Voice Check-ins**: Conversational check-ins powered by Gemini Live - speak naturally, get real-time responses
+- **Acoustic Biomarker Analysis**: Detects stress and fatigue from speech rate, pitch variations, pause patterns, and spectral features
+- **Burnout Forecasting**: Predicts risk 3-7 days ahead based on voice pattern trends
+- **Check-in Synthesis**: AI-generated summaries with insights and journal entries after each session
 
-<!-- PLACEHOLDER: Dashboard screenshot - overview page with trend charts, wellness score gauge, burnout forecast graph -->
+### Personalization
+- **30+ AI Voices**: Choose from distinct Gemini voices with audio preview
+- **Interactive Widgets**: Breathing exercises, stress gauges, quick actions triggered during check-ins
+- **Recovery Suggestions**: Context-aware recommendations based on your conversation and biomarkers
+
+### Integration
+- **Calendar Sync**: Schedule recovery blocks directly to Google Calendar
+- **Week View**: Visual scheduler showing your recovery activities
+- **Achievement System**: Track streaks and milestones
+
+### Privacy
+- **Client-side Processing**: Acoustic analysis runs entirely in your browser
+- **Your API Key**: Users provide their own Gemini API key (free tier available)
+- **No Account Required**: Data stored locally in IndexedDB
 
 ---
 
 ## How It Works
 
-1. **Record**: Speak naturally for 30-60 seconds about your day
-2. **Analyze**: Local acoustic processing extracts vocal biomarkers while Gemini 3 detects emotional cues
-3. **Predict**: Trends are compared against your baseline to forecast risk
-4. **Act**: Get personalized suggestions and optionally schedule recovery time
-
-<!-- PLACEHOLDER: Workflow diagram - 4 step horizontal visual with icons: microphone → waveform → chart → calendar -->
+1. **Check in**: Start a voice conversation with Gemini about your day
+2. **Analyze**: Local acoustic processing extracts biomarkers while Gemini provides real-time responses
+3. **Synthesize**: Get AI-generated insights, journal entries, and recovery suggestions
+4. **Schedule**: Book recovery activities directly to your calendar
 
 ---
 
@@ -50,7 +57,7 @@ kanari helps remote workers and professionals detect early signs of burnout thro
 |----------|-------------|
 | Frontend | Next.js 16, React 19, Tailwind CSS 4, Framer Motion |
 | Audio | Web Audio API, Meyda, @ricky0123/vad-web |
-| AI | Gemini 3 Flash API |
+| AI | Gemini 3 Flash (REST), Gemini Live (WebSocket) |
 | Storage | IndexedDB (Dexie), Web Crypto API |
 | Integration | Google Calendar API, Google OAuth 2.0 |
 
@@ -67,13 +74,17 @@ pnpm dev
 ```
 
 Open `http://localhost:3000` in Chrome, Safari, or Firefox.
-Add your Gemini API key in Settings (stored locally in IndexedDB).
+
+The onboarding flow will guide you to:
+1. Get a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
+2. Configure your preferences (check-in duration, voice activity detection)
+3. Choose your accent color
 
 ---
 
 ## Privacy
 
-All acoustic analysis happens locally in your browser. Audio is only sent to Gemini for semantic analysis (emotion detection, transcription). No personal identifiers are collected and no account is required.
+All acoustic analysis (speech rate, spectral features, pause patterns) happens locally in your browser. Audio is sent to Gemini only for conversation and semantic analysis. No personal identifiers are collected. Data is stored locally in IndexedDB.
 
 ---
 
@@ -81,7 +92,11 @@ All acoustic analysis happens locally in your browser. Audio is only sent to Gem
 
 Built for the **Google DeepMind Gemini 3 Hackathon** (Dec 2025 - Feb 2026).
 
-Uses Gemini 3 Flash for multimodal audio analysis, emotion detection, personalized suggestion generation, and calendar event creation.
+Uses Gemini 3 Flash for:
+- Real-time voice conversations (Gemini Live WebSocket)
+- Burnout risk prediction and forecasting
+- Personalized recovery suggestion generation
+- Check-in synthesis and journaling
 
 ---
 
