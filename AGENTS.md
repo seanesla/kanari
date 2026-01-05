@@ -33,12 +33,14 @@ Note: Gemini API keys are entered by the user in the Settings UI (no server env 
 
 ### Key Directories
 - `app/api/gemini/live/` - Gemini Live streaming routes (WebSocket proxy)
-- `components/check-in/` - Check-in dialog, voice indicator, conversation UI
-- `components/dashboard/` - Dashboard UI (recording, charts, kanban, history)
-- `hooks/` - `use-check-in`, `use-gemini-live`, `use-audio-playback`, `use-recording`, `use-storage`
+- `app/api/gemini/synthesize/` - Post-check-in synthesis API (insights, journal entries)
+- `components/check-in/` - Check-in dialog, voice picker, synthesis screen, conversation UI
+- `components/dashboard/` - Dashboard UI (recording, charts, kanban, history, insights panel, journal entries panel)
+- `hooks/` - `use-check-in`, `use-gemini-live`, `use-audio-playback`, `use-recording`, `use-storage`, `use-voice-preview`
 - `lib/audio/` - Web Audio, VAD, Meyda features, PCM conversion
-- `lib/gemini/` - API client, prompts, `live-client.ts` (WebSocket), mismatch detection
+- `lib/gemini/` - API client, prompts, `live-client.ts` (WebSocket), `synthesis-client.ts`, `voices.ts`, mismatch detection
 - `lib/ml/` - Forecasting, inference, `thresholds.ts` (constants)
+- `lib/settings/` - Default settings configuration
 
 ### State Management
 - `SceneProvider` - Scene mode, accent color, loading

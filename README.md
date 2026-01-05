@@ -22,6 +22,9 @@ kanari helps remote workers and professionals detect early signs of burnout thro
 - **Voice Analysis**: Detects stress and fatigue from speech patterns, pitch variations, and pause timing
 - **Predictive Forecasting**: Warns you 3-7 days before burnout risk peaks
 - **Personalized Suggestions**: Gemini 3 generates context-aware recovery recommendations
+- **AI Voice Selection**: Choose from 30+ distinct AI voices for your check-in conversations
+- **Check-in Synthesis**: Get summarized insights and journal entries after each check-in
+- **Interruptible AI**: Pause or redirect the AI mid-conversation for natural dialogue
 - **Calendar Integration**: Automatically schedules recovery blocks on Google Calendar
 - **Privacy-First**: Acoustic analysis runs entirely in your browser
 - **Zero Friction**: No app install, no account required
@@ -86,7 +89,7 @@ Uses Gemini 3 Flash for multimodal audio analysis, emotion detection, personaliz
 
 | Resource | URL |
 |----------|-----|
-| Live Demo | `[LIVE_DEMO_URL]` |
+| Live Demo | https://kanari-three.vercel.app |
 | Demo Video | `[VIDEO_URL]` |
 | Devpost | `[DEVPOST_URL]` |
 
