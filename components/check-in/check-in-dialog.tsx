@@ -26,7 +26,6 @@ import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { synthesizeCheckInSession } from "@/lib/gemini/synthesis-client"
 import { SynthesisScreen } from "@/components/check-in/synthesis-screen"
-import { VoiceIndicatorLarge } from "./voice-indicator"
 import { BiomarkerIndicator } from "./biomarker-indicator"
 import { ConversationView } from "./conversation-view"
 import {
@@ -257,14 +256,6 @@ export function CheckInDialog({
 
   const showInitializing = ["initializing", "connecting"].includes(checkIn.state)
 
-  // Calculate active audio level
-  const activeAudioLevel =
-    checkIn.state === "user_speaking"
-      ? checkIn.audioLevels.input
-      : checkIn.state === "assistant_speaking"
-        ? checkIn.audioLevels.output
-        : 0
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -317,7 +308,6 @@ export function CheckInDialog({
                 {/* Has voice - show normal start UI */}
                 {hasVoice === true && (
                   <>
-                    <VoiceIndicatorLarge state="idle" audioLevel={0} initPhase={null} />
                     <p className="text-sm text-muted-foreground text-center">
                       Tap start to begin your voice check-in.
                     </p>
@@ -343,11 +333,6 @@ export function CheckInDialog({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <VoiceIndicatorLarge
-                  state={checkIn.state}
-                  audioLevel={0}
-                  initPhase={checkIn.initPhase}
-                />
                 <motion.p
                   key={checkIn.initPhase || "default"}
                   className="text-sm text-muted-foreground text-center"
@@ -370,47 +355,32 @@ export function CheckInDialog({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                {/* Voice indicator - compact when messages exist */}
-                <motion.div
-                  className={cn(
-                    "flex-shrink-0 flex justify-center border-b transition-all",
-                    checkIn.messages.length > 0 ? "py-3" : "py-8"
-                  )}
-                  layout
-                >
-                  {checkIn.messages.length > 0 ? (
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={cn(
-                            "w-3 h-3 rounded-full transition-colors",
-                            checkIn.state === "user_speaking"
-                              ? "bg-green-500"
-                              : checkIn.state === "assistant_speaking"
-                                ? "bg-blue-500"
-                                : checkIn.state === "listening"
-                                  ? "bg-accent animate-pulse"
-                                  : "bg-muted"
-                          )}
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {checkIn.state === "user_speaking"
-                            ? "Listening..."
-                            : checkIn.state === "assistant_speaking"
-                              ? "kanari responding..."
-                              : checkIn.state === "processing"
-                                ? "Thinking..."
-                                : "Ready"}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <VoiceIndicatorLarge
-                      state={checkIn.state}
-                      audioLevel={activeAudioLevel}
+                {/* Compact status indicator with colored dot */}
+                <div className="flex-shrink-0 flex justify-center border-b py-3">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={cn(
+                        "w-3 h-3 rounded-full transition-colors",
+                        checkIn.state === "user_speaking"
+                          ? "bg-green-500"
+                          : checkIn.state === "assistant_speaking"
+                            ? "bg-blue-500"
+                            : checkIn.state === "listening"
+                              ? "bg-accent animate-pulse"
+                              : "bg-muted"
+                      )}
                     />
-                  )}
-                </motion.div>
+                    <span className="text-sm text-muted-foreground">
+                      {checkIn.state === "user_speaking"
+                        ? "Listening..."
+                        : checkIn.state === "assistant_speaking"
+                          ? "kanari responding..."
+                          : checkIn.state === "processing"
+                            ? "Thinking..."
+                            : "Ready"}
+                    </span>
+                  </div>
+                </div>
 
                 <div className="px-6 py-3 border-b border-border/50 bg-background/40">
                   <BiomarkerIndicator metrics={checkIn.session?.acousticMetrics} />

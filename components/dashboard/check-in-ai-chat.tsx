@@ -37,7 +37,6 @@ import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
 import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
-import { VoiceIndicatorLarge } from "@/components/check-in/voice-indicator"
 import { BiomarkerIndicator } from "@/components/check-in/biomarker-indicator"
 import { ConversationView } from "@/components/check-in/conversation-view"
 import { ChatInput } from "@/components/check-in/chat-input"
@@ -303,15 +302,6 @@ export function AIChatContent({
 
   const showInitializing = ["initializing", "connecting"].includes(checkIn.state)
 
-  // Calculate which audio level to show in the visualizer
-  // Shows input level when user is speaking, output level when AI is speaking
-  const activeAudioLevel =
-    checkIn.state === "user_speaking"
-      ? checkIn.audioLevels.input
-      : checkIn.state === "assistant_speaking"
-        ? checkIn.audioLevels.output
-        : 0
-
   return (
     <div className="flex h-full overflow-hidden">
       {/* Main chat content area (full width - no sidebar) */}
@@ -329,9 +319,8 @@ export function AIChatContent({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <VoiceIndicatorLarge state="idle" audioLevel={0} />
             <p className="text-sm text-muted-foreground text-center">
-              Start a voice check-in when you’re ready.
+              Start a voice check-in when you're ready.
             </p>
             <Button onClick={startOrResume} disabled={!canStart}>
               {canStart ? "Start" : "Preparing..."}
@@ -349,11 +338,6 @@ export function AIChatContent({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            {/* Large pulsing voice indicator shows we're setting up */}
-            <VoiceIndicatorLarge
-              state={checkIn.state}
-              audioLevel={0}
-            />
             <p className="text-sm text-muted-foreground text-center">
               {checkIn.initPhase ? getInitPhaseLabel(checkIn.initPhase) : "Setting up voice conversation..."}
             </p>
@@ -370,53 +354,32 @@ export function AIChatContent({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            {/*
-              Voice indicator section
-              - Shows large indicator when no messages yet (first time)
-              - Switches to compact indicator once conversation starts
-            */}
-            <motion.div
-              className={cn(
-                "flex-shrink-0 flex justify-center border-b transition-all",
-                checkIn.messages.length > 0 ? "py-3" : "py-8"
-              )}
-              layout
-            >
-              {checkIn.messages.length > 0 ? (
-                /* Compact status indicator with colored dot */
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={cn(
-                        "w-3 h-3 rounded-full transition-colors",
-                        checkIn.state === "user_speaking"
-                          ? "bg-green-500"           // Green = user talking
-                          : checkIn.state === "assistant_speaking"
-                            ? "bg-blue-500"          // Blue = AI talking
-                            : checkIn.state === "listening"
-                              ? "bg-accent animate-pulse"  // Pulsing = listening
-                              : "bg-muted"           // Gray = idle
-                      )}
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      {checkIn.state === "user_speaking"
-                        ? "Listening..."
-                        : checkIn.state === "assistant_speaking"
-                          ? "kanari responding..."
-                          : checkIn.state === "processing"
-                            ? "Thinking..."
-                            : "Ready"}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                /* Large animated indicator for first-time/empty state */
-                <VoiceIndicatorLarge
-                  state={checkIn.state}
-                  audioLevel={activeAudioLevel}
+            {/* Compact status indicator with colored dot */}
+            <div className="flex-shrink-0 flex justify-center border-b py-3">
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    "w-3 h-3 rounded-full transition-colors",
+                    checkIn.state === "user_speaking"
+                      ? "bg-green-500"           // Green = user talking
+                      : checkIn.state === "assistant_speaking"
+                        ? "bg-blue-500"          // Blue = AI talking
+                        : checkIn.state === "listening"
+                          ? "bg-accent animate-pulse"  // Pulsing = listening
+                          : "bg-muted"           // Gray = idle
+                  )}
                 />
-              )}
-            </motion.div>
+                <span className="text-sm text-muted-foreground">
+                  {checkIn.state === "user_speaking"
+                    ? "Listening..."
+                    : checkIn.state === "assistant_speaking"
+                      ? "kanari responding..."
+                      : checkIn.state === "processing"
+                        ? "Thinking..."
+                        : "Ready"}
+                </span>
+              </div>
+            </div>
 
             {/* Real-time biomarker panel */}
             <div className="px-6 py-3 border-b border-border/50 bg-background/40">
