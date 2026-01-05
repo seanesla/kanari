@@ -1,10 +1,11 @@
 "use client"
 
 import { createContext, useContext, useState, useCallback, useRef, useMemo, useEffect, type ReactNode, type MutableRefObject } from "react"
-import { db, type DBSettings } from "@/lib/storage/db"
+import { db } from "@/lib/storage/db"
 import { DEFAULT_ACCENT } from "@/lib/color-utils"
 import { DEFAULT_SANS, DEFAULT_SERIF, updateFontVariable, getFontCssFamily } from "@/lib/font-utils"
 import type { FontFamily, SerifFamily } from "@/lib/types"
+import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
 
 export type SceneMode = "landing" | "transitioning" | "dashboard"
 
@@ -26,20 +27,6 @@ interface SceneContextValue {
 
 // Exported for useContextBridge in 3D scenes (Drei Html portals)
 export const SceneContext = createContext<SceneContextValue | null>(null)
-
-// Helper to create default settings object - avoids DRY violation across callbacks
-function createDefaultSettings(): DBSettings {
-  return {
-    id: "default",
-    defaultRecordingDuration: 30,
-    enableVAD: true,
-    enableNotifications: true,
-    calendarConnected: false,
-    autoScheduleRecovery: false,
-    preferredRecoveryTimes: [],
-    localStorageOnly: true,
-  }
-}
 
 export function SceneProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<SceneMode>("landing")
@@ -89,7 +76,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     db.settings.update("default", { accentColor: color }).then((updated) => {
       if (updated === 0) {
         // No record exists, create it
-        return db.settings.put({ ...createDefaultSettings(), accentColor: color })
+        return db.settings.put(createDefaultSettingsRecord({ accentColor: color }))
       }
     }).catch((error) => {
       if (process.env.NODE_ENV === "development") {
@@ -105,7 +92,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     db.settings.update("default", { selectedSansFont: font as FontFamily }).then((updated) => {
       if (updated === 0) {
         // No record exists, create it
-        return db.settings.put({ ...createDefaultSettings(), selectedSansFont: font as FontFamily })
+        return db.settings.put(createDefaultSettingsRecord({ selectedSansFont: font as FontFamily }))
       }
     }).catch((error) => {
       if (process.env.NODE_ENV === "development") {
@@ -121,7 +108,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     db.settings.update("default", { selectedSerifFont: font as SerifFamily }).then((updated) => {
       if (updated === 0) {
         // No record exists, create it
-        return db.settings.put({ ...createDefaultSettings(), selectedSerifFont: font as SerifFamily })
+        return db.settings.put(createDefaultSettingsRecord({ selectedSerifFont: font as SerifFamily }))
       }
     }).catch((error) => {
       if (process.env.NODE_ENV === "development") {

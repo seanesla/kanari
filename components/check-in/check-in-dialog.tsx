@@ -19,12 +19,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X, PhoneOff, MicOff } from "lucide-react"
+import { X, PhoneOff, MicOff, Square } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
 import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { synthesizeCheckInSession } from "@/lib/gemini/synthesis-client"
+import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
 import { SynthesisScreen } from "@/components/check-in/synthesis-screen"
 import { BiomarkerIndicator } from "./biomarker-indicator"
 import { ConversationView } from "./conversation-view"
@@ -120,19 +121,10 @@ export function CheckInDialog({
   const handleVoiceSelected = useCallback(async (voice: GeminiVoice) => {
     setIsSavingVoice(true)
     try {
-      const existingSettings = await db.settings.get("default")
-      await db.settings.put({
-        id: "default",
-        defaultRecordingDuration: 30,
-        enableVAD: true,
-        enableNotifications: true,
-        calendarConnected: false,
-        autoScheduleRecovery: false,
-        preferredRecoveryTimes: [],
-        localStorageOnly: true,
-        ...existingSettings,
-        selectedGeminiVoice: voice,
-      })
+      const updated = await db.settings.update("default", { selectedGeminiVoice: voice })
+      if (updated === 0) {
+        await db.settings.put(createDefaultSettingsRecord({ selectedGeminiVoice: voice }))
+      }
       setHasVoice(true)
     } catch (error) {
       logError("CheckInDialog", "Failed to save voice selection:", error)
@@ -357,7 +349,7 @@ export function CheckInDialog({
               >
                 {/* Compact status indicator with colored dot */}
                 <div className="flex-shrink-0 flex justify-center border-b py-3">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-3">
                     <div
                       className={cn(
                         "w-3 h-3 rounded-full transition-colors",
@@ -379,6 +371,19 @@ export function CheckInDialog({
                             ? "Thinking..."
                             : "Ready"}
                     </span>
+
+                    {(checkIn.state === "assistant_speaking" || checkIn.state === "ai_greeting") && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => controls.interruptAssistant()}
+                        className="h-8"
+                      >
+                        <Square className="h-3.5 w-3.5 mr-2" />
+                        Interrupt
+                      </Button>
+                    )}
                   </div>
                 </div>
 

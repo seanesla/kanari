@@ -1,7 +1,6 @@
 "use client"
 
 import { Shield } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 
@@ -35,14 +34,15 @@ export function SettingsPrivacySection({
             id="local-storage"
             checked={localStorageOnly}
             onCheckedChange={onLocalStorageOnlyChange}
+            aria-label="Local Storage Only"
           />
         </div>
 
-        <Button variant="outline" className="w-full bg-transparent text-destructive hover:bg-destructive/10">
-          Clear All Data
-        </Button>
+        <p className="text-sm text-muted-foreground font-sans">
+          Want to delete your data? Use the <span className="font-medium text-foreground">Account</span>{" "}
+          section below to reset everything.
+        </p>
       </div>
     </div>
   )
 }
-

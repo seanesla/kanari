@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useEffect, useMemo, useCallback, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
 import { GeminiMemorySection } from "./settings-gemini-memory"
@@ -13,88 +13,143 @@ import { SettingsPrivacySection } from "./settings-privacy"
 import { SettingsRecordingSection } from "./settings-recording"
 import { SettingsVoiceSection } from "./settings-voice-section"
 import { db } from "@/lib/storage/db"
-import type { GeminiVoice } from "@/lib/types"
+import { DEFAULT_USER_SETTINGS, createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import type { GeminiVoice, UserSettings } from "@/lib/types"
 
-type DraftSettings = {
-  enableNotifications: boolean
-  dailyReminder: boolean
-  enableVAD: boolean
-  autoScheduleRecovery: boolean
-  localStorageOnly: boolean
-}
+// Pattern doc: docs/error-patterns/settings-schema-drift-and-partial-save.md
+type SettingsDraft = Pick<
+  UserSettings,
+  | "defaultRecordingDuration"
+  | "enableVAD"
+  | "enableNotifications"
+  | "dailyReminderTime"
+  | "autoScheduleRecovery"
+  | "localStorageOnly"
+  | "geminiApiKey"
+  | "selectedGeminiVoice"
+>
 
 export function SettingsContent() {
-  const [settings, setSettings] = useState<DraftSettings>({
-    enableNotifications: true,
-    dailyReminder: false,
-    enableVAD: true,
-    autoScheduleRecovery: false,
-    localStorageOnly: true,
+  const [draft, setDraft] = useState<SettingsDraft>({
+    defaultRecordingDuration: DEFAULT_USER_SETTINGS.defaultRecordingDuration,
+    enableVAD: DEFAULT_USER_SETTINGS.enableVAD,
+    enableNotifications: DEFAULT_USER_SETTINGS.enableNotifications,
+    dailyReminderTime: undefined,
+    autoScheduleRecovery: DEFAULT_USER_SETTINGS.autoScheduleRecovery,
+    localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
+    geminiApiKey: undefined,
+    selectedGeminiVoice: undefined,
   })
 
-  // Gemini API key state
-  const [geminiApiKey, setGeminiApiKey] = useState("")
-
-  // Gemini voice state
-  const [selectedGeminiVoice, setSelectedGeminiVoice] = useState<GeminiVoice | undefined>(undefined)
+  const [baseline, setBaseline] = useState<SettingsDraft | null>(null)
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
   // Load settings from IndexedDB on mount
   useEffect(() => {
+    const fallback: SettingsDraft = {
+      defaultRecordingDuration: DEFAULT_USER_SETTINGS.defaultRecordingDuration,
+      enableVAD: DEFAULT_USER_SETTINGS.enableVAD,
+      enableNotifications: DEFAULT_USER_SETTINGS.enableNotifications,
+      dailyReminderTime: undefined,
+      autoScheduleRecovery: DEFAULT_USER_SETTINGS.autoScheduleRecovery,
+      localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
+      geminiApiKey: undefined,
+      selectedGeminiVoice: undefined,
+    }
+
     async function loadSettings() {
       try {
         const savedSettings = await db.settings.get("default")
-        if (savedSettings?.geminiApiKey) {
-          setGeminiApiKey(savedSettings.geminiApiKey)
+        const hydrated: SettingsDraft = {
+          defaultRecordingDuration: savedSettings?.defaultRecordingDuration ?? DEFAULT_USER_SETTINGS.defaultRecordingDuration,
+          enableVAD: savedSettings?.enableVAD ?? DEFAULT_USER_SETTINGS.enableVAD,
+          enableNotifications: savedSettings?.enableNotifications ?? DEFAULT_USER_SETTINGS.enableNotifications,
+          dailyReminderTime: savedSettings?.dailyReminderTime,
+          autoScheduleRecovery: savedSettings?.autoScheduleRecovery ?? DEFAULT_USER_SETTINGS.autoScheduleRecovery,
+          localStorageOnly: savedSettings?.localStorageOnly ?? DEFAULT_USER_SETTINGS.localStorageOnly,
+          geminiApiKey: savedSettings?.geminiApiKey,
+          selectedGeminiVoice: savedSettings?.selectedGeminiVoice as GeminiVoice | undefined,
         }
-        if (savedSettings?.selectedGeminiVoice) {
-          setSelectedGeminiVoice(savedSettings.selectedGeminiVoice)
-        }
+        setDraft(hydrated)
+        setBaseline(hydrated)
       } catch (error) {
         console.error("Failed to load settings:", error)
+        // If IndexedDB read fails, treat defaults as the baseline so the Save button
+        // doesn't appear "dirty" by default.
+        setBaseline((prev) => prev ?? fallback)
       }
     }
     loadSettings()
   }, [])
 
-  const handleApiKeyChange = useCallback((value: string) => {
-    setGeminiApiKey(value)
-    setSaveMessage(null)
-  }, [])
+  const normalizedDraft = useMemo((): SettingsDraft => {
+    const trimmedKey = draft.geminiApiKey?.trim() ?? ""
+    return {
+      ...draft,
+      geminiApiKey: trimmedKey.length > 0 ? trimmedKey : undefined,
+      dailyReminderTime: draft.dailyReminderTime ? draft.dailyReminderTime : undefined,
+      selectedGeminiVoice: draft.selectedGeminiVoice ?? undefined,
+    }
+  }, [draft])
+
+  const isDirty = useMemo(() => {
+    if (!baseline) return false
+    return (
+      baseline.defaultRecordingDuration !== normalizedDraft.defaultRecordingDuration ||
+      baseline.enableVAD !== normalizedDraft.enableVAD ||
+      baseline.enableNotifications !== normalizedDraft.enableNotifications ||
+      baseline.dailyReminderTime !== normalizedDraft.dailyReminderTime ||
+      baseline.autoScheduleRecovery !== normalizedDraft.autoScheduleRecovery ||
+      baseline.localStorageOnly !== normalizedDraft.localStorageOnly ||
+      baseline.geminiApiKey !== normalizedDraft.geminiApiKey ||
+      baseline.selectedGeminiVoice !== normalizedDraft.selectedGeminiVoice
+    )
+  }, [baseline, normalizedDraft])
+
+  const [isSaveReminderVisible, setIsSaveReminderVisible] = useState(false)
+  const saveReminderDismissedRef = useRef(false)
+  const prevDirtyRef = useRef(false)
+
+  useEffect(() => {
+    // Show the reminder once per "dirty session" (until saved).
+    if (!prevDirtyRef.current && isDirty) {
+      saveReminderDismissedRef.current = false
+      setIsSaveReminderVisible(true)
+    }
+
+    // Reset when changes are saved.
+    if (!isDirty) {
+      saveReminderDismissedRef.current = false
+      setIsSaveReminderVisible(false)
+    }
+
+    prevDirtyRef.current = isDirty
+  }, [isDirty])
 
   // Save settings to IndexedDB
   const handleSaveSettings = useCallback(async () => {
     setIsSaving(true)
     setSaveMessage(null)
     try {
-      // Get existing settings or create new with defaults
-      const existingSettings = await db.settings.get("default")
-
-      // Build settings object with defaults, existing values, and current UI state
-      const defaults = {
-        defaultRecordingDuration: 30,
-        calendarConnected: false,
-        preferredRecoveryTimes: [] as string[],
+      const updates: Partial<UserSettings> = {
+        defaultRecordingDuration: normalizedDraft.defaultRecordingDuration,
+        enableVAD: normalizedDraft.enableVAD,
+        enableNotifications: normalizedDraft.enableNotifications,
+        dailyReminderTime: normalizedDraft.dailyReminderTime,
+        autoScheduleRecovery: normalizedDraft.autoScheduleRecovery,
+        localStorageOnly: normalizedDraft.localStorageOnly,
+        geminiApiKey: normalizedDraft.geminiApiKey,
+        selectedGeminiVoice: normalizedDraft.selectedGeminiVoice,
       }
 
-      const updatedSettings = {
-        ...defaults,
-        ...existingSettings,
-        // Current UI state
-        enableNotifications: settings.enableNotifications,
-        dailyReminder: settings.dailyReminder,
-        enableVAD: settings.enableVAD,
-        autoScheduleRecovery: settings.autoScheduleRecovery,
-        localStorageOnly: settings.localStorageOnly,
-        // Always set id, API key, and voice
-        id: "default" as const,
-        geminiApiKey: geminiApiKey || undefined,
-        selectedGeminiVoice: selectedGeminiVoice,
+      const updated = await db.settings.update("default", updates)
+      if (updated === 0) {
+        await db.settings.put(createDefaultSettingsRecord(updates))
       }
 
-      await db.settings.put(updatedSettings)
+      setBaseline(normalizedDraft)
       setSaveMessage({ type: "success", text: "Settings saved successfully!" })
       // Clear success message after 3 seconds
       setTimeout(() => setSaveMessage(null), 3000)
@@ -104,31 +159,51 @@ export function SettingsContent() {
     } finally {
       setIsSaving(false)
     }
-  }, [settings, geminiApiKey, selectedGeminiVoice])
+  }, [normalizedDraft])
 
   return (
     <div className="w-full space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 auto-rows-max">
         <SettingsRecordingSection
-          enableVAD={settings.enableVAD}
-          onEnableVADChange={(checked) => setSettings({ ...settings, enableVAD: checked })}
+          enableVAD={draft.enableVAD}
+          onEnableVADChange={(checked) => {
+            setDraft((prev) => ({ ...prev, enableVAD: checked }))
+            setSaveMessage(null)
+          }}
+          defaultRecordingDuration={draft.defaultRecordingDuration}
+          onDefaultRecordingDurationChange={(seconds) => {
+            setDraft((prev) => ({ ...prev, defaultRecordingDuration: seconds }))
+            setSaveMessage(null)
+          }}
         />
 
         <SettingsVoiceSection
-          selectedVoice={selectedGeminiVoice}
-          onVoiceChange={setSelectedGeminiVoice}
+          selectedVoice={draft.selectedGeminiVoice}
+          onVoiceChange={(voice) => {
+            setDraft((prev) => ({ ...prev, selectedGeminiVoice: voice }))
+            setSaveMessage(null)
+          }}
         />
 
         <SettingsNotificationsSection
-          enableNotifications={settings.enableNotifications}
-          dailyReminder={settings.dailyReminder}
-          onEnableNotificationsChange={(checked) => setSettings({ ...settings, enableNotifications: checked })}
-          onDailyReminderChange={(checked) => setSettings({ ...settings, dailyReminder: checked })}
+          enableNotifications={draft.enableNotifications}
+          onEnableNotificationsChange={(checked) => {
+            setDraft((prev) => ({ ...prev, enableNotifications: checked }))
+            setSaveMessage(null)
+          }}
+          dailyReminderTime={draft.dailyReminderTime}
+          onDailyReminderTimeChange={(time) => {
+            setDraft((prev) => ({ ...prev, dailyReminderTime: time }))
+            setSaveMessage(null)
+          }}
         />
 
         <SettingsPrivacySection
-          localStorageOnly={settings.localStorageOnly}
-          onLocalStorageOnlyChange={(checked) => setSettings({ ...settings, localStorageOnly: checked })}
+          localStorageOnly={draft.localStorageOnly}
+          onLocalStorageOnlyChange={(checked) => {
+            setDraft((prev) => ({ ...prev, localStorageOnly: checked }))
+            setSaveMessage(null)
+          }}
         />
 
         <SettingsAppearanceSection />
@@ -136,13 +211,19 @@ export function SettingsContent() {
         <SettingsAccountSection isSaving={isSaving} />
 
         <SettingsCalendarSection
-          autoScheduleRecovery={settings.autoScheduleRecovery}
-          onAutoScheduleRecoveryChange={(checked) => setSettings({ ...settings, autoScheduleRecovery: checked })}
+          autoScheduleRecovery={draft.autoScheduleRecovery}
+          onAutoScheduleRecoveryChange={(checked) => {
+            setDraft((prev) => ({ ...prev, autoScheduleRecovery: checked }))
+            setSaveMessage(null)
+          }}
         />
 
         <SettingsApiSection
-          geminiApiKey={geminiApiKey}
-          onGeminiApiKeyChange={handleApiKeyChange}
+          geminiApiKey={draft.geminiApiKey ?? ""}
+          onGeminiApiKeyChange={(value) => {
+            setDraft((prev) => ({ ...prev, geminiApiKey: value }))
+            setSaveMessage(null)
+          }}
         />
 
         {/* Gemini Memory */}
@@ -171,21 +252,76 @@ export function SettingsContent() {
         </div>
       )}
 
-      <div className="flex justify-end">
-        <Button
-          onClick={handleSaveSettings}
-          disabled={isSaving}
-          className="bg-accent text-accent-foreground hover:bg-accent/90"
+      {/* Unsaved changes reminder */}
+      {isDirty && isSaveReminderVisible && !saveReminderDismissedRef.current && (
+        <div
+          className="fixed bottom-24 right-6 z-50 w-[340px] max-w-[calc(100vw-3rem)] rounded-xl border border-border bg-background/95 backdrop-blur shadow-lg"
+          role="status"
+          aria-live="polite"
         >
-          {isSaving ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            "Save Changes"
-          )}
-        </Button>
+          <div className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-full bg-accent/10 p-2 text-accent">
+                <AlertCircle className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">Don&apos;t forget to save your changes.</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Your updates won&apos;t be applied until you click Save.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  saveReminderDismissedRef.current = true
+                  setIsSaveReminderVisible(false)
+                }}
+              >
+                Dismiss
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleSaveSettings()}
+                disabled={isSaving}
+              >
+                {isSaving ? "Saving..." : "Save now"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="sticky bottom-4 z-10 rounded-lg bg-background/80 backdrop-blur border border-border/50 px-4 py-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="text-sm text-muted-foreground font-sans">
+            {isDirty ? (
+              <span className="font-medium text-foreground">You have unsaved changes.</span>
+            ) : (
+              <span>All changes saved.</span>
+            )}
+          </div>
+
+          <Button
+            onClick={handleSaveSettings}
+            disabled={isSaving || !isDirty}
+            className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              "Save Changes"
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   )

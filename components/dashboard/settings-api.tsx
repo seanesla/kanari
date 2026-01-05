@@ -55,7 +55,9 @@ export function SettingsApiSection({
 
       <div className="space-y-4">
         <div>
-          <Label className="text-base font-sans">API Key</Label>
+          <Label htmlFor="gemini-api-key" className="text-base font-sans">
+            Gemini API Key
+          </Label>
           <p className="text-sm text-muted-foreground mb-3 font-sans">
             Required for personalized suggestions. Get one from{" "}
             <a
@@ -70,6 +72,7 @@ export function SettingsApiSection({
           <div className="flex gap-2">
             <div className="relative flex-1">
               <input
+                id="gemini-api-key"
                 type={showApiKey ? "text" : "password"}
                 value={geminiApiKey}
                 onChange={(e) => handleApiKeyChange(e.target.value)}
@@ -132,4 +135,3 @@ export function SettingsApiSection({
     </div>
   )
 }
-

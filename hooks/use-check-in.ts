@@ -61,6 +61,8 @@ export interface CheckInControls {
   resumePreservedSession: () => Promise<void>
   /** Get current context fingerprint (for external invalidation checks) */
   getContextFingerprint: () => Promise<string>
+  /** Interrupt the assistant while it's speaking (barge-in) */
+  interruptAssistant: () => void
 }
 
 export interface UseCheckInOptions {
@@ -118,6 +120,12 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
     },
   })
 
+  // When the user manually interrupts the assistant, we should:
+  // - stop any currently buffered/playing output audio
+  // - suppress any additional model audio chunks for the *current* turn
+  //   (until onTurnComplete / onInterrupted fires)
+  const suppressAssistantAudioRef = useRef(false)
+
   // Gemini Live hook wiring
   const geminiControlsRef = useRef<GeminiLiveControls | null>(null)
 
@@ -166,13 +174,21 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
   // Sub-hooks
   const audio = useCheckInAudio({ dispatch, sendAudio })
 
+  const queueAssistantAudio = useCallback(
+    (base64Audio: string) => {
+      if (suppressAssistantAudioRef.current) return
+      playbackControls.queueAudio(base64Audio)
+    },
+    [playbackControls.queueAudio]
+  )
+
   const messages = useCheckInMessages({
     data,
     dispatch,
     callbacksRef: messageCallbacksRef,
     sendText,
     injectContext,
-    queueAudio: playbackControls.queueAudio,
+    queueAudio: queueAssistantAudio,
     clearQueuedAudio: playbackControls.clearQueue,
     resetAudioChunks: audio.resetAudioChunks,
     drainAudioChunks: audio.drainAudioChunks,
@@ -201,8 +217,21 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
     stateRef,
   })
 
-  const [gemini, geminiControls] = useGeminiLive({
+  // Ensure manual interruption only suppresses audio for the current assistant turn.
+  const messageHandlersWithAudioSuppression = {
     ...messages.handlers,
+    onTurnComplete: () => {
+      suppressAssistantAudioRef.current = false
+      messages.handlers.onTurnComplete()
+    },
+    onInterrupted: () => {
+      suppressAssistantAudioRef.current = false
+      messages.handlers.onInterrupted()
+    },
+  }
+
+  const [gemini, geminiControls] = useGeminiLive({
+    ...messageHandlersWithAudioSuppression,
     ...widgets.handlers,
     ...session.handlers,
   })
@@ -231,6 +260,14 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
     hasPreservedSession: session.hasPreservedSession,
     resumePreservedSession: session.resumePreservedSession,
     getContextFingerprint: session.getContextFingerprint,
+    interruptAssistant: () => {
+      suppressAssistantAudioRef.current = true
+      playbackControls.clearQueue()
+      const state = stateRef.current
+      if (state === "assistant_speaking" || state === "ai_greeting" || state === "processing") {
+        dispatch({ type: "SET_LISTENING" })
+      }
+    },
   }
 
   return [data, controls]

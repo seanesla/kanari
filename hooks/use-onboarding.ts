@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation"
 import { useLiveQuery } from "dexie-react-hooks"
 import { db } from "@/lib/storage/db"
 import type { UserSettings } from "@/lib/types"
+import { DEFAULT_USER_SETTINGS } from "@/lib/settings/default-settings"
 
 interface UseOnboardingResult {
   /** Whether onboarding data has loaded */
@@ -28,16 +29,7 @@ interface UseOnboardingResult {
   redirectIfNeeded: () => void
 }
 
-const DEFAULT_SETTINGS: UserSettings = {
-  defaultRecordingDuration: 30,
-  enableVAD: true,
-  enableNotifications: false,
-  calendarConnected: false,
-  autoScheduleRecovery: false,
-  preferredRecoveryTimes: [],
-  localStorageOnly: true,
-  hasCompletedOnboarding: false,
-}
+const DEFAULT_SETTINGS: UserSettings = DEFAULT_USER_SETTINGS
 
 export function useOnboarding(): UseOnboardingResult {
   const router = useRouter()

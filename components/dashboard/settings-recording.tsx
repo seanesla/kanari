@@ -7,11 +7,15 @@ import { Label } from "@/components/ui/label"
 interface SettingsRecordingSectionProps {
   enableVAD: boolean
   onEnableVADChange: (checked: boolean) => void
+  defaultRecordingDuration: number
+  onDefaultRecordingDurationChange: (seconds: number) => void
 }
 
 export function SettingsRecordingSection({
   enableVAD,
   onEnableVADChange,
+  defaultRecordingDuration,
+  onDefaultRecordingDurationChange,
 }: SettingsRecordingSectionProps) {
   return (
     <div className="rounded-lg border border-border bg-card p-6">
@@ -34,15 +38,23 @@ export function SettingsRecordingSection({
             id="enable-vad"
             checked={enableVAD}
             onCheckedChange={onEnableVADChange}
+            aria-label="Voice Activity Detection"
           />
         </div>
 
         <div>
-          <Label className="text-base font-sans">Default Check-in Duration</Label>
+          <Label htmlFor="default-check-in-duration" className="text-base font-sans">
+            Default Check-in Duration
+          </Label>
           <p className="text-sm text-muted-foreground mb-3 font-sans">
             Recommended duration for voice check-ins
           </p>
-          <select className="h-10 w-32 rounded-md border border-border bg-background px-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent font-sans">
+          <select
+            id="default-check-in-duration"
+            value={String(defaultRecordingDuration)}
+            onChange={(e) => onDefaultRecordingDurationChange(Number(e.target.value))}
+            className="h-10 w-32 rounded-md border border-border bg-background px-3 text-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent font-sans"
+          >
             <option value="30">30 seconds</option>
             <option value="45">45 seconds</option>
             <option value="60">60 seconds</option>
