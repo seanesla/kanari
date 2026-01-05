@@ -48,6 +48,7 @@ const LIVE_MODEL = "gemini-2.5-flash-native-audio-preview-12-2025"
 export interface SessionContext {
   contextSummary?: SystemContextSummary
   timeContext?: SystemTimeContext
+  voiceName?: string // Gemini TTS voice name (e.g., "Aoede", "Sulafat")
 }
 
 export type GeminiWidgetEvent =
@@ -333,6 +334,16 @@ export class GeminiLiveClient {
 
       const ai = new GoogleGenAI({ apiKey })
 
+      // Build speechConfig if voice is specified
+      // Source: Context7 - /googleapis/js-genai docs - "SpeechConfig Interface"
+      const speechConfig = context?.voiceName
+        ? {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: context.voiceName },
+            },
+          }
+        : undefined
+
       connectPromise = ai.live.connect({
         model: LIVE_MODEL,
         config: {
@@ -341,6 +352,7 @@ export class GeminiLiveClient {
           inputAudioTranscription: {},
           systemInstruction,
           tools: GEMINI_TOOLS,
+          ...(speechConfig && { speechConfig }),
         },
         callbacks: {
           onopen: () => {

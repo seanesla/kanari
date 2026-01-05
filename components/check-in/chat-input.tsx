@@ -9,7 +9,8 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import { Send } from "lucide-react"
+import { Send, Mic, MicOff } from "lucide-react"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
@@ -27,9 +28,13 @@ interface ChatInputProps {
   onTriggerTool: (toolName: string, args: Record<string, unknown>) => void
   /** Whether the input is disabled */
   disabled?: boolean
+  /** Whether the microphone is muted */
+  isMuted?: boolean
+  /** Called when user toggles mute */
+  onToggleMute?: () => void
 }
 
-export function ChatInput({ onSendText, onTriggerTool, disabled }: ChatInputProps) {
+export function ChatInput({ onSendText, onTriggerTool, disabled, isMuted, onToggleMute }: ChatInputProps) {
   const [value, setValue] = useState("")
   const [showCommandMenu, setShowCommandMenu] = useState(false)
   const [selectedTool, setSelectedTool] = useState<ManualToolConfig | null>(null)
@@ -133,64 +138,85 @@ export function ChatInput({ onSendText, onTriggerTool, disabled }: ChatInputProp
   const searchValue = value.startsWith("/") ? value.slice(1) : ""
 
   return (
-    <div className="px-4 py-3">
-      <div
-        className="relative rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 group"
-        onMouseMove={glow.onMouseMove}
-        onMouseLeave={glow.onMouseLeave}
-        style={{
-          ...glow.style,
-          boxShadow:
-            "inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)",
-        }}
-      >
-        <CursorBorderGlow
-          className="rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-          size={260}
-          borderWidth={2}
-        />
-        <Popover open={showCommandMenu} onOpenChange={setShowCommandMenu}>
-          <div className="flex items-center gap-2 p-3">
-            {/* Tool picker button */}
-            <ToolPickerButton onSelect={handleToolSelect} disabled={disabled} />
+    <div
+      className="relative w-full p-4 rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 group"
+      onMouseMove={glow.onMouseMove}
+      onMouseLeave={glow.onMouseLeave}
+      style={{
+        ...glow.style,
+        boxShadow:
+          "inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)",
+      }}
+    >
+      <CursorBorderGlow
+        className="rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+        size={260}
+        borderWidth={2}
+      />
+      <Popover open={showCommandMenu} onOpenChange={setShowCommandMenu}>
+        <div className="flex items-center gap-2 w-full px-4 py-3 rounded-xl border border-white/10 bg-[rgba(255,255,255,0.02)] text-left hover:border-white/20 hover:bg-[rgba(255,255,255,0.04)] transition-all">
+          {/* Tool picker button */}
+          <ToolPickerButton onSelect={handleToolSelect} disabled={disabled} />
 
-            {/* Input field with popover anchor */}
-            <PopoverAnchor asChild>
-              <Input
-                ref={inputRef}
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Type a message or / for tools..."
-                disabled={disabled}
-                className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-              />
-            </PopoverAnchor>
+          {/* Input field with popover anchor */}
+          <PopoverAnchor asChild>
+            <Input
+              ref={inputRef}
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type a message or / for tools..."
+              disabled={disabled}
+              className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+          </PopoverAnchor>
 
-            {/* Send button */}
+          {/* Mute button - only show if onToggleMute is provided */}
+          {onToggleMute && (
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 shrink-0 hover:bg-white/5"
-              onClick={handleSend}
-              disabled={disabled || !value.trim() || value.startsWith("/")}
+              className={cn(
+                "h-9 w-9 shrink-0 rounded-full transition-all duration-200 hover:scale-110 active:scale-100",
+                isMuted
+                  ? "bg-red-500 hover:bg-red-600 text-white ring-2 ring-red-500/30"
+                  : "hover:bg-white/5"
+              )}
+              onClick={onToggleMute}
+              aria-pressed={!!isMuted}
             >
-              <Send className="h-4 w-4" />
-              <span className="sr-only">Send message</span>
+              {isMuted ? (
+                <MicOff className="h-4 w-4" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
+              <span className="sr-only">{isMuted ? "Unmute" : "Mute"}</span>
             </Button>
-          </div>
+          )}
 
-          {/* Command menu popup */}
-          <PopoverContent
-            side="top"
-            align="start"
-            className="p-0 w-[300px]"
-            onOpenAutoFocus={(e) => e.preventDefault()}
+          {/* Send button */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 hover:bg-white/5"
+            onClick={handleSend}
+            disabled={disabled || !value.trim() || value.startsWith("/")}
           >
-            <ToolCommandMenu searchValue={searchValue} onSelect={handleToolSelect} />
-          </PopoverContent>
-        </Popover>
-      </div>
+            <Send className="h-4 w-4" />
+            <span className="sr-only">Send message</span>
+          </Button>
+        </div>
+
+        {/* Command menu popup */}
+        <PopoverContent
+          side="top"
+          align="start"
+          className="p-0 w-[300px]"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <ToolCommandMenu searchValue={searchValue} onSelect={handleToolSelect} />
+        </PopoverContent>
+      </Popover>
     </div>
   )
 }

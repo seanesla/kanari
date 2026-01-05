@@ -7,8 +7,9 @@
  * Coordinates the full voice conversation experience.
  */
 
-import { useCallback } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { logDebug, logError } from "@/lib/logger"
+import { db } from "@/lib/storage/db"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   Dialog,
@@ -17,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X, Phone, PhoneOff, Mic, MicOff } from "lucide-react"
+import { X, Phone, PhoneOff, MicOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
 import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
@@ -33,7 +34,8 @@ import {
   StressGauge,
 } from "./widgets"
 import { ChatInput } from "./chat-input"
-import type { CheckInSession } from "@/lib/types"
+import { VoicePicker } from "./voice-picker"
+import type { CheckInSession, GeminiVoice } from "@/lib/types"
 import type { InitPhase } from "@/hooks/check-in/state"
 
 /**
@@ -71,6 +73,55 @@ export function CheckInDialog({
   const { addCheckInSession } = useCheckInSessionActions()
 
   const canStart = useStrictModeReady(open)
+
+  // Voice selection state - null = loading, undefined = no voice, string = has voice
+  const [hasVoice, setHasVoice] = useState<boolean | null>(null)
+  const [isSavingVoice, setIsSavingVoice] = useState(false)
+
+  // Check if user has selected a voice when dialog opens
+  useEffect(() => {
+    if (!open) {
+      // Reset on close so we re-check next time
+      setHasVoice(null)
+      return
+    }
+
+    async function checkVoice() {
+      try {
+        const settings = await db.settings.get("default")
+        setHasVoice(!!settings?.selectedGeminiVoice)
+      } catch {
+        // If settings read fails, assume no voice (will prompt user)
+        setHasVoice(false)
+      }
+    }
+    checkVoice()
+  }, [open])
+
+  // Handle voice selection from picker
+  const handleVoiceSelected = useCallback(async (voice: GeminiVoice) => {
+    setIsSavingVoice(true)
+    try {
+      const existingSettings = await db.settings.get("default")
+      await db.settings.put({
+        id: "default",
+        defaultRecordingDuration: 30,
+        enableVAD: true,
+        enableNotifications: true,
+        calendarConnected: false,
+        autoScheduleRecovery: false,
+        preferredRecoveryTimes: [],
+        localStorageOnly: true,
+        ...existingSettings,
+        selectedGeminiVoice: voice,
+      })
+      setHasVoice(true)
+    } catch (error) {
+      logError("CheckInDialog", "Failed to save voice selection:", error)
+    } finally {
+      setIsSavingVoice(false)
+    }
+  }, [])
 
   const [checkIn, controls] = useCheckIn({
     onSessionEnd: async (session) => {
@@ -167,18 +218,36 @@ export function CheckInDialog({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
-                <VoiceIndicatorLarge state="idle" audioLevel={0} initPhase={null} />
-                <p className="text-sm text-muted-foreground text-center">
-                  Tap start to begin your voice check-in.
-                </p>
-                <Button
-                  onClick={async () => {
-                    await controls.startSession({ userGesture: true })
-                  }}
-                  disabled={!canStart}
-                >
-                  {canStart ? "Start" : "Preparing..."}
-                </Button>
+                {/* Loading voice check */}
+                {hasVoice === null && (
+                  <p className="text-sm text-muted-foreground">Preparing...</p>
+                )}
+
+                {/* No voice selected - show picker */}
+                {hasVoice === false && (
+                  <VoicePicker
+                    onVoiceSelected={handleVoiceSelected}
+                    isLoading={isSavingVoice}
+                  />
+                )}
+
+                {/* Has voice - show normal start UI */}
+                {hasVoice === true && (
+                  <>
+                    <VoiceIndicatorLarge state="idle" audioLevel={0} initPhase={null} />
+                    <p className="text-sm text-muted-foreground text-center">
+                      Tap start to begin your voice check-in.
+                    </p>
+                    <Button
+                      onClick={async () => {
+                        await controls.startSession({ userGesture: true })
+                      }}
+                      disabled={!canStart}
+                    >
+                      {canStart ? "Start" : "Preparing..."}
+                    </Button>
+                  </>
+                )}
               </motion.div>
             )}
 
@@ -392,47 +461,32 @@ export function CheckInDialog({
           </AnimatePresence>
         </div>
 
-        {/* Footer with chat input and controls */}
+        {/* Footer with chat input and hang up button */}
         {showConversation && (
-          <div className="flex-shrink-0 border-t bg-muted/30">
-            {/* Chat input for text messages and tool triggers */}
-            <ChatInput
-              onSendText={(text) => controls.sendTextMessage(text)}
-              onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
-              disabled={!checkIn.isActive}
-            />
+          <div className="flex-shrink-0 border-t">
+            <div className="px-4 py-3">
+              <div className="relative mx-auto w-full max-w-2xl">
+                {/* Reserve space on the right so the floating hang up button doesn't overlap the bar */}
+                <div className="pr-20">
+                  <ChatInput
+                    onSendText={(text) => controls.sendTextMessage(text)}
+                    onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
+                    disabled={!checkIn.isActive}
+                    isMuted={checkIn.isMuted}
+                    onToggleMute={() => controls.toggleMute()}
+                  />
+                </div>
 
-            {/* Voice controls */}
-            <div className="px-6 py-3 flex items-center justify-center gap-4">
-              {/* Mute button */}
-              <Button
-                variant="outline"
-                size="icon"
-                className={cn(
-                  "h-12 w-12 rounded-full",
-                  checkIn.isMuted && "bg-red-500 hover:bg-red-600 text-white"
-                )}
-                onClick={() => controls.toggleMute()}
-              >
-                {checkIn.isMuted ? (
-                  <MicOff className="h-5 w-5" />
-                ) : (
-                  <Mic className="h-5 w-5" />
-                )}
-              </Button>
-
-              {/* End call button */}
-              <Button
-                variant="destructive"
-                size="icon"
-                className="h-14 w-14 rounded-full"
-                onClick={handleEndCall}
-              >
-                <PhoneOff className="h-6 w-6" />
-              </Button>
-
-              {/* Placeholder for symmetry */}
-              <div className="h-12 w-12" />
+                {/* Floating hang up button (outside the input bar) */}
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 h-14 w-14 rounded-full shadow-lg"
+                  onClick={handleEndCall}
+                >
+                  <PhoneOff className="h-6 w-6" />
+                </Button>
+              </div>
             </div>
           </div>
         )}

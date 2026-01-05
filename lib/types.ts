@@ -319,6 +319,40 @@ export interface RecoveryBlock {
 
 export type CoachVoice = 'warm' | 'professional' | 'minimal'
 
+// Gemini TTS voice options (30 prebuilt voices)
+// Source: Context7 - /websites/ai_google_dev_gemini-api docs - "Speech generation"
+export type GeminiVoice =
+  | "Zephyr"      // Bright
+  | "Puck"        // Upbeat
+  | "Charon"      // Informative
+  | "Kore"        // Firm
+  | "Fenrir"      // Excitable
+  | "Leda"        // Youthful
+  | "Orus"        // Firm
+  | "Aoede"       // Breezy
+  | "Callirrhoe"  // Easy-going
+  | "Autonoe"     // Bright
+  | "Enceladus"   // Breathy
+  | "Iapetus"     // Clear
+  | "Umbriel"     // Easy-going
+  | "Algieba"     // Smooth
+  | "Despina"     // Smooth
+  | "Erinome"     // Clear
+  | "Algenib"     // Gravelly
+  | "Rasalgethi"  // Informative
+  | "Laomedeia"   // Upbeat
+  | "Achernar"    // Soft
+  | "Alnilam"     // Firm
+  | "Schedar"     // Even
+  | "Gacrux"      // Mature
+  | "Pulcherrima" // Forward
+  | "Achird"      // Friendly
+  | "Zubenelgenubi" // Casual
+  | "Vindemiatrix"  // Gentle
+  | "Sadachbia"   // Lively
+  | "Sadaltager"  // Knowledgeable
+  | "Sulafat"     // Warm
+
 // Font family options
 export type FontFamily =
   | "Instrument Sans"
@@ -378,6 +412,8 @@ export interface UserSettings {
   localStorageOnly: boolean
   // Coach preferences
   coachVoice?: CoachVoice
+  // AI Voice (Gemini TTS)
+  selectedGeminiVoice?: GeminiVoice // User's chosen AI assistant voice
   // Appearance
   accentColor?: string // Hex color string (e.g., "#d4a574")
   selectedSansFont?: FontFamily

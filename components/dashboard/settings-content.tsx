@@ -11,7 +11,9 @@ import { SettingsCalendarSection } from "./settings-calendar"
 import { SettingsNotificationsSection } from "./settings-notifications"
 import { SettingsPrivacySection } from "./settings-privacy"
 import { SettingsRecordingSection } from "./settings-recording"
+import { SettingsVoiceSection } from "./settings-voice-section"
 import { db } from "@/lib/storage/db"
+import type { GeminiVoice } from "@/lib/types"
 
 type DraftSettings = {
   enableNotifications: boolean
@@ -33,6 +35,9 @@ export function SettingsContent() {
   // Gemini API key state
   const [geminiApiKey, setGeminiApiKey] = useState("")
 
+  // Gemini voice state
+  const [selectedGeminiVoice, setSelectedGeminiVoice] = useState<GeminiVoice | undefined>(undefined)
+
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
@@ -43,6 +48,9 @@ export function SettingsContent() {
         const savedSettings = await db.settings.get("default")
         if (savedSettings?.geminiApiKey) {
           setGeminiApiKey(savedSettings.geminiApiKey)
+        }
+        if (savedSettings?.selectedGeminiVoice) {
+          setSelectedGeminiVoice(savedSettings.selectedGeminiVoice)
         }
       } catch (error) {
         console.error("Failed to load settings:", error)
@@ -80,9 +88,10 @@ export function SettingsContent() {
         enableVAD: settings.enableVAD,
         autoScheduleRecovery: settings.autoScheduleRecovery,
         localStorageOnly: settings.localStorageOnly,
-        // Always set id and API key
+        // Always set id, API key, and voice
         id: "default" as const,
         geminiApiKey: geminiApiKey || undefined,
+        selectedGeminiVoice: selectedGeminiVoice,
       }
 
       await db.settings.put(updatedSettings)
@@ -95,7 +104,7 @@ export function SettingsContent() {
     } finally {
       setIsSaving(false)
     }
-  }, [settings, geminiApiKey])
+  }, [settings, geminiApiKey, selectedGeminiVoice])
 
   return (
     <div className="w-full space-y-8">
@@ -103,6 +112,11 @@ export function SettingsContent() {
         <SettingsRecordingSection
           enableVAD={settings.enableVAD}
           onEnableVADChange={(checked) => setSettings({ ...settings, enableVAD: checked })}
+        />
+
+        <SettingsVoiceSection
+          selectedVoice={selectedGeminiVoice}
+          onVoiceChange={setSelectedGeminiVoice}
         />
 
         <SettingsNotificationsSection

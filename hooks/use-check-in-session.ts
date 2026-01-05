@@ -3,8 +3,11 @@
 import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch, MutableRefObject } from "react"
 import { processAudio } from "@/lib/audio/processor"
+import { db } from "@/lib/storage/db"
 import { computeContextFingerprint } from "@/lib/gemini/context-fingerprint"
+import { fetchCheckInContext, formatContextForAPI } from "@/lib/gemini/check-in-context"
 import { logWarn } from "@/lib/logger"
+import { createGeminiHeaders } from "@/lib/utils"
 import {
   consumePreservedSession,
   clearPreservedSession,
@@ -22,6 +25,41 @@ function createTimeoutError(message: string): Error {
   const err = new Error(message)
   err.name = "TimeoutError"
   return err
+}
+
+function getTimeOfDay(hour: number): "morning" | "afternoon" | "evening" | "night" {
+  if (hour >= 5 && hour < 12) return "morning"
+  if (hour >= 12 && hour < 17) return "afternoon"
+  if (hour >= 17 && hour < 21) return "evening"
+  return "night"
+}
+
+function formatUserLocalTime(now: Date): string {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone
+  const formatted = new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "2-digit",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZoneName: "short",
+  }).format(now)
+
+  return timeZone ? `${formatted} (${timeZone})` : formatted
+}
+
+function buildFallbackTimeContext(): NonNullable<SessionContext["timeContext"]> {
+  const now = new Date()
+  const dayOfWeek = new Intl.DateTimeFormat(undefined, { weekday: "long" }).format(now)
+
+  return {
+    currentTime: formatUserLocalTime(now),
+    dayOfWeek,
+    timeOfDay: getTimeOfDay(now.getHours()),
+    daysSinceLastCheckIn: null,
+  }
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
@@ -159,6 +197,62 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         dispatch({ type: "SET_SESSION", session })
         sessionStartRef.current = session.startedAt
 
+        // Build time context (and optional historical summary) for Gemini systemInstruction.
+        // Pattern doc: docs/error-patterns/utc-local-time-mismatch-in-prompts.md
+        const fallbackTimeContext = buildFallbackTimeContext()
+        const contextPromise = (async () => {
+          try {
+            const contextData = await fetchCheckInContext()
+
+            const timeContext = {
+              currentTime: contextData.timeContext.currentTime,
+              dayOfWeek: contextData.timeContext.dayOfWeek,
+              timeOfDay: contextData.timeContext.timeOfDay,
+              daysSinceLastCheckIn: contextData.timeContext.daysSinceLastCheckIn,
+            } satisfies NonNullable<SessionContext["timeContext"]>
+
+            // Fetch an optional context summary (Gemini Flash) for a personalized greeting.
+            // Failures here should NOT block the live session starting.
+            let contextSummary: SessionContext["contextSummary"] | undefined
+            try {
+              const requestBody = formatContextForAPI(contextData)
+              const headers = await createGeminiHeaders({ "Content-Type": "application/json" })
+
+              const response = await fetch("/api/gemini/check-in-context", {
+                method: "POST",
+                headers,
+                body: JSON.stringify(requestBody),
+              })
+
+              if (response.ok) {
+                const json = (await response.json()) as { summary?: unknown }
+                const summary = (json as { summary?: unknown }).summary as
+                  | { patternSummary?: unknown; keyObservations?: unknown; contextNotes?: unknown }
+                  | undefined
+
+                if (
+                  summary &&
+                  typeof summary.patternSummary === "string" &&
+                  Array.isArray(summary.keyObservations) &&
+                  typeof summary.contextNotes === "string"
+                ) {
+                  contextSummary = {
+                    patternSummary: summary.patternSummary,
+                    keyObservations: summary.keyObservations as string[],
+                    contextNotes: summary.contextNotes,
+                  }
+                }
+              }
+            } catch {
+              // Ignore summary failures - timeContext is still valuable.
+            }
+
+            return { timeContext, contextSummary }
+          } catch {
+            return { timeContext: fallbackTimeContext, contextSummary: undefined }
+          }
+        })()
+
         // If this startSession isn't called within a user activation (e.g., auto-start in a useEffect),
         // yield once so React unmount/cleanup (StrictMode) can abort before we allocate AudioContexts/worklets.
         // When called from a click/tap handler, avoid yielding before audio init to satisfy autoplay policies.
@@ -209,9 +303,35 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         dispatch({ type: "SET_INIT_PHASE", phase: "connecting_gemini" })
         dispatch({ type: "SET_CONNECTING" })
 
-        // Connect to Gemini (context is optional; avoid blocking on IndexedDB history).
+        // Load user's voice preference from settings (fast IndexedDB read)
+        let voiceName: string | undefined
+        try {
+          const settings = await db.settings.get("default")
+          voiceName = settings?.selectedGeminiVoice
+        } catch {
+          // If settings read fails, continue without voice preference
+        }
+
+        // Prefer full time context + optional summary (but never block startup indefinitely).
+        let timeContext: NonNullable<SessionContext["timeContext"]> = fallbackTimeContext
+        let contextSummary: SessionContext["contextSummary"] | undefined
+        try {
+          const ctx = await withTimeout(contextPromise, 15_000, "Context generation timed out")
+          timeContext = ctx.timeContext ?? timeContext
+          contextSummary = ctx.contextSummary
+        } catch {
+          // Keep fallback timeContext; proceed without summary.
+        }
+
+        const sessionContext: SessionContext = {
+          timeContext,
+          ...(contextSummary ? { contextSummary } : {}),
+          ...(voiceName ? { voiceName } : {}),
+        }
+
+        // Connect to Gemini with voice context
         await withTimeout(
-          gemini.connect(undefined),
+          gemini.connect(sessionContext),
           45_000,
           "Gemini connection timed out. Check your API key and network, then try again."
         )

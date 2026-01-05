@@ -184,7 +184,14 @@ describe("useCheckIn session lifecycle", () => {
 
     expect(result.current[0].session?.id).toEqual(expect.any(String))
     expect(onSessionStart).toHaveBeenCalledWith(expect.objectContaining({ id: expect.any(String) }))
-    expect(connectMock).toHaveBeenCalled()
+    expect(connectMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        timeContext: expect.objectContaining({
+          dayOfWeek: "Monday",
+          timeOfDay: "morning",
+        }),
+      })
+    )
   })
 
   it("ends a session and calls onSessionEnd", async () => {

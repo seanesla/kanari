@@ -31,7 +31,7 @@ import { useCallback, useEffect } from "react"
 import { logDebug, logError, logWarn } from "@/lib/logger"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { Phone, PhoneOff, Mic, MicOff } from "lucide-react"
+import { Phone, PhoneOff, MicOff } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
 import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
@@ -476,46 +476,30 @@ export function AIChatContent({
         {/* ===== FOOTER CONTROLS ===== */}
         {/* Only shown during active conversation (not during init/complete/error) */}
         {showConversation && (
-          <div className="flex-shrink-0 border-t bg-muted/30">
-            <ChatInput
-              onSendText={(text) => controls.sendTextMessage(text)}
-              onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
-              disabled={!checkIn.isActive}
-            />
+          <div className="flex-shrink-0 border-t">
+            <div className="px-4 py-3">
+              <div className="relative mx-auto w-full max-w-2xl">
+                {/* Reserve space on the right so the floating hang up button doesn't overlap the bar */}
+                <div className="pr-20">
+                  <ChatInput
+                    onSendText={(text) => controls.sendTextMessage(text)}
+                    onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
+                    disabled={!checkIn.isActive}
+                    isMuted={checkIn.isMuted}
+                    onToggleMute={() => controls.toggleMute()}
+                  />
+                </div>
 
-            <div className="px-6 py-3 flex items-center justify-center gap-4">
-              {/*
-                Mute button - toggles microphone on/off
-                Red background when muted to clearly indicate state
-              */}
-              <Button
-                variant="outline"
-                size="icon"
-                className={cn(
-                  "h-12 w-12 rounded-full",
-                  checkIn.isMuted && "bg-red-500 hover:bg-red-600 text-white"
-                )}
-                onClick={() => controls.toggleMute()}
-              >
-                {checkIn.isMuted ? (
-                  <MicOff className="h-5 w-5" />
-                ) : (
-                  <Mic className="h-5 w-5" />
-                )}
-              </Button>
-
-              {/*
-                End call button - large red button to end the conversation
-                Triggers graceful session end and saves to database
-              */}
-              <Button
-                variant="destructive"
-                size="icon"
-                className="h-14 w-14 rounded-full"
-                onClick={handleEndCall}
-              >
-                <PhoneOff className="h-6 w-6" />
-              </Button>
+                {/* Floating hang up button (outside the input bar) */}
+                <Button
+                  variant="destructive"
+                  size="icon"
+                  className="absolute right-0 top-1/2 -translate-y-1/2 h-14 w-14 rounded-full shadow-lg"
+                  onClick={handleEndCall}
+                >
+                  <PhoneOff className="h-6 w-6" />
+                </Button>
+              </div>
             </div>
           </div>
         )}
