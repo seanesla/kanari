@@ -32,7 +32,7 @@ import { useRouter } from "next/navigation"
 import { logDebug, logError, logWarn } from "@/lib/logger"
 import { motion, AnimatePresence } from "framer-motion"
 import { Button } from "@/components/ui/button"
-import { PhoneOff, MicOff } from "lucide-react"
+import { PhoneOff, MicOff, Square } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
 import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
@@ -81,6 +81,8 @@ interface CheckInAIChatProps {
   onSessionChange?: (isActive: boolean) => void
   /** Called when the conversation session is saved to IndexedDB */
   onSessionComplete?: (session: CheckInSession) => void
+  /** Visual chrome variant for embedding contexts */
+  chrome?: "default" | "glass"
   /** When true, parent is requesting to discard the session */
   requestDiscard?: boolean
   /** Called after session has been cancelled due to discard request */
@@ -91,9 +93,11 @@ export function AIChatContent({
   onClose,
   onSessionChange,
   onSessionComplete,
+  chrome = "default",
   requestDiscard,
   onDiscardComplete,
 }: CheckInAIChatProps) {
+  const isGlassChrome = chrome === "glass"
   // Hook to save completed sessions to IndexedDB
   const router = useRouter()
   const { addCheckInSession, updateCheckInSession } = useCheckInSessionActions()
@@ -301,6 +305,7 @@ export function AIChatContent({
   ].includes(checkIn.state)
 
   const showInitializing = ["initializing", "connecting"].includes(checkIn.state)
+  const canInterruptAssistant = checkIn.state === "assistant_speaking"
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -355,7 +360,12 @@ export function AIChatContent({
             exit={{ opacity: 0 }}
           >
             {/* Compact status indicator with colored dot */}
-            <div className="flex-shrink-0 flex justify-center border-b py-3">
+            <div
+              className={cn(
+                "flex-shrink-0 flex justify-center border-b py-3",
+                isGlassChrome && "border-white/10"
+              )}
+            >
               <div className="flex items-center gap-2">
                 <div
                   className={cn(
@@ -378,12 +388,34 @@ export function AIChatContent({
                         ? "Thinking..."
                         : "Ready"}
                 </span>
+                {canInterruptAssistant && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 ml-2 gap-2"
+                    onClick={() => controls.interruptAssistant()}
+                  >
+                    <Square className="h-4 w-4 fill-current" />
+                    Interrupt
+                  </Button>
+                )}
               </div>
             </div>
 
             {/* Real-time biomarker panel */}
-            <div className="px-6 py-3 border-b border-border/50 bg-background/40">
-              <BiomarkerIndicator metrics={checkIn.session?.acousticMetrics} />
+            <div
+              className={cn(
+                "px-6 py-3 border-b",
+                isGlassChrome
+                  ? "border-white/10 bg-transparent"
+                  : "border-border/50 bg-background/40"
+              )}
+            >
+              <BiomarkerIndicator
+                metrics={checkIn.session?.acousticMetrics}
+                className={isGlassChrome ? "border-white/10 bg-transparent" : undefined}
+              />
             </div>
 
             {/*
@@ -401,7 +433,12 @@ export function AIChatContent({
 
             {/* Gemini-triggered widgets */}
             {checkIn.widgets.length > 0 && (
-              <div className="flex-shrink-0 border-t bg-background/60 p-4 space-y-3 overflow-y-auto max-h-[260px]">
+              <div
+                className={cn(
+                  "flex-shrink-0 border-t p-4 space-y-3 overflow-y-auto max-h-[260px]",
+                  isGlassChrome ? "border-white/10 bg-transparent" : "bg-background/60"
+                )}
+              >
                 <AnimatePresence initial={false}>
                   {checkIn.widgets.map((widget) => {
                     switch (widget.type) {
@@ -516,13 +553,18 @@ export function AIChatContent({
         {/* ===== FOOTER CONTROLS ===== */}
         {/* Only shown during active conversation (not during init/complete/error) */}
         {showConversation && (
-          <div className="flex-shrink-0 border-t">
+          <div className={cn("flex-shrink-0 border-t", isGlassChrome && "border-white/10")}>
             <div className="px-4 py-3">
               <div className="relative mx-auto w-full max-w-2xl">
                 {/* Reserve space on the right so the floating hang up button doesn't overlap the bar */}
                 <div className="pr-20">
                   <ChatInput
-                    onSendText={(text) => controls.sendTextMessage(text)}
+                    onSendText={(text) => {
+                      if (checkIn.state === "assistant_speaking") {
+                        controls.interruptAssistant()
+                      }
+                      controls.sendTextMessage(text)
+                    }}
                     onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
                     disabled={!checkIn.isActive}
                     isMuted={checkIn.isMuted}

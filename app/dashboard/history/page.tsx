@@ -227,28 +227,42 @@ function NewCheckInContent({
   onSessionChange: (active: boolean) => void
 }) {
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-accent/30">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-full bg-accent/10">
-            <Sparkles className="h-5 w-5 text-accent" />
-          </div>
-          <h2 className="text-lg font-semibold">New Check-in</h2>
-        </div>
-        {!isSessionActive && (
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancel
-          </Button>
+    <div className={cn("flex flex-col h-full", isSessionActive && "p-3 md:p-4")}>
+      <div
+        className={cn(
+          "flex flex-col h-full",
+          isSessionActive &&
+            "rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 overflow-hidden shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(0,0,0,0.02),0_8px_32px_rgba(0,0,0,0.25),0_2px_8px_rgba(0,0,0,0.1)]"
         )}
-      </div>
+      >
+        {/* Header */}
+        <div
+          className={cn(
+            "flex items-center justify-between px-6 py-4 border-b",
+            isSessionActive ? "border-white/10" : "border-accent/30"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-full bg-accent/10">
+              <Sparkles className="h-5 w-5 text-accent" />
+            </div>
+            <h2 className="text-lg font-semibold">New Check-in</h2>
+          </div>
+          {!isSessionActive && (
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              Cancel
+            </Button>
+          )}
+        </div>
 
-      <div className="flex-1 overflow-hidden">
-        <AIChatContent
-          onClose={onClose}
-          onSessionChange={onSessionChange}
-          onSessionComplete={onSessionComplete}
-        />
+        <div className="flex-1 overflow-hidden">
+          <AIChatContent
+            onClose={onClose}
+            onSessionChange={onSessionChange}
+            onSessionComplete={onSessionComplete}
+            chrome={isSessionActive ? "glass" : "default"}
+          />
+        </div>
       </div>
     </div>
   )
