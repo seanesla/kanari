@@ -446,7 +446,6 @@ function HistoryPageContent() {
   const handleSessionComplete = useCallback((session: CheckInSession) => {
     setHighlightedItemId(session.id)
     setSelectedItemId(session.id)
-    setIsCreatingNew(false)
     setIsSessionActive(false)
   }, [])
 

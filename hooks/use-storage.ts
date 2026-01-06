@@ -510,13 +510,14 @@ export function useCheckInSessionActions() {
 
   /**
    * Delete all check-in sessions where user never participated.
-   * With AI-speaks-first, 0-1 messages = no real conversation happened.
+   * With AI-speaks-first, message count alone is not reliable; preserve sessions with voice metrics.
+   * Pattern doc: docs/error-patterns/check-in-results-missing-on-disconnect.md
    * Returns the number of deleted sessions.
    */
   const deleteIncompleteSessions = useCallback(async () => {
     const allSessions = await db.checkInSessions.toArray()
     const incompleteSessionIds = allSessions
-      .filter(session => !session.messages || session.messages.length <= 1)
+      .filter(session => (!session.messages || session.messages.length <= 1) && !session.acousticMetrics)
       .map(session => session.id)
 
     if (incompleteSessionIds.length > 0) {

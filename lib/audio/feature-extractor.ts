@@ -17,6 +17,7 @@ const DEFAULT_HOP_SIZE = 256
 const YIN_THRESHOLD = 0.15 // Confidence threshold for pitch detection
 const MIN_PITCH_HZ = 50 // Minimum detectable pitch (low male voice)
 const MAX_PITCH_HZ = 500 // Maximum detectable pitch (high female voice)
+const DEFAULT_SPECTRAL_ROLLOFF_PERCENT = 0.85
 
 /**
  * Extract audio features from raw audio data using Meyda
@@ -71,6 +72,132 @@ export class FeatureExtractor {
   }
 
   /**
+   * Calculate RMS energy of a frame
+   */
+  private calculateRms(frame: Float32Array): number {
+    if (frame.length === 0) return 0
+
+    let sumSquares = 0
+    for (let i = 0; i < frame.length; i++) {
+      const s = frame[i]
+      sumSquares += s * s
+    }
+
+    return Math.sqrt(sumSquares / frame.length)
+  }
+
+  /**
+   * Calculate zero crossing rate (normalized 0..1)
+   */
+  private calculateZcr(frame: Float32Array): number {
+    if (frame.length < 2) return 0
+
+    let crossings = 0
+    let prev = frame[0] ?? 0
+    for (let i = 1; i < frame.length; i++) {
+      const current = frame[i] ?? 0
+      if ((prev >= 0 && current < 0) || (prev < 0 && current >= 0)) {
+        crossings++
+      }
+      prev = current
+    }
+
+    return crossings / frame.length
+  }
+
+  private sumSpectrum(spectrum: ArrayLike<number>): number {
+    let sum = 0
+    for (let i = 0; i < spectrum.length; i++) {
+      const v = spectrum[i] ?? 0
+      if (Number.isFinite(v)) sum += Math.abs(v)
+    }
+    return sum
+  }
+
+  /**
+   * Calculate spectral centroid as a normalized value (0..1).
+   *
+   * We compute this manually from the amplitude spectrum to ensure consistent units
+   * across environments (Meyda output has differed between runtimes).
+   *
+   * Pattern doc: docs/error-patterns/voice-feature-unit-mismatch-causes-stuck-scores.md
+   */
+  private calculateSpectralCentroidNormalized(spectrum: ArrayLike<number>): number {
+    const total = this.sumSpectrum(spectrum)
+    if (total <= 0) return 0
+
+    let weightedIndexSum = 0
+    for (let i = 0; i < spectrum.length; i++) {
+      const v = spectrum[i] ?? 0
+      if (!Number.isFinite(v)) continue
+      weightedIndexSum += i * Math.abs(v)
+    }
+
+    // Convert bin index to normalized frequency: f_norm = (i * sampleRate / bufferSize) / (sampleRate/2) = 2i/bufferSize
+    const centroidNorm = (2 * weightedIndexSum) / (this.bufferSize * total)
+    return Math.max(0, Math.min(1, centroidNorm))
+  }
+
+  /**
+   * Calculate spectral rolloff as a normalized value (0..1).
+   * Rolloff is the frequency below which `percent` of the spectral energy is contained.
+   */
+  private calculateSpectralRolloffNormalized(
+    spectrum: ArrayLike<number>,
+    percent: number = DEFAULT_SPECTRAL_ROLLOFF_PERCENT
+  ): number {
+    const total = this.sumSpectrum(spectrum)
+    if (total <= 0) return 0
+
+    const target = total * Math.max(0, Math.min(1, percent))
+    let cumulative = 0
+    let rolloffIndex = 0
+    for (let i = 0; i < spectrum.length; i++) {
+      const v = spectrum[i] ?? 0
+      if (!Number.isFinite(v)) continue
+      cumulative += Math.abs(v)
+      if (cumulative >= target) {
+        rolloffIndex = i
+        break
+      }
+    }
+
+    const rolloffNorm = (2 * rolloffIndex) / this.bufferSize
+    return Math.max(0, Math.min(1, rolloffNorm))
+  }
+
+  /**
+   * Calculate spectral flux (normalized 0..1) between two spectra.
+   *
+   * Uses L2 distance between L1-normalized spectra, then scales by sqrt(2)
+   * (the max possible L2 distance between two probability distributions).
+   */
+  private calculateSpectralFluxNormalized(
+    currentSpectrum: ArrayLike<number>,
+    previousSpectrum: ArrayLike<number>
+  ): number {
+    const currentSum = this.sumSpectrum(currentSpectrum)
+    const previousSum = this.sumSpectrum(previousSpectrum)
+    if (currentSum <= 0 || previousSum <= 0) return 0
+
+    const len = Math.min(currentSpectrum.length, previousSpectrum.length)
+    let diffSquares = 0
+
+    for (let i = 0; i < len; i++) {
+      const c = currentSpectrum[i] ?? 0
+      const p = previousSpectrum[i] ?? 0
+      if (!Number.isFinite(c) || !Number.isFinite(p)) continue
+      const cNorm = Math.abs(c) / currentSum
+      const pNorm = Math.abs(p) / previousSum
+      const diff = cNorm - pNorm
+      diffSquares += diff * diff
+    }
+
+    const flux = Math.sqrt(diffSquares) / Math.SQRT2
+    return Math.max(0, Math.min(1, flux))
+  }
+
+  /**
    * Calculate spectral flux manually (L2 norm of spectrum difference)
    * This avoids Meyda 5.6.3 bug with spectralFlux calculation
    */
@@ -103,7 +230,7 @@ export class FeatureExtractor {
 
     // Track previous amplitude spectrum for manual spectralFlux calculation
     // (Meyda 5.6.3 has a bug with spectralFlux when using Meyda.extract())
-    let previousSpectrum: number[] | null = null
+    let previousSpectrum: Float32Array | number[] | null = null
 
     for (let i = 0; i < numFrames; i++) {
       const start = i * this.hopSize
@@ -112,40 +239,46 @@ export class FeatureExtractor {
       // Extract frame
       const frame = audioData.slice(start, end)
 
+      // Always compute time-domain features, even if Meyda extraction fails.
+      rms.push(this.calculateRms(frame))
+      zcr.push(this.calculateZcr(frame))
+
       try {
         // Use Meyda to extract features for this frame
         // Note: spectralFlux is computed manually to avoid Meyda bug
         const features = Meyda.extract(
           [
             "mfcc",
-            "spectralCentroid",
             "amplitudeSpectrum",
-            "spectralRolloff",
-            "rms",
-            "zcr",
           ],
           frame
         )
 
         if (features) {
           if (features.mfcc) mfccFrames.push(features.mfcc as number[])
-          if (typeof features.spectralCentroid === "number")
-            spectralCentroid.push(features.spectralCentroid)
-          if (typeof features.spectralRolloff === "number")
-            spectralRolloff.push(features.spectralRolloff)
-          if (typeof features.rms === "number") rms.push(features.rms)
-          if (typeof features.zcr === "number") zcr.push(features.zcr)
 
           // Calculate spectralFlux manually using amplitude spectrum
-          const currentSpectrum = features.amplitudeSpectrum as number[] | undefined
-          if (currentSpectrum && previousSpectrum) {
-            const flux = this.calculateSpectralFlux(currentSpectrum, previousSpectrum)
-            spectralFlux.push(flux)
-          }
-
-          // Store current spectrum for next iteration
+          const currentSpectrum = features.amplitudeSpectrum as ArrayLike<number> | undefined
           if (currentSpectrum) {
-            previousSpectrum = [...currentSpectrum]
+            const centroidNorm = this.calculateSpectralCentroidNormalized(currentSpectrum)
+            if (Number.isFinite(centroidNorm)) {
+              spectralCentroid.push(centroidNorm)
+            }
+
+            const rolloffNorm = this.calculateSpectralRolloffNormalized(currentSpectrum)
+            if (Number.isFinite(rolloffNorm)) {
+              spectralRolloff.push(rolloffNorm)
+            }
+
+            if (previousSpectrum) {
+              const fluxNorm = this.calculateSpectralFluxNormalized(currentSpectrum, previousSpectrum)
+              if (Number.isFinite(fluxNorm)) {
+                spectralFlux.push(fluxNorm)
+              }
+            }
+
+            // Store current spectrum for next iteration (copy to avoid mutation/reuse issues).
+            previousSpectrum = Array.from(currentSpectrum)
           }
         }
       } catch (error) {
@@ -263,7 +396,12 @@ export class FeatureExtractor {
     const speechDuration = speechFrames.filter(Boolean).length * frameDuration
 
     // Speech rate = peaks (syllables) per second
-    return speechDuration > 0 ? peakCount / speechDuration : 0
+    if (speechDuration <= 0) return 0
+
+    // Overlapping windows can over-count peaks vs duration.
+    // Compensate by scaling with hop/buffer ratio (512/256 => 0.5).
+    const overlapCompensation = this.hopSize / this.bufferSize
+    return (peakCount / speechDuration) * overlapCompensation
   }
 
   /**
@@ -290,7 +428,16 @@ export class FeatureExtractor {
    */
   private mean(values: number[]): number {
     if (values.length === 0) return 0
-    return values.reduce((sum, val) => sum + val, 0) / values.length
+
+    let sum = 0
+    let count = 0
+    for (const value of values) {
+      if (!Number.isFinite(value)) continue
+      sum += value
+      count++
+    }
+
+    return count > 0 ? sum / count : 0
   }
 
   /**

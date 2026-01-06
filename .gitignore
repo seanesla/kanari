@@ -47,3 +47,6 @@ coverage/
 *.seed
 *.pid.lock
 AGENTS.md
+
+# Local Claude settings
+.claude/settings.local.json

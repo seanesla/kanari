@@ -144,7 +144,7 @@ function analyzeAcousticSignal(
   if (
     features.rms > 0.15 &&
     features.speechRate > 4.5 &&
-    features.spectralCentroid > 2000
+    features.spectralCentroid > 0.5
   ) {
     return "energetic"
   }
@@ -302,9 +302,9 @@ export function featuresToPatterns(features: AudioFeatures): VoicePatterns {
 
   // Voice tone from spectral centroid
   let voiceTone: VoicePatterns["voiceTone"] = "neutral"
-  if (features.spectralCentroid > 2500) {
+  if (features.spectralCentroid > 0.5) {
     voiceTone = "bright"
-  } else if (features.spectralCentroid < 1500) {
+  } else if (features.spectralCentroid < 0.3) {
     voiceTone = "dull"
   }
 

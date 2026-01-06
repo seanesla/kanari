@@ -143,6 +143,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
   const startSessionRunIdRef = useRef(0)
   const startSessionAbortRef = useRef(false)
   const unmountedRef = useRef(false)
+  const endSessionInProgressRef = useRef(false)
 
   useEffect(() => {
     // React StrictMode (dev) may run effect cleanups and then re-run effects
@@ -383,88 +384,98 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
   )
 
   const endSession = useCallback(async () => {
-    dispatch({ type: "SET_ENDING" })
+    if (endSessionInProgressRef.current) {
+      return
+    }
 
-    // Clear any preserved session (user explicitly ended, don't preserve)
-    clearPreservedSession(false) // false = don't disconnect, we'll do it below
+    endSessionInProgressRef.current = true
 
-    const sessionAudio = audio.getSessionAudio()
-    const sessionAudioData = sessionAudio ? Array.from(sessionAudio) : undefined
-    const sessionSampleRate = sessionAudio ? 16000 : undefined
+    try {
+      dispatch({ type: "SET_ENDING" })
 
-    let acousticMetrics = data.session?.acousticMetrics
-    if (!acousticMetrics && sessionAudio) {
-      try {
-        const processed = await processAudio(sessionAudio, {
-          sampleRate: 16000,
-          enableVAD: true,
-        })
-        const metrics = analyzeVoiceMetrics(processed.features)
-        acousticMetrics = {
-          stressScore: metrics.stressScore,
-          fatigueScore: metrics.fatigueScore,
-          stressLevel: metrics.stressLevel,
-          fatigueLevel: metrics.fatigueLevel,
-          confidence: metrics.confidence,
-          analyzedAt: metrics.analyzedAt,
-          features: processed.features,
+      // Clear any preserved session (user explicitly ended, don't preserve)
+      clearPreservedSession(false) // false = don't disconnect, we'll do it below
+
+      const sessionAudio = audio.getSessionAudio()
+      const sessionAudioData = sessionAudio ? Array.from(sessionAudio) : undefined
+      const sessionSampleRate = sessionAudio ? 16000 : undefined
+
+      let acousticMetrics = data.session?.acousticMetrics
+      if (!acousticMetrics && sessionAudio) {
+        try {
+          const processed = await processAudio(sessionAudio, {
+            sampleRate: 16000,
+            enableVAD: true,
+          })
+          const metrics = analyzeVoiceMetrics(processed.features)
+          acousticMetrics = {
+            stressScore: metrics.stressScore,
+            fatigueScore: metrics.fatigueScore,
+            stressLevel: metrics.stressLevel,
+            fatigueLevel: metrics.fatigueLevel,
+            confidence: metrics.confidence,
+            analyzedAt: metrics.analyzedAt,
+            features: processed.features,
+          }
+
+          dispatch({ type: "SET_SESSION_ACOUSTIC_METRICS", metrics: acousticMetrics })
+        } catch (error) {
+          console.warn("[useCheckIn] Failed to compute session-level metrics:", error)
         }
-
-        dispatch({ type: "SET_SESSION_ACOUSTIC_METRICS", metrics: acousticMetrics })
-      } catch (error) {
-        console.warn("[useCheckIn] Failed to compute session-level metrics:", error)
       }
-    }
 
-    // Calculate session duration
-    const duration = sessionStartRef.current
-      ? (Date.now() - new Date(sessionStartRef.current).getTime()) / 1000
-      : 0
+      // Calculate session duration
+      const duration = sessionStartRef.current
+        ? (Date.now() - new Date(sessionStartRef.current).getTime()) / 1000
+        : 0
 
-    // Update session with final data
-    const finalSession: CheckInSession | null = data.session
-      ? {
-          ...data.session,
-          endedAt: new Date().toISOString(),
-          messages: data.messages,
-          mismatchCount: data.mismatchCount,
-          duration,
-          acousticMetrics: acousticMetrics ?? data.session.acousticMetrics,
-          audioData: sessionAudioData,
-          sampleRate: sessionSampleRate,
-        }
-      : null
+      // Update session with final data
+      const finalSession: CheckInSession | null = data.session
+        ? {
+            ...data.session,
+            endedAt: new Date().toISOString(),
+            messages: data.messages,
+            mismatchCount: data.mismatchCount,
+            duration,
+            acousticMetrics: acousticMetrics ?? data.session.acousticMetrics,
+            audioData: sessionAudioData,
+            sampleRate: sessionSampleRate,
+          }
+        : null
 
-    // Cleanup with error handling - continue cleanup even if one fails
-    const cleanupErrors: Error[] = []
+      // Cleanup with error handling - continue cleanup even if one fails
+      const cleanupErrors: Error[] = []
 
-    try {
-      audio.cleanupAudioCapture()
-    } catch (error) {
-      cleanupErrors.push(error instanceof Error ? error : new Error("Audio capture cleanup failed"))
-    }
+      try {
+        audio.cleanupAudioCapture()
+      } catch (error) {
+        cleanupErrors.push(error instanceof Error ? error : new Error("Audio capture cleanup failed"))
+      }
 
-    try {
-      playbackControls.cleanup()
-    } catch (error) {
-      cleanupErrors.push(error instanceof Error ? error : new Error("Playback cleanup failed"))
-    }
+      try {
+        playbackControls.cleanup()
+      } catch (error) {
+        cleanupErrors.push(error instanceof Error ? error : new Error("Playback cleanup failed"))
+      }
 
-    try {
-      gemini.disconnect()
-    } catch (error) {
-      cleanupErrors.push(error instanceof Error ? error : new Error("Gemini disconnect failed"))
-    }
+      try {
+        gemini.disconnect()
+      } catch (error) {
+        cleanupErrors.push(error instanceof Error ? error : new Error("Gemini disconnect failed"))
+      }
 
-    // Log cleanup errors but don't fail the session end
-    if (cleanupErrors.length > 0) {
-      console.error("[useCheckIn] Cleanup errors:", cleanupErrors)
-    }
+      // Log cleanup errors but don't fail the session end
+      if (cleanupErrors.length > 0) {
+        console.error("[useCheckIn] Cleanup errors:", cleanupErrors)
+      }
 
-    dispatch({ type: "SET_COMPLETE" })
+      dispatch({ type: "SET_COMPLETE" })
 
-    if (finalSession) {
-      callbacksRef.current.onSessionEnd?.(finalSession)
+      if (finalSession) {
+        callbacksRef.current.onSessionEnd?.(finalSession)
+      }
+    } finally {
+      endSessionInProgressRef.current = false
     }
   }, [audio, callbacksRef, data.messages, data.mismatchCount, data.session, dispatch, gemini, playbackControls])
 
@@ -621,17 +632,22 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
     (reason: string) => {
       console.log("[useCheckIn] Disconnected:", reason)
       const currentState = stateRef.current
-      const hasUserMessage = data.messages.some((m) => m.role === "user" && m.content.trim().length > 0)
       const normalizedReason = (reason || "").toLowerCase()
-
-      // Always release microphone + playback resources on disconnect.
-      audio.cleanupAudioCapture()
-      playbackControls.cleanup()
 
       // Manual disconnects happen during end/cancel flows and should not force the UI into error/complete.
       if (normalizedReason.includes("manual disconnect")) {
         return
       }
+
+      if (endSessionInProgressRef.current) {
+        return
+      }
+
+      // Pattern doc: docs/error-patterns/check-in-results-missing-on-disconnect.md
+      const hasUserMessage = data.messages.some((m) => m.role === "user" && m.content.trim().length > 0)
+      const hasTranscript = data.currentUserTranscript.trim().length > 0
+      const hasVoiceMetrics = Boolean(data.session?.acousticMetrics)
+      const hasUserParticipation = hasUserMessage || hasTranscript || hasVoiceMetrics
 
       // Only auto-complete if we were in an active state (user had chance to interact)
       const activeStates: CheckInState[] = [
@@ -645,23 +661,41 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
       if (activeStates.includes(currentState)) {
         // If the user never spoke, treat disconnects as errors (common on invalid config / auth).
-        if (!hasUserMessage || normalizedReason.includes("invalid argument")) {
+        if (!hasUserParticipation || normalizedReason.includes("invalid argument")) {
+          // Always release microphone + playback resources on disconnect.
+          audio.cleanupAudioCapture()
+          playbackControls.cleanup()
+
           dispatch({
             type: "SET_ERROR",
             error: reason || "Connection lost before you could respond",
           })
         } else {
-          dispatch({ type: "SET_COMPLETE" })
+          // Finalize the session (compute metrics, fire persistence callbacks) like an explicit end-call.
+          void endSession()
         }
       } else if (currentState !== "complete" && currentState !== "error") {
         // Disconnected during initialization - show error
+        // Always release microphone + playback resources on disconnect.
+        audio.cleanupAudioCapture()
+        playbackControls.cleanup()
+
         dispatch({
           type: "SET_ERROR",
           error: reason || "Connection failed during initialization",
         })
       }
     },
-    [audio, data.messages, dispatch, playbackControls, stateRef]
+    [
+      audio,
+      data.currentUserTranscript,
+      data.messages,
+      data.session?.acousticMetrics,
+      dispatch,
+      endSession,
+      playbackControls,
+      stateRef,
+    ]
   )
 
   const onError = useCallback(

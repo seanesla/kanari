@@ -4,9 +4,9 @@ import type { AudioFeatures, VoiceMetrics } from "@/lib/types"
 
 const baseFeatures: AudioFeatures = {
   mfcc: [1, 2, 3],
-  spectralCentroid: 1800,
+  spectralCentroid: 0.4,
   spectralFlux: 0.1,
-  spectralRolloff: 3000,
+  spectralRolloff: 0.7,
   rms: 0.1,
   zcr: 0.05,
   speechRate: 4,
@@ -66,7 +66,7 @@ describe("featuresToPatterns", () => {
       rms: 0.3,
       pauseRatio: 0.5,
       pauseCount: 11,
-      spectralCentroid: 3000,
+      spectralCentroid: 0.7,
     })
 
     expect(patterns).toEqual({
@@ -86,7 +86,7 @@ describe("featuresToPatterns", () => {
       rms: 0.05,
       pauseRatio: 0.1,
       pauseCount: 0,
-      spectralCentroid: 1000,
+      spectralCentroid: 0.2,
     })
 
     expect(patterns).toEqual({
@@ -125,7 +125,7 @@ describe("detectMismatch", () => {
       ...baseFeatures,
       rms: 0.2,
       speechRate: 5,
-      spectralCentroid: 2500,
+      spectralCentroid: 0.6,
     }
 
     const result = detectMismatch(
@@ -140,4 +140,3 @@ describe("detectMismatch", () => {
     expect(result.suggestionForGemini).toContain("energetic")
   })
 })
-

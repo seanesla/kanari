@@ -186,9 +186,13 @@ export function AIChatContent({
     // Called when user ends the session or AI ends naturally
     onSessionEnd: async (session) => {
       try {
-        // Only save sessions where user actually participated (at least 2 messages)
-        // With AI-speaks-first, 1 message = just the AI greeting, no user response
-        if (session.messages.length <= 1) {
+        // Only save sessions where the user actually participated.
+        // NOTE: Message count alone is not reliable (e.g., transcripts may fail to commit
+        // before disconnect/end), so also accept sessions with computed voice metrics.
+        // Pattern doc: docs/error-patterns/check-in-results-missing-on-disconnect.md
+        const hasUserMessage = session.messages.some((m) => m.role === "user" && m.content.trim().length > 0)
+        const hasVoiceMetrics = Boolean(session.acousticMetrics)
+        if (!hasUserMessage && !hasVoiceMetrics) {
           logDebug("AIChatContent", "Skipping save - no user participation")
           setCompletedSession(session)
           return

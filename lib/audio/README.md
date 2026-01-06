@@ -113,9 +113,9 @@ const features = extractFeatures(audioData, {
 console.log(features)
 // {
 //   mfcc: [13 coefficients],
-//   spectralCentroid: 1234.5,
-//   spectralFlux: 0.123,
-//   spectralRolloff: 2345.6,
+//   spectralCentroid: 0.23,  // Normalized 0..1 (0 = low, 1 = high)
+//   spectralFlux: 0.12,      // Normalized 0..1 (higher = more dynamic)
+//   spectralRolloff: 0.62,   // Normalized 0..1
 //   rms: 0.045,
 //   zcr: 0.123,
 //   speechRate: 4.2,

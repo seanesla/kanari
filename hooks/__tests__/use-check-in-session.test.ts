@@ -10,6 +10,7 @@ let initialState: typeof import("../use-check-in").initialState
 
 type GeminiLiveCallbacks = {
   onConnected?: () => void
+  onDisconnected?: (reason: string) => void
   onWidget?: (event: { widget: string; args: unknown }) => void
 }
 
@@ -212,6 +213,33 @@ describe("useCheckIn session lifecycle", () => {
 
     expect(result.current[0].state).toBe("complete")
     expect(disconnectMock).toHaveBeenCalled()
+    expect(onSessionEnd).toHaveBeenCalledWith(expect.objectContaining({ endedAt: expect.any(String) }))
+  })
+
+  it("finalizes and calls onSessionEnd when Gemini disconnects unexpectedly after user participation", async () => {
+    const onSessionEnd = vi.fn()
+    const { result } = renderHook(() => useCheckIn({ onSessionEnd }))
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    act(() => {
+      result.current[1].sendTextMessage("hello")
+    })
+
+    await waitFor(() => {
+      expect(result.current[0].messages.some((m) => m.role === "user")).toBe(true)
+    })
+
+    act(() => {
+      geminiCallbacks?.onDisconnected?.("network lost")
+    })
+
+    await waitFor(() => {
+      expect(result.current[0].state).toBe("complete")
+    })
+
     expect(onSessionEnd).toHaveBeenCalledWith(expect.objectContaining({ endedAt: expect.any(String) }))
   })
 

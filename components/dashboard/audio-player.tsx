@@ -44,6 +44,23 @@ export function AudioPlayer({
     isPlayingRef.current = isPlaying
   }, [isPlaying])
 
+  const stopCurrentSource = useCallback(() => {
+    const source = sourceNodeRef.current
+    if (!source) return
+
+    // Prevent `onended` from resetting state for manual stops (pause/seek/restart).
+    // Pattern doc: docs/error-patterns/audio-player-seek-resets-onended.md
+    source.onended = null
+
+    try {
+      source.stop()
+    } catch (error) {
+      logUnexpectedError("AudioPlayer", "Unexpected error stopping source:", error)
+    } finally {
+      sourceNodeRef.current = null
+    }
+  }, [])
+
   // Initialize audio context and buffer
   useEffect(() => {
     const initAudio = async () => {
@@ -80,20 +97,14 @@ export function AudioPlayer({
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current)
       }
-      if (sourceNodeRef.current) {
-        try {
-          sourceNodeRef.current.stop()
-        } catch (error) {
-          logUnexpectedError("AudioPlayer", "Unexpected error stopping source:", error)
-        }
-      }
+      stopCurrentSource()
       // Close audio context if not already closed
       // See: docs/error-patterns/audiocontext-double-close.md
       if (audioContextRef.current && audioContextRef.current.state !== "closed") {
         audioContextRef.current.close()
       }
     }
-  }, [audioData, sampleRate])
+  }, [audioData, sampleRate, stopCurrentSource])
 
   // Update time display during playback
   const updateTime = useCallback(() => {
@@ -137,14 +148,7 @@ export function AudioPlayer({
       await ctx.resume()
     }
 
-    // Stop any existing source
-    if (sourceNodeRef.current) {
-      try {
-        sourceNodeRef.current.stop()
-      } catch (error) {
-        logUnexpectedError("AudioPlayer", "Unexpected error stopping source:", error)
-      }
-    }
+    stopCurrentSource()
 
     // Create new source node
     const source = ctx.createBufferSource()
@@ -153,6 +157,9 @@ export function AudioPlayer({
 
     // Handle playback end (use ref to avoid stale closure)
     source.onended = () => {
+      if (sourceNodeRef.current !== source) return
+      sourceNodeRef.current = null
+
       if (isPlayingRef.current) {
         setIsPlaying(false)
         onPlayStateChange?.(false)
@@ -170,7 +177,7 @@ export function AudioPlayer({
     source.start(0, offset)
     setIsPlaying(true)
     onPlayStateChange?.(true)
-  }, [isReady, duration, onPlayStateChange, onTimeUpdate])
+  }, [isReady, duration, onPlayStateChange, onTimeUpdate, stopCurrentSource])
 
   const pause = useCallback(() => {
     if (!audioContextRef.current || !sourceNodeRef.current) return
@@ -179,16 +186,11 @@ export function AudioPlayer({
     const elapsed = audioContextRef.current.currentTime - startTimeRef.current
     pauseOffsetRef.current = Math.max(0, Math.min(pauseOffsetRef.current + elapsed, duration))
 
-    // Stop source
-    try {
-      sourceNodeRef.current.stop()
-    } catch (error) {
-      logUnexpectedError("AudioPlayer", "Unexpected error stopping source:", error)
-    }
+    stopCurrentSource()
 
     setIsPlaying(false)
     onPlayStateChange?.(false)
-  }, [duration, onPlayStateChange])
+  }, [duration, onPlayStateChange, stopCurrentSource])
 
   const togglePlayPause = useCallback(() => {
     if (isPlaying) {
@@ -215,16 +217,10 @@ export function AudioPlayer({
 
     // If playing, restart from new position
     if (isPlaying) {
-      if (sourceNodeRef.current) {
-        try {
-          sourceNodeRef.current.stop()
-        } catch (error) {
-          logUnexpectedError("AudioPlayer", "Unexpected error stopping source:", error)
-        }
-      }
-      play()
+      stopCurrentSource()
+      void play()
     }
-  }, [duration, isPlaying, play, onTimeUpdate])
+  }, [duration, isPlaying, onTimeUpdate, play, stopCurrentSource])
 
   const handleProgressClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect()

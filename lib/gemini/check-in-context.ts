@@ -137,7 +137,10 @@ export async function fetchCheckInContext(): Promise<CheckInContextData> {
     .toArray()
 
   const recentSessions = dbSessions
-    .filter(s => s.messages && s.messages.length > 0) // Only sessions with messages
+    // Message count alone is not reliable (e.g., transcripts may fail to commit before disconnect/end).
+    // Prefer "did the user participate" signals like voice metrics.
+    // Pattern doc: docs/error-patterns/check-in-results-missing-on-disconnect.md
+    .filter(s => (s.messages && s.messages.length > 0) || Boolean(s.acousticMetrics))
     .map(toCheckInSession)
 
   // Fetch trend data from last 7 days
