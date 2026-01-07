@@ -47,5 +47,11 @@ describe("ConversationView", () => {
     expect(screen.queryByText("Hello there...")).not.toBeInTheDocument()
     expect(screen.getByText("Hello there")).toBeInTheDocument()
   })
-})
 
+  it("shows an AI-first empty state while waiting for the greeting", () => {
+    render(<ConversationView state="ai_greeting" messages={[]} />)
+
+    expect(screen.getByText(/kanari will greet you first/i)).toBeInTheDocument()
+    expect(screen.getByText(/respond as soon as it starts speaking/i)).toBeInTheDocument()
+  })
+})

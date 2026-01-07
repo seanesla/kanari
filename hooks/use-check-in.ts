@@ -83,6 +83,10 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
 
   const [data, dispatch] = useReducer(checkInReducer, initialState)
 
+  // Enforce "AI speaks first" at the start of a session.
+  // We block user audio/text until the assistant produces *any* output (audio, transcript, or explicit silence).
+  const assistantHasStartedRef = useRef(false)
+
   const sessionCallbacksRef = useRef<CheckInSessionCallbacks>({
     onSessionStart,
     onSessionEnd,
@@ -105,9 +109,19 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
     stateRef.current = data.state
   }, [data.state])
 
+  // If we restore a session (preserve/resume) that already contains assistant messages,
+  // allow user input immediately.
+  useEffect(() => {
+    if (assistantHasStartedRef.current) return
+    if (data.messages.some((m) => m.role === "assistant")) {
+      assistantHasStartedRef.current = true
+    }
+  }, [data.messages])
+
   // Audio playback hook (assistant output)
   const [_playback, playbackControls] = useAudioPlayback({
     onPlaybackStart: () => {
+      assistantHasStartedRef.current = true
       dispatch({ type: "SET_ASSISTANT_SPEAKING" })
     },
     onPlaybackEnd: () => {
@@ -138,6 +152,8 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
   }, [])
 
   const sendAudio = useCallback((base64Audio: string) => {
+    // Block user audio until the assistant starts the conversation.
+    if (!assistantHasStartedRef.current) return
     getGeminiControls().sendAudio(base64Audio)
   }, [getGeminiControls])
 
@@ -220,6 +236,18 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
   // Ensure manual interruption only suppresses audio for the current assistant turn.
   const messageHandlersWithAudioSuppression = {
     ...messages.handlers,
+    onModelTranscript: (text: string, finished: boolean) => {
+      assistantHasStartedRef.current = true
+      messages.handlers.onModelTranscript(text, finished)
+    },
+    onAudioChunk: (base64Audio: string) => {
+      assistantHasStartedRef.current = true
+      messages.handlers.onAudioChunk(base64Audio)
+    },
+    onSilenceChosen: (reason: string) => {
+      assistantHasStartedRef.current = true
+      messages.handlers.onSilenceChosen(reason)
+    },
     onTurnComplete: () => {
       suppressAssistantAudioRef.current = false
       messages.handlers.onTurnComplete()
@@ -245,7 +273,10 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
   }, [gemini.state])
 
   const controls: CheckInControls = {
-    startSession: session.startSession,
+    startSession: async (options) => {
+      assistantHasStartedRef.current = false
+      await session.startSession(options)
+    },
     endSession: session.endSession,
     cancelSession: session.cancelSession,
     getSession: session.getSession,
@@ -255,10 +286,16 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
     runQuickAction: widgets.runQuickAction,
     saveJournalEntry: widgets.saveJournalEntry,
     triggerManualTool: widgets.triggerManualTool,
-    sendTextMessage: messages.sendTextMessage,
+    sendTextMessage: (text) => {
+      if (!assistantHasStartedRef.current) return
+      messages.sendTextMessage(text)
+    },
     preserveSession: session.preserveSession,
     hasPreservedSession: session.hasPreservedSession,
-    resumePreservedSession: session.resumePreservedSession,
+    resumePreservedSession: async () => {
+      assistantHasStartedRef.current = false
+      await session.resumePreservedSession()
+    },
     getContextFingerprint: session.getContextFingerprint,
     interruptAssistant: () => {
       suppressAssistantAudioRef.current = true

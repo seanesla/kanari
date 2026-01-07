@@ -378,6 +378,8 @@ export function AIChatContent({
                       ? "bg-green-500"           // Green = user talking
                       : checkIn.state === "assistant_speaking"
                         ? "bg-blue-500"          // Blue = AI talking
+                        : checkIn.state === "ai_greeting"
+                          ? "bg-blue-500 animate-pulse" // Pulsing blue = AI starting
                         : checkIn.state === "listening"
                           ? "bg-accent animate-pulse"  // Pulsing = listening
                           : "bg-muted"           // Gray = idle
@@ -388,6 +390,8 @@ export function AIChatContent({
                     ? "Listening..."
                     : checkIn.state === "assistant_speaking"
                       ? "kanari responding..."
+                      : checkIn.state === "ai_greeting"
+                        ? "kanari starting..."
                       : checkIn.state === "processing"
                         ? "Thinking..."
                         : "Ready"}
@@ -395,13 +399,17 @@ export function AIChatContent({
                 {canInterruptAssistant && (
                   <Button
                     type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 ml-2 gap-2"
+                    variant="ghost"
+                    size="icon-sm"
+                    className={cn(
+                      "ml-2 rounded-full border border-red-500/20 bg-red-500/10 text-red-500 shadow-sm",
+                      "hover:bg-red-500/15 hover:text-red-500 focus-visible:ring-red-500/30"
+                    )}
                     onClick={() => controls.interruptAssistant()}
+                    aria-label="Interrupt"
+                    title="Interrupt"
                   >
                     <Square className="h-4 w-4 fill-current" />
-                    Interrupt
                   </Button>
                 )}
               </div>
@@ -570,7 +578,7 @@ export function AIChatContent({
                       controls.sendTextMessage(text)
                     }}
                     onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
-                    disabled={!checkIn.isActive}
+                    disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
                     isMuted={checkIn.isMuted}
                     onToggleMute={() => controls.toggleMute()}
                   />

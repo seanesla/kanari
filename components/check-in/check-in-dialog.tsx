@@ -361,6 +361,8 @@ export function CheckInDialog({
                           ? "bg-green-500"
                           : checkIn.state === "assistant_speaking"
                             ? "bg-blue-500"
+                            : checkIn.state === "ai_greeting"
+                              ? "bg-blue-500 animate-pulse"
                             : checkIn.state === "listening"
                               ? "bg-accent animate-pulse"
                               : "bg-muted"
@@ -371,21 +373,27 @@ export function CheckInDialog({
                         ? "Listening..."
                         : checkIn.state === "assistant_speaking"
                           ? "kanari responding..."
+                          : checkIn.state === "ai_greeting"
+                            ? "kanari starting..."
                           : checkIn.state === "processing"
                             ? "Thinking..."
                             : "Ready"}
                     </span>
 
-                    {(checkIn.state === "assistant_speaking" || checkIn.state === "ai_greeting") && (
+                    {checkIn.state === "assistant_speaking" && (
                       <Button
                         type="button"
-                        variant="outline"
-                        size="sm"
+                        variant="ghost"
+                        size="icon-sm"
                         onClick={() => controls.interruptAssistant()}
-                        className="h-8"
+                        className={cn(
+                          "ml-2 rounded-full border border-red-500/20 bg-red-500/10 text-red-500 shadow-sm",
+                          "hover:bg-red-500/15 hover:text-red-500 focus-visible:ring-red-500/30"
+                        )}
+                        aria-label="Interrupt"
+                        title="Interrupt"
                       >
-                        <Square className="h-3.5 w-3.5 mr-2" />
-                        Interrupt
+                        <Square className="h-4 w-4 fill-current" />
                       </Button>
                     )}
                   </div>
@@ -525,7 +533,7 @@ export function CheckInDialog({
                   <ChatInput
                     onSendText={(text) => controls.sendTextMessage(text)}
                     onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
-                    disabled={!checkIn.isActive}
+                    disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
                     isMuted={checkIn.isMuted}
                     onToggleMute={() => controls.toggleMute()}
                   />

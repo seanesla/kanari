@@ -13,6 +13,9 @@ type GeminiLiveCallbacks = {
   onUserSpeechStart?: () => void
   onUserSpeechEnd?: () => void
   onUserTranscript?: (text: string, isFinal: boolean) => void
+  onModelTranscript?: (text: string, finished: boolean) => void
+  onAudioChunk?: (base64Audio: string) => void
+  onSilenceChosen?: (reason: string) => void
 }
 
 let geminiCallbacks: GeminiLiveCallbacks | null = null
@@ -274,6 +277,11 @@ describe("useCheckIn audio capture", () => {
 
     await act(async () => {
       await result.current[1].startSession()
+    })
+
+    // AI-first: user audio should only stream after the assistant has produced output.
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("hello", false)
     })
 
     expect(lastWorklet?.port.onmessage).toEqual(expect.any(Function))

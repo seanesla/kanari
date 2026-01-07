@@ -184,7 +184,7 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
     expect(mockSession.close).toHaveBeenCalled()
   })
 
-  test("handles mute_audio_response tool call and suppresses audio for the turn", async () => {
+  test("handles mute_audio_response tool call and suppresses all output for the turn", async () => {
     await client.connect()
 
     getClientInternals(client).handleMessage({
@@ -210,15 +210,30 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
       ],
     })
 
+    ;(config.events.onModelTranscript as ReturnType<typeof vi.fn>).mockClear()
+    ;(config.events.onModelThinking as ReturnType<typeof vi.fn>).mockClear()
+
     getClientInternals(client).handleServerContent({
       modelTurn: {
         parts: [
           { inlineData: { mimeType: "audio/pcm", data: "suppressed==" } },
+          { text: "Let me check" },
+          { text: "internal", thought: true },
         ],
       },
+      outputTranscription: { text: "Let me check", finished: true },
     })
 
     expect(config.events.onAudioChunk).not.toHaveBeenCalledWith("suppressed==")
+    expect(config.events.onModelTranscript).not.toHaveBeenCalled()
+    expect(config.events.onModelThinking).not.toHaveBeenCalled()
+
+    // After turnComplete, silence mode resets and output is allowed again.
+    getClientInternals(client).handleServerContent({ turnComplete: true })
+    getClientInternals(client).handleServerContent({
+      modelTurn: { parts: [{ text: "Hello" }] },
+    })
+    expect(config.events.onModelTranscript).toHaveBeenCalledWith("Hello", false)
   })
 
   test("streams model text parts as transcript and routes thought parts to thinking", async () => {

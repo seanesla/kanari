@@ -184,6 +184,7 @@ export function ChatInput({ onSendText, onTriggerTool, disabled, isMuted, onTogg
               )}
               onClick={onToggleMute}
               aria-pressed={!!isMuted}
+              disabled={disabled}
             >
               {isMuted ? (
                 <MicOff className="h-4 w-4" />

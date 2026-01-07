@@ -12,6 +12,9 @@ type GeminiLiveCallbacks = {
   onConnected?: () => void
   onDisconnected?: (reason: string) => void
   onWidget?: (event: { widget: string; args: unknown }) => void
+  onModelTranscript?: (text: string, finished: boolean) => void
+  onAudioChunk?: (base64Audio: string) => void
+  onSilenceChosen?: (reason: string) => void
 }
 
 let geminiCallbacks: GeminiLiveCallbacks | null = null
@@ -203,6 +206,11 @@ describe("useCheckIn session lifecycle", () => {
       await result.current[1].startSession()
     })
 
+    // AI-first: unlock user input after the assistant starts.
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("hello", false)
+    })
+
     act(() => {
       result.current[1].sendTextMessage("hello")
     })
@@ -222,6 +230,11 @@ describe("useCheckIn session lifecycle", () => {
 
     await act(async () => {
       await result.current[1].startSession()
+    })
+
+    // AI-first: unlock user input after the assistant starts.
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("hello", false)
     })
 
     act(() => {
@@ -250,6 +263,11 @@ describe("useCheckIn session lifecycle", () => {
       await result.current[1].startSession()
     })
 
+    // AI-first: unlock user input after the assistant starts.
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("hello", false)
+    })
+
     act(() => {
       result.current[1].sendTextMessage("hello")
     })
@@ -267,6 +285,11 @@ describe("useCheckIn session lifecycle", () => {
 
     await act(async () => {
       await result.current[1].startSession()
+    })
+
+    // AI-first: unlock user input after the assistant starts.
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("hello", false)
     })
 
     act(() => {

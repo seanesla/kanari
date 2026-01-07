@@ -12,6 +12,7 @@ type GeminiLiveCallbacks = {
   onUserSpeechEnd?: () => void
   onModelTranscript?: (text: string, isFinal: boolean) => void
   onTurnComplete?: () => void
+  onSilenceChosen?: (reason: string) => void
 }
 
 let geminiCallbacks: GeminiLiveCallbacks | null = null
@@ -261,6 +262,25 @@ describe("useCheckIn message handling", () => {
 
     expect(result.current[0].messages[0]?.isStreaming).toBe(false)
     expect(result.current[0].state).toBe("listening")
+  })
+
+  it("removes any assistant transcript and marks the user message when silence is chosen", () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onUserTranscript?.("just listen", false)
+      geminiCallbacks?.onModelTranscript?.("Let me check", false)
+    })
+
+    expect(result.current[0].messages.some((m) => m.role === "assistant")).toBe(true)
+
+    act(() => {
+      geminiCallbacks?.onSilenceChosen?.("user requested silence")
+    })
+
+    expect(result.current[0].messages.some((m) => m.role === "assistant")).toBe(false)
+    const userMessage = result.current[0].messages.find((m) => m.role === "user")
+    expect(userMessage?.silenceTriggered).toBe(true)
   })
 
   it("merges user transcript updates into a single message", () => {

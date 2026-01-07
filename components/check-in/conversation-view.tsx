@@ -51,6 +51,7 @@ export function ConversationView({
 
   const isProcessing = state === "processing"
   const isUserSpeaking = state === "user_speaking"
+  const isWaitingForAiToStart = state === "ai_greeting" || state === "ready"
 
   const hasStreamingUserMessage = useMemo(
     () => messages.some((m) => m.role === "user" && m.isStreaming),
@@ -82,10 +83,19 @@ export function ConversationView({
       {/* Empty state */}
       {messages.length === 0 && !isUserSpeaking && !currentUserTranscript && (
         <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
-          <p className="text-sm">Start speaking to begin the conversation</p>
-          <p className="text-xs mt-1 opacity-70">
-            kanari is listening and ready to chat
-          </p>
+          {isWaitingForAiToStart ? (
+            <>
+              <p className="text-sm">kanari will greet you first</p>
+              <p className="text-xs mt-1 opacity-70">
+                You can respond as soon as it starts speaking
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm">Start speaking to begin the conversation</p>
+              <p className="text-xs mt-1 opacity-70">kanari is listening and ready to chat</p>
+            </>
+          )}
         </div>
       )}
 

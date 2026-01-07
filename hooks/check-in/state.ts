@@ -86,6 +86,7 @@ export type CheckInAction =
   | { type: "SET_COMPLETE" }
   | { type: "SET_SESSION"; session: CheckInSession }
   | { type: "ADD_MESSAGE"; message: CheckInMessage }
+  | { type: "REMOVE_MESSAGE"; messageId: string }
   | { type: "UPDATE_MESSAGE_CONTENT"; messageId: string; content: string }
   | { type: "SET_MESSAGE_STREAMING"; messageId: string; isStreaming: boolean }
   | { type: "SET_MESSAGE_SILENCE_TRIGGERED"; messageId: string }
@@ -194,6 +195,19 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
         messages: newMessages,
         currentStreamingMessageId,
         session: state.session ? { ...state.session, messages: newMessages } : null,
+      }
+    }
+
+    case "REMOVE_MESSAGE": {
+      const updatedMessages = state.messages.filter((msg) => msg.id !== action.messageId)
+      const currentStreamingMessageId =
+        state.currentStreamingMessageId === action.messageId ? null : state.currentStreamingMessageId
+
+      return {
+        ...state,
+        messages: updatedMessages,
+        currentStreamingMessageId,
+        session: state.session ? { ...state.session, messages: updatedMessages } : null,
       }
     }
 
