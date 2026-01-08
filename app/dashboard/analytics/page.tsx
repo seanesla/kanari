@@ -18,10 +18,12 @@ import { EngagementTracker } from "@/components/dashboard/engagement-tracker"
 import { AnalyticsInsightsSection } from "@/components/dashboard/analytics-insights"
 import { useSceneMode } from "@/lib/scene-context"
 import { DecorativeGrid } from "@/components/ui/decorative-grid"
+import { useTimeZone } from "@/lib/timezone-context"
 import type { BurnoutPrediction } from "@/lib/types"
 
 export default function AnalyticsPage() {
   const { accentColor } = useSceneMode()
+  const { timeZone } = useTimeZone()
   const { shouldAnimate } = useDashboardAnimation()
   const [visible, setVisible] = useState(!shouldAnimate)
   const [wellnessExpanded, setWellnessExpanded] = useState(false)
@@ -110,14 +112,14 @@ export default function AnalyticsPage() {
 
     return storedTrendData.map((data) => {
       const date = new Date(data.date)
-      const day = date.toLocaleDateString("en-US", { weekday: "short" })
+      const day = date.toLocaleDateString("en-US", { weekday: "short", timeZone })
       return {
         day,
         stress: data.stressScore,
         fatigue: data.fatigueScore,
       }
     })
-  }, [storedTrendData])
+  }, [storedTrendData, timeZone])
 
   // Wellness score calculated from average stress and fatigue (inverse)
   const wellnessScore = useMemo(() => {

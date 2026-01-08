@@ -9,6 +9,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { SuggestionCard } from "./suggestion-card"
 import type { Suggestion, KanbanColumn as KanbanColumnType } from "@/lib/types"
 
+type KanbanColumnVariant = "full" | "compact"
+
 const columnConfig: Record<KanbanColumnType, {
   title: string
   icon: typeof Inbox
@@ -39,9 +41,10 @@ interface KanbanColumnProps {
   column: KanbanColumnType
   suggestions: Suggestion[]
   onCardClick: (suggestion: Suggestion) => void
+  variant?: KanbanColumnVariant
 }
 
-export function KanbanColumn({ column, suggestions, onCardClick }: KanbanColumnProps) {
+export function KanbanColumn({ column, suggestions, onCardClick, variant = "full" }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column,
     data: { column },
@@ -54,7 +57,8 @@ export function KanbanColumn({ column, suggestions, onCardClick }: KanbanColumnP
   return (
     <div
       className={cn(
-        "flex flex-col rounded-xl border bg-card/20 backdrop-blur-sm h-full min-h-[400px]",
+        "flex flex-col rounded-xl border bg-card/20 backdrop-blur-sm h-full",
+        variant === "compact" ? "min-h-0" : "min-h-[400px]",
         "transition-colors duration-200",
         isOver ? "border-accent/50 bg-card/30" : "border-border/50"
       )}
@@ -62,7 +66,12 @@ export function KanbanColumn({ column, suggestions, onCardClick }: KanbanColumnP
       aria-label={`${config.title} column with ${suggestions.length} ${suggestions.length === 1 ? "suggestion" : "suggestions"}`}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between p-4 border-b border-border/50">
+      <div
+        className={cn(
+          "flex items-center justify-between border-b border-border/50",
+          variant === "compact" ? "px-3 py-2" : "p-4"
+        )}
+      >
         <div className="flex items-center gap-2">
           <Icon
             className={cn(
@@ -85,7 +94,7 @@ export function KanbanColumn({ column, suggestions, onCardClick }: KanbanColumnP
         <div
           ref={setNodeRef}
           className={cn(
-            "p-3 min-h-[200px]",
+            variant === "compact" ? "p-2 min-h-[120px]" : "p-3 min-h-[200px]",
             isOver && "bg-accent/5"
           )}
           role="list"
@@ -107,6 +116,7 @@ export function KanbanColumn({ column, suggestions, onCardClick }: KanbanColumnP
                 icon={config.icon}
                 text={config.emptyText}
                 subtext={config.emptySubtext}
+                variant={variant}
               />
             )}
           </SortableContext>
@@ -116,9 +126,24 @@ export function KanbanColumn({ column, suggestions, onCardClick }: KanbanColumnP
   )
 }
 
-function EmptyState({ icon: Icon, text, subtext }: { icon: typeof Inbox; text: string; subtext: string }) {
+function EmptyState({
+  icon: Icon,
+  text,
+  subtext,
+  variant,
+}: {
+  icon: typeof Inbox
+  text: string
+  subtext: string
+  variant: KanbanColumnVariant
+}) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center px-4 text-center",
+        variant === "compact" ? "py-6" : "py-12"
+      )}
+    >
       <div className="h-10 w-10 rounded-lg bg-muted/50 flex items-center justify-center mb-3">
         <Icon className="h-5 w-5 text-muted-foreground" />
       </div>

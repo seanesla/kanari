@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { X, Calendar, MessageSquare, AlertCircle } from "lucide-react"
 import { formatDate } from "@/lib/date-utils"
+import { useTimeZone } from "@/lib/timezone-context"
 import { MessageBubble } from "@/components/check-in/message-bubble"
 import type { CheckInSession } from "@/lib/types"
 
@@ -30,6 +31,7 @@ interface ChatSessionDrawerProps {
 }
 
 export function ChatSessionDrawer({ session, onClose }: ChatSessionDrawerProps) {
+  const { timeZone } = useTimeZone()
   // Handle escape key to close modal
   useEffect(() => {
     if (!session) return
@@ -79,7 +81,7 @@ export function ChatSessionDrawer({ session, onClose }: ChatSessionDrawerProps) 
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                <span>{formatDate(session.startedAt)}</span>
+                <span>{formatDate(session.startedAt, timeZone)}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <MessageSquare className="h-4 w-4" />

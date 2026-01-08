@@ -16,6 +16,7 @@ import { MessageBubble } from "@/components/check-in/message-bubble"
 import { RecordingWaveform } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
 import { formatDate, formatDurationWithUnits } from "@/lib/date-utils"
+import { useTimeZone } from "@/lib/timezone-context"
 import type { CheckInSession } from "@/lib/types"
 
 interface AIChatDetailViewProps {
@@ -27,6 +28,7 @@ export function AIChatDetailView({
   session,
   onDelete,
 }: AIChatDetailViewProps) {
+  const { timeZone } = useTimeZone()
   // Calculate session duration
   const duration = session.duration ? formatDurationWithUnits(session.duration) : null
 
@@ -95,7 +97,7 @@ export function AIChatDetailView({
         {/* Date */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Calendar className="h-4 w-4" />
-          <span>{formatDate(session.startedAt)}</span>
+          <span>{formatDate(session.startedAt, timeZone)}</span>
         </div>
 
         {/* Voice mismatch indicator */}

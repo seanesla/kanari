@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Brain, ChevronDown, ChevronUp, Info, CheckCircle2, XCircle, Clock } from "lucide-react"
 import { useSuggestionMemory } from "@/hooks/use-suggestion-memory"
 import { cn } from "@/lib/utils"
+import { useTimeZone } from "@/lib/timezone-context"
 import type { SuggestionCategory } from "@/lib/types"
 
 const categoryLabels: Record<SuggestionCategory, string> = {
@@ -57,6 +58,7 @@ function CollapsibleSection({ title, icon, count, children, defaultOpen = false 
 }
 
 export function GeminiMemorySection() {
+  const { timeZone } = useTimeZone()
   const { memoryContext } = useSuggestionMemory()
 
   const hasAnyData =
@@ -162,7 +164,7 @@ export function GeminiMemorySection() {
                     <span className="text-foreground/80 font-sans">{item.content}</span>
                     {item.scheduledFor && (
                       <span className="text-xs text-blue-400 ml-2 font-sans">
-                        {new Date(item.scheduledFor).toLocaleDateString()}
+                        {new Date(item.scheduledFor).toLocaleDateString("en-US", { timeZone })}
                       </span>
                     )}
                   </li>

@@ -3,6 +3,7 @@ import { z } from "zod"
 import { getTokensFromCookies, isTokenExpired, updateAccessToken } from "@/lib/auth/session"
 import { refreshAccessToken } from "@/lib/calendar/oauth"
 import { createCalendarEvent, deleteCalendarEvent } from "@/lib/calendar/api"
+import { normalizeTimeZone } from "@/lib/timezone"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -18,6 +19,7 @@ const SuggestionSchema = z.object({
 
 const CreateEventRequestSchema = z.object({
   suggestion: SuggestionSchema,
+  timeZone: z.string().min(1).max(64).optional(),
 })
 
 const DeleteEventRequestSchema = z.object({
@@ -79,6 +81,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { suggestion } = parsed.data
+    const timeZone = parsed.data.timeZone ? normalizeTimeZone(parsed.data.timeZone) : undefined
 
     const start = new Date(suggestion.scheduledFor)
     const end = new Date(start.getTime() + suggestion.duration * 60 * 1000)
@@ -98,6 +101,7 @@ export async function POST(request: NextRequest) {
         description,
         start: start.toISOString(),
         end: end.toISOString(),
+        timeZone,
       },
       tokens
     )

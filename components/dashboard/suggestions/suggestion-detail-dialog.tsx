@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { formatScheduledTime } from "@/lib/date-utils"
+import { useTimeZone } from "@/lib/timezone-context"
 import { EffectivenessFeedbackDialog } from "./effectiveness-feedback-dialog"
 import type { Suggestion, SuggestionCategory, VoicePatterns, HistoricalContext, BurnoutPrediction, AudioFeatures, EffectivenessFeedback } from "@/lib/types"
 
@@ -71,6 +72,7 @@ export function SuggestionDetailDialog({
   burnoutPrediction,
   features,
 }: SuggestionDetailDialogProps) {
+  const { timeZone } = useTimeZone()
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [showRawValues, setShowRawValues] = useState(false)
 
@@ -271,7 +273,7 @@ export function SuggestionDetailDialog({
           {isScheduled && suggestion.scheduledFor && (
             <div className="flex items-center gap-2 text-sm text-blue-500">
               <Calendar className="h-4 w-4" />
-              <span>{formatScheduledTime(suggestion.scheduledFor)}</span>
+              <span>{formatScheduledTime(suggestion.scheduledFor, timeZone)}</span>
             </div>
           )}
 

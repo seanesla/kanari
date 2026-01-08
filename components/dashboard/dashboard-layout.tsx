@@ -1,18 +1,14 @@
 "use client"
 
 import { Link } from "next-view-transitions"
-import { Calendar as CalendarIcon, ArrowRight } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import type { ReactNode } from "react"
 
 interface DashboardLayoutProps {
   isMobile: boolean
-  isSidebarSheetOpen: boolean
-  setIsSidebarSheetOpen: (open: boolean) => void
-  sidebar: ReactNode
+  kanban: ReactNode
   calendar: ReactNode
-  pendingCount: number
   showEmptyState: boolean
 }
 
@@ -21,11 +17,8 @@ interface DashboardLayoutProps {
  */
 export function DashboardLayout({
   isMobile,
-  isSidebarSheetOpen,
-  setIsSidebarSheetOpen,
-  sidebar,
+  kanban,
   calendar,
-  pendingCount,
   showEmptyState,
 }: DashboardLayoutProps) {
   const emptyStateContent = showEmptyState && (
@@ -45,40 +38,32 @@ export function DashboardLayout({
   if (isMobile) {
     return (
       <div className="space-y-4">
-        {/* Calendar */}
-        <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden">
-          {calendar}
+        {/* Kanban */}
+        <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 h-[260px] overflow-hidden">
+          {kanban}
         </div>
 
-        {/* Mobile sidebar sheet trigger */}
-        <Sheet open={isSidebarSheetOpen} onOpenChange={setIsSidebarSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" className="w-full">
-              <CalendarIcon className="h-4 w-4 mr-2" />
-              Manage Suggestions ({pendingCount} pending)
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="bottom" className="h-[70vh]">
-            <div className="h-full pt-4">{sidebar}</div>
-          </SheetContent>
-        </Sheet>
+        {/* Calendar */}
+        <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden h-[70vh]">
+          {calendar}
+        </div>
 
         {emptyStateContent}
       </div>
     )
   }
 
-  // Desktop: Sidebar + Calendar grid
+  // Desktop: Kanban (fixed height) + Calendar (remaining height)
   return (
     <>
-      <div className="grid grid-cols-[320px_1fr] gap-6">
-        {/* Sidebar */}
-        <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 h-[calc(100vh-180px)] overflow-hidden">
-          {sidebar}
+      <div className="flex flex-col gap-6 h-[calc(100vh-180px)]">
+        {/* Kanban */}
+        <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 h-[200px] overflow-hidden">
+          {kanban}
         </div>
 
         {/* Calendar */}
-        <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden">
+        <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden flex-1">
           {calendar}
         </div>
       </div>

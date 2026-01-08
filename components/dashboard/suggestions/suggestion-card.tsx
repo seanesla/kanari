@@ -5,6 +5,8 @@ import { CSS } from "@dnd-kit/utilities"
 import { Clock, GripVertical, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import { formatScheduledTime } from "@/lib/date-utils"
+import { useTimeZone } from "@/lib/timezone-context"
 import type { Suggestion, SuggestionCategory } from "@/lib/types"
 
 const categoryIcons: Record<SuggestionCategory, typeof Coffee> = {
@@ -30,6 +32,7 @@ interface SuggestionCardProps {
 }
 
 export function SuggestionCard({ suggestion, onClick, isDragging }: SuggestionCardProps) {
+  const { timeZone } = useTimeZone()
   const {
     attributes,
     listeners,
@@ -127,7 +130,7 @@ export function SuggestionCard({ suggestion, onClick, isDragging }: SuggestionCa
           {isScheduled && suggestion.scheduledFor && (
             <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
               <Clock className="h-3 w-3" aria-hidden="true" />
-              {formatScheduledTime(suggestion.scheduledFor)}
+              {formatScheduledTime(suggestion.scheduledFor, timeZone)}
             </p>
           )}
 
@@ -166,16 +169,4 @@ function extractTitle(content: string, maxLength = 60): string {
   return (lastSpace > 20 ? truncated.slice(0, lastSpace) : truncated) + "..."
 }
 
-// Helper to format scheduled time
-function formatScheduledTime(isoString: string): string {
-  const date = new Date(isoString)
-  const now = new Date()
-  const isToday = date.toDateString() === now.toDateString()
-  const isTomorrow = date.toDateString() === new Date(now.getTime() + 86400000).toDateString()
-
-  const timeStr = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-
-  if (isToday) return `Today at ${timeStr}`
-  if (isTomorrow) return `Tomorrow at ${timeStr}`
-  return date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" }) + ` at ${timeStr}`
-}
+ 

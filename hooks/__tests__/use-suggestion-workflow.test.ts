@@ -107,15 +107,15 @@ describe("useSuggestionWorkflow", () => {
     it("handles external drop with suggestion lookup", () => {
       const { result } = renderHook(() => useSuggestionWorkflow(defaultParams))
 
-      const dropDate = new Date("2024-12-24")
+      const dropDateISO = "2024-12-24"
 
       act(() => {
-        result.current.handlers.handleExternalDrop("test-1", dropDate, 14, 30)
+        result.current.handlers.handleExternalDrop("test-1", dropDateISO, 14, 30)
       })
 
       expect(result.current.droppedSuggestion).toEqual({
         suggestion: mockSuggestion,
-        date: dropDate,
+        dateISO: dropDateISO,
         hour: 14,
         minute: 30,
       })
@@ -125,10 +125,10 @@ describe("useSuggestionWorkflow", () => {
     it("handles time slot click with pending suggestion", () => {
       const { result } = renderHook(() => useSuggestionWorkflow(defaultParams))
 
-      const clickDate = new Date("2024-12-24")
+      const clickDateISO = "2024-12-24"
 
       act(() => {
-        result.current.handlers.handleTimeSlotClick(clickDate, 10)
+        result.current.handlers.handleTimeSlotClick(clickDateISO, 10, 0)
       })
 
       // Should find the first pending suggestion

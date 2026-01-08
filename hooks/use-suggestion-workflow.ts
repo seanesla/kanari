@@ -1,14 +1,16 @@
 "use client"
 
 import { useState, useCallback, useMemo } from "react"
-import type { Suggestion, RecoveryBlock, UserSettings, EffectivenessFeedback } from "@/lib/types"
+import type { Suggestion, RecoveryBlock, EffectivenessFeedback } from "@/lib/types"
+import type { CalendarEventOptions } from "@/hooks/use-calendar"
 
 /**
  * Dropped suggestion info when dragging to calendar
  */
 export interface DroppedSuggestionInfo {
   suggestion: Suggestion
-  date: Date
+  /** YYYY-MM-DD in the app's selected timezone */
+  dateISO: string
   hour: number
   minute: number
 }
@@ -29,8 +31,8 @@ export interface SuggestionWorkflowState {
 export interface SuggestionWorkflowHandlers {
   handleSuggestionClick: (suggestion: Suggestion) => void
   handleScheduleFromDialog: (suggestion: Suggestion) => void
-  handleExternalDrop: (suggestionId: string, date: Date, hour: number, minute: number) => void
-  handleTimeSlotClick: (date: Date, hour: number) => void
+  handleExternalDrop: (suggestionId: string, dateISO: string, hour: number, minute: number) => void
+  handleTimeSlotClick: (dateISO: string, hour: number, minute: number) => void
   handleScheduleConfirm: (suggestion: Suggestion, scheduledFor: string) => Promise<boolean>
   handleDismiss: (suggestion: Suggestion) => Promise<boolean>
   /**
@@ -57,7 +59,7 @@ interface UseSuggestionWorkflowParams {
   dismissSuggestion: (id: string) => Promise<boolean>
   /** Complete a suggestion with optional effectiveness feedback */
   completeSuggestion: (id: string, feedback?: EffectivenessFeedback) => Promise<boolean>
-  scheduleGoogleEvent?: (suggestion: Suggestion, settings?: UserSettings) => Promise<RecoveryBlock | null>
+  scheduleGoogleEvent?: (suggestion: Suggestion, options?: CalendarEventOptions) => Promise<RecoveryBlock | null>
   isCalendarConnected?: boolean
 }
 
@@ -97,19 +99,19 @@ export function useSuggestionWorkflow({
   }, [])
 
   // Handle drop from sidebar to calendar time slot
-  const handleExternalDrop = useCallback((suggestionId: string, date: Date, hour: number, minute: number) => {
+  const handleExternalDrop = useCallback((suggestionId: string, dateISO: string, hour: number, minute: number) => {
     const suggestion = suggestions.find(s => s.id === suggestionId)
     if (!suggestion) return
 
-    setDroppedSuggestion({ suggestion, date, hour, minute })
+    setDroppedSuggestion({ suggestion, dateISO, hour, minute })
     setScheduleDialogSuggestion(suggestion)
   }, [suggestions])
 
   // Handle clicking an empty time slot on calendar
-  const handleTimeSlotClick = useCallback((date: Date, hour: number) => {
+  const handleTimeSlotClick = useCallback((dateISO: string, hour: number, minute: number) => {
     const pendingSuggestion = suggestions.find(s => s.status === "pending")
     if (pendingSuggestion) {
-      setDroppedSuggestion({ suggestion: pendingSuggestion, date, hour, minute: 0 })
+      setDroppedSuggestion({ suggestion: pendingSuggestion, dateISO, hour, minute })
       setScheduleDialogSuggestion(pendingSuggestion)
     }
   }, [suggestions])

@@ -1,8 +1,10 @@
 "use client"
 
+import { Temporal } from "temporal-polyfill"
 import { CalendarCheck, CalendarX } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { useTimeZone } from "@/lib/timezone-context"
 import type { ScheduleActivityWidgetState, SuggestionCategory } from "@/lib/types"
 import { WidgetContainer } from "./widget-container"
 
@@ -10,17 +12,38 @@ function formatCategory(category: SuggestionCategory): string {
   return category.charAt(0).toUpperCase() + category.slice(1)
 }
 
-function formatLocalDateTime(date: string, time: string): string {
+function formatZonedDateTime(date: string, time: string, timeZone: string): string {
   const [year, month, day] = date.split("-").map(Number)
   const [hour, minute] = time.split(":").map(Number)
-  const dt = new Date(year, month - 1, day, hour, minute, 0, 0)
-  return dt.toLocaleString([], {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
+
+  try {
+    const zdt = Temporal.ZonedDateTime.from({
+      timeZone,
+      year,
+      month,
+      day,
+      hour,
+      minute,
+    })
+
+    return new Intl.DateTimeFormat([], {
+      timeZone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(zdt.epochMilliseconds))
+  } catch {
+    const dt = new Date(year, month - 1, day, hour, minute, 0, 0)
+    return dt.toLocaleString([], {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
 }
 
 interface ScheduleConfirmationProps {
@@ -35,6 +58,7 @@ export function ScheduleConfirmation({
   onUndo,
 }: ScheduleConfirmationProps) {
   const { args } = widget
+  const { timeZone } = useTimeZone()
 
   return (
     <WidgetContainer
@@ -46,7 +70,7 @@ export function ScheduleConfirmation({
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{args.title}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {formatLocalDateTime(args.date, args.time)} • {args.duration}m
+            {formatZonedDateTime(args.date, args.time, timeZone)} • {args.duration}m
           </p>
         </div>
         <Badge

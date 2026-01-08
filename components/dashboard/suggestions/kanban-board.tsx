@@ -15,9 +15,12 @@ import {
 } from "@dnd-kit/core"
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable"
 import { snapCenterToCursor } from "@dnd-kit/modifiers"
+import { cn } from "@/lib/utils"
 import { KanbanColumn } from "./kanban-column"
 import { SuggestionCardOverlay } from "./suggestion-card"
 import type { Suggestion, KanbanColumn as KanbanColumnType, SuggestionStatus } from "@/lib/types"
+
+type KanbanBoardVariant = "full" | "compact"
 
 // Map status to column
 const statusToColumn: Record<SuggestionStatus, KanbanColumnType> = {
@@ -32,7 +35,7 @@ const statusToColumn: Record<SuggestionStatus, KanbanColumnType> = {
 const columnToStatus: Record<KanbanColumnType, SuggestionStatus> = {
   pending: "pending",
   scheduled: "scheduled",
-  completed: "accepted",
+  completed: "completed",
 }
 
 interface KanbanBoardProps {
@@ -40,6 +43,8 @@ interface KanbanBoardProps {
   onCardClick: (suggestion: Suggestion) => void
   onMoveCard: (suggestionId: string, newStatus: SuggestionStatus) => void
   onScheduleRequest?: (suggestion: Suggestion) => void
+  variant?: KanbanBoardVariant
+  className?: string
 }
 
 export function KanbanBoard({
@@ -47,6 +52,8 @@ export function KanbanBoard({
   onCardClick,
   onMoveCard,
   onScheduleRequest,
+  variant = "full",
+  className,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null)
 
@@ -135,8 +142,13 @@ export function KanbanBoard({
     const currentColumn = statusToColumn[suggestion.status]
     if (currentColumn === targetColumn) return
 
+    // Keep the flow simple: Pending → Scheduled → Completed
+    if (currentColumn === "completed") return
+    if (currentColumn === "scheduled" && targetColumn === "pending") return
+
     // Handle scheduling request
-    if (targetColumn === "scheduled" && onScheduleRequest) {
+    if (targetColumn === "scheduled") {
+      if (currentColumn !== "pending" || !onScheduleRequest) return
       onScheduleRequest(suggestion)
       return
     }
@@ -160,7 +172,7 @@ export function KanbanBoard({
               ? `Picked up suggestion: ${suggestion.category}. Use arrow keys to move between columns.`
               : "Picked up suggestion."
           },
-          onDragOver({ active, over }) {
+          onDragOver({ active: _active, over }) {
             if (!over) return
             const targetColumn = over.data.current?.column as KanbanColumnType | undefined
             if (targetColumn) {
@@ -168,7 +180,7 @@ export function KanbanBoard({
             }
             return undefined
           },
-          onDragEnd({ active, over }) {
+          onDragEnd({ active: _active, over }) {
             if (!over) return "Cancelled."
             const targetColumn = over.data.current?.column as KanbanColumnType | undefined
             if (targetColumn) {
@@ -183,25 +195,41 @@ export function KanbanBoard({
       }}
     >
       <div
-        className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full"
+        className={cn(
+          "h-full",
+          variant === "compact" ? "overflow-x-auto" : "overflow-visible",
+          className
+        )}
         role="region"
         aria-label="Suggestion kanban board"
       >
-        <KanbanColumn
-          column="pending"
-          suggestions={columns.pending}
-          onCardClick={onCardClick}
-        />
-        <KanbanColumn
-          column="scheduled"
-          suggestions={columns.scheduled}
-          onCardClick={onCardClick}
-        />
-        <KanbanColumn
-          column="completed"
-          suggestions={columns.completed}
-          onCardClick={onCardClick}
-        />
+        <div
+          className={cn(
+            "grid gap-4 h-full",
+            variant === "compact"
+              ? "grid-cols-3 min-w-[900px] md:min-w-0"
+              : "grid-cols-1 md:grid-cols-3"
+          )}
+        >
+          <KanbanColumn
+            column="pending"
+            suggestions={columns.pending}
+            onCardClick={onCardClick}
+            variant={variant}
+          />
+          <KanbanColumn
+            column="scheduled"
+            suggestions={columns.scheduled}
+            onCardClick={onCardClick}
+            variant={variant}
+          />
+          <KanbanColumn
+            column="completed"
+            suggestions={columns.completed}
+            onCardClick={onCardClick}
+            variant={variant}
+          />
+        </div>
       </div>
 
       <DragOverlay modifiers={[snapCenterToCursor]}>

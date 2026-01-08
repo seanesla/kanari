@@ -9,6 +9,7 @@ import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop'
 import { cn } from '@/lib/utils'
 import { logDebug } from '@/lib/logger'
 import { useSceneMode } from '@/lib/scene-context'
+import { useTimeZone } from '@/lib/timezone-context'
 import { generateDarkVariant, generateLightVariant } from '@/lib/color-utils'
 import { CheckInMarker } from './check-in-marker'
 import { CheckInTooltip } from './check-in-tooltip'
@@ -41,25 +42,29 @@ interface ScheduleXWeekCalendarProps {
   recoveryBlocks?: RecoveryBlock[]
   onEventClick?: (suggestion: Suggestion) => void
   onCheckInClick?: (session: CheckInSession) => void
-  onTimeSlotClick?: (date: Date, hour: number) => void
+  onTimeSlotClick?: (dateISO: string, hour: number, minute: number) => void
   onEventUpdate?: (suggestion: Suggestion, newScheduledFor: string) => void
-  onExternalDrop?: (suggestionId: string, date: Date, hour: number, minute: number) => void
+  onExternalDrop?: (suggestionId: string, dateISO: string, hour: number, minute: number) => void
   pendingDragActive?: boolean
   className?: string
 }
 
 interface ScheduleXWeekCalendarInnerProps extends ScheduleXWeekCalendarProps {
   accentColor: string
+  timeZone: string
 }
 
 // Helper to map Suggestion to Schedule-X event format
-function suggestionToEvent(suggestion: Suggestion, recoveryBlock?: RecoveryBlock): SuggestionEvent | null {
+function suggestionToEvent(
+  suggestion: Suggestion,
+  timeZone: string,
+  recoveryBlock?: RecoveryBlock
+): SuggestionEvent | null {
   if (!suggestion.scheduledFor) return null
 
   // Schedule-X requires ZonedDateTime for timed events (not PlainDateTime)
   // Source: Context7 - schedule-x/schedule-x docs - "Timed Event Example"
   // https://github.com/schedule-x/schedule-x/blob/main/website/app/docs/calendar/events/page.mdx
-  const timeZone = Temporal.Now.timeZoneId()
   const instant = Temporal.Instant.from(suggestion.scheduledFor)
   const startDateTime = instant.toZonedDateTimeISO(timeZone)
   const endDateTime = startDateTime.add({ minutes: suggestion.duration })
@@ -83,10 +88,13 @@ function suggestionToEvent(suggestion: Suggestion, recoveryBlock?: RecoveryBlock
 }
 
 // Helper to map completed suggestion to faded event
-function completedToEvent(suggestion: Suggestion, recoveryBlock?: RecoveryBlock): SuggestionEvent | null {
+function completedToEvent(
+  suggestion: Suggestion,
+  timeZone: string,
+  recoveryBlock?: RecoveryBlock
+): SuggestionEvent | null {
   if (!suggestion.scheduledFor) return null
 
-  const timeZone = Temporal.Now.timeZoneId()
   const instant = Temporal.Instant.from(suggestion.scheduledFor)
   const startDateTime = instant.toZonedDateTimeISO(timeZone)
   const endDateTime = startDateTime.add({ minutes: suggestion.duration })
@@ -110,11 +118,10 @@ function completedToEvent(suggestion: Suggestion, recoveryBlock?: RecoveryBlock)
 }
 
 // Helper to map check-ins to Schedule-X event format (as marker)
-function checkInToEvent(session: CheckInSession): CheckInEvent | null {
+function checkInToEvent(session: CheckInSession, timeZone: string): CheckInEvent | null {
   if (!session.startedAt) return null
 
   // Source: Context7 - schedule-x/schedule-x docs - "Timed Event Example"
-  const timeZone = Temporal.Now.timeZoneId()
   const instant = Temporal.Instant.from(session.startedAt)
   const startDateTime = instant.toZonedDateTimeISO(timeZone)
   // 20-min duration gives enough height for a proper pill-shaped event (~33px)
@@ -140,7 +147,15 @@ function checkInToEvent(session: CheckInSession): CheckInEvent | null {
 // Wrapper component that keys on accentColor to force calendar recreation
 export function ScheduleXWeekCalendar(props: ScheduleXWeekCalendarProps) {
   const { accentColor } = useSceneMode()
-  return <ScheduleXWeekCalendarInner key={accentColor} {...props} accentColor={accentColor} />
+  const { timeZone } = useTimeZone()
+  return (
+    <ScheduleXWeekCalendarInner
+      key={`${accentColor}-${timeZone}`}
+      {...props}
+      accentColor={accentColor}
+      timeZone={timeZone}
+    />
+  )
 }
 
 // Inner component that creates the calendar with the given accent color
@@ -157,6 +172,7 @@ function ScheduleXWeekCalendarInner({
   pendingDragActive = false,
   className = '',
   accentColor,
+  timeZone,
 }: ScheduleXWeekCalendarInnerProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -317,10 +333,8 @@ function ScheduleXWeekCalendarInner({
       },
       onClickDateTime(dateTime) {
         if (onTimeSlotClick) {
-          // Convert Temporal.ZonedDateTime to JavaScript Date
-          const date = new Date(dateTime.toString().split('[')[0])
-          const hour = dateTime.hour
-          onTimeSlotClick(date, hour)
+          const dateISO = dateTime.toPlainDate().toString()
+          onTimeSlotClick(dateISO, dateTime.hour, dateTime.minute)
         }
       },
       onEventUpdate(updatedEvent) {
@@ -357,15 +371,15 @@ function ScheduleXWeekCalendarInner({
     }
 
     const scheduledEvents = scheduledSuggestions
-      .map((s) => suggestionToEvent(s, recoveryBySuggestionId.get(s.id)))
+      .map((s) => suggestionToEvent(s, timeZone, recoveryBySuggestionId.get(s.id)))
       .filter((event): event is SuggestionEvent => event !== null)
 
     const completedEvents = completedSuggestions
-      .map((s) => completedToEvent(s, recoveryBySuggestionId.get(s.id)))
+      .map((s) => completedToEvent(s, timeZone, recoveryBySuggestionId.get(s.id)))
       .filter((event): event is SuggestionEvent => event !== null)
 
     const checkInEvents = checkInSessions
-      .map(checkInToEvent)
+      .map((session) => checkInToEvent(session, timeZone))
       .filter((event): event is CheckInEvent => event !== null)
 
     const allEvents: CustomCalendarEvent[] = [
@@ -381,10 +395,10 @@ function ScheduleXWeekCalendarInner({
       // Calendar not fully mounted yet, will retry on next render
       logDebug("ScheduleXCalendar", "Events service not ready:", error)
     }
-  }, [scheduledSuggestions, completedSuggestions, checkInSessions, recoveryBlocks, eventsService, calendar])
+  }, [scheduledSuggestions, completedSuggestions, checkInSessions, recoveryBlocks, eventsService, calendar, timeZone])
 
   // Calculate drop target time from mouse position
-  const calculateDropTime = useCallback((e: React.DragEvent): { date: Date; hour: number; minute: number } | null => {
+  const calculateDropTime = useCallback((e: React.DragEvent): { dateISO: string; hour: number; minute: number } | null => {
     if (!containerRef.current) return null
 
     const calendarGrid = containerRef.current.querySelector('.sx__week-grid')
@@ -412,20 +426,12 @@ function ScheduleXWeekCalendarInner({
 
     if (hour < 0 || hour >= 24) return null
 
-    // Calculate the date for this day column
-    const today = new Date()
-    const startOfWeek = new Date(today)
-    const dayOfWeek = today.getDay()
-    const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek // Start from Monday
-    startOfWeek.setDate(today.getDate() + diff)
-    startOfWeek.setHours(0, 0, 0, 0)
+    const now = Temporal.Now.zonedDateTimeISO(timeZone)
+    const startOfWeek = now.toPlainDate().subtract({ days: now.dayOfWeek - 1 }) // Monday
+    const targetDate = startOfWeek.add({ days: dayIndex })
 
-    const targetDate = new Date(startOfWeek)
-    targetDate.setDate(startOfWeek.getDate() + dayIndex)
-    targetDate.setHours(hour, minute % 60, 0, 0)
-
-    return { date: targetDate, hour, minute: minute % 60 }
-  }, [])
+    return { dateISO: targetDate.toString(), hour, minute: minute % 60 }
+  }, [timeZone])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -450,7 +456,7 @@ function ScheduleXWeekCalendarInner({
     const dropTime = calculateDropTime(e)
     if (!dropTime) return
 
-    onExternalDrop(suggestionId, dropTime.date, dropTime.hour, dropTime.minute)
+    onExternalDrop(suggestionId, dropTime.dateISO, dropTime.hour, dropTime.minute)
   }, [onExternalDrop, calculateDropTime])
 
   // Fix 4: Handler to open tooltip (used for both click and keyboard)

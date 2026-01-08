@@ -1,1 +1,1 @@
-export { ScheduleXWeekCalendar } from "./schedule-x-calendar"
+export { GoogleCalendarEmbed } from "./google-calendar-embed"

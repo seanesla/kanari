@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react"
 import { Clock, CalendarPlus, Coffee, Dumbbell, Brain, Users, Moon } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useTimeZone } from "@/lib/timezone-context"
 import {
   Dialog,
   DialogContent,
@@ -73,7 +74,7 @@ interface ScheduleTimeDialogProps {
   onOpenChange: (open: boolean) => void
   onSchedule: (suggestion: Suggestion, scheduledFor: string) => void
   /** Pre-fill date when dropping from calendar */
-  defaultDate?: Date
+  defaultDateISO?: string
   /** Pre-fill hour when dropping from calendar */
   defaultHour?: number
   /** Pre-fill minute when dropping from calendar */
@@ -85,11 +86,12 @@ export function ScheduleTimeDialog({
   open,
   onOpenChange,
   onSchedule,
-  defaultDate,
+  defaultDateISO,
   defaultHour,
   defaultMinute,
 }: ScheduleTimeDialogProps) {
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined)
+  const { timeZone } = useTimeZone()
+  const [selectedDateISO, setSelectedDateISO] = useState<string | undefined>(undefined)
   const [selectedHour, setSelectedHour] = useState<string>("9")
   const [selectedMinute, setSelectedMinute] = useState<string>("0")
   const datePickerRef = useRef<HTMLDivElement>(null)
@@ -99,13 +101,9 @@ export function ScheduleTimeDialog({
   useEffect(() => {
     if (!datePickerRef.current || !open) return
 
-    // Get today's date as Temporal.PlainDate
-    const today = Temporal.Now.plainDateISO()
+    const today = Temporal.Now.zonedDateTimeISO(timeZone).toPlainDate()
 
-    // Convert selectedDate (Date) to Temporal.PlainDate if present
-    const selectedPlainDate = selectedDate
-      ? Temporal.PlainDate.from(selectedDate.toISOString().split('T')[0])
-      : today
+    const selectedPlainDate = selectedDateISO ? Temporal.PlainDate.from(selectedDateISO) : today
 
     const datePicker = createDatePicker({
       locale: 'en-US',
@@ -118,11 +116,9 @@ export function ScheduleTimeDialog({
       listeners: {
         onChange: (plainDate) => {
           if (plainDate) {
-            // Convert Temporal.PlainDate to Date object
-            const date = new Date(plainDate.year, plainDate.month - 1, plainDate.day)
-            setSelectedDate(date)
+            setSelectedDateISO(plainDate.toString())
           } else {
-            setSelectedDate(undefined)
+            setSelectedDateISO(undefined)
           }
         },
       },
@@ -136,28 +132,24 @@ export function ScheduleTimeDialog({
         datePickerInstanceRef.current.destroy?.()
       }
     }
-  }, [open])
+  }, [open, selectedDateISO, timeZone])
 
   // Reset state when dialog opens with new suggestion
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen && suggestion) {
       // Use defaults if provided (from calendar drop), otherwise calculate
-      if (defaultDate !== undefined) {
-        setSelectedDate(defaultDate)
+      if (defaultDateISO !== undefined) {
+        setSelectedDateISO(defaultDateISO)
         setSelectedHour(String(defaultHour ?? 9))
         setSelectedMinute(String(defaultMinute ?? 0))
       } else {
-        // Default to today or tomorrow if past 7 PM
-        const now = new Date()
-        if (now.getHours() >= 19) {
-          const tomorrow = new Date(now)
-          tomorrow.setDate(tomorrow.getDate() + 1)
-          setSelectedDate(tomorrow)
+        const now = Temporal.Now.zonedDateTimeISO(timeZone)
+        if (now.hour >= 19) {
+          setSelectedDateISO(now.toPlainDate().add({ days: 1 }).toString())
           setSelectedHour("9")
         } else {
-          setSelectedDate(now)
-          // Default to next hour, clamped to 8-20
-          const nextHour = Math.min(Math.max(now.getHours() + 1, 8), 20)
+          setSelectedDateISO(now.toPlainDate().toString())
+          const nextHour = Math.min(Math.max(now.hour + 1, 8), 20)
           setSelectedHour(String(nextHour))
         }
         setSelectedMinute("0")
@@ -168,22 +160,40 @@ export function ScheduleTimeDialog({
 
   // Validate selected time is not in the past
   const isValidTime = useMemo(() => {
-    if (!selectedDate) return false
+    if (!selectedDateISO) return false
 
-    const now = new Date()
-    const selected = new Date(selectedDate)
-    selected.setHours(parseInt(selectedHour), parseInt(selectedMinute), 0, 0)
+    try {
+      const now = Temporal.Now.zonedDateTimeISO(timeZone)
+      const plainDate = Temporal.PlainDate.from(selectedDateISO)
+      const selected = Temporal.ZonedDateTime.from({
+        timeZone,
+        year: plainDate.year,
+        month: plainDate.month,
+        day: plainDate.day,
+        hour: parseInt(selectedHour, 10),
+        minute: parseInt(selectedMinute, 10),
+      })
 
-    return selected > now
-  }, [selectedDate, selectedHour, selectedMinute])
+      return Temporal.Instant.compare(selected.toInstant(), now.toInstant()) === 1
+    } catch {
+      return false
+    }
+  }, [selectedDateISO, selectedHour, selectedMinute, timeZone])
 
   const handleSchedule = () => {
-    if (!suggestion || !selectedDate || !isValidTime) return
+    if (!suggestion || !selectedDateISO || !isValidTime) return
 
-    const scheduledFor = new Date(selectedDate)
-    scheduledFor.setHours(parseInt(selectedHour), parseInt(selectedMinute), 0, 0)
+    const plainDate = Temporal.PlainDate.from(selectedDateISO)
+    const scheduled = Temporal.ZonedDateTime.from({
+      timeZone,
+      year: plainDate.year,
+      month: plainDate.month,
+      day: plainDate.day,
+      hour: parseInt(selectedHour, 10),
+      minute: parseInt(selectedMinute, 10),
+    })
 
-    onSchedule(suggestion, scheduledFor.toISOString())
+    onSchedule(suggestion, scheduled.toInstant().toString())
   }
 
   if (!suggestion) return null
@@ -268,7 +278,7 @@ export function ScheduleTimeDialog({
         </div>
 
         {/* Validation message */}
-        {selectedDate && !isValidTime && (
+        {selectedDateISO && !isValidTime && (
           <p className="text-xs text-destructive">
             Please select a time in the future
           </p>
@@ -285,7 +295,7 @@ export function ScheduleTimeDialog({
           <Button
             size="sm"
             onClick={handleSchedule}
-            disabled={!selectedDate || !isValidTime}
+            disabled={!selectedDateISO || !isValidTime}
             className="bg-accent text-accent-foreground hover:bg-accent/90"
           >
             <CalendarPlus className="h-4 w-4 mr-2" />

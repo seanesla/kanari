@@ -20,6 +20,8 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { X, ChevronLeft, MessageSquare, Calendar } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useCheckInSessions } from "@/hooks/use-storage"
+import { formatTime, getDateLabel } from "@/lib/date-utils"
+import { useTimeZone } from "@/lib/timezone-context"
 import { MessageBubble } from "./message-bubble"
 import type { CheckInSession } from "@/lib/types"
 
@@ -31,32 +33,17 @@ interface ConversationHistoryProps {
 }
 
 export function ConversationHistory({ onClose, className }: ConversationHistoryProps) {
+  const { timeZone } = useTimeZone()
   // Fetch the last 20 check-in sessions
   const sessions = useCheckInSessions(20)
 
   // Currently selected session to view in detail
   const [selectedSession, setSelectedSession] = useState<CheckInSession | null>(null)
 
-  // Format date for display
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const isToday = date.toDateString() === now.toDateString()
-    const isYesterday =
-      new Date(now.getTime() - 86400000).toDateString() === date.toDateString()
-
-    if (isToday) {
-      return `Today, ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-    }
-    if (isYesterday) {
-      return `Yesterday, ${date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`
-    }
-    return date.toLocaleDateString([], {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    })
+  const formatSessionTimestamp = (dateStr: string) => {
+    const label = getDateLabel(dateStr, timeZone)
+    const time = formatTime(dateStr, timeZone)
+    return `${label}, ${time}`
   }
 
   // Get a preview of the first user message (for list display)
@@ -123,7 +110,7 @@ export function ConversationHistory({ onClose, className }: ConversationHistoryP
             <div className="px-4 py-3 border-b bg-muted/30">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Calendar className="h-3.5 w-3.5" />
-                <span>{formatDate(selectedSession.startedAt)}</span>
+                <span>{formatSessionTimestamp(selectedSession.startedAt)}</span>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                 <MessageSquare className="h-3.5 w-3.5" />
@@ -177,7 +164,7 @@ export function ConversationHistory({ onClose, className }: ConversationHistoryP
               ) : (
                 // Session list
                 <div className="flex flex-col">
-                  {sessions.map((session) => (
+                          {sessions.map((session) => (
                     <button
                       key={session.id}
                       onClick={() => setSelectedSession(session)}
@@ -185,7 +172,7 @@ export function ConversationHistory({ onClose, className }: ConversationHistoryP
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-sm font-medium">
-                          {formatDate(session.startedAt)}
+                          {formatSessionTimestamp(session.startedAt)}
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {session.messages.length} msgs

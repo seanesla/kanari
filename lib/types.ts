@@ -411,6 +411,8 @@ export interface UserSettings {
   // Notification preferences
   enableNotifications: boolean
   dailyReminderTime?: string // HH:mm format
+  // Timezone
+  timeZone?: string // IANA timezone id (e.g., "America/Los_Angeles")
   // Calendar integration
   calendarConnected: boolean
   autoScheduleRecovery: boolean

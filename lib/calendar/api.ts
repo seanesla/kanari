@@ -3,6 +3,7 @@
 
 import type { CalendarEvent, Suggestion } from "@/lib/types"
 import type { OAuthTokens } from "./oauth"
+import { Temporal } from "temporal-polyfill"
 
 const CALENDAR_API_BASE = "https://www.googleapis.com/calendar/v3"
 
@@ -28,6 +29,7 @@ export interface CreateEventParams {
   description?: string
   start: string // ISO 8601
   end: string // ISO 8601
+  timeZone?: string // IANA timezone id (e.g., "America/Los_Angeles")
   colorId?: string
   calendarId?: string // Defaults to "primary"
 }
@@ -48,14 +50,8 @@ export async function createCalendarEvent(
   const eventBody = {
     summary: params.summary,
     description: params.description,
-    start: {
-      dateTime: params.start,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    },
-    end: {
-      dateTime: params.end,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    },
+    start: buildGoogleDateTime(params.start, params.timeZone),
+    end: buildGoogleDateTime(params.end, params.timeZone),
     colorId: params.colorId || "9", // Blue color for recovery events
     reminders: {
       useDefault: false,
@@ -102,16 +98,10 @@ export async function updateCalendarEvent(
   if (params.summary) updates.summary = params.summary
   if (params.description !== undefined) updates.description = params.description
   if (params.start) {
-    updates.start = {
-      dateTime: params.start,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    }
+    updates.start = buildGoogleDateTime(params.start, params.timeZone)
   }
   if (params.end) {
-    updates.end = {
-      dateTime: params.end,
-      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    }
+    updates.end = buildGoogleDateTime(params.end, params.timeZone)
   }
 
   const response = await fetch(
@@ -228,6 +218,26 @@ export async function getFreeBusy(
 // ============================================
 // Utility Functions
 // ============================================
+
+function formatGoogleDateTime(isoString: string, timeZone: string): string {
+  try {
+    const instant = Temporal.Instant.from(isoString)
+    return instant.toZonedDateTimeISO(timeZone).toString({ timeZoneName: "never" })
+  } catch {
+    return isoString
+  }
+}
+
+function buildGoogleDateTime(isoString: string, timeZone?: string) {
+  if (timeZone) {
+    return {
+      dateTime: formatGoogleDateTime(isoString, timeZone),
+      timeZone,
+    }
+  }
+
+  return { dateTime: isoString }
+}
 
 /**
  * Map Google Calendar API event to our CalendarEvent type

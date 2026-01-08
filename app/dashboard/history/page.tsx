@@ -47,6 +47,7 @@ import { SelectionActionBar } from "@/components/dashboard/selection-action-bar"
 import { BatchDeleteConfirmDialog } from "@/components/dashboard/batch-delete-confirm-dialog"
 import { useCursorGlow } from "@/hooks/use-cursor-glow"
 import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
+import { useTimeZone } from "@/lib/timezone-context"
 import type { HistoryItem, CheckInSession } from "@/lib/types"
 
 /** Filter options for the check-ins list */
@@ -274,6 +275,7 @@ function NewCheckInContent({
 function HistoryPageContent() {
   const searchParams = useSearchParams()
   const { shouldAnimate } = useDashboardAnimation()
+  const { timeZone } = useTimeZone()
 
   // Animation state
   const [visible, setVisible] = useState(!shouldAnimate)
@@ -310,12 +312,12 @@ function HistoryPageContent() {
 
     for (const item of filteredItems) {
       const itemDate = item.timestamp
-      const dateKey = getDateKey(itemDate)
+      const dateKey = getDateKey(itemDate, timeZone)
 
       if (dateKey !== currentDateKey) {
         groups.push({
           dateKey,
-          dateLabel: getDateLabel(itemDate),
+          dateLabel: getDateLabel(itemDate, timeZone),
           items: [item],
         })
         currentDateKey = dateKey
@@ -325,7 +327,7 @@ function HistoryPageContent() {
     }
 
     return groups
-  }, [filteredItems])
+  }, [filteredItems, timeZone])
 
   // Get delete actions
   const { deleteCheckInSession, deleteIncompleteSessions } = useCheckInSessionActions()

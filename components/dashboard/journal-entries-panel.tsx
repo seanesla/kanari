@@ -4,6 +4,7 @@ import { Link } from "next-view-transitions"
 import { NotebookPen, ArrowRight } from "lucide-react"
 import { useJournalEntries } from "@/hooks/use-storage"
 import { formatDate } from "@/lib/date-utils"
+import { useTimeZone } from "@/lib/timezone-context"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,6 +16,7 @@ interface JournalEntriesPanelProps {
 }
 
 export function JournalEntriesPanel({ limit = 5, className }: JournalEntriesPanelProps) {
+  const { timeZone } = useTimeZone()
   const entries = useJournalEntries(limit)
 
   return (
@@ -40,7 +42,7 @@ export function JournalEntriesPanel({ limit = 5, className }: JournalEntriesPane
               <div key={entry.id} className="rounded-lg border border-border/50 bg-background/30 p-3">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">{formatDate(entry.createdAt)}</p>
+                    <p className="text-xs text-muted-foreground">{formatDate(entry.createdAt, timeZone)}</p>
                     <p className="text-sm font-medium mt-1 line-clamp-2">{entry.prompt}</p>
                   </div>
                   <Badge variant="secondary" className="shrink-0">
@@ -67,4 +69,3 @@ export function JournalEntriesPanel({ limit = 5, className }: JournalEntriesPane
     </Card>
   )
 }
-

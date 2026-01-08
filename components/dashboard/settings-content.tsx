@@ -11,6 +11,7 @@ import { SettingsCalendarSection } from "./settings-calendar"
 import { SettingsNotificationsSection } from "./settings-notifications"
 import { SettingsPrivacySection } from "./settings-privacy"
 import { SettingsRecordingSection } from "./settings-recording"
+import { SettingsTimeZoneSection } from "./settings-timezone"
 import { SettingsVoiceSection } from "./settings-voice-section"
 import { db } from "@/lib/storage/db"
 import { DEFAULT_USER_SETTINGS, createDefaultSettingsRecord } from "@/lib/settings/default-settings"
@@ -197,6 +198,8 @@ export function SettingsContent() {
             setSaveMessage(null)
           }}
         />
+
+        <SettingsTimeZoneSection />
 
         <SettingsPrivacySection
           localStorageOnly={draft.localStorageOnly}

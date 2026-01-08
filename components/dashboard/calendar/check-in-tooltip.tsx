@@ -16,6 +16,7 @@ import { Mic, Clock, TrendingUp, ArrowRight, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDuration } from '@/lib/date-utils'
+import { useTimeZone } from '@/lib/timezone-context'
 import type { CheckInSession } from '@/lib/types'
 
 interface CheckInTooltipProps {
@@ -55,6 +56,7 @@ export function CheckInTooltip({
   anchorPosition,
 }: CheckInTooltipProps) {
   const router = useRouter()
+  const { timeZone } = useTimeZone()
   const [positionReady, setPositionReady] = useState(false)
 
   // Source: Context7 - /floating-ui/floating-ui docs - "Configure useFloating Hook for Popover Positioning"
@@ -148,7 +150,7 @@ export function CheckInTooltip({
             {/* Time & Duration */}
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
-                {formatDate(session.startedAt)}
+                {formatDate(session.startedAt, timeZone)}
               </span>
               <div className="flex items-center gap-1 text-muted-foreground">
                 <Clock className="h-3 w-3" />

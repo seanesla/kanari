@@ -1,14 +1,13 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
+import { RefreshCw } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/app/dashboard/layout"
 import {
   useTrendData,
-  useScheduledSuggestions,
   useRecordings,
   useCheckInSessions,
-  useRecoveryBlocks,
   useRecoveryBlockActions,
 } from "@/hooks/use-storage"
 import { useSuggestions, featuresToVoicePatterns, computeHistoricalContext } from "@/hooks/use-suggestions"
@@ -17,13 +16,14 @@ import { useResponsive } from "@/hooks/use-responsive"
 import { useSuggestionWorkflow } from "@/hooks/use-suggestion-workflow"
 import { useAchievements, useCanGenerateAchievements, useAchievementCooldown } from "@/hooks/use-achievements"
 import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
+import { Button } from "@/components/ui/button"
 import { DashboardHero } from "./dashboard-hero"
 import { DashboardLayout } from "./dashboard-layout"
 import { MetricsHeaderBar } from "./metrics-header-bar"
 import { InsightsPanel } from "./insights-panel"
 import { JournalEntriesPanel } from "./journal-entries-panel"
-import { PendingSidebar } from "./suggestions/pending-sidebar"
-import { ScheduleXWeekCalendar } from "./calendar"
+import { KanbanBoard } from "./suggestions/kanban-board"
+import { GoogleCalendarEmbed } from "./calendar"
 import { SuggestionDetailDialog, ScheduleTimeDialog } from "./suggestions"
 import { AchievementToastQueue } from "@/components/achievements"
 import type { BurnoutPrediction } from "@/lib/types"
@@ -33,14 +33,16 @@ export function UnifiedDashboard() {
   const { shouldAnimate } = useDashboardAnimation()
   const [visible, setVisible] = useState(!shouldAnimate)
   const { isMobile } = useResponsive()
-  const [isSidebarSheetOpen, setIsSidebarSheetOpen] = useState(false)
 
   // Data hooks
   const storedTrendData = useTrendData(7)
-  const scheduledSuggestions = useScheduledSuggestions()
   const allRecordings = useRecordings(14)
-  const { isConnected: isCalendarConnected, scheduleEvent } = useCalendar()
-  const recoveryBlocks = useRecoveryBlocks(100)
+  const {
+    isConnected: isCalendarConnected,
+    isLoading: isCalendarLoading,
+    connect: connectCalendar,
+    scheduleEvent,
+  } = useCalendar()
   const { addRecoveryBlock } = useRecoveryBlockActions()
 
   const scheduleGoogleEventAndPersist = useCallback(
@@ -89,8 +91,6 @@ export function UnifiedDashboard() {
   const {
     selectedSuggestion,
     scheduleDialogSuggestion,
-    pendingDragActive,
-    droppedSuggestion,
     handlers,
   } = useSuggestionWorkflow({
     suggestions,
@@ -144,13 +144,6 @@ export function UnifiedDashboard() {
     return computeHistoricalContext(checkInSessions || [])
   }, [checkInSessions])
 
-  // Completed suggestions (for calendar display)
-  const completedSuggestions = useMemo(() => {
-    return suggestions.filter(s =>
-      (s.status === "completed" || s.status === "accepted") && s.scheduledFor
-    )
-  }, [suggestions])
-
   // Handle regenerating suggestions
   const handleRegenerate = useCallback(async () => {
     const latestSession = checkInSessions?.[0]
@@ -174,6 +167,7 @@ export function UnifiedDashboard() {
   }, [checkInSessions, regenerateWithDiff])
 
   const pendingCount = suggestions.filter(s => s.status === "pending").length
+  const scheduledCount = suggestions.filter(s => s.status === "scheduled").length
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
@@ -204,32 +198,49 @@ export function UnifiedDashboard() {
 
           <DashboardLayout
             isMobile={isMobile}
-            isSidebarSheetOpen={isSidebarSheetOpen}
-            setIsSidebarSheetOpen={setIsSidebarSheetOpen}
-            pendingCount={pendingCount}
-            showEmptyState={!suggestionsLoading && scheduledSuggestions.length === 0 && pendingCount === 0}
-            sidebar={
-              <PendingSidebar
-                suggestions={suggestions}
-                onSuggestionClick={handlers.handleSuggestionClick}
-                onDragStart={handlers.handleDragStart}
-                onDragEnd={handlers.handleDragEnd}
-                onRegenerate={handleRegenerate}
-                isRegenerating={suggestionsLoading}
-                className="h-full"
-              />
+            showEmptyState={!suggestionsLoading && scheduledCount === 0 && pendingCount === 0}
+            kanban={
+              <div className="h-full flex flex-col">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-medium">Suggestions</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Pending → Scheduled → Completed
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleRegenerate}
+                    disabled={suggestionsLoading}
+                    aria-label="Regenerate recovery suggestions"
+                  >
+                    <RefreshCw className={cn("h-4 w-4", suggestionsLoading && "animate-spin")} />
+                    <span className="ml-2 hidden sm:inline">Regenerate</span>
+                  </Button>
+                </div>
+                <div className="flex-1 min-h-0">
+                  <KanbanBoard
+                    suggestions={suggestions}
+                    onCardClick={handlers.handleSuggestionClick}
+                    onScheduleRequest={handlers.handleScheduleFromDialog}
+                    variant="compact"
+                    onMoveCard={(suggestionId, newStatus) => {
+                      const suggestion = suggestions.find((s) => s.id === suggestionId)
+                      if (!suggestion) return
+                      if (newStatus === "completed") {
+                        void handlers.handleComplete(suggestion)
+                      }
+                    }}
+                  />
+                </div>
+              </div>
             }
             calendar={
-              <ScheduleXWeekCalendar
-                scheduledSuggestions={scheduledSuggestions}
-                completedSuggestions={completedSuggestions}
-                checkInSessions={checkInSessions}
-                recoveryBlocks={recoveryBlocks}
-                onEventClick={handlers.handleEventClick}
-                onTimeSlotClick={handlers.handleTimeSlotClick}
-                onExternalDrop={handlers.handleExternalDrop}
-                pendingDragActive={pendingDragActive}
-                className={isMobile ? "h-[60vh] md:h-[70vh]" : "h-[calc(100vh-180px)]"}
+              <GoogleCalendarEmbed
+                isConnected={isCalendarConnected}
+                isLoading={isCalendarLoading && !isCalendarConnected}
+                onConnect={connectCalendar}
               />
             }
           />
@@ -257,9 +268,6 @@ export function UnifiedDashboard() {
           open={!!scheduleDialogSuggestion}
           onOpenChange={(open) => !open && handlers.closeDialogs()}
           onSchedule={handlers.handleScheduleConfirm}
-          defaultDate={droppedSuggestion?.date}
-          defaultHour={droppedSuggestion?.hour}
-          defaultMinute={droppedSuggestion?.minute}
         />
 
         {/* Achievement Toast Queue - Shows celebration for new achievements */}

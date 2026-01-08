@@ -12,6 +12,7 @@ import { motion } from "framer-motion"
 import { SidebarMenuButton } from "@/components/ui/sidebar"
 import { Checkbox } from "@/components/ui/checkbox"
 import { formatTime } from "@/lib/date-utils"
+import { useTimeZone } from "@/lib/timezone-context"
 import type { HistoryItem } from "@/lib/types"
 
 interface CheckInListItemProps {
@@ -41,13 +42,6 @@ function getPreviewText(item: HistoryItem): string {
   return `${item.session.messages.length} messages`
 }
 
-/**
- * Get the timestamp for display
- */
-function getTimestamp(item: HistoryItem): string {
-  return formatTime(item.timestamp)
-}
-
 export function CheckInListItem({
   item,
   isSelected,
@@ -56,9 +50,10 @@ export function CheckInListItem({
   isChecked = false,
   onCheckChange,
 }: CheckInListItemProps) {
+  const { timeZone } = useTimeZone()
   const Icon = MessageSquare
   const preview = getPreviewText(item)
-  const time = getTimestamp(item)
+  const time = formatTime(item.timestamp, timeZone)
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.target !== e.currentTarget) return

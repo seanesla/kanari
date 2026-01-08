@@ -17,6 +17,7 @@ import { motion } from "framer-motion"
 import { Flame, Target, TrendingUp, Zap, Clock, Heart, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useTimeZone } from "@/lib/timezone-context"
 import type { AchievementCategory, AchievementRarity, StoredAchievement } from "@/lib/achievements"
 
 // ============================================
@@ -137,6 +138,7 @@ export function AchievementBadge({
   onClick,
   className,
 }: AchievementBadgeProps) {
+  const { timeZone } = useTimeZone()
   const categoryConfig = CATEGORY_CONFIG[achievement.category]
   const rarityConfig = RARITY_CONFIG[achievement.rarity]
   const CategoryIcon = categoryConfig.icon
@@ -262,7 +264,7 @@ export function AchievementBadge({
 
       {/* Date earned */}
       <p className="text-xs text-muted-foreground/70 mt-2">
-        Earned {new Date(achievement.earnedAt).toLocaleDateString()}
+        Earned {new Date(achievement.earnedAt).toLocaleDateString("en-US", { timeZone })}
       </p>
 
       {/* Legendary glow effect */}

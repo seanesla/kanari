@@ -4,7 +4,11 @@
 // Manages OAuth flow, token refresh, and calendar event creation
 
 import { useState, useEffect, useCallback, useRef } from "react"
-import type { Suggestion, RecoveryBlock, UserSettings } from "@/lib/types"
+import type { Suggestion, RecoveryBlock } from "@/lib/types"
+
+export interface CalendarEventOptions {
+  timeZone?: string
+}
 
 export interface UseCalendarReturn {
   // Connection status
@@ -15,7 +19,7 @@ export interface UseCalendarReturn {
   // Actions
   connect: () => Promise<void>
   disconnect: () => Promise<void>
-  scheduleEvent: (suggestion: Suggestion, settings?: UserSettings) => Promise<RecoveryBlock | null>
+  scheduleEvent: (suggestion: Suggestion, options?: CalendarEventOptions) => Promise<RecoveryBlock | null>
   deleteEvent: (eventId: string) => Promise<void>
   clearError: () => void
 
@@ -27,6 +31,15 @@ interface SessionResponse {
   authenticated: boolean
   expiresAt?: number
   error?: string
+}
+
+function getApiUrl(path: string): string {
+  if (typeof window === "undefined") return path
+  try {
+    return new URL(path, window.location.origin).toString()
+  } catch {
+    return path
+  }
 }
 
 export function useCalendar(): UseCalendarReturn {
@@ -43,7 +56,7 @@ export function useCalendar(): UseCalendarReturn {
 
     const checkSession = async () => {
       try {
-        const response = await fetch("/api/auth/session")
+        const response = await fetch(getApiUrl("/api/auth/session"))
         const data: SessionResponse = await response.json()
 
         if (data.authenticated) {
@@ -76,11 +89,12 @@ export function useCalendar(): UseCalendarReturn {
   // Refresh tokens via session API
   const refreshTokens = useCallback(async (): Promise<boolean> => {
     try {
-      const response = await fetch("/api/auth/session")
+      const response = await fetch(getApiUrl("/api/auth/session"))
       const data: SessionResponse = await response.json()
 
       if (data.authenticated) {
         setError(null)
+        setIsConnected(true)
         return true
       } else {
         setError(data.error || "Failed to refresh token")
@@ -101,7 +115,7 @@ export function useCalendar(): UseCalendarReturn {
 
     try {
       // Call our API route to get the authorization URL
-      const response = await fetch("/api/auth/google")
+      const response = await fetch(getApiUrl("/api/auth/google"))
 
       if (!response.ok) {
         throw new Error("Failed to initiate OAuth flow")
@@ -124,7 +138,7 @@ export function useCalendar(): UseCalendarReturn {
 
     try {
       // Clear session cookies via API
-      await fetch("/api/auth/session", { method: "DELETE" })
+      await fetch(getApiUrl("/api/auth/session"), { method: "DELETE" })
 
       setIsConnected(false)
     } catch (err) {
@@ -136,19 +150,18 @@ export function useCalendar(): UseCalendarReturn {
 
   // Schedule a recovery event
   const scheduleEvent = useCallback(
-    async (suggestion: Suggestion, settings?: UserSettings): Promise<RecoveryBlock | null> => {
+    async (suggestion: Suggestion, options?: CalendarEventOptions): Promise<RecoveryBlock | null> => {
       setIsLoading(true)
       setError(null)
 
       try {
-        if (!isConnected) {
-          throw new Error("Not connected to calendar")
-        }
+        const connected = isConnected || (await refreshTokens())
+        if (!connected) throw new Error("Not connected to calendar")
 
-        const response = await fetch("/api/calendar/event", {
+        const response = await fetch(getApiUrl("/api/calendar/event"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ suggestion, settings }),
+          body: JSON.stringify({ suggestion, timeZone: options?.timeZone }),
         })
 
         const data = await response.json()
@@ -164,7 +177,7 @@ export function useCalendar(): UseCalendarReturn {
         setIsLoading(false)
       }
     },
-    [isConnected]
+    [isConnected, refreshTokens]
   )
 
   // Delete a calendar event
@@ -174,11 +187,10 @@ export function useCalendar(): UseCalendarReturn {
       setError(null)
 
       try {
-        if (!isConnected) {
-          throw new Error("Not connected to calendar")
-        }
+        const connected = isConnected || (await refreshTokens())
+        if (!connected) throw new Error("Not connected to calendar")
 
-        const response = await fetch("/api/calendar/event", {
+        const response = await fetch(getApiUrl("/api/calendar/event"), {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ eventId }),
@@ -195,7 +207,7 @@ export function useCalendar(): UseCalendarReturn {
         setIsLoading(false)
       }
     },
-    [isConnected]
+    [isConnected, refreshTokens]
   )
 
   // Clear error state

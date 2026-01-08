@@ -11,6 +11,7 @@ import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { User, Sparkles, AlertTriangle, ChevronDown, ChevronRight, VolumeX } from "lucide-react"
+import { useTimeZone } from "@/lib/timezone-context"
 import type { CheckInMessage } from "@/lib/types"
 
 interface MessageBubbleProps {
@@ -26,6 +27,7 @@ export function MessageBubble({
   skipAnimation = false,
   className,
 }: MessageBubbleProps) {
+  const { timeZone } = useTimeZone()
   const isUser = message.role === "user"
   const isAssistant = message.role === "assistant"
   const hasMismatch = message.mismatch?.detected
@@ -37,7 +39,8 @@ export function MessageBubble({
   const [showThinking, setShowThinking] = useState(false)
 
   // Format timestamp
-  const time = new Date(message.timestamp).toLocaleTimeString([], {
+  const time = new Date(message.timestamp).toLocaleTimeString("en-US", {
+    timeZone,
     hour: "2-digit",
     minute: "2-digit",
   })

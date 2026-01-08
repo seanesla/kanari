@@ -2,6 +2,29 @@
  * Centralized date formatting utilities
  */
 
+function getYmdParts(date: Date, timeZone?: string): { year: number; month: number; day: number } {
+  if (!timeZone) {
+    return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() }
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date)
+
+  const year = Number(parts.find((p) => p.type === "year")?.value)
+  const month = Number(parts.find((p) => p.type === "month")?.value)
+  const day = Number(parts.find((p) => p.type === "day")?.value)
+
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+    return { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() }
+  }
+
+  return { year, month, day }
+}
+
 /**
  * Get the start of the current week (Monday at 00:00:00)
  */
@@ -57,7 +80,7 @@ export function formatDurationWithUnits(seconds: number): string {
 /**
  * Format date for display (e.g., "Mon, Dec 23, 3:45 PM")
  */
-export function formatDate(dateStr: string): string {
+export function formatDate(dateStr: string, timeZone?: string): string {
   const date = new Date(dateStr)
   return date.toLocaleDateString("en-US", {
     weekday: "short",
@@ -65,25 +88,31 @@ export function formatDate(dateStr: string): string {
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   })
 }
 
 /**
  * Format time only (e.g., "3:45 PM")
  */
-export function formatTime(dateStr: string): string {
+export function formatTime(dateStr: string, timeZone?: string): string {
   const date = new Date(dateStr)
   return date.toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
   })
 }
 
 /**
  * Get a consistent date key for grouping (YYYY-MM-DD format)
  */
-export function getDateKey(dateStr: string): string {
+export function getDateKey(dateStr: string, timeZone?: string): string {
   const date = new Date(dateStr)
+  if (timeZone) {
+    const { year, month, day } = getYmdParts(date, timeZone)
+    return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+  }
   return date.toISOString().split("T")[0]
 }
 
@@ -91,23 +120,28 @@ export function getDateKey(dateStr: string): string {
  * Get human-readable date label for section dividers
  * Returns "Today", "Yesterday", or "Mon, Dec 25"
  */
-export function getDateLabel(dateStr: string): string {
+export function getDateLabel(dateStr: string, timeZone?: string): string {
   const date = new Date(dateStr)
   const now = new Date()
 
-  // Reset times to compare just dates
-  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  const todayOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const yesterdayOnly = new Date(todayOnly)
-  yesterdayOnly.setDate(yesterdayOnly.getDate() - 1)
+  const dateYmd = getYmdParts(date, timeZone)
+  const nowYmd = getYmdParts(now, timeZone)
 
-  if (dateOnly.getTime() === todayOnly.getTime()) return "Today"
-  if (dateOnly.getTime() === yesterdayOnly.getTime()) return "Yesterday"
+  const dateKey = `${dateYmd.year}-${dateYmd.month}-${dateYmd.day}`
+  const todayKey = `${nowYmd.year}-${nowYmd.month}-${nowYmd.day}`
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  const yesterdayYmd = getYmdParts(yesterday, timeZone)
+  const yesterdayKey = `${yesterdayYmd.year}-${yesterdayYmd.month}-${yesterdayYmd.day}`
+
+  if (dateKey === todayKey) return "Today"
+  if (dateKey === yesterdayKey) return "Yesterday"
 
   return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric",
+    ...(timeZone ? { timeZone } : {}),
   })
 }
 
@@ -115,15 +149,27 @@ export function getDateLabel(dateStr: string): string {
  * Format scheduled time with relative dates
  * Returns "Today at 3:00 PM", "Tomorrow at 10:00 AM", or "Mon, Dec 23 at 3:00 PM"
  */
-export function formatScheduledTime(isoString: string): string {
+export function formatScheduledTime(isoString: string, timeZone?: string): string {
   const date = new Date(isoString)
   const now = new Date()
-  const isToday = date.toDateString() === now.toDateString()
+  const dateYmd = getYmdParts(date, timeZone)
+  const nowYmd = getYmdParts(now, timeZone)
+
+  const dateKey = `${dateYmd.year}-${dateYmd.month}-${dateYmd.day}`
+  const todayKey = `${nowYmd.year}-${nowYmd.month}-${nowYmd.day}`
   const tomorrow = new Date(now)
   tomorrow.setDate(tomorrow.getDate() + 1)
-  const isTomorrow = date.toDateString() === tomorrow.toDateString()
+  const tomorrowYmd = getYmdParts(tomorrow, timeZone)
+  const tomorrowKey = `${tomorrowYmd.year}-${tomorrowYmd.month}-${tomorrowYmd.day}`
 
-  const timeStr = date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+  const isToday = dateKey === todayKey
+  const isTomorrow = dateKey === tomorrowKey
+
+  const timeStr = date.toLocaleTimeString([], {
+    hour: "numeric",
+    minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
+  })
 
   if (isToday) return `Today at ${timeStr}`
   if (isTomorrow) return `Tomorrow at ${timeStr}`
@@ -131,7 +177,8 @@ export function formatScheduledTime(isoString: string): string {
   const dateStr = date.toLocaleDateString([], {
     weekday: "short",
     month: "short",
-    day: "numeric"
+    day: "numeric",
+    ...(timeZone ? { timeZone } : {}),
   })
   return `${dateStr} at ${timeStr}`
 }

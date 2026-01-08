@@ -3,10 +3,14 @@
 import { useCallback } from "react"
 import type { Dispatch } from "react"
 import type { GeminiWidgetEvent } from "@/lib/gemini/live-client"
+import { useCalendar } from "@/hooks/use-calendar"
+import { useTimeZone } from "@/lib/timezone-context"
+import { Temporal } from "temporal-polyfill"
 import type {
   JournalEntry,
   ScheduleActivityToolArgs,
   Suggestion,
+  RecoveryBlock,
 } from "@/lib/types"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 
@@ -30,7 +34,7 @@ export interface UseCheckInWidgetsResult {
   handlers: CheckInWidgetsGeminiHandlers
 }
 
-function parseLocalDateTime(date: string, time: string): Date | null {
+function parseZonedDateTimeInstant(date: string, time: string, timeZone: string): string | null {
   const [yearStr, monthStr, dayStr] = date.split("-")
   const [hourStr, minuteStr] = time.split(":")
 
@@ -51,28 +55,23 @@ function parseLocalDateTime(date: string, time: string): Date | null {
   }
 
   if (month < 1 || month > 12) return null
-  if (day < 1 || day > 31) return null
   if (hour < 0 || hour > 23) return null
   if (minute < 0 || minute > 59) return null
 
-  const dt = new Date(year, month - 1, day, hour, minute, 0, 0)
-
-  // Guard against Date overflow rollovers (e.g., 2025-02-31)
-  if (
-    dt.getFullYear() !== year ||
-    dt.getMonth() !== month - 1 ||
-    dt.getDate() !== day ||
-    dt.getHours() !== hour ||
-    dt.getMinutes() !== minute
-  ) {
+  try {
+    // Parse via ISO string to reject overflow dates like 2024-02-31.
+    const plainDateTime = Temporal.PlainDateTime.from(`${yearStr}-${monthStr}-${dayStr}T${hourStr}:${minuteStr}`)
+    const zdt = plainDateTime.toZonedDateTime(timeZone)
+    return zdt.toInstant().toString()
+  } catch {
     return null
   }
-
-  return dt
 }
 
 export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckInWidgetsResult {
   const { data, dispatch, sendText, addUserTextMessage } = options
+  const { isConnected: isCalendarConnected, scheduleEvent, deleteEvent, refreshTokens } = useCalendar()
+  const { timeZone } = useTimeZone()
 
   // ========================================
   // Storage Helpers (dynamic import)
@@ -102,6 +101,31 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
     await db.journalEntries.add(fromJournalEntry(entry))
   }, [])
 
+  const addRecoveryBlockToDb = useCallback(async (block: RecoveryBlock) => {
+    if (typeof indexedDB === "undefined") {
+      throw new Error("IndexedDB not available")
+    }
+    const { db, fromRecoveryBlock } = await import("@/lib/storage/db")
+    await db.recoveryBlocks.put(fromRecoveryBlock(block))
+  }, [])
+
+  const getRecoveryBlocksBySuggestionId = useCallback(async (suggestionId: string): Promise<RecoveryBlock[]> => {
+    if (typeof indexedDB === "undefined") {
+      throw new Error("IndexedDB not available")
+    }
+    const { db, toRecoveryBlock } = await import("@/lib/storage/db")
+    const records = await db.recoveryBlocks.where("suggestionId").equals(suggestionId).toArray()
+    return records.map(toRecoveryBlock)
+  }, [])
+
+  const deleteRecoveryBlockFromDb = useCallback(async (recoveryBlockId: string) => {
+    if (typeof indexedDB === "undefined") {
+      throw new Error("IndexedDB not available")
+    }
+    const { db } = await import("@/lib/storage/db")
+    await db.recoveryBlocks.delete(recoveryBlockId)
+  }, [])
+
   // ========================================
   // Widget Controls
   // ========================================
@@ -116,6 +140,34 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
   const undoScheduledActivity = useCallback(
     async (widgetId: string, suggestionId: string) => {
       try {
+        // Best-effort cleanup: if this suggestion was synced to Google Calendar, remove it there too.
+        try {
+          const recoveryBlocks = await getRecoveryBlocksBySuggestionId(suggestionId)
+          const canDeleteFromCalendar = isCalendarConnected || (await refreshTokens())
+          if (canDeleteFromCalendar) {
+            await Promise.all(
+              recoveryBlocks
+                .filter((block) => !!block.calendarEventId)
+                .map((block) => deleteEvent(block.calendarEventId))
+            )
+          }
+
+          // Always remove local recovery blocks for this suggestion.
+          await Promise.all(recoveryBlocks.map((block) => deleteRecoveryBlockFromDb(block.id)))
+        } catch (calendarCleanupError) {
+          // Don't block undo if Google cleanup fails; surface the error on the widget.
+          dispatch({
+            type: "UPDATE_WIDGET",
+            widgetId,
+            updates: {
+              error:
+                calendarCleanupError instanceof Error
+                  ? calendarCleanupError.message
+                  : "Failed to remove calendar event",
+            },
+          })
+        }
+
         await deleteSuggestionFromDb(suggestionId)
         dispatch({ type: "DISMISS_WIDGET", widgetId })
       } catch (error) {
@@ -128,8 +180,49 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         })
       }
     },
-    [deleteSuggestionFromDb, dispatch]
+    [
+      deleteEvent,
+      deleteRecoveryBlockFromDb,
+      deleteSuggestionFromDb,
+      dispatch,
+      getRecoveryBlocksBySuggestionId,
+      isCalendarConnected,
+      refreshTokens,
+    ]
   )
+
+  const syncSuggestionToCalendar = useCallback(async (widgetId: string, suggestion: Suggestion) => {
+    // Pattern doc: docs/error-patterns/calendar-sync-missing-for-ai-scheduled-activities.md
+    const connected = isCalendarConnected || (await refreshTokens())
+    if (!connected) return
+
+    const block = await scheduleEvent(suggestion, { timeZone })
+    if (!block) {
+      dispatch({
+        type: "UPDATE_WIDGET",
+        widgetId,
+        updates: {
+          error: "Saved, but Google Calendar sync failed",
+        },
+      })
+      return
+    }
+
+    try {
+      await addRecoveryBlockToDb(block)
+    } catch (persistError) {
+      dispatch({
+        type: "UPDATE_WIDGET",
+        widgetId,
+        updates: {
+          error:
+            persistError instanceof Error
+              ? persistError.message
+              : "Saved, but failed to persist calendar sync",
+        },
+      })
+    }
+  }, [addRecoveryBlockToDb, dispatch, isCalendarConnected, refreshTokens, scheduleEvent, timeZone])
 
   const runQuickAction = useCallback(
     (widgetId: string, action: string, label?: string) => {
@@ -219,9 +312,9 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           const widgetId = generateId()
           const suggestionId = generateId()
 
-          const scheduledAt = parseLocalDateTime(args.date as string, args.time as string)
+          const scheduledFor = parseZonedDateTimeInstant(args.date as string, args.time as string, timeZone)
 
-          if (!scheduledAt) {
+          if (!scheduledFor) {
             dispatch({
               type: "ADD_WIDGET",
               widget: {
@@ -250,7 +343,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
             category: args.category as "break" | "exercise" | "mindfulness" | "social" | "rest",
             status: "scheduled",
             createdAt: now,
-            scheduledFor: scheduledAt.toISOString(),
+            scheduledFor,
           }
 
           dispatch({
@@ -274,6 +367,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           void (async () => {
             try {
               await addSuggestionToDb(suggestion)
+              await syncSuggestionToCalendar(widgetId, suggestion)
             } catch (error) {
               dispatch({
                 type: "UPDATE_WIDGET",
@@ -341,7 +435,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           console.warn("[useCheckIn] Unknown manual tool:", toolName)
       }
     },
-    [addSuggestionToDb, data.latestMismatch, dispatch]
+    [addSuggestionToDb, data.latestMismatch, dispatch, syncSuggestionToCalendar, timeZone]
   )
 
   // ========================================
@@ -352,12 +446,12 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
     (event: GeminiWidgetEvent) => {
       const now = new Date().toISOString()
 
-      if (event.widget === "schedule_activity") {
-        const widgetId = generateId()
-        const suggestionId = generateId()
+        if (event.widget === "schedule_activity") {
+          const widgetId = generateId()
+          const suggestionId = generateId()
 
-        const scheduledAt = parseLocalDateTime(event.args.date, event.args.time)
-        if (!scheduledAt) {
+        const scheduledFor = parseZonedDateTimeInstant(event.args.date, event.args.time, timeZone)
+        if (!scheduledFor) {
           dispatch({
             type: "ADD_WIDGET",
             widget: {
@@ -380,7 +474,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           category: event.args.category,
           status: "scheduled",
           createdAt: now,
-          scheduledFor: scheduledAt.toISOString(),
+          scheduledFor,
         }
 
         // Optimistically show confirmation, then mark failed if Dexie write fails.
@@ -399,6 +493,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         void (async () => {
           try {
             await addSuggestionToDb(suggestion)
+            await syncSuggestionToCalendar(widgetId, suggestion)
           } catch (error) {
             dispatch({
               type: "UPDATE_WIDGET",
@@ -466,7 +561,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         })
       }
     },
-    [addSuggestionToDb, dispatch]
+    [addSuggestionToDb, dispatch, syncSuggestionToCalendar, timeZone]
   )
 
   const handlers: CheckInWidgetsGeminiHandlers = {
