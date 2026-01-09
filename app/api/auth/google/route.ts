@@ -8,6 +8,7 @@ export const runtime = "edge" // Optional: use edge runtime for faster response
 
 const OAUTH_STATE_COOKIE = "kanari_oauth_state"
 const OAUTH_CODE_VERIFIER_COOKIE = "kanari_oauth_code_verifier"
+const OAUTH_RETURN_TO_COOKIE = "kanari_oauth_return_to"
 
 const OAUTH_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -35,6 +36,9 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Get the return URL from query params (where to redirect after OAuth)
+    const returnTo = request.nextUrl.searchParams.get("returnTo") || "/dashboard"
+
     // Generate authorization URL with PKCE
     const { url: authUrl, state, codeVerifier } = await generateAuthUrl({
       clientId,
@@ -47,6 +51,7 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.json({ authUrl })
     response.cookies.set(OAUTH_STATE_COOKIE, state, OAUTH_COOKIE_OPTIONS)
     response.cookies.set(OAUTH_CODE_VERIFIER_COOKIE, codeVerifier, OAUTH_COOKIE_OPTIONS)
+    response.cookies.set(OAUTH_RETURN_TO_COOKIE, returnTo, OAUTH_COOKIE_OPTIONS)
 
     // Return the URL for client-side redirect
     // Alternatively, could redirect server-side:

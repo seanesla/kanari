@@ -26,7 +26,10 @@ describe("createCalendarEvent", () => {
     const end = "2026-01-08T17:30:00.000Z"
 
     const fetchMock = mockFetchOnce(async (_input, init) => {
-      const body = JSON.parse(String(init?.body ?? "{}")) as any
+      const body = JSON.parse(String(init?.body ?? "{}")) as {
+        start?: { dateTime?: string; timeZone?: string }
+        end?: { dateTime?: string; timeZone?: string }
+      }
 
       expect(body.start).toEqual({ dateTime: start })
       expect(body.end).toEqual({ dateTime: end })
@@ -69,7 +72,10 @@ describe("createCalendarEvent", () => {
       .toString({ timeZoneName: "never" })
 
     const fetchMock = mockFetchOnce(async (_input, init) => {
-      const body = JSON.parse(String(init?.body ?? "{}")) as any
+      const body = JSON.parse(String(init?.body ?? "{}")) as {
+        start?: { dateTime?: string; timeZone?: string }
+        end?: { dateTime?: string; timeZone?: string }
+      }
 
       expect(body.start).toEqual({ dateTime: expectedStart, timeZone })
       expect(body.end).toEqual({ dateTime: expectedEnd, timeZone })
@@ -98,4 +104,3 @@ describe("createCalendarEvent", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
-

@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo } from "react"
 import type { Suggestion, RecoveryBlock, EffectivenessFeedback } from "@/lib/types"
-import type { CalendarEventOptions } from "@/hooks/use-calendar"
+import type { LocalCalendarEventOptions } from "@/hooks/use-local-calendar"
 
 /**
  * Dropped suggestion info when dragging to calendar
@@ -59,7 +59,7 @@ interface UseSuggestionWorkflowParams {
   dismissSuggestion: (id: string) => Promise<boolean>
   /** Complete a suggestion with optional effectiveness feedback */
   completeSuggestion: (id: string, feedback?: EffectivenessFeedback) => Promise<boolean>
-  scheduleGoogleEvent?: (suggestion: Suggestion, options?: CalendarEventOptions) => Promise<RecoveryBlock | null>
+  scheduleGoogleEvent?: (suggestion: Suggestion, options?: LocalCalendarEventOptions) => Promise<RecoveryBlock | null>
   isCalendarConnected?: boolean
 }
 

@@ -1,12 +1,9 @@
 "use client"
 
 import { useMemo } from "react"
-import { Link } from "next-view-transitions"
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, Calendar, Flame } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Flame } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useDashboardStats, useTrendData } from "@/hooks/use-storage"
-import { useCalendar } from "@/hooks/use-calendar"
 import { predictBurnoutRisk } from "@/lib/ml/forecasting"
 // Unified check-in button replaces separate entry points
 import { CheckInButton } from "@/components/dashboard/check-in-button"
@@ -15,7 +12,6 @@ import type { BurnoutPrediction } from "@/lib/types"
 export function MetricsHeaderBar() {
   const dashboardStats = useDashboardStats()
   const storedTrendData = useTrendData(7)
-  const { isConnected, isLoading: calendarLoading } = useCalendar()
 
   // Calculate wellness score (100 - average of stress and fatigue)
   const wellnessScore = useMemo(() => {
@@ -116,23 +112,6 @@ export function MetricsHeaderBar() {
 
       {/* Actions */}
       <div className="flex items-center gap-2">
-        {/* Calendar Connection */}
-        {!calendarLoading && (
-          isConnected ? (
-            <div className="flex items-center gap-1.5 text-xs text-success px-3 py-1.5 rounded-md bg-success/10">
-              <Calendar className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Calendar synced</span>
-            </div>
-          ) : (
-            <Button asChild variant="outline" size="sm">
-              <Link href="/dashboard/settings">
-                <Calendar className="h-4 w-4 mr-1.5" />
-                <span className="hidden sm:inline">Connect Calendar</span>
-              </Link>
-            </Button>
-          )
-        )}
-
         {/*
           Unified Check-in Button
           Single entry point for AI chat check-ins with live biomarker capture.

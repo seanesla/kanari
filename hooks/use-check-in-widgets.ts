@@ -3,7 +3,7 @@
 import { useCallback } from "react"
 import type { Dispatch } from "react"
 import type { GeminiWidgetEvent } from "@/lib/gemini/live-client"
-import { useCalendar } from "@/hooks/use-calendar"
+import { useLocalCalendar } from "@/hooks/use-local-calendar"
 import { useTimeZone } from "@/lib/timezone-context"
 import { Temporal } from "temporal-polyfill"
 import type {
@@ -70,7 +70,7 @@ function parseZonedDateTimeInstant(date: string, time: string, timeZone: string)
 
 export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckInWidgetsResult {
   const { data, dispatch, sendText, addUserTextMessage } = options
-  const { isConnected: isCalendarConnected, scheduleEvent, deleteEvent, refreshTokens } = useCalendar()
+  const { isConnected: isCalendarConnected, scheduleEvent, deleteEvent } = useLocalCalendar()
   const { timeZone } = useTimeZone()
 
   // ========================================
@@ -140,29 +140,19 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
   const undoScheduledActivity = useCallback(
     async (widgetId: string, suggestionId: string) => {
       try {
-        // Best-effort cleanup: if this suggestion was synced to Google Calendar, remove it there too.
+        // Cleanup local recovery blocks for this suggestion.
         try {
           const recoveryBlocks = await getRecoveryBlocksBySuggestionId(suggestionId)
-          const canDeleteFromCalendar = isCalendarConnected || (await refreshTokens())
-          if (canDeleteFromCalendar) {
-            await Promise.all(
-              recoveryBlocks
-                .filter((block) => !!block.calendarEventId)
-                .map((block) => deleteEvent(block.calendarEventId))
-            )
-          }
-
-          // Always remove local recovery blocks for this suggestion.
           await Promise.all(recoveryBlocks.map((block) => deleteRecoveryBlockFromDb(block.id)))
-        } catch (calendarCleanupError) {
-          // Don't block undo if Google cleanup fails; surface the error on the widget.
+        } catch (cleanupError) {
+          // Don't block undo if cleanup fails; surface the error on the widget.
           dispatch({
             type: "UPDATE_WIDGET",
             widgetId,
             updates: {
               error:
-                calendarCleanupError instanceof Error
-                  ? calendarCleanupError.message
+                cleanupError instanceof Error
+                  ? cleanupError.message
                   : "Failed to remove calendar event",
             },
           })
@@ -181,28 +171,22 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
       }
     },
     [
-      deleteEvent,
       deleteRecoveryBlockFromDb,
       deleteSuggestionFromDb,
       dispatch,
       getRecoveryBlocksBySuggestionId,
-      isCalendarConnected,
-      refreshTokens,
     ]
   )
 
   const syncSuggestionToCalendar = useCallback(async (widgetId: string, suggestion: Suggestion) => {
-    // Pattern doc: docs/error-patterns/calendar-sync-missing-for-ai-scheduled-activities.md
-    const connected = isCalendarConnected || (await refreshTokens())
-    if (!connected) return
-
+    // Local calendar is always connected
     const block = await scheduleEvent(suggestion, { timeZone })
     if (!block) {
       dispatch({
         type: "UPDATE_WIDGET",
         widgetId,
         updates: {
-          error: "Saved, but Google Calendar sync failed",
+          error: "Failed to save calendar event",
         },
       })
       return
@@ -218,11 +202,11 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           error:
             persistError instanceof Error
               ? persistError.message
-              : "Saved, but failed to persist calendar sync",
+              : "Failed to persist calendar event",
         },
       })
     }
-  }, [addRecoveryBlockToDb, dispatch, isCalendarConnected, refreshTokens, scheduleEvent, timeZone])
+  }, [addRecoveryBlockToDb, dispatch, scheduleEvent, timeZone])
 
   const runQuickAction = useCallback(
     (widgetId: string, action: string, label?: string) => {

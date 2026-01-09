@@ -9,9 +9,10 @@ import {
   useRecordings,
   useCheckInSessions,
   useRecoveryBlockActions,
+  useRecoveryBlocks,
 } from "@/hooks/use-storage"
 import { useSuggestions, featuresToVoicePatterns, computeHistoricalContext } from "@/hooks/use-suggestions"
-import { useCalendar } from "@/hooks/use-calendar"
+import { useLocalCalendar } from "@/hooks/use-local-calendar"
 import { useResponsive } from "@/hooks/use-responsive"
 import { useSuggestionWorkflow } from "@/hooks/use-suggestion-workflow"
 import { useAchievements, useCanGenerateAchievements, useAchievementCooldown } from "@/hooks/use-achievements"
@@ -23,7 +24,7 @@ import { MetricsHeaderBar } from "./metrics-header-bar"
 import { InsightsPanel } from "./insights-panel"
 import { JournalEntriesPanel } from "./journal-entries-panel"
 import { KanbanBoard } from "./suggestions/kanban-board"
-import { GoogleCalendarEmbed } from "./calendar"
+import { FullCalendarView } from "./calendar"
 import { SuggestionDetailDialog, ScheduleTimeDialog } from "./suggestions"
 import { AchievementToastQueue } from "@/components/achievements"
 import type { BurnoutPrediction } from "@/lib/types"
@@ -39,13 +40,12 @@ export function UnifiedDashboard() {
   const allRecordings = useRecordings(14)
   const {
     isConnected: isCalendarConnected,
-    isLoading: isCalendarLoading,
-    connect: connectCalendar,
     scheduleEvent,
-  } = useCalendar()
+  } = useLocalCalendar()
   const { addRecoveryBlock } = useRecoveryBlockActions()
+  const recoveryBlocks = useRecoveryBlocks()
 
-  const scheduleGoogleEventAndPersist = useCallback(
+  const scheduleLocalEventAndPersist = useCallback(
     async (suggestion: Parameters<typeof scheduleEvent>[0]) => {
       const block = await scheduleEvent(suggestion)
       if (block) {
@@ -97,7 +97,7 @@ export function UnifiedDashboard() {
     scheduleSuggestion,
     dismissSuggestion,
     completeSuggestion,
-    scheduleGoogleEvent: scheduleGoogleEventAndPersist,
+    scheduleGoogleEvent: scheduleLocalEventAndPersist,
     isCalendarConnected,
   })
 
@@ -166,8 +166,20 @@ export function UnifiedDashboard() {
     await regenerateWithDiff(metrics, trend, checkInSessions || [])
   }, [checkInSessions, regenerateWithDiff])
 
-  const pendingCount = suggestions.filter(s => s.status === "pending").length
-  const scheduledCount = suggestions.filter(s => s.status === "scheduled").length
+  const { scheduledSuggestions, completedSuggestions, pendingCount } = useMemo(() => {
+    const scheduledSuggestions: typeof suggestions = []
+    const completedSuggestions: typeof suggestions = []
+    let pendingCount = 0
+
+    for (const suggestion of suggestions) {
+      if (suggestion.status === "pending") pendingCount += 1
+      if (suggestion.status === "scheduled") scheduledSuggestions.push(suggestion)
+      if (suggestion.status === "completed") completedSuggestions.push(suggestion)
+    }
+
+    return { scheduledSuggestions, completedSuggestions, pendingCount }
+  }, [suggestions])
+  const scheduledCount = scheduledSuggestions.length
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
@@ -237,10 +249,16 @@ export function UnifiedDashboard() {
               </div>
             }
             calendar={
-              <GoogleCalendarEmbed
-                isConnected={isCalendarConnected}
-                isLoading={isCalendarLoading && !isCalendarConnected}
-                onConnect={connectCalendar}
+              <FullCalendarView
+                scheduledSuggestions={scheduledSuggestions}
+                completedSuggestions={completedSuggestions}
+                checkInSessions={checkInSessions}
+                recoveryBlocks={recoveryBlocks}
+                onEventClick={handlers.handleSuggestionClick}
+                onEventUpdate={(suggestion, newScheduledFor) => {
+                  scheduleSuggestion(suggestion.id, newScheduledFor)
+                }}
+                className="h-full"
               />
             }
           />

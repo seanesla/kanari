@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Calendar, ExternalLink } from "lucide-react"
+import { useSearchParams } from "next/navigation"
+import { Calendar, ExternalLink, AlertCircle } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -10,16 +11,40 @@ interface GoogleCalendarEmbedProps {
   isConnected: boolean
   isLoading?: boolean
   onConnect?: () => void
+  error?: string | null
   className?: string
+}
+
+const ERROR_MESSAGES: Record<string, string> = {
+  oauth_failed: "Google Calendar connection was denied or cancelled.",
+  invalid_callback: "Invalid OAuth callback. Please try again.",
+  state_mismatch: "Security validation failed. Please try connecting again.",
+  missing_verifier: "OAuth verification failed. Please try again.",
+  token_exchange_failed: "Failed to complete authentication. Please try again.",
 }
 
 export function GoogleCalendarEmbed({
   isConnected,
   isLoading = false,
   onConnect,
+  error: propError,
   className,
 }: GoogleCalendarEmbedProps) {
   const [iframeLoaded, setIframeLoaded] = useState(false)
+  const searchParams = useSearchParams()
+
+  // Check for OAuth error in URL params
+  const urlError = searchParams.get("error")
+  const displayError = propError || (urlError ? ERROR_MESSAGES[urlError] || urlError : null)
+
+  // Clear error from URL after displaying
+  useEffect(() => {
+    if (urlError) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete("error")
+      window.history.replaceState({}, "", url.toString())
+    }
+  }, [urlError])
 
   useEffect(() => {
     setIframeLoaded(false)
@@ -58,6 +83,12 @@ export function GoogleCalendarEmbed({
           <p className="text-xs text-muted-foreground mb-4">
             Kanari embeds your real Google Calendar so timezone and existing events are always accurate.
           </p>
+          {displayError && (
+            <div className="flex items-center justify-center gap-2 mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-xs">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>{displayError}</span>
+            </div>
+          )}
           <div className="flex items-center justify-center gap-2">
             {onConnect && (
               <Button onClick={onConnect} className="bg-accent text-accent-foreground hover:bg-accent/90">
@@ -77,7 +108,7 @@ export function GoogleCalendarEmbed({
             </Button>
           </div>
           <p className="text-[11px] text-muted-foreground mt-4">
-            If the embed looks empty, make sure you’re signed into Google in this browser.
+            If the embed looks empty, make sure you're signed into Google in this browser.
           </p>
         </div>
       </div>

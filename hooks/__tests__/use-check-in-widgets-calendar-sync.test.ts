@@ -80,17 +80,14 @@ beforeEach(async () => {
     },
   }))
 
-  vi.doMock("@/hooks/use-calendar", () => ({
-    useCalendar: () => ({
+  vi.doMock("@/hooks/use-local-calendar", () => ({
+    useLocalCalendar: () => ({
       isConnected: true,
       isLoading: false,
       error: null,
-      connect: vi.fn(async () => {}),
-      disconnect: vi.fn(async () => {}),
       scheduleEvent: scheduleEventMock,
       deleteEvent: vi.fn(async () => {}),
       clearError: vi.fn(),
-      refreshTokens: vi.fn(async () => true),
     }),
   }))
 
@@ -124,7 +121,7 @@ afterEach(() => {
 })
 
 describe("useCheckIn schedule_activity calendar sync", () => {
-  it("syncs AI-scheduled activities to Google Calendar when connected", async () => {
+  it("syncs AI-scheduled activities to local calendar", async () => {
     const { result } = renderHook(() => useCheckIn())
 
     act(() => {

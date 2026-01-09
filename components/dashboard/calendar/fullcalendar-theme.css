@@ -1,0 +1,212 @@
+/* FullCalendar Dark Theme - Matches Kanari's design system */
+
+.fullcalendar-wrapper {
+  --fc-small-font-size: 0.75rem;
+  --fc-page-bg-color: transparent;
+  --fc-neutral-bg-color: oklch(0.14 0.01 60);
+  --fc-neutral-text-color: oklch(0.93 0.01 60);
+  --fc-border-color: oklch(0.30 0.01 60);
+  --fc-event-border-color: transparent;
+  --fc-event-text-color: inherit;
+  --fc-list-event-dot-width: 8px;
+  --fc-today-bg-color: oklch(0.78 0.16 70 / 0.1);
+}
+
+/* Main calendar background */
+.fullcalendar-wrapper .fc {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  color: oklch(0.93 0.01 60);
+}
+
+/* Header toolbar */
+.fullcalendar-wrapper .fc .fc-toolbar {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 0;
+}
+
+.fullcalendar-wrapper .fc .fc-toolbar-title {
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: var(--font-serif), serif;
+}
+
+/* Buttons */
+.fullcalendar-wrapper .fc .fc-button {
+  font-size: 0.75rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 0.375rem;
+  font-weight: 500;
+  text-transform: capitalize;
+  transition: all 0.15s ease;
+}
+
+.fullcalendar-wrapper .fc .fc-button:focus {
+  box-shadow: 0 0 0 2px oklch(0.08 0.01 60), 0 0 0 4px var(--fc-button-bg-color);
+}
+
+.fullcalendar-wrapper .fc .fc-button-primary:not(:disabled).fc-button-active,
+.fullcalendar-wrapper .fc .fc-button-primary:not(:disabled):active {
+  background-color: var(--fc-button-active-bg-color);
+  border-color: var(--fc-button-active-border-color);
+}
+
+/* Day headers */
+.fullcalendar-wrapper .fc .fc-col-header-cell {
+  padding: 0.5rem 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  color: oklch(0.78 0.08 60);
+}
+
+.fullcalendar-wrapper .fc .fc-col-header-cell-cushion {
+  padding: 0.25rem 0.5rem;
+}
+
+/* Time grid */
+.fullcalendar-wrapper .fc .fc-timegrid-slot {
+  height: 2.5rem;
+  border-bottom: 1px solid oklch(0.20 0.01 60);
+}
+
+.fullcalendar-wrapper .fc .fc-timegrid-slot-label {
+  font-size: 0.625rem;
+  color: oklch(0.65 0.05 60);
+  vertical-align: top;
+  padding-top: 0.25rem;
+}
+
+/* Events */
+.fullcalendar-wrapper .fc .fc-event {
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  border-width: 1px;
+  border-left-width: 3px;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.fullcalendar-wrapper .fc .fc-event:hover {
+  transform: scale(1.02);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.fullcalendar-wrapper .fc .fc-event-title {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fullcalendar-wrapper .fc .fc-event-time {
+  font-size: 0.625rem;
+  opacity: 0.8;
+}
+
+/* Check-in event styling */
+.fullcalendar-wrapper .fc .fc-event.checkin-event {
+  border-radius: 1rem;
+  font-size: 0.625rem;
+  padding: 0.125rem 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Now indicator */
+.fullcalendar-wrapper .fc .fc-timegrid-now-indicator-line {
+  border-color: oklch(0.65 0.20 25);
+  border-width: 2px;
+}
+
+.fullcalendar-wrapper .fc .fc-timegrid-now-indicator-arrow {
+  border-color: oklch(0.65 0.20 25);
+  border-top-color: transparent;
+  border-bottom-color: transparent;
+}
+
+/* Day cells */
+.fullcalendar-wrapper .fc .fc-daygrid-day {
+  background-color: transparent;
+}
+
+.fullcalendar-wrapper .fc .fc-daygrid-day.fc-day-today {
+  background-color: var(--fc-today-bg-color);
+}
+
+.fullcalendar-wrapper .fc .fc-daygrid-day-number {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  color: oklch(0.78 0.08 60);
+}
+
+.fullcalendar-wrapper .fc .fc-day-today .fc-daygrid-day-number {
+  font-weight: 600;
+  color: var(--fc-button-bg-color);
+}
+
+/* Scrollbar styling */
+.fullcalendar-wrapper .fc-scroller::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.fullcalendar-wrapper .fc-scroller::-webkit-scrollbar-track {
+  background: oklch(0.14 0.01 60);
+}
+
+.fullcalendar-wrapper .fc-scroller::-webkit-scrollbar-thumb {
+  background: oklch(0.30 0.01 60);
+  border-radius: 3px;
+}
+
+.fullcalendar-wrapper .fc-scroller::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.40 0.01 60);
+}
+
+/* Month view */
+.fullcalendar-wrapper .fc .fc-daygrid-body {
+  background-color: transparent;
+}
+
+.fullcalendar-wrapper .fc .fc-daygrid-day-frame {
+  min-height: 5rem;
+}
+
+.fullcalendar-wrapper .fc .fc-daygrid-more-link {
+  font-size: 0.625rem;
+  color: var(--fc-button-bg-color);
+  font-weight: 500;
+}
+
+/* Week view day cells */
+.fullcalendar-wrapper .fc .fc-timegrid-col.fc-day-today {
+  background-color: var(--fc-today-bg-color);
+}
+
+/* Border fixes */
+.fullcalendar-wrapper .fc .fc-scrollgrid {
+  border-color: oklch(0.25 0.01 60);
+}
+
+.fullcalendar-wrapper .fc .fc-scrollgrid-section > * {
+  border-color: oklch(0.25 0.01 60);
+}
+
+.fullcalendar-wrapper .fc td,
+.fullcalendar-wrapper .fc th {
+  border-color: oklch(0.20 0.01 60);
+}
+
+/* Remove double borders */
+.fullcalendar-wrapper .fc .fc-scrollgrid {
+  border-width: 0;
+}
+
+.fullcalendar-wrapper .fc .fc-scrollgrid-section-header > th {
+  border-bottom: 1px solid oklch(0.25 0.01 60);
+}

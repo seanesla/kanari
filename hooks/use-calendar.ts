@@ -114,8 +114,11 @@ export function useCalendar(): UseCalendarReturn {
     setError(null)
 
     try {
+      // Pass current path so we redirect back here after OAuth
+      const returnTo = encodeURIComponent(window.location.pathname)
+
       // Call our API route to get the authorization URL
-      const response = await fetch(getApiUrl("/api/auth/google"))
+      const response = await fetch(getApiUrl(`/api/auth/google?returnTo=${returnTo}`))
 
       if (!response.ok) {
         throw new Error("Failed to initiate OAuth flow")
