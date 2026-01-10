@@ -42,7 +42,7 @@ export const MUTE_RESPONSE_TOOL = {
 export const SCHEDULE_ACTIVITY_TOOL = {
   functionDeclarations: [{
     name: "schedule_activity",
-    description: "Schedule a short self-care activity on the user's in-app calendar. Use this when the user asks to schedule something (e.g. 'schedule a break tomorrow') or when a concrete time-bound plan would help. If the user has not specified a date/time, ask a clarifying question instead of calling the tool.",
+    description: "Schedule a short activity, check-in reminder, or personal appointment on the user's in-app calendar. Use this when the user asks to schedule something (e.g. 'schedule a break tomorrow', 'schedule a check-in at 10pm', 'schedule an appointment') or when a concrete time-bound plan would help. If the user has not specified a date/time, ask a clarifying question instead of calling the tool.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -61,7 +61,7 @@ export const SCHEDULE_ACTIVITY_TOOL = {
         },
         time: {
           type: Type.STRING,
-          description: "Time in HH:MM 24h (user's local time)"
+          description: "Time in HH:MM 24h (user's local time). Preserve the user's time EXACTLY (do not round minutes). Convert AM/PM precisely (e.g., 9:30 PM → 21:30, 12:00 AM → 00:00)."
         },
         duration: {
           type: Type.INTEGER,
@@ -288,9 +288,12 @@ Use these tools when the user asks for them OR when a quick visual/interactive a
 
 AVAILABLE TOOLS:
 1) schedule_activity({ title, category, date, time, duration })
-   - Use when the user asks to schedule an activity (e.g., "schedule a break tomorrow at 3")
+   - Use when the user asks to schedule something time-bound (e.g., "schedule a break tomorrow at 3", "schedule an appointment at 9:30PM")
+   - If the user asks to schedule a "check-in" later, schedule it as an activity titled "Check-in" (category: rest, duration: 20 minutes unless the user specifies otherwise)
    - Date must be YYYY-MM-DD and time must be HH:MM (24h), in the user's local time
+   - Preserve the user's time EXACTLY: do not round minutes; convert AM/PM precisely (e.g., 9:30 PM → 21:30)
    - If date/time is unclear, ask ONE clarifying question before calling
+   - After calling schedule_activity, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
 
 2) show_breathing_exercise({ type, duration })
    - Use for calming and regulation (type: box | 478 | relaxing)

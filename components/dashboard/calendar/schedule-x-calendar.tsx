@@ -129,9 +129,10 @@ function checkInToEvent(session: CheckInSession, timeZone: string): CheckInEvent
 
   const stressScore = session.acousticMetrics?.stressScore
   const fatigueScore = session.acousticMetrics?.fatigueScore
-  const title = stressScore !== undefined
+  const metrics = stressScore !== undefined
     ? `S:${stressScore} F:${fatigueScore ?? '?'}`
-    : 'Check-in'
+    : null
+  const title = metrics ? `✓ Check-in • ${metrics}` : '✓ Check-in'
 
   return {
     id: `checkin-${session.id}`,

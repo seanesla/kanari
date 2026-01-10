@@ -25,6 +25,20 @@
   padding: 0.75rem 0;
 }
 
+.fullcalendar-wrapper .fc .fc-toolbar-chunk {
+  display: flex;
+  align-items: center;
+}
+
+/* Add a bit of breathing room between header controls */
+.fullcalendar-wrapper .fc .fc-toolbar-chunk .fc-button-group > .fc-button + .fc-button {
+  margin-left: 0.25rem;
+}
+
+.fullcalendar-wrapper .fc .fc-toolbar-chunk .fc-button-group + .fc-button {
+  margin-left: 0.375rem;
+}
+
 .fullcalendar-wrapper .fc .fc-toolbar-title {
   font-size: 1rem;
   font-weight: 500;

@@ -1,12 +1,13 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch } from "react"
 import type { GeminiWidgetEvent } from "@/lib/gemini/live-client"
 import { useLocalCalendar } from "@/hooks/use-local-calendar"
 import { useTimeZone } from "@/lib/timezone-context"
 import { Temporal } from "temporal-polyfill"
 import type {
+  CheckInMessage,
   JournalEntry,
   ScheduleActivityToolArgs,
   Suggestion,
@@ -32,6 +33,138 @@ export interface UseCheckInWidgetsResult {
   saveJournalEntry: (widgetId: string, content: string) => Promise<void>
   triggerManualTool: (toolName: string, args: Record<string, unknown>) => void
   handlers: CheckInWidgetsGeminiHandlers
+}
+
+interface ParsedTime {
+  hour: number
+  minute: number
+}
+
+function parseTimeHHMM(time: string): ParsedTime | null {
+  const [hourStr, minuteStr] = time.split(":")
+  const hour = Number(hourStr)
+  const minute = Number(minuteStr)
+
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null
+  if (hour < 0 || hour > 23) return null
+  if (minute < 0 || minute > 59) return null
+
+  return { hour, minute }
+}
+
+function formatTimeHHMM(time: ParsedTime): string {
+  return `${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}`
+}
+
+function to24Hour(hour12: number, meridiem: "am" | "pm"): number {
+  const normalized = hour12 % 12
+  return meridiem === "pm" ? normalized + 12 : normalized
+}
+
+function extractExplicitTimeFromText(text: string): ParsedTime | null {
+  // This is intentionally conservative: only treat a time as "explicit" when
+  // the user provides AM/PM (or 24h time with hour>=13). This prevents us from
+  // overriding the model when the user says something ambiguous like "at 9:30".
+  const input = text.toLowerCase()
+
+  const foundTimes = new Map<string, ParsedTime>()
+
+  const push = (t: ParsedTime) => {
+    const key = formatTimeHHMM(t)
+    foundTimes.set(key, t)
+  }
+
+  // e.g. "9:30pm", "9:30 pm", "9.30 p.m."
+  for (const match of input.matchAll(/\b(1[0-2]|0?[1-9])\s*[:.]\s*([0-5]\d)\s*(a\.?m|p\.?m)\b/g)) {
+    const hour12 = Number(match[1])
+    const minute = Number(match[2])
+    const meridiem = match[3]?.startsWith("p") ? "pm" : "am"
+    push({ hour: to24Hour(hour12, meridiem), minute })
+  }
+
+  // e.g. "9 30 pm" (common speech-to-text variant)
+  for (const match of input.matchAll(/\b(1[0-2]|0?[1-9])\s+([0-5]\d)\s*(a\.?m|p\.?m)\b/g)) {
+    const hour12 = Number(match[1])
+    const minute = Number(match[2])
+    const meridiem = match[3]?.startsWith("p") ? "pm" : "am"
+    push({ hour: to24Hour(hour12, meridiem), minute })
+  }
+
+  // e.g. "9pm", "9 pm", "9 p.m."
+  for (const match of input.matchAll(/\b(1[0-2]|0?[1-9])\s*(a\.?m|p\.?m)\b/g)) {
+    const hour12 = Number(match[1])
+    const meridiem = match[2]?.startsWith("p") ? "pm" : "am"
+    push({ hour: to24Hour(hour12, meridiem), minute: 0 })
+  }
+
+  // e.g. "21:30" (24h). Only accept hour>=13 to avoid ambiguity with "9:30".
+  for (const match of input.matchAll(/\b([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)\b/g)) {
+    const hour = Number(match[1])
+    if (hour < 13) continue
+    const minute = Number(match[2])
+    push({ hour, minute })
+  }
+
+  if (foundTimes.size !== 1) return null
+  return foundTimes.values().next().value ?? null
+}
+
+function extractDateISOFromText(text: string, timeZone: string): string | null {
+  const input = text.toLowerCase()
+
+  const explicitDate = input.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0]
+  if (explicitDate) return explicitDate
+
+  const today = Temporal.Now.zonedDateTimeISO(timeZone).toPlainDate()
+
+  if (input.includes("tomorrow")) {
+    return today.add({ days: 1 }).toString()
+  }
+
+  if (input.includes("today") || input.includes("tonight")) {
+    return today.toString()
+  }
+
+  return null
+}
+
+function isCheckInScheduleRequest(text: string): boolean {
+  const input = text.toLowerCase()
+  return input.includes("schedule") && (input.includes("check-in") || input.includes("check in"))
+}
+
+function formatZonedDateTimeForMessage(dateISO: string, timeHHMM: string, timeZone: string): string {
+  const [year, month, day] = dateISO.split("-").map(Number)
+  const [hour, minute] = timeHHMM.split(":").map(Number)
+
+  try {
+    const zdt = Temporal.ZonedDateTime.from({
+      timeZone,
+      year,
+      month,
+      day,
+      hour,
+      minute,
+    })
+
+    return new Intl.DateTimeFormat([], {
+      timeZone,
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(new Date(zdt.epochMilliseconds))
+  } catch {
+    const dt = new Date(year, month - 1, day, hour, minute, 0, 0)
+    return dt.toLocaleString([], {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+  }
 }
 
 function parseZonedDateTimeInstant(date: string, time: string, timeZone: string): string | null {
@@ -72,6 +205,11 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
   const { data, dispatch, sendText, addUserTextMessage } = options
   const { isConnected: isCalendarConnected, scheduleEvent, deleteEvent } = useLocalCalendar()
   const { timeZone } = useTimeZone()
+
+  const widgetsRef = useRef(data.widgets)
+  useEffect(() => {
+    widgetsRef.current = data.widgets
+  }, [data.widgets])
 
   // ========================================
   // Storage Helpers (dynamic import)
@@ -178,7 +316,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
     ]
   )
 
-  const syncSuggestionToCalendar = useCallback(async (widgetId: string, suggestion: Suggestion) => {
+  const syncSuggestionToCalendar = useCallback(async (widgetId: string, suggestion: Suggestion): Promise<boolean> => {
     // Local calendar is always connected
     const block = await scheduleEvent(suggestion, { timeZone })
     if (!block) {
@@ -189,11 +327,12 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           error: "Failed to save calendar event",
         },
       })
-      return
+      return false
     }
 
     try {
       await addRecoveryBlockToDb(block)
+      return true
     } catch (persistError) {
       dispatch({
         type: "UPDATE_WIDGET",
@@ -205,6 +344,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
               : "Failed to persist calendar event",
         },
       })
+      return false
     }
   }, [addRecoveryBlockToDb, dispatch, scheduleEvent, timeZone])
 
@@ -430,11 +570,27 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
     (event: GeminiWidgetEvent) => {
       const now = new Date().toISOString()
 
-        if (event.widget === "schedule_activity") {
-          const widgetId = generateId()
-          const suggestionId = generateId()
+      if (event.widget === "schedule_activity") {
+        const widgetId = generateId()
+        const suggestionId = generateId()
 
-        const scheduledFor = parseZonedDateTimeInstant(event.args.date, event.args.time, timeZone)
+        // Some models occasionally mis-convert (or round) times even when the user
+        // explicitly says "9:30PM" etc. We conservatively prefer the explicit time
+        // from the most recent user message when it is unambiguous.
+        // Pattern doc: docs/error-patterns/schedule-activity-user-time-mismatch.md
+        const lastUserMessage = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? ""
+        const userTime = extractExplicitTimeFromText(lastUserMessage)
+        const toolTime = parseTimeHHMM(event.args.time)
+        const resolvedTime = userTime
+          ? formatTimeHHMM(userTime)
+          : event.args.time
+
+        // Only override if tool time parses (it always should) and user time is explicit.
+        const resolvedArgs: ScheduleActivityToolArgs = toolTime && userTime
+          ? { ...event.args, time: resolvedTime }
+          : event.args
+
+        const scheduledFor = parseZonedDateTimeInstant(resolvedArgs.date, resolvedArgs.time, timeZone)
         if (!scheduledFor) {
           dispatch({
             type: "ADD_WIDGET",
@@ -452,10 +608,10 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
 
         const suggestion: Suggestion = {
           id: suggestionId,
-          content: event.args.title,
+          content: resolvedArgs.title,
           rationale: "Scheduled from AI chat",
-          duration: event.args.duration,
-          category: event.args.category,
+          duration: resolvedArgs.duration,
+          category: resolvedArgs.category,
           status: "scheduled",
           createdAt: now,
           scheduledFor,
@@ -468,7 +624,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
             id: widgetId,
             type: "schedule_activity",
             createdAt: now,
-            args: event.args,
+            args: resolvedArgs,
             status: "scheduled",
             suggestionId,
           },
@@ -477,7 +633,16 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         void (async () => {
           try {
             await addSuggestionToDb(suggestion)
-            await syncSuggestionToCalendar(widgetId, suggestion)
+            const synced = await syncSuggestionToCalendar(widgetId, suggestion)
+            if (synced) {
+              const confirmationMessage: CheckInMessage = {
+                id: generateId(),
+                role: "assistant",
+                content: `Done — scheduled “${resolvedArgs.title}” for ${formatZonedDateTimeForMessage(resolvedArgs.date, resolvedArgs.time, timeZone)}.`,
+                timestamp: new Date().toISOString(),
+              }
+              dispatch({ type: "ADD_MESSAGE", message: confirmationMessage })
+            }
           } catch (error) {
             dispatch({
               type: "UPDATE_WIDGET",
@@ -545,8 +710,134 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         })
       }
     },
-    [addSuggestionToDb, dispatch, syncSuggestionToCalendar, timeZone]
+    [addSuggestionToDb, data.messages, dispatch, syncSuggestionToCalendar, timeZone]
   )
+
+  // ========================================
+  // Client-side fallback: schedule next check-in
+  // ========================================
+
+  const autoScheduleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastAutoScheduledMessageIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (autoScheduleTimeoutRef.current) {
+        clearTimeout(autoScheduleTimeoutRef.current)
+        autoScheduleTimeoutRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const lastUserMessage = [...data.messages].reverse().find((m) => m.role === "user")
+    if (!lastUserMessage) return
+    if (lastAutoScheduledMessageIdRef.current === lastUserMessage.id) return
+
+    if (!isCheckInScheduleRequest(lastUserMessage.content)) return
+
+    const dateISO = extractDateISOFromText(lastUserMessage.content, timeZone)
+    const timeParts = extractExplicitTimeFromText(lastUserMessage.content)
+    if (!dateISO || !timeParts) return
+
+    lastAutoScheduledMessageIdRef.current = lastUserMessage.id
+
+    if (autoScheduleTimeoutRef.current) {
+      clearTimeout(autoScheduleTimeoutRef.current)
+      autoScheduleTimeoutRef.current = null
+    }
+
+    // Give Gemini a brief window to issue `schedule_activity` so we don't double-schedule.
+    // Pattern doc: docs/error-patterns/schedule-check-in-doesnt-create-event.md
+    const messageTimestampMs = new Date(lastUserMessage.timestamp).getTime()
+    autoScheduleTimeoutRef.current = setTimeout(() => {
+      const alreadyScheduledByGemini = widgetsRef.current.some((w) => {
+        if (w.type !== "schedule_activity") return false
+        if (w.status !== "scheduled") return false
+        return new Date(w.createdAt).getTime() >= messageTimestampMs - 250
+      })
+
+      if (alreadyScheduledByGemini) return
+
+      const widgetId = generateId()
+      const suggestionId = generateId()
+      const now = new Date().toISOString()
+      const timeHHMM = formatTimeHHMM(timeParts)
+      const scheduledFor = parseZonedDateTimeInstant(dateISO, timeHHMM, timeZone)
+
+      const args: ScheduleActivityToolArgs = {
+        title: "Check-in",
+        category: "rest",
+        date: dateISO,
+        time: timeHHMM,
+        duration: 20,
+      }
+
+      if (!scheduledFor) {
+        dispatch({
+          type: "ADD_WIDGET",
+          widget: {
+            id: widgetId,
+            type: "schedule_activity",
+            createdAt: now,
+            args,
+            status: "failed",
+            error: "Invalid date/time",
+          },
+        })
+        return
+      }
+
+      const suggestion: Suggestion = {
+        id: suggestionId,
+        content: "Check-in",
+        rationale: "Scheduled check-in reminder",
+        duration: args.duration,
+        category: args.category,
+        status: "scheduled",
+        createdAt: now,
+        scheduledFor,
+      }
+
+      dispatch({
+        type: "ADD_WIDGET",
+        widget: {
+          id: widgetId,
+          type: "schedule_activity",
+          createdAt: now,
+          args,
+          status: "scheduled",
+          suggestionId,
+        },
+      })
+
+      void (async () => {
+        try {
+          await addSuggestionToDb(suggestion)
+          const synced = await syncSuggestionToCalendar(widgetId, suggestion)
+          if (synced) {
+            const confirmationMessage: CheckInMessage = {
+              id: generateId(),
+              role: "assistant",
+              content: `Done — scheduled “Check-in” for ${formatZonedDateTimeForMessage(args.date, args.time, timeZone)}.`,
+              timestamp: new Date().toISOString(),
+            }
+            dispatch({ type: "ADD_MESSAGE", message: confirmationMessage })
+          }
+        } catch (error) {
+          dispatch({
+            type: "UPDATE_WIDGET",
+            widgetId,
+            updates: {
+              status: "failed",
+              error: error instanceof Error ? error.message : "Failed to save",
+              suggestionId: undefined,
+            },
+          })
+        }
+      })()
+    }, 1200)
+  }, [addSuggestionToDb, data.messages, dispatch, syncSuggestionToCalendar, timeZone, widgetsRef])
 
   const handlers: CheckInWidgetsGeminiHandlers = {
     onWidget,

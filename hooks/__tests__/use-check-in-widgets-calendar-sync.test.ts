@@ -2,6 +2,7 @@
 
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest"
+import { Temporal } from "temporal-polyfill"
 
 let useCheckIn: typeof import("../use-check-in").useCheckIn
 
@@ -23,6 +24,7 @@ type GeminiWidgetEvent =
 
 type GeminiLiveCallbacks = {
   onWidget?: (event: GeminiWidgetEvent) => void
+  onModelTranscript?: (text: string, finished: boolean) => void
 }
 
 let geminiCallbacks: GeminiLiveCallbacks | null = null
@@ -52,6 +54,10 @@ beforeEach(async () => {
 
   vi.resetModules()
   vi.unmock("@/hooks/use-gemini-live")
+
+  vi.doMock("@/lib/timezone-context", () => ({
+    useTimeZone: () => ({ timeZone: "UTC" }),
+  }))
 
   vi.doMock("@/hooks/use-gemini-live", () => ({
     useGeminiLive: (options: GeminiLiveCallbacks) => {
@@ -148,5 +154,148 @@ describe("useCheckIn schedule_activity calendar sync", () => {
       expect(putRecoveryBlockMock).toHaveBeenCalledTimes(1)
     })
   })
-})
 
+  it("uses explicit user-provided time (e.g., 9:30PM) over tool args", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+      result.current[1].sendTextMessage("Schedule me an appointment at 9:30PM.")
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Appointment",
+          category: "rest",
+          date: "2025-01-01",
+          time: "09:30", // Wrong: AM instead of PM
+          duration: 30,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+    })
+
+    const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as { scheduledFor?: string } | undefined
+    expect(scheduledSuggestion?.scheduledFor).toBeTruthy()
+
+    const scheduledAt = Temporal.Instant.from(scheduledSuggestion!.scheduledFor!).toZonedDateTimeISO("UTC")
+    expect(scheduledAt.hour).toBe(21)
+    expect(scheduledAt.minute).toBe(30)
+
+    // UI widget args should also reflect the corrected time.
+    expect(result.current[0].widgets[0]?.type).toBe("schedule_activity")
+    expect(result.current[0].widgets[0]?.args.time).toBe("21:30")
+  })
+
+  it("does not round minutes when the user says a specific time", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+      result.current[1].sendTextMessage("Can you schedule a break for 9:30 pm?")
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Break",
+          category: "break",
+          date: "2025-01-01",
+          time: "21:00", // Wrong: rounded down
+          duration: 15,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+    })
+
+    const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as { scheduledFor?: string } | undefined
+    expect(scheduledSuggestion?.scheduledFor).toBeTruthy()
+
+    const scheduledAt = Temporal.Instant.from(scheduledSuggestion!.scheduledFor!).toZonedDateTimeISO("UTC")
+    expect(scheduledAt.hour).toBe(21)
+    expect(scheduledAt.minute).toBe(30)
+  })
+
+  it("does not override ambiguous times without AM/PM", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+      result.current[1].sendTextMessage("Schedule a break at 9:30 tomorrow.")
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Break",
+          category: "break",
+          date: "2025-01-01",
+          time: "21:30",
+          duration: 15,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+    })
+
+    const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as { scheduledFor?: string } | undefined
+    expect(scheduledSuggestion?.scheduledFor).toBeTruthy()
+
+    const scheduledAt = Temporal.Instant.from(scheduledSuggestion!.scheduledFor!).toZonedDateTimeISO("UTC")
+    expect(scheduledAt.hour).toBe(21)
+    expect(scheduledAt.minute).toBe(30)
+
+    expect(result.current[0].widgets[0]?.type).toBe("schedule_activity")
+    expect(result.current[0].widgets[0]?.args.time).toBe("21:30")
+  })
+
+  it("auto-schedules next check-in requests when user provides an explicit date/time", async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date("2026-01-09T21:54:16Z"))
+
+      const { result } = renderHook(() => useCheckIn())
+
+      act(() => {
+        geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+        result.current[1].sendTextMessage("Schedule a check-in today at 10:00 PM.")
+      })
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500) // Wait past the fallback window (1200ms)
+      })
+
+      await act(async () => {
+        // Flush the async persistence path.
+        await Promise.resolve()
+      })
+
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+
+      const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as { scheduledFor?: string } | undefined
+      expect(scheduledSuggestion?.scheduledFor).toBeTruthy()
+
+      const scheduledAt = Temporal.Instant.from(scheduledSuggestion!.scheduledFor!).toZonedDateTimeISO("UTC")
+      expect(scheduledAt.hour).toBe(22)
+      expect(scheduledAt.minute).toBe(0)
+
+      // Shows a confirmation widget and does NOT end the conversation.
+      expect(result.current[0].widgets.some((w) => w.type === "schedule_activity" && w.status === "scheduled")).toBe(true)
+      expect(result.current[0].messages.some((m) => m.role === "assistant" && /scheduled/i.test(m.content))).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

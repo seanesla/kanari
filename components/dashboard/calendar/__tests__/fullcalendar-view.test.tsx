@@ -127,7 +127,7 @@ describe("FullCalendarView", () => {
     expect(completedEvent.textColor).toBe("#9ca3af")
 
     const checkInEvent = events.find((e) => e.id === "checkin-c1") as EventInput
-    expect(checkInEvent.title).toBe("S:42 F:70")
+    expect(checkInEvent.title).toBe("✓ Check-in • S:42 F:70")
     expect(checkInEvent.backgroundColor).toBe("#78350f")
     expect(checkInEvent.borderColor).toBe("#f59e0b")
     expect(checkInEvent.textColor).toBe("#fef3c7")
