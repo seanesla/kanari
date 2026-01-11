@@ -22,7 +22,8 @@
 .fullcalendar-wrapper .fc .fc-toolbar {
   flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .fullcalendar-wrapper .fc .fc-toolbar-chunk {
@@ -223,4 +224,66 @@
 
 .fullcalendar-wrapper .fc .fc-scrollgrid-section-header > th {
   border-bottom: 1px solid oklch(0.25 0.01 60);
+}
+
+/* Mobile responsive styles */
+@media (max-width: 640px) {
+  .fullcalendar-wrapper .fc .fc-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .fullcalendar-wrapper .fc .fc-toolbar-chunk {
+    justify-content: center;
+  }
+
+  .fullcalendar-wrapper .fc .fc-toolbar-title {
+    font-size: 0.875rem;
+    text-align: center;
+  }
+
+  .fullcalendar-wrapper .fc .fc-button {
+    font-size: 0.6875rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .fullcalendar-wrapper .fc .fc-col-header-cell {
+    font-size: 0.625rem;
+    padding: 0.25rem 0;
+  }
+
+  .fullcalendar-wrapper .fc .fc-timegrid-slot {
+    height: 2rem;
+  }
+
+  .fullcalendar-wrapper .fc .fc-timegrid-slot-label {
+    font-size: 0.5rem;
+  }
+
+  .fullcalendar-wrapper .fc .fc-event {
+    font-size: 0.5625rem;
+    padding: 0.0625rem 0.125rem;
+  }
+
+  .fullcalendar-wrapper .fc .fc-event-time {
+    font-size: 0.5rem;
+  }
+}
+
+/* Tablet responsive styles */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .fullcalendar-wrapper .fc .fc-toolbar {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .fullcalendar-wrapper .fc .fc-toolbar-title {
+    font-size: 0.9375rem;
+  }
+
+  .fullcalendar-wrapper .fc .fc-button {
+    font-size: 0.6875rem;
+    padding: 0.3125rem 0.625rem;
+  }
 }

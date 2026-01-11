@@ -338,8 +338,7 @@ export function FullCalendarView({
         dateClick={handleDateClick}
         editable={true}
         droppable={true}
-        selectable={true}
-        selectMirror={true}
+        selectable={false}
         dayMaxEvents={true}
         weekends={true}
         nowIndicator={true}

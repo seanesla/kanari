@@ -44,8 +44,16 @@ export function MetricsHeaderBar() {
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl px-4 py-3 md:px-6 md:py-4">
-      {/* Metrics */}
+      {/* Title + Metrics */}
       <div className="flex flex-wrap items-center gap-4 md:gap-6">
+        {/* Page Title */}
+        <h1 className="text-xl md:text-2xl font-serif">
+          Your <span className="text-accent">overview</span>
+        </h1>
+
+        {/* Divider */}
+        <div className="h-8 w-px bg-border/70 hidden md:block" />
+
         {/* Wellness Score */}
         <div className="flex items-center gap-2">
           <div className={cn("text-2xl md:text-3xl font-serif tabular-nums", wellnessColor)}>

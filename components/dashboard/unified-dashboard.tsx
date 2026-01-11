@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { RefreshCw } from "lucide-react"
+import { RefreshCw, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/app/dashboard/layout"
 import {
@@ -18,8 +18,8 @@ import { useSuggestionWorkflow } from "@/hooks/use-suggestion-workflow"
 import { useAchievements, useCanGenerateAchievements, useAchievementCooldown } from "@/hooks/use-achievements"
 import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
 import { Button } from "@/components/ui/button"
-import { DashboardHero } from "./dashboard-hero"
 import { DashboardLayout } from "./dashboard-layout"
+import { CollapsibleSection } from "./collapsible-section"
 import { MetricsHeaderBar } from "./metrics-header-bar"
 import { InsightsPanel } from "./insights-panel"
 import { JournalEntriesPanel } from "./journal-entries-panel"
@@ -34,6 +34,7 @@ export function UnifiedDashboard() {
   const { shouldAnimate } = useDashboardAnimation()
   const [visible, setVisible] = useState(!shouldAnimate)
   const { isMobile } = useResponsive()
+  const [kanbanExpanded, setKanbanExpanded] = useState(false)
 
   // Data hooks
   const storedTrendData = useTrendData(7)
@@ -181,15 +182,80 @@ export function UnifiedDashboard() {
   }, [suggestions])
   const scheduledCount = scheduledSuggestions.length
 
+  // Kanban content (shared between mobile and desktop)
+  const kanbanContent = (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-medium">Suggestions</h3>
+          <p className="text-xs text-muted-foreground">
+            Pending → Scheduled → Completed
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRegenerate}
+            disabled={suggestionsLoading}
+            aria-label="Regenerate recovery suggestions"
+          >
+            <RefreshCw className={cn("h-4 w-4", suggestionsLoading && "animate-spin")} />
+            <span className="ml-2 hidden sm:inline">Regenerate</span>
+          </Button>
+          {!isMobile && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setKanbanExpanded(!kanbanExpanded)}
+              aria-label={kanbanExpanded ? "Collapse suggestions" : "Expand suggestions"}
+              className="px-2"
+            >
+              <ChevronsUpDown className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      </div>
+      <div className="flex-1 min-h-0">
+        <KanbanBoard
+          suggestions={suggestions}
+          onCardClick={handlers.handleSuggestionClick}
+          onScheduleRequest={handlers.handleScheduleFromDialog}
+          variant="compact"
+          onMoveCard={(suggestionId, newStatus) => {
+            const suggestion = suggestions.find((s) => s.id === suggestionId)
+            if (!suggestion) return
+            if (newStatus === "completed") {
+              void handlers.handleComplete(suggestion)
+            }
+          }}
+        />
+      </div>
+    </div>
+  )
+
+  // Calendar content (shared between mobile and desktop)
+  const calendarContent = (
+    <FullCalendarView
+      scheduledSuggestions={scheduledSuggestions}
+      completedSuggestions={completedSuggestions}
+      checkInSessions={checkInSessions}
+      recoveryBlocks={recoveryBlocks}
+      onEventClick={handlers.handleSuggestionClick}
+      onEventUpdate={(suggestion, newScheduledFor) => {
+        scheduleSuggestion(suggestion.id, newScheduledFor)
+      }}
+      className="h-full"
+    />
+  )
+
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
-        <DashboardHero visible={visible} />
-
-        {/* Metrics Header */}
+      <main className="px-4 md:px-8 lg:px-12 pt-20 pb-8 relative z-10">
+        {/* Compact Header with Title + Metrics */}
         <div
           className={cn(
-            "mb-6 transition-all duration-1000 delay-200",
+            "mb-6 transition-all duration-1000 delay-100",
             visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
@@ -199,69 +265,84 @@ export function UnifiedDashboard() {
         {/* Main Content */}
         <div
           className={cn(
-            "transition-all duration-1000 delay-300",
+            "transition-all duration-1000 delay-200",
             visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
-          <div className="mb-6 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-            <InsightsPanel session={latestSynthesisSession} />
-            <JournalEntriesPanel />
-          </div>
-
-          <DashboardLayout
-            isMobile={isMobile}
-            showEmptyState={!suggestionsLoading && scheduledCount === 0 && pendingCount === 0}
-            kanban={
-              <div className="h-full flex flex-col">
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-medium">Suggestions</h3>
-                    <p className="text-xs text-muted-foreground">
-                      Pending → Scheduled → Completed
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleRegenerate}
-                    disabled={suggestionsLoading}
-                    aria-label="Regenerate recovery suggestions"
-                  >
-                    <RefreshCw className={cn("h-4 w-4", suggestionsLoading && "animate-spin")} />
-                    <span className="ml-2 hidden sm:inline">Regenerate</span>
-                  </Button>
-                </div>
-                <div className="flex-1 min-h-0">
-                  <KanbanBoard
-                    suggestions={suggestions}
-                    onCardClick={handlers.handleSuggestionClick}
-                    onScheduleRequest={handlers.handleScheduleFromDialog}
-                    variant="compact"
-                    onMoveCard={(suggestionId, newStatus) => {
-                      const suggestion = suggestions.find((s) => s.id === suggestionId)
-                      if (!suggestion) return
-                      if (newStatus === "completed") {
-                        void handlers.handleComplete(suggestion)
-                      }
-                    }}
-                  />
-                </div>
+          {isMobile ? (
+            /* Mobile Layout: Stacked with collapsible panels at bottom */
+            <div className="space-y-4">
+              {/* Kanban */}
+              <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 h-[240px] overflow-hidden">
+                {kanbanContent}
               </div>
-            }
-            calendar={
-              <FullCalendarView
-                scheduledSuggestions={scheduledSuggestions}
-                completedSuggestions={completedSuggestions}
-                checkInSessions={checkInSessions}
-                recoveryBlocks={recoveryBlocks}
-                onEventClick={handlers.handleSuggestionClick}
-                onEventUpdate={(suggestion, newScheduledFor) => {
-                  scheduleSuggestion(suggestion.id, newScheduledFor)
-                }}
-                className="h-full"
-              />
-            }
-          />
+
+              {/* Calendar */}
+              <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden h-[60vh]">
+                {calendarContent}
+              </div>
+
+              {/* Collapsible Insights */}
+              <CollapsibleSection title="Latest Insights" defaultOpen={false}>
+                <InsightsPanel session={latestSynthesisSession} className="border-0 bg-transparent" />
+              </CollapsibleSection>
+
+              {/* Collapsible Journal */}
+              <CollapsibleSection title="Journal Entries" defaultOpen={false}>
+                <JournalEntriesPanel className="border-0 bg-transparent" />
+              </CollapsibleSection>
+
+              {/* Empty state */}
+              {!suggestionsLoading && scheduledCount === 0 && pendingCount === 0 && (
+                <DashboardLayout
+                  isMobile={isMobile}
+                  showEmptyState={true}
+                  kanban={null}
+                  calendar={null}
+                />
+              )}
+            </div>
+          ) : (
+            /* Desktop Layout: Sidebar + Main Content */
+            <div className="grid grid-cols-[300px_1fr] gap-6 h-[calc(100vh-140px)]">
+              {/* Sidebar: Insights + Journal */}
+              <div className="flex flex-col gap-4 overflow-hidden">
+                <InsightsPanel
+                  session={latestSynthesisSession}
+                  className="flex-1 min-h-0 overflow-auto"
+                />
+                <JournalEntriesPanel className="flex-1 min-h-0 overflow-auto" />
+              </div>
+
+              {/* Main Content: Kanban + Calendar */}
+              <div className="flex flex-col gap-4 overflow-hidden">
+                {/* Kanban */}
+                <div
+                  className={cn(
+                    "rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 overflow-hidden transition-all duration-300",
+                    kanbanExpanded ? "h-[400px]" : "h-[200px]"
+                  )}
+                >
+                  {kanbanContent}
+                </div>
+
+                {/* Calendar */}
+                <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden flex-1">
+                  {calendarContent}
+                </div>
+
+                {/* Empty state */}
+                {!suggestionsLoading && scheduledCount === 0 && pendingCount === 0 && (
+                  <DashboardLayout
+                    isMobile={isMobile}
+                    showEmptyState={true}
+                    kanban={null}
+                    calendar={null}
+                  />
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Suggestion Detail Dialog */}
