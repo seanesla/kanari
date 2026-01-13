@@ -1,22 +1,21 @@
 /**
  * POST /api/gemini/achievements
  *
- * Generate personalized achievements using Gemini based on user stats.
- * Unlike hardcoded badges, each achievement is uniquely generated for the user's journey.
+ * Generate daily achievements (challenges + badges) using Gemini based on user stats.
  *
- * Request body: UserStatsForAchievements
- * Response: { achievements: GeminiAchievementResponse["achievements"], reasoning: string }
+ * Request body: UserStatsForDailyAchievements
+ * Response: { achievements: GeminiDailyAchievementsResponse["achievements"], reasoning: string }
  */
 
 import { NextRequest, NextResponse } from "next/server"
 import { validateAPIKey, getAPIKeyFromRequest } from "@/lib/gemini/client"
 import { parseGeminiJson } from "@/lib/gemini/json"
 import {
-  ACHIEVEMENT_SYSTEM_PROMPT,
-  ACHIEVEMENT_RESPONSE_SCHEMA,
-  generateAchievementUserPrompt,
-  type UserStatsForAchievements,
-  type GeminiAchievementResponse,
+  DAILY_ACHIEVEMENTS_SYSTEM_PROMPT,
+  DAILY_ACHIEVEMENTS_RESPONSE_SCHEMA,
+  generateDailyAchievementsUserPrompt,
+  type UserStatsForDailyAchievements,
+  type GeminiDailyAchievementsResponse,
 } from "@/lib/achievements"
 
 /**
@@ -24,15 +23,15 @@ import {
  */
 async function generateAchievements(
   apiKey: string,
-  userStats: UserStatsForAchievements
-): Promise<GeminiAchievementResponse> {
+  userStats: UserStatsForDailyAchievements
+): Promise<GeminiDailyAchievementsResponse> {
   const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
 
-  const userPrompt = generateAchievementUserPrompt(userStats)
+  const userPrompt = generateDailyAchievementsUserPrompt(userStats)
 
   const request = {
     systemInstruction: {
-      parts: [{ text: ACHIEVEMENT_SYSTEM_PROMPT }],
+      parts: [{ text: DAILY_ACHIEVEMENTS_SYSTEM_PROMPT }],
     },
     contents: [
       {
@@ -41,12 +40,12 @@ async function generateAchievements(
       },
     ],
     generationConfig: {
-      temperature: 0.9, // Higher creativity for unique achievements
+      temperature: 0.8, // Creativity while staying structured
       topK: 40,
       topP: 0.95,
       maxOutputTokens: 2048,
       responseMimeType: "application/json",
-      responseSchema: ACHIEVEMENT_RESPONSE_SCHEMA,
+      responseSchema: DAILY_ACHIEVEMENTS_RESPONSE_SCHEMA,
     },
   }
 
@@ -89,7 +88,7 @@ async function generateAchievements(
     throw new Error("Gemini response parse error: missing text")
   }
 
-  const parsed = parseGeminiJson<GeminiAchievementResponse>(text)
+  const parsed = parseGeminiJson<GeminiDailyAchievementsResponse>(text)
 
   // Validate structure
   if (!Array.isArray(parsed.achievements)) {
@@ -97,19 +96,42 @@ async function generateAchievements(
   }
 
   // Validate each achievement
-  const validCategories = ["streak", "milestone", "improvement", "engagement", "pattern", "recovery"]
-  const validRarities = ["common", "uncommon", "rare", "epic", "legendary"]
+  const validTypes = ["challenge", "badge"]
+  const validCategories = ["consistency", "improvement", "engagement", "recovery"]
+  const validTrackingKeys = ["do_check_in", "complete_suggestions", "schedule_suggestion"]
 
   for (const achievement of parsed.achievements) {
     if (
+      typeof achievement.type !== "string" ||
+      !validTypes.includes(achievement.type) ||
       typeof achievement.title !== "string" ||
       typeof achievement.description !== "string" ||
       !validCategories.includes(achievement.category) ||
-      !validRarities.includes(achievement.rarity) ||
-      typeof achievement.insight !== "string" ||
-      typeof achievement.emoji !== "string"
+      typeof achievement.emoji !== "string" ||
+      typeof achievement.points !== "number" ||
+      !Number.isFinite(achievement.points) ||
+      achievement.points <= 0 ||
+      achievement.points > 80
     ) {
       throw new Error("Gemini response parse error: Invalid achievement structure")
+    }
+
+    if (achievement.type === "challenge") {
+      const tracking = achievement.tracking as unknown
+      if (typeof tracking !== "object" || tracking === null) {
+        throw new Error("Gemini response parse error: Challenge missing tracking")
+      }
+      const t = tracking as Record<string, unknown>
+      if (
+        typeof t.key !== "string" ||
+        !validTrackingKeys.includes(t.key) ||
+        typeof t.target !== "number" ||
+        !Number.isFinite(t.target) ||
+        t.target <= 0 ||
+        t.target > 10
+      ) {
+        throw new Error("Gemini response parse error: Invalid tracking object")
+      }
     }
   }
 
@@ -119,18 +141,19 @@ async function generateAchievements(
 /**
  * Validate user stats input
  */
-function validateUserStats(stats: unknown): stats is UserStatsForAchievements {
+function validateUserStats(stats: unknown): stats is UserStatsForDailyAchievements {
   if (typeof stats !== "object" || stats === null) return false
 
   const s = stats as Record<string, unknown>
 
   // Check required numeric fields
   const numericFields = [
-    "totalRecordings", "recordingsThisWeek", "recordingStreak", "longestStreak",
-    "averageStressScore", "averageFatigueScore", "suggestionsCompleted",
-    "suggestionsScheduled", "suggestionsDismissed", "completionRate",
-    "helpfulSuggestionsCount", "totalFeedbackGiven", "totalCheckInSessions",
-    "averageSessionDuration", "daysActive"
+    "requestedCount", "carryOverCount",
+    "totalCheckIns", "checkInsToday", "checkInStreak", "longestCheckInStreak", "daysActive",
+    "averageStressScore", "averageFatigueScore",
+    "activeSuggestionsCount", "suggestionsCompletedTotal", "suggestionsCompletedToday", "suggestionsScheduledToday",
+    "completionRate",
+    "totalPoints", "level", "currentDailyCompletionStreak",
   ]
 
   for (const field of numericFields) {
@@ -138,16 +161,15 @@ function validateUserStats(stats: unknown): stats is UserStatsForAchievements {
   }
 
   // Check required string fields
-  const validTimeOfDay = ["morning", "afternoon", "evening", "night", "varied"]
   const validTrends = ["improving", "stable", "worsening"]
 
-  if (!validTimeOfDay.includes(s.preferredTimeOfDay as string)) return false
-  if (typeof s.mostActiveDay !== "string") return false
+  if (typeof s.todayISO !== "string") return false
+  if (typeof s.timeZone !== "string") return false
   if (!validTrends.includes(s.stressTrend as string)) return false
   if (!validTrends.includes(s.fatigueTrend as string)) return false
 
   // Check array field
-  if (!Array.isArray(s.recentAchievementTitles)) return false
+  if (!Array.isArray(s.recentDailyTitles)) return false
 
   return true
 }

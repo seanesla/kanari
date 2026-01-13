@@ -1,21 +1,23 @@
 /**
- * Dynamic AI-Generated Achievements System
+ * Daily Hybrid Achievements System
  *
- * Unlike traditional hardcoded badges, Kanari's achievements are personalized
- * by Gemini based on each user's unique wellness journey.
+ * Kanari generates 2-3 daily achievements combining:
+ * - Prospective challenges (to complete today)
+ * - Retrospective badges (recognition for what you did)
  *
  * Features:
- * - AI-generated achievement titles and descriptions
- * - Pattern recognition for behavioral insights
- * - Rarity system based on achievement difficulty
- * - Celebration animations for new achievements
+ * - AI-generated daily content + points
+ * - Level progression + AI-generated level titles
+ * - Midnight reset in the user's time zone
+ * - One-day carry-over for incomplete challenges
+ * - Milestone badges for 7/30/60/90+ day completion streaks
  *
  * Usage:
  * ```tsx
- * import { collectUserStats, type Achievement } from "@/lib/achievements"
+ * import { collectUserStatsForDailyAchievements } from "@/lib/achievements"
  *
  * // Collect stats from recordings, suggestions, and sessions
- * const stats = collectUserStats(recordings, suggestions, sessions, recentAchievements)
+ * const stats = collectUserStatsForDailyAchievements(...)
  *
  * // Call the achievements API to generate new ones
  * const response = await fetch("/api/gemini/achievements", {
@@ -27,22 +29,28 @@
 
 // Export types
 export type {
-  AchievementCategory,
-  AchievementRarity,
-  Achievement,
-  StoredAchievement,
-  UserStatsForAchievements,
-  GeminiAchievementResponse,
-  AchievementNotification,
+  DailyAchievementType,
+  DailyAchievementCategory,
+  DailyAchievementTrackingKey,
+  DailyAchievementTracking,
+  DailyAchievement,
+  UserProgress,
+  MilestoneBadgeType,
+  MilestoneBadge,
+  UserStatsForDailyAchievements,
+  GeminiDailyAchievementsResponse,
+  GeminiLevelTitleResponse,
 } from "./types"
 
 // Export prompts
 export {
-  ACHIEVEMENT_SYSTEM_PROMPT,
-  ACHIEVEMENT_RESPONSE_SCHEMA,
-  generateAchievementUserPrompt,
-  EXAMPLE_ACHIEVEMENTS,
+  DAILY_ACHIEVEMENTS_SYSTEM_PROMPT,
+  DAILY_ACHIEVEMENTS_RESPONSE_SCHEMA,
+  generateDailyAchievementsUserPrompt,
+  LEVEL_TITLE_SYSTEM_PROMPT,
+  LEVEL_TITLE_RESPONSE_SCHEMA,
+  generateLevelTitleUserPrompt,
 } from "./prompts"
 
 // Export stats collector
-export { collectUserStats } from "./stats-collector"
+export { collectUserStatsForDailyAchievements } from "./stats-collector"

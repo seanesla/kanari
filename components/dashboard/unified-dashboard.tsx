@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
+import Link from "next/link"
 import { RefreshCw, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/app/dashboard/layout"
@@ -15,9 +16,10 @@ import { useSuggestions, featuresToVoicePatterns, computeHistoricalContext } fro
 import { useLocalCalendar } from "@/hooks/use-local-calendar"
 import { useResponsive } from "@/hooks/use-responsive"
 import { useSuggestionWorkflow } from "@/hooks/use-suggestion-workflow"
-import { useAchievements, useCanGenerateAchievements, useAchievementCooldown } from "@/hooks/use-achievements"
+import { useAchievements } from "@/hooks/use-achievements"
 import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
 import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
 import { DashboardLayout } from "./dashboard-layout"
 import { CollapsibleSection } from "./collapsible-section"
 import { MetricsHeaderBar } from "./metrics-header-bar"
@@ -26,7 +28,7 @@ import { JournalEntriesPanel } from "./journal-entries-panel"
 import { KanbanBoard } from "./suggestions/kanban-board"
 import { FullCalendarView } from "./calendar"
 import { SuggestionDetailDialog, ScheduleTimeDialog } from "./suggestions"
-import { AchievementToastQueue } from "@/components/achievements"
+import { CelebrationToastQueue, DailyAchievementCard } from "@/components/achievements"
 import type { BurnoutPrediction } from "@/lib/types"
 
 export function UnifiedDashboard() {
@@ -74,19 +76,18 @@ export function UnifiedDashboard() {
     return checkInSessions.find((s) => !!s.synthesis) ?? null
   }, [checkInSessions])
 
-  // Achievements hook
+  // Daily achievements (generated on app open)
   const {
-    newAchievements,
+    achievementsToday,
+    progress: achievementProgress,
+    dayCompletion,
     loading: achievementsLoading,
-    generateAchievements,
-    markAsSeen,
-  } = useAchievements()
-
-  // Check if user has enough data for achievements
-  const canGenerateAchievements = useCanGenerateAchievements(allRecordings || [], checkInSessions, suggestions)
-
-  // 24-hour cooldown for achievement generation
-  const { canCheck: cooldownAllowsCheck, markChecked } = useAchievementCooldown()
+    completeAchievement,
+    celebrationQueue,
+    milestoneCelebrationQueue,
+    markAchievementSeen,
+    markMilestoneSeen,
+  } = useAchievements({ recordings: allRecordings, suggestions, sessions: checkInSessions })
 
   // Suggestion workflow (dialogs, drag-drop, handlers)
   const {
@@ -110,23 +111,9 @@ export function UnifiedDashboard() {
     }
   }, [shouldAnimate])
 
-  // Check for new achievements (with 24-hour cooldown to save API credits)
-  useEffect(() => {
-    // Cooldown check - only allow one API call per 24 hours
-    if (!cooldownAllowsCheck) return
-    if (!canGenerateAchievements || achievementsLoading) return
-    if ((!allRecordings || allRecordings.length === 0) && checkInSessions.length === 0) return
-
-    // Generate achievements after a short delay to avoid blocking initial load
-    const timer = setTimeout(async () => {
-      await generateAchievements(allRecordings, suggestions, checkInSessions)
-      // Mark as checked to start 24-hour cooldown
-      markChecked()
-    }, 3000)
-
-    return () => clearTimeout(timer)
-    // Only run once when cooldown allows, not on every recording change
-  }, [cooldownAllowsCheck, canGenerateAchievements])
+  const dailyProgressPct = dayCompletion.totalCount > 0
+    ? (dayCompletion.completedCount / dayCompletion.totalCount) * 100
+    : 0
 
   // Burnout prediction
   const burnoutPrediction: BurnoutPrediction | null = useMemo(() => {
@@ -262,6 +249,66 @@ export function UnifiedDashboard() {
           <MetricsHeaderBar />
         </div>
 
+        {/* Daily achievements (compact) */}
+        <div className="mb-4">
+          <CollapsibleSection title="Today's Achievements" defaultOpen={!isMobile}>
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    Level {achievementProgress.level} • {achievementProgress.levelTitle}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {achievementProgress.totalPoints} pts • Suggestions {dayCompletion.recommendedActionsCompleted}/{dayCompletion.recommendedActionsRequired}
+                  </p>
+                </div>
+                <div className="text-right text-xs text-muted-foreground">
+                  <div>
+                    Daily{" "}
+                    <span className="font-medium text-foreground">
+                      {dayCompletion.completedCount}/{dayCompletion.totalCount}
+                    </span>
+                  </div>
+                  {dayCompletion.isComplete && (
+                    <div className="text-accent">Complete</div>
+                  )}
+                </div>
+              </div>
+
+              <Progress value={dailyProgressPct} />
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                {achievementsToday.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">
+                    {achievementsLoading ? "Generating today’s achievements…" : "No achievements yet."}
+                  </div>
+                ) : (
+                  achievementsToday.slice(0, 3).map((achievement) => (
+                    <DailyAchievementCard
+                      key={achievement.id}
+                      achievement={achievement}
+                      variant="compact"
+                      showNewIndicator
+                      onClick={() => {
+                        if (achievement.type === "challenge" && !achievement.completed && !achievement.expired) {
+                          void completeAchievement(achievement.id)
+                        }
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Resets at midnight (local)</span>
+                <Link href="/dashboard/achievements" className="underline underline-offset-4 hover:text-foreground">
+                  View all
+                </Link>
+              </div>
+            </div>
+          </CollapsibleSection>
+        </div>
+
         {/* Main Content */}
         <div
           className={cn(
@@ -369,10 +416,12 @@ export function UnifiedDashboard() {
           onSchedule={handlers.handleScheduleConfirm}
         />
 
-        {/* Achievement Toast Queue - Shows celebration for new achievements */}
-        <AchievementToastQueue
-          achievements={newAchievements}
-          onDismiss={markAsSeen}
+        {/* Celebrations */}
+        <CelebrationToastQueue
+          achievements={celebrationQueue}
+          milestones={milestoneCelebrationQueue}
+          onDismissAchievement={(id) => void markAchievementSeen(id)}
+          onDismissMilestone={(id) => void markMilestoneSeen(id)}
         />
       </main>
     </div>

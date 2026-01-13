@@ -1,420 +1,233 @@
 /**
- * Stats Collector for Achievement Generation
+ * Stats Collector for Daily Achievement Generation
  *
- * Gathers user stats from various sources (recordings, suggestions, sessions)
- * to build the context needed for Gemini to generate personalized achievements.
+ * Builds a compact summary of recent user activity to help Gemini generate
+ * daily challenges + badges that are achievable and measurable.
  */
 
-import type { Recording, Suggestion, CheckInSession } from "@/lib/types"
-import type { UserStatsForAchievements, StoredAchievement } from "./types"
+import { getDateKey } from "@/lib/date-utils"
+import type { CheckInSession, Recording, Suggestion } from "@/lib/types"
+import type {
+  DailyAchievement,
+  UserProgress,
+  UserStatsForDailyAchievements,
+} from "./types"
 
-function sessionsToVoiceRecordings(sessions: CheckInSession[]): Recording[] {
-  return sessions
-    .filter((session) => session.acousticMetrics)
-    .map((session) => ({
-      id: `session-${session.id}`,
-      createdAt: session.startedAt,
-      duration: session.duration ?? 0,
-      status: "complete",
-      metrics: session.acousticMetrics
-        ? {
-            stressScore: session.acousticMetrics.stressScore,
-            fatigueScore: session.acousticMetrics.fatigueScore,
-            stressLevel: session.acousticMetrics.stressLevel,
-            fatigueLevel: session.acousticMetrics.fatigueLevel,
-            confidence: session.acousticMetrics.confidence,
-            analyzedAt: session.acousticMetrics.analyzedAt ?? session.startedAt,
-          }
-        : undefined,
-      features: session.acousticMetrics?.features,
-    }))
+function shiftDateISO(dateISO: string, deltaDays: number): string {
+  const [year, month, day] = dateISO.split("-").map(Number)
+  const base = Date.UTC(year, (month ?? 1) - 1, day ?? 1)
+  const shifted = new Date(base + deltaDays * 86_400_000)
+  const y = shifted.getUTCFullYear()
+  const m = String(shifted.getUTCMonth() + 1).padStart(2, "0")
+  const d = String(shifted.getUTCDate()).padStart(2, "0")
+  return `${y}-${m}-${d}`
 }
 
-/**
- * Calculate the current recording streak (consecutive days)
- */
-function calculateStreak(recordings: Recording[]): number {
-  if (recordings.length === 0) return 0
+function ymdToUtcMidnightMs(dateISO: string): number {
+  const [year, month, day] = dateISO.split("-").map(Number)
+  return Date.UTC(year, (month ?? 1) - 1, day ?? 1)
+}
 
-  // Sort by date descending
-  const sorted = [...recordings].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  )
+function calculateStreakFromDateKeys(dateKeys: string[], todayISO: string): number {
+  if (dateKeys.length === 0) return 0
 
-  // Get unique dates
-  const dates = [...new Set(sorted.map(r => r.createdAt.split("T")[0]))]
-  if (dates.length === 0) return 0
+  const yesterdayISO = shiftDateISO(todayISO, -1)
+  const sortedDesc = [...new Set(dateKeys)].sort((a, b) => b.localeCompare(a))
 
-  // Check if user has recorded today or yesterday (streak is active)
-  const today = new Date().toISOString().split("T")[0]
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split("T")[0]
+  if (sortedDesc[0] !== todayISO && sortedDesc[0] !== yesterdayISO) return 0
 
-  if (dates[0] !== today && dates[0] !== yesterday) {
-    return 0 // Streak is broken
-  }
-
-  // Count consecutive days
   let streak = 1
-  for (let i = 1; i < dates.length; i++) {
-    const prevDate = new Date(dates[i - 1])
-    const currDate = new Date(dates[i])
-    const diffDays = Math.round((prevDate.getTime() - currDate.getTime()) / 86400000)
-
+  for (let i = 1; i < sortedDesc.length; i++) {
+    const prev = sortedDesc[i - 1]
+    const curr = sortedDesc[i]
+    const diffDays = Math.round((ymdToUtcMidnightMs(prev) - ymdToUtcMidnightMs(curr)) / 86_400_000)
     if (diffDays === 1) {
-      streak++
+      streak += 1
     } else {
       break
     }
   }
-
   return streak
 }
 
-/**
- * Calculate the longest streak ever
- */
-function calculateLongestStreak(recordings: Recording[]): number {
-  if (recordings.length === 0) return 0
+function calculateLongestStreakFromDateKeys(dateKeys: string[]): number {
+  const unique = [...new Set(dateKeys)].sort((a, b) => a.localeCompare(b))
+  if (unique.length === 0) return 0
 
-  // Get unique dates sorted ascending
-  const dates = [...new Set(recordings.map(r => r.createdAt.split("T")[0]))].sort()
-  if (dates.length === 0) return 0
+  let longest = 1
+  let current = 1
 
-  let maxStreak = 1
-  let currentStreak = 1
-
-  for (let i = 1; i < dates.length; i++) {
-    const prevDate = new Date(dates[i - 1])
-    const currDate = new Date(dates[i])
-    const diffDays = Math.round((currDate.getTime() - prevDate.getTime()) / 86400000)
-
+  for (let i = 1; i < unique.length; i++) {
+    const prev = unique[i - 1]
+    const curr = unique[i]
+    const diffDays = Math.round((ymdToUtcMidnightMs(curr) - ymdToUtcMidnightMs(prev)) / 86_400_000)
     if (diffDays === 1) {
-      currentStreak++
-      maxStreak = Math.max(maxStreak, currentStreak)
+      current += 1
+      longest = Math.max(longest, current)
     } else {
-      currentStreak = 1
+      current = 1
     }
   }
 
-  return maxStreak
+  return longest
 }
 
-/**
- * Determine preferred time of day based on recording timestamps
- */
-function getPreferredTimeOfDay(recordings: Recording[]): UserStatsForAchievements["preferredTimeOfDay"] {
-  if (recordings.length < 3) return "varied"
+function calculateTrend(
+  entries: Array<{ stressScore: number; fatigueScore: number }>,
+  metric: "stressScore" | "fatigueScore"
+): "improving" | "stable" | "worsening" {
+  if (entries.length < 4) return "stable"
 
-  const hourCounts = { morning: 0, afternoon: 0, evening: 0, night: 0 }
+  const midpoint = Math.floor(entries.length / 2)
+  const recent = entries.slice(0, midpoint)
+  const older = entries.slice(midpoint)
 
-  for (const recording of recordings) {
-    const hour = new Date(recording.createdAt).getHours()
-    if (hour >= 5 && hour < 12) hourCounts.morning++
-    else if (hour >= 12 && hour < 17) hourCounts.afternoon++
-    else if (hour >= 17 && hour < 21) hourCounts.evening++
-    else hourCounts.night++
-  }
-
-  const total = recordings.length
-  const entries = Object.entries(hourCounts) as [keyof typeof hourCounts, number][]
-  const sorted = entries.sort((a, b) => b[1] - a[1])
-
-  // If top preference is more than 50%, it's their preferred time
-  if (sorted[0][1] / total > 0.5) {
-    return sorted[0][0]
-  }
-
-  return "varied"
-}
-
-/**
- * Get most active day of the week
- */
-function getMostActiveDay(recordings: Recording[]): string {
-  if (recordings.length === 0) return "None"
-
-  const dayCounts: Record<string, number> = {
-    Sunday: 0, Monday: 0, Tuesday: 0, Wednesday: 0,
-    Thursday: 0, Friday: 0, Saturday: 0
-  }
-
-  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
-
-  for (const recording of recordings) {
-    const day = dayNames[new Date(recording.createdAt).getDay()]
-    dayCounts[day]++
-  }
-
-  const sorted = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])
-  return sorted[0][0]
-}
-
-/**
- * Calculate average stress and fatigue scores
- */
-function calculateAverages(recordings: Recording[]): { stress: number; fatigue: number } {
-  const withMetrics = recordings.filter(r => r.metrics)
-  if (withMetrics.length === 0) return { stress: 0, fatigue: 0 }
-
-  const totalStress = withMetrics.reduce((sum, r) => sum + (r.metrics?.stressScore || 0), 0)
-  const totalFatigue = withMetrics.reduce((sum, r) => sum + (r.metrics?.fatigueScore || 0), 0)
-
-  return {
-    stress: Math.round(totalStress / withMetrics.length),
-    fatigue: Math.round(totalFatigue / withMetrics.length),
-  }
-}
-
-/**
- * Calculate trend direction from recordings
- */
-function calculateTrend(recordings: Recording[], metric: "stressScore" | "fatigueScore"): "improving" | "stable" | "worsening" {
-  const withMetrics = recordings.filter(r => r.metrics).slice(0, 14) // Last 2 weeks
-  if (withMetrics.length < 3) return "stable"
-
-  // Compare recent average to older average
-  const midpoint = Math.floor(withMetrics.length / 2)
-  const recent = withMetrics.slice(0, midpoint)
-  const older = withMetrics.slice(midpoint)
-
-  const recentAvg = recent.reduce((sum, r) => sum + (r.metrics?.[metric] || 0), 0) / recent.length
-  const olderAvg = older.reduce((sum, r) => sum + (r.metrics?.[metric] || 0), 0) / older.length
+  const recentAvg = recent.reduce((sum, e) => sum + e[metric], 0) / recent.length
+  const olderAvg = older.reduce((sum, e) => sum + e[metric], 0) / older.length
 
   const diff = recentAvg - olderAvg
-  if (diff < -5) return "improving" // Lower is better
+  if (diff < -5) return "improving" // lower is better
   if (diff > 5) return "worsening"
   return "stable"
 }
 
-/**
- * Get suggestion category stats
- */
-function getSuggestionStats(suggestions: Suggestion[]): {
-  completed: number
-  scheduled: number
-  dismissed: number
-  favoriteCategory: string | null
-  leastUsedCategory: string | null
-  completionRate: number
-  helpfulCount: number
-  feedbackCount: number
-} {
-  const completed = suggestions.filter(s => s.status === "completed" || s.status === "accepted")
-  const scheduled = suggestions.filter(s => s.status === "scheduled")
-  const dismissed = suggestions.filter(s => s.status === "dismissed")
+function getSuggestionStats(suggestions: Suggestion[]) {
+  const completed = suggestions.filter((s) => s.status === "completed" || s.status === "accepted")
+  const accepted = suggestions.filter((s) => s.status !== "dismissed" && s.status !== "pending")
 
-  // Count by category
   const categoryCounts: Record<string, number> = {}
   for (const s of completed) {
     categoryCounts[s.category] = (categoryCounts[s.category] || 0) + 1
   }
 
   const sortedCategories = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])
-  const favoriteCategory = sortedCategories[0]?.[0] || null
-  const leastUsedCategory = sortedCategories.length > 1 ? sortedCategories[sortedCategories.length - 1][0] : null
-
-  // Calculate completion rate
-  const accepted = suggestions.filter(s => s.status !== "dismissed" && s.status !== "pending")
+  const favoriteCategory = sortedCategories[0]?.[0] ?? null
   const completionRate = accepted.length > 0 ? completed.length / accepted.length : 0
-
-  // Count effectiveness feedback
-  const withFeedback = completed.filter(s => s.effectiveness)
-  const helpful = withFeedback.filter(
-    s => s.effectiveness?.rating === "very_helpful" || s.effectiveness?.rating === "somewhat_helpful"
-  )
+  const activeSuggestionsCount = suggestions.filter((s) => s.status === "pending" || s.status === "scheduled").length
 
   return {
-    completed: completed.length,
-    scheduled: scheduled.length,
-    dismissed: dismissed.length,
+    activeSuggestionsCount,
+    completedTotal: completed.length,
     favoriteCategory,
-    leastUsedCategory,
     completionRate,
-    helpfulCount: helpful.length,
-    feedbackCount: withFeedback.length,
   }
 }
 
-/**
- * Get check-in session stats
- */
-function getSessionStats(sessions: CheckInSession[]): { total: number; avgDuration: number } {
-  if (sessions.length === 0) return { total: 0, avgDuration: 0 }
-
-  const withDuration = sessions.filter(s => s.duration !== undefined)
-  const avgDuration = withDuration.length > 0
-    ? withDuration.reduce((sum, s) => sum + (s.duration || 0), 0) / withDuration.length
-    : 0
-
-  return {
-    total: sessions.length,
-    avgDuration,
-  }
+function countSuggestionsCompletedOnDate(suggestions: Suggestion[], timeZone: string, dateISO: string): number {
+  return suggestions.filter((s) => {
+    if (s.status !== "completed" && s.status !== "accepted") return false
+    const timestamp = s.completedAt ?? s.lastUpdatedAt ?? s.createdAt
+    return getDateKey(timestamp, timeZone) === dateISO
+  }).length
 }
 
-/**
- * Count recordings in the current week (Sunday to Saturday)
- */
-function countRecordingsThisWeek(recordings: Recording[]): number {
-  const now = new Date()
-  const dayOfWeek = now.getDay()
-  const startOfWeek = new Date(now)
-  startOfWeek.setDate(now.getDate() - dayOfWeek)
-  startOfWeek.setHours(0, 0, 0, 0)
-
-  return recordings.filter(r => new Date(r.createdAt) >= startOfWeek).length
+function countSuggestionsScheduledOnDate(suggestions: Suggestion[], timeZone: string, dateISO: string): number {
+  return suggestions.filter((s) => {
+    if (s.status !== "scheduled") return false
+    const timestamp = s.lastUpdatedAt ?? s.createdAt
+    return getDateKey(timestamp, timeZone) === dateISO
+  }).length
 }
 
-/**
- * Count unique days with activity
- */
-function countDaysActive(recordings: Recording[], sessions: CheckInSession[]): number {
-  const dates = new Set<string>()
+function collectMetricEntries(recordings: Recording[], sessions: CheckInSession[]) {
+  const recordingEntries = recordings
+    .filter((r) => !!r.metrics)
+    .map((r) => ({
+      timestamp: r.createdAt,
+      stressScore: r.metrics?.stressScore ?? 0,
+      fatigueScore: r.metrics?.fatigueScore ?? 0,
+    }))
 
-  for (const r of recordings) {
-    dates.add(r.createdAt.split("T")[0])
-  }
+  const sessionEntries = sessions
+    .filter((s) => !!s.acousticMetrics)
+    .map((s) => ({
+      timestamp: s.startedAt,
+      stressScore: s.acousticMetrics?.stressScore ?? 0,
+      fatigueScore: s.acousticMetrics?.fatigueScore ?? 0,
+    }))
 
-  for (const s of sessions) {
-    dates.add(s.startedAt.split("T")[0])
-  }
-
-  return dates.size
-}
-
-/**
- * Calculate data quality indicators for Gemini to assess
- * whether there's enough meaningful data for achievements
- */
-function calculateDataQuality(
-  recordings: Recording[],
-  suggestions: Suggestion[],
-  daysActive: number,
-  firstRecordingDate: string | null
-): UserStatsForAchievements["dataQuality"] {
-  // Calculate journey duration
-  let journeyDurationDays = 0
-  if (firstRecordingDate) {
-    const firstDate = new Date(firstRecordingDate)
-    const now = new Date()
-    journeyDurationDays = Math.floor((now.getTime() - firstDate.getTime()) / (1000 * 60 * 60 * 24))
-  }
-
-  // Has enough history (14+ days since first recording)
-  const hasEnoughHistory = journeyDurationDays >= 14
-
-  // Has consistent usage (active on 50%+ of days since start)
-  const hasConsistentUsage = journeyDurationDays > 0
-    ? (daysActive / journeyDurationDays) >= 0.5
-    : false
-
-  // Has measurable trends (enough variance in stress/fatigue scores)
-  const withMetrics = recordings.filter(r => r.metrics)
-  let hasMeasurableTrends = false
-  if (withMetrics.length >= 5) {
-    const stressScores = withMetrics.map(r => r.metrics?.stressScore || 0)
-    const minStress = Math.min(...stressScores)
-    const maxStress = Math.max(...stressScores)
-    // Need at least 15 point variance to detect meaningful trends
-    hasMeasurableTrends = (maxStress - minStress) >= 15
-  }
-
-  // Suggestion engagement rate (what % of suggestions user interacted with)
-  const totalSuggestions = suggestions.length
-  const interactedSuggestions = suggestions.filter(
-    s => s.status !== "pending"
-  ).length
-  const suggestionEngagementRate = totalSuggestions > 0
-    ? interactedSuggestions / totalSuggestions
-    : 0
-
-  return {
-    journeyDurationDays,
-    hasEnoughHistory,
-    hasConsistentUsage,
-    hasMeasurableTrends,
-    suggestionEngagementRate,
-  }
-}
-
-/**
- * Collect all user stats for achievement generation
- *
- * @param recordings - All user recordings
- * @param suggestions - All suggestions
- * @param sessions - All check-in sessions
- * @param recentAchievements - Recently earned achievements (to avoid duplicates)
- */
-export function collectUserStats(
-  recordings: Recording[],
-  suggestions: Suggestion[],
-  sessions: CheckInSession[],
-  recentAchievements: StoredAchievement[]
-): UserStatsForAchievements {
-  const voiceRecordings = [...recordings, ...sessionsToVoiceRecordings(sessions)]
-
-  // Sort recordings by date descending (most recent first)
-  const sortedRecordings = [...voiceRecordings].sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  return [...recordingEntries, ...sessionEntries].sort(
+    (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   )
+}
 
-  const averages = calculateAverages(sortedRecordings)
-  const suggestionStats = getSuggestionStats(suggestions)
-  const sessionStats = getSessionStats(sessions)
-  const daysActive = countDaysActive(sortedRecordings, sessions)
-  const firstRecordingDate = sortedRecordings.length > 0
-    ? sortedRecordings[sortedRecordings.length - 1].createdAt.split("T")[0]
-    : null
-  const dataQuality = calculateDataQuality(
-    sortedRecordings,
-    suggestions,
-    daysActive,
-    firstRecordingDate
-  )
+function calculateMetricAverages(entries: Array<{ stressScore: number; fatigueScore: number }>): {
+  averageStressScore: number
+  averageFatigueScore: number
+} {
+  if (entries.length === 0) return { averageStressScore: 0, averageFatigueScore: 0 }
+  const stress = entries.reduce((sum, e) => sum + e.stressScore, 0) / entries.length
+  const fatigue = entries.reduce((sum, e) => sum + e.fatigueScore, 0) / entries.length
+  return { averageStressScore: Math.round(stress), averageFatigueScore: Math.round(fatigue) }
+}
+
+/**
+ * Collect user stats for daily achievements generation.
+ */
+export function collectUserStatsForDailyAchievements(input: {
+  recordings: Recording[]
+  suggestions: Suggestion[]
+  sessions: CheckInSession[]
+  recentDailyAchievements: DailyAchievement[]
+  progress: Pick<UserProgress, "totalPoints" | "level" | "currentDailyCompletionStreak" | "longestDailyCompletionStreak">
+  timeZone: string
+  todayISO: string
+  requestedCount: number
+  carryOverCount: number
+}): UserStatsForDailyAchievements {
+  const voiceDateKeys: string[] = []
+
+  for (const r of input.recordings) {
+    voiceDateKeys.push(getDateKey(r.createdAt, input.timeZone))
+  }
+  for (const s of input.sessions) {
+    voiceDateKeys.push(getDateKey(s.startedAt, input.timeZone))
+  }
+
+  const uniqueVoiceDays = [...new Set(voiceDateKeys)]
+
+  const checkInsToday =
+    input.recordings.filter((r) => getDateKey(r.createdAt, input.timeZone) === input.todayISO).length +
+    input.sessions.filter((s) => getDateKey(s.startedAt, input.timeZone) === input.todayISO).length
+
+  const checkInStreak = calculateStreakFromDateKeys(voiceDateKeys, input.todayISO)
+  const longestCheckInStreak = calculateLongestStreakFromDateKeys(voiceDateKeys)
+
+  const metricEntries = collectMetricEntries(input.recordings, input.sessions)
+  const averages = calculateMetricAverages(metricEntries)
+  const trendWindow = metricEntries.slice(0, 14)
+
+  const suggestionStats = getSuggestionStats(input.suggestions)
 
   return {
-    // Recording stats
-    totalRecordings: voiceRecordings.length,
-    recordingsThisWeek: countRecordingsThisWeek(sortedRecordings),
-    recordingStreak: calculateStreak(sortedRecordings),
-    longestStreak: calculateLongestStreak(sortedRecordings),
-
-    // Time patterns
-    preferredTimeOfDay: getPreferredTimeOfDay(sortedRecordings),
-    mostActiveDay: getMostActiveDay(sortedRecordings),
-
-    // Stress & fatigue trends
-    averageStressScore: averages.stress,
-    averageFatigueScore: averages.fatigue,
-    stressTrend: calculateTrend(sortedRecordings, "stressScore"),
-    fatigueTrend: calculateTrend(sortedRecordings, "fatigueScore"),
-    lowestStressDay: null, // TODO: implement if needed
-    highestImprovementDay: null, // TODO: implement if needed
-
-    // Suggestion engagement
-    suggestionsCompleted: suggestionStats.completed,
-    suggestionsScheduled: suggestionStats.scheduled,
-    suggestionsDismissed: suggestionStats.dismissed,
+    todayISO: input.todayISO,
+    timeZone: input.timeZone,
+    requestedCount: input.requestedCount,
+    carryOverCount: input.carryOverCount,
+    // Activity
+    totalCheckIns: input.recordings.length + input.sessions.length,
+    checkInsToday,
+    checkInStreak,
+    longestCheckInStreak,
+    daysActive: uniqueVoiceDays.length,
+    // Wellness
+    averageStressScore: averages.averageStressScore,
+    averageFatigueScore: averages.averageFatigueScore,
+    stressTrend: calculateTrend(trendWindow, "stressScore"),
+    fatigueTrend: calculateTrend(trendWindow, "fatigueScore"),
+    // Suggestions
+    activeSuggestionsCount: suggestionStats.activeSuggestionsCount,
+    suggestionsCompletedTotal: suggestionStats.completedTotal,
+    suggestionsCompletedToday: countSuggestionsCompletedOnDate(input.suggestions, input.timeZone, input.todayISO),
+    suggestionsScheduledToday: countSuggestionsScheduledOnDate(input.suggestions, input.timeZone, input.todayISO),
     favoriteCategory: suggestionStats.favoriteCategory,
-    leastUsedCategory: suggestionStats.leastUsedCategory,
     completionRate: suggestionStats.completionRate,
-
-    // Effectiveness feedback
-    helpfulSuggestionsCount: suggestionStats.helpfulCount,
-    totalFeedbackGiven: suggestionStats.feedbackCount,
-
-    // Check-in sessions
-    totalCheckInSessions: sessionStats.total,
-    averageSessionDuration: sessionStats.avgDuration,
-
-    // Milestones
-    daysActive,
-    firstRecordingDate,
-
-    // Recent achievements (to avoid duplicates)
-    recentAchievementTitles: recentAchievements.map(a => a.title),
-
-    // Data quality indicators
-    dataQuality,
+    // Progress
+    totalPoints: input.progress.totalPoints,
+    level: input.progress.level,
+    currentDailyCompletionStreak: input.progress.currentDailyCompletionStreak,
+    // Dedupe
+    recentDailyTitles: input.recentDailyAchievements.map((a) => a.title),
   }
 }
+

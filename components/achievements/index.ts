@@ -1,9 +1,8 @@
 /**
  * Achievements Components
  *
- * UI components for displaying dynamic AI-generated achievements.
+ * UI components for displaying daily achievements + celebrations.
  */
 
-export { AchievementBadge, CATEGORY_CONFIG, RARITY_CONFIG } from "./achievement-badge"
-export { AchievementToast, AchievementToastQueue } from "./achievement-toast"
-export { AchievementsShowcase } from "./achievements-showcase"
+export { DailyAchievementCard, CATEGORY_CONFIG } from "./achievement-badge"
+export { CelebrationToast, CelebrationToastQueue } from "./achievement-toast"

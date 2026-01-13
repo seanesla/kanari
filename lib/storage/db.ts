@@ -7,12 +7,10 @@ import type {
   RecoveryBlock,
   UserSettings,
   TrendData,
-  SuggestionDecision,
   CheckInSession,
-  CheckInMessage,
   JournalEntry,
 } from "@/lib/types"
-import type { StoredAchievement, AchievementCategory, AchievementRarity } from "@/lib/achievements/types"
+import type { DailyAchievement, MilestoneBadge, UserProgress } from "@/lib/achievements/types"
 
 // Database record types with IndexedDB-friendly structure
 export interface DBRecording extends Omit<Recording, "createdAt"> {
@@ -43,9 +41,20 @@ export interface DBCheckInSession extends Omit<CheckInSession, "startedAt" | "en
   endedAt?: Date
 }
 
-export interface DBAchievement extends Omit<StoredAchievement, "earnedAt" | "seenAt"> {
+export interface DBDailyAchievement extends Omit<DailyAchievement, "createdAt" | "completedAt" | "seenAt" | "expiredAt"> {
+  createdAt: Date
+  completedAt?: Date
+  seenAt?: Date
+  expiredAt?: Date
+}
+
+export interface DBMilestoneBadge extends Omit<MilestoneBadge, "earnedAt" | "seenAt"> {
   earnedAt: Date
   seenAt?: Date
+}
+
+export interface DBUserProgress extends UserProgress {
+  id: string // Always "default"
 }
 
 export interface DBJournalEntry extends Omit<JournalEntry, "createdAt"> {
@@ -60,7 +69,9 @@ class KanariDB extends Dexie {
   trendData!: EntityTable<DBTrendData & { id: string }, "id">
   settings!: EntityTable<DBSettings, "id">
   checkInSessions!: EntityTable<DBCheckInSession, "id">
-  achievements!: EntityTable<DBAchievement, "id">
+  achievements!: EntityTable<DBDailyAchievement, "id">
+  milestoneBadges!: EntityTable<DBMilestoneBadge, "id">
+  userProgress!: EntityTable<DBUserProgress, "id">
   journalEntries!: EntityTable<DBJournalEntry, "id">
 
   constructor() {
@@ -133,6 +144,24 @@ class KanariDB extends Dexie {
       checkInSessions: "id, startedAt, recordingId",
       achievements: "id, earnedAt, category, rarity, seen",
       journalEntries: "id, createdAt, category, checkInSessionId",
+    })
+
+    // Version 7: Daily achievements system (challenges + badges), milestone badges, and user progress
+    this.version(7).stores({
+      recordings: "id, createdAt, status",
+      suggestions: "id, createdAt, status, category, recordingId, version",
+      recoveryBlocks: "id, suggestionId, scheduledAt, completed",
+      trendData: "id, date",
+      settings: "id",
+      checkInSessions: "id, startedAt, recordingId",
+      achievements: "id, dateISO, type, category, completed, createdAt, seen",
+      milestoneBadges: "id, earnedAt, type, seen",
+      userProgress: "id",
+      journalEntries: "id, createdAt, category, checkInSessionId",
+    }).upgrade(async (tx) => {
+      // Clear the legacy rarity-based achievements (schema changed)
+      await tx.table("achievements").clear()
+      // userProgress + milestoneBadges are new; created empty on upgrade
     })
   }
 }
@@ -223,7 +252,27 @@ export function fromCheckInSession(record: CheckInSession): DBCheckInSession {
   }
 }
 
-export function toAchievement(dbRecord: DBAchievement): StoredAchievement {
+export function toDailyAchievement(dbRecord: DBDailyAchievement): DailyAchievement {
+  return {
+    ...dbRecord,
+    createdAt: dbRecord.createdAt.toISOString(),
+    completedAt: dbRecord.completedAt?.toISOString(),
+    seenAt: dbRecord.seenAt?.toISOString(),
+    expiredAt: dbRecord.expiredAt?.toISOString(),
+  }
+}
+
+export function fromDailyAchievement(record: DailyAchievement): DBDailyAchievement {
+  return {
+    ...record,
+    createdAt: new Date(record.createdAt),
+    completedAt: record.completedAt ? new Date(record.completedAt) : undefined,
+    seenAt: record.seenAt ? new Date(record.seenAt) : undefined,
+    expiredAt: record.expiredAt ? new Date(record.expiredAt) : undefined,
+  }
+}
+
+export function toMilestoneBadge(dbRecord: DBMilestoneBadge): MilestoneBadge {
   return {
     ...dbRecord,
     earnedAt: dbRecord.earnedAt.toISOString(),
@@ -231,7 +280,7 @@ export function toAchievement(dbRecord: DBAchievement): StoredAchievement {
   }
 }
 
-export function fromAchievement(record: StoredAchievement): DBAchievement {
+export function fromMilestoneBadge(record: MilestoneBadge): DBMilestoneBadge {
   return {
     ...record,
     earnedAt: new Date(record.earnedAt),

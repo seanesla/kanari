@@ -1,40 +1,41 @@
 "use client"
 
 /**
- * Achievement Toast / Celebration Component
+ * Celebration Toast / Modal Component
  *
- * A celebratory modal that appears when a user earns a new achievement.
+ * A celebratory modal that appears when a user completes a challenge,
+ * earns a badge, or unlocks a milestone.
  * Features confetti animation, sound effects (optional), and smooth transitions.
  *
  * Usage:
  * ```tsx
- * <AchievementToast
- *   achievement={newAchievement}
- *   open={showCelebration}
- *   onOpenChange={setShowCelebration}
- *   onDismiss={() => markAsSeen(newAchievement.id)}
+ * <CelebrationToastQueue
+ *   achievements={celebrations}
+ *   milestones={milestones}
+ *   onDismissAchievement={markAchievementSeen}
+ *   onDismissMilestone={markMilestoneSeen}
  * />
  * ```
  */
 
 import { useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Trophy, Sparkles } from "lucide-react"
+import { X, Trophy, Sparkles, CheckCircle2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { AchievementBadge, RARITY_CONFIG } from "./achievement-badge"
-import type { StoredAchievement } from "@/lib/achievements"
+import { DailyAchievementCard } from "./achievement-badge"
+import type { DailyAchievement, MilestoneBadge } from "@/lib/achievements"
 
 // ============================================
 // Confetti Particle Component
 // ============================================
 
 interface ConfettiParticleProps {
-  index: number
+  _index: number
   color: string
 }
 
-function ConfettiParticle({ index, color }: ConfettiParticleProps) {
+function ConfettiParticle({ _index, color }: ConfettiParticleProps) {
   const randomX = Math.random() * 200 - 100 // -100 to 100
   const randomDelay = Math.random() * 0.5
   const randomDuration = 1.5 + Math.random() * 1
@@ -100,9 +101,12 @@ function ConfettiExplosion() {
 // Component Props
 // ============================================
 
-interface AchievementToastProps {
-  /** The achievement to celebrate */
-  achievement: StoredAchievement | null
+type CelebrationItem =
+  | { kind: "achievement"; achievement: DailyAchievement }
+  | { kind: "milestone"; milestone: MilestoneBadge }
+
+interface CelebrationToastProps {
+  item: CelebrationItem | null
   /** Whether the toast is visible */
   open: boolean
   /** Callback when visibility changes */
@@ -117,13 +121,13 @@ interface AchievementToastProps {
 // Main Component
 // ============================================
 
-export function AchievementToast({
-  achievement,
+export function CelebrationToast({
+  item,
   open,
   onOpenChange,
   onDismiss,
   autoDismissMs = 5000,
-}: AchievementToastProps) {
+}: CelebrationToastProps) {
   // Auto-dismiss after timeout
   useEffect(() => {
     if (!open || autoDismissMs === 0) return
@@ -140,9 +144,21 @@ export function AchievementToast({
     onDismiss?.()
   }, [onOpenChange, onDismiss])
 
-  if (!achievement) return null
+  if (!item) return null
 
-  const rarityConfig = RARITY_CONFIG[achievement.rarity]
+  const heading =
+    item.kind === "milestone"
+      ? "Milestone Unlocked!"
+      : item.achievement.type === "challenge"
+        ? "Challenge Complete!"
+        : "Badge Earned!"
+
+  const subheading =
+    item.kind === "milestone"
+      ? `Streak: ${item.milestone.streakDays} days`
+      : item.achievement.type === "challenge"
+        ? `+${item.achievement.points} points`
+        : `+${item.achievement.points} points`
 
   return (
     <AnimatePresence>
@@ -171,13 +187,11 @@ export function AchievementToast({
 
               {/* Card */}
               <div className={cn(
-                "relative bg-card rounded-2xl border-2 p-6 shadow-2xl overflow-hidden",
-                rarityConfig.borderStyle
+                "relative bg-card rounded-2xl border p-6 shadow-2xl overflow-hidden",
+                item.kind === "milestone" ? "border-accent/40" : "border-border/60"
               )}>
-                {/* Glow background for rare+ */}
-                {(achievement.rarity === "rare" || achievement.rarity === "epic" || achievement.rarity === "legendary") && (
-                  <div className="absolute inset-0 opacity-10 bg-gradient-to-br from-accent to-transparent" />
-                )}
+                {/* Subtle glow */}
+                <div className="absolute inset-0 opacity-10 bg-gradient-to-br from-accent to-transparent" />
 
                 {/* Close button */}
                 <button
@@ -195,7 +209,11 @@ export function AchievementToast({
                     transition={{ type: "spring", stiffness: 300, damping: 20, delay: 0.1 }}
                     className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-accent/10 mb-3"
                   >
-                    <Trophy className="h-8 w-8 text-accent" />
+                    {item.kind === "milestone" ? (
+                      <Trophy className="h-8 w-8 text-accent" />
+                    ) : (
+                      <CheckCircle2 className="h-8 w-8 text-accent" />
+                    )}
                   </motion.div>
 
                   <motion.h2
@@ -204,7 +222,7 @@ export function AchievementToast({
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.2 }}
                   >
-                    Achievement Unlocked!
+                    {heading}
                   </motion.h2>
 
                   <motion.p
@@ -214,21 +232,36 @@ export function AchievementToast({
                     transition={{ delay: 0.3 }}
                   >
                     <Sparkles className="inline h-3 w-3 mr-1" />
-                    You&apos;ve earned a new achievement
+                    {subheading}
                   </motion.p>
                 </div>
 
-                {/* Achievement Badge */}
+                {/* Content */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.4 }}
                 >
-                  <AchievementBadge
-                    achievement={achievement}
-                    variant="full"
-                    showNewIndicator={false}
-                  />
+                  {item.kind === "achievement" ? (
+                    <DailyAchievementCard achievement={item.achievement} variant="full" showNewIndicator={false} />
+                  ) : (
+                    <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
+                      <div className="flex items-start gap-3">
+                        <div className="h-12 w-12 rounded-lg border border-accent/30 flex items-center justify-center text-2xl">
+                          {item.milestone.emoji}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="font-semibold truncate">{item.milestone.title}</h3>
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              {item.milestone.streakDays}d
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">{item.milestone.description}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
 
                 {/* Dismiss button */}
@@ -259,30 +292,38 @@ export function AchievementToast({
 // Queue Component for Multiple Achievements
 // ============================================
 
-interface AchievementToastQueueProps {
-  /** Array of achievements to show (will show one at a time) */
-  achievements: StoredAchievement[]
-  /** Callback when an achievement is dismissed */
-  onDismiss: (achievementId: string) => void
+interface CelebrationToastQueueProps {
+  achievements: DailyAchievement[]
+  milestones: MilestoneBadge[]
+  onDismissAchievement: (achievementId: string) => void
+  onDismissMilestone: (badgeId: string) => void
 }
 
-export function AchievementToastQueue({
+export function CelebrationToastQueue({
   achievements,
-  onDismiss,
-}: AchievementToastQueueProps) {
-  // Show the first achievement in the queue
-  const currentAchievement = achievements[0] || null
+  milestones,
+  onDismissAchievement,
+  onDismissMilestone,
+}: CelebrationToastQueueProps) {
+  const currentItem: CelebrationItem | null = milestones[0]
+    ? { kind: "milestone", milestone: milestones[0] }
+    : achievements[0]
+      ? { kind: "achievement", achievement: achievements[0] }
+      : null
 
   const handleDismiss = useCallback(() => {
-    if (currentAchievement) {
-      onDismiss(currentAchievement.id)
+    if (!currentItem) return
+    if (currentItem.kind === "milestone") {
+      onDismissMilestone(currentItem.milestone.id)
+      return
     }
-  }, [currentAchievement, onDismiss])
+    onDismissAchievement(currentItem.achievement.id)
+  }, [currentItem, onDismissAchievement, onDismissMilestone])
 
   return (
-    <AchievementToast
-      achievement={currentAchievement}
-      open={!!currentAchievement}
+    <CelebrationToast
+      item={currentItem}
+      open={!!currentItem}
       onOpenChange={(open) => {
         if (!open) handleDismiss()
       }}

@@ -591,6 +591,8 @@ export function useClearAllData() {
       db.trendData.clear(),
       db.checkInSessions.clear(),
       db.achievements.clear(),
+      db.milestoneBadges.clear(),
+      db.userProgress.clear(),
       db.journalEntries.clear(),
     ])
   }, [])
