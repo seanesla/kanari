@@ -31,11 +31,10 @@ import type { DailyAchievement, MilestoneBadge } from "@/lib/achievements"
 // ============================================
 
 interface ConfettiParticleProps {
-  _index: number
   color: string
 }
 
-function ConfettiParticle({ _index, color }: ConfettiParticleProps) {
+function ConfettiParticle({ color }: ConfettiParticleProps) {
   const randomX = Math.random() * 200 - 100 // -100 to 100
   const randomDelay = Math.random() * 0.5
   const randomDuration = 1.5 + Math.random() * 1
@@ -89,7 +88,6 @@ function ConfettiExplosion() {
       {particles.map((i) => (
         <ConfettiParticle
           key={i}
-          index={i}
           color={CONFETTI_COLORS[i % CONFETTI_COLORS.length]}
         />
       ))}
