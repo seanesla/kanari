@@ -6,8 +6,8 @@
  * conversations and reference patterns when starting a new check-in.
  */
 
-import { db, toCheckInSession, toTrendData } from "@/lib/storage/db"
-import type { CheckInSession, TrendData } from "@/lib/types"
+import { db, toCheckInSession, toCommitment, toSuggestion, toTrendData } from "@/lib/storage/db"
+import type { CheckInSession, Commitment, Suggestion, TrendData } from "@/lib/types"
 import { calculateAverage } from "@/lib/math/statistics"
 
 // ============================================
@@ -37,6 +37,8 @@ export interface CheckInContextData {
   recentTrends: TrendData[]
   timeContext: TimeContext
   voiceTrends: VoiceTrends
+  pendingCommitments: Commitment[]
+  recentSuggestions: Suggestion[]
 }
 
 // ============================================
@@ -181,11 +183,45 @@ export async function fetchCheckInContext(): Promise<CheckInContextData> {
       : null,
   }
 
+  // Fetch pending commitments (not yet resolved)
+  let pendingCommitments: Commitment[] = []
+  try {
+    const dbCommitments = await db.commitments
+      .orderBy("extractedAt")
+      .reverse()
+      .toArray()
+
+    pendingCommitments = dbCommitments
+      .filter(c => !c.outcome)
+      .slice(0, 8)
+      .map(toCommitment)
+  } catch {
+    // Commitments are optional; ignore failures
+  }
+
+  // Fetch recently accepted/scheduled suggestions (to support follow-up)
+  let recentSuggestions: Suggestion[] = []
+  try {
+    const dbSuggestions = await db.suggestions
+      .where("status")
+      .anyOf(["accepted", "scheduled"])
+      .toArray()
+
+    recentSuggestions = dbSuggestions
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 8)
+      .map(toSuggestion)
+  } catch {
+    // Suggestions are optional; ignore failures
+  }
+
   return {
     recentSessions,
     recentTrends,
     timeContext,
     voiceTrends,
+    pendingCommitments,
+    recentSuggestions,
   }
 }
 
@@ -206,6 +242,8 @@ export function formatContextForAPI(context: CheckInContextData): {
   }>
   timeContext: TimeContext
   voiceTrends: VoiceTrends
+  pendingCommitments: Commitment[]
+  recentSuggestions: Suggestion[]
 } {
   return {
     sessionCount: context.recentSessions.length,
@@ -224,5 +262,7 @@ export function formatContextForAPI(context: CheckInContextData): {
     })),
     timeContext: context.timeContext,
     voiceTrends: context.voiceTrends,
+    pendingCommitments: context.pendingCommitments,
+    recentSuggestions: context.recentSuggestions,
   }
 }

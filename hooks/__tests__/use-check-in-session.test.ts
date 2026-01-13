@@ -145,6 +145,8 @@ beforeEach(async () => {
         averageStressLastWeek: null,
         averageFatigueLastWeek: null,
       },
+      pendingCommitments: [],
+      recentSuggestions: [],
     })),
     formatContextForAPI: vi.fn((data: unknown) => data),
   }))

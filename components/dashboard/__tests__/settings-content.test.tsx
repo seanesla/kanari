@@ -173,6 +173,7 @@ describe("SettingsContent", () => {
       autoScheduleRecovery: true,
       geminiApiKey: "new-key",
       selectedGeminiVoice: "Aoede",
+      accountabilityMode: "balanced",
     })
   })
 

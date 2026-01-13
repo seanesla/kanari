@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch, MutableRefObject } from "react"
 import { processAudio } from "@/lib/audio/processor"
-import { db } from "@/lib/storage/db"
+import { db, fromCommitment } from "@/lib/storage/db"
 import { computeContextFingerprint } from "@/lib/gemini/context-fingerprint"
 import { fetchCheckInContext, formatContextForAPI } from "@/lib/gemini/check-in-context"
 import { logWarn } from "@/lib/logger"
@@ -16,7 +16,14 @@ import {
   preserveSession as storePreservedSession,
 } from "@/lib/gemini/preserved-session"
 import type { GeminiLiveClient, SessionContext } from "@/lib/gemini/live-client"
-import type { CheckInSession, CheckInState } from "@/lib/types"
+import type {
+  AccountabilityMode,
+  CheckInSession,
+  CheckInState,
+  Commitment,
+  CommitmentToolArgs,
+  Suggestion,
+} from "@/lib/types"
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 import type { UseCheckInAudioResult } from "./use-check-in-audio"
@@ -103,6 +110,7 @@ export interface CheckInSessionGeminiHandlers {
   onConnected: () => void
   onDisconnected: (reason: string) => void
   onError: (error: Error) => void
+  onCommitment: (commitment: CommitmentToolArgs) => void
 }
 
 export interface UseCheckInSessionOptions {
@@ -249,9 +257,19 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
               // Ignore summary failures - timeContext is still valuable.
             }
 
-            return { timeContext, contextSummary }
+            return {
+              timeContext,
+              contextSummary,
+              pendingCommitments: contextData.pendingCommitments ?? [],
+              recentSuggestions: contextData.recentSuggestions ?? [],
+            }
           } catch {
-            return { timeContext: fallbackTimeContext, contextSummary: undefined }
+            return {
+              timeContext: fallbackTimeContext,
+              contextSummary: undefined,
+              pendingCommitments: [],
+              recentSuggestions: [],
+            }
           }
         })()
 
@@ -307,9 +325,11 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
         // Load user's voice preference from settings (fast IndexedDB read)
         let voiceName: string | undefined
+        let accountabilityMode: AccountabilityMode | undefined
         try {
           const settings = await db.settings.get("default")
           voiceName = settings?.selectedGeminiVoice
+          accountabilityMode = settings?.accountabilityMode ?? "balanced"
         } catch {
           // If settings read fails, continue without voice preference
         }
@@ -317,18 +337,49 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         // Prefer full time context + optional summary (but never block startup indefinitely).
         let timeContext: NonNullable<SessionContext["timeContext"]> = fallbackTimeContext
         let contextSummary: SessionContext["contextSummary"] | undefined
+        let pendingCommitments: Commitment[] = []
+        let recentSuggestions: Suggestion[] = []
         try {
           const ctx = await withTimeout(contextPromise, 15_000, "Context generation timed out")
           timeContext = ctx.timeContext ?? timeContext
           contextSummary = ctx.contextSummary
+          pendingCommitments = ctx.pendingCommitments ?? []
+          recentSuggestions = ctx.recentSuggestions ?? []
         } catch {
           // Keep fallback timeContext; proceed without summary.
         }
 
+        const extendedContextSummary = (() => {
+          if (accountabilityMode === "supportive") {
+            return contextSummary
+          }
+
+          if (pendingCommitments.length === 0 && recentSuggestions.length === 0) {
+            return contextSummary
+          }
+
+          if (!contextSummary) {
+            return {
+              patternSummary: "No prior check-in summary is available yet.",
+              keyObservations: [],
+              contextNotes: "Use the follow-up context below naturally in conversation.",
+              pendingCommitments,
+              recentSuggestions,
+            }
+          }
+
+          return {
+            ...contextSummary,
+            pendingCommitments,
+            recentSuggestions,
+          }
+        })()
+
         const sessionContext: SessionContext = {
           timeContext,
-          ...(contextSummary ? { contextSummary } : {}),
+          ...(extendedContextSummary ? { contextSummary: extendedContextSummary } : {}),
           ...(voiceName ? { voiceName } : {}),
+          ...(accountabilityMode ? { accountabilityMode } : {}),
         }
         sessionContextRef.current = sessionContext
 
@@ -758,10 +809,35 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
     [callbacksRef, dispatch]
   )
 
+  const onCommitment = useCallback(
+    (commitmentArgs: CommitmentToolArgs) => {
+      const sessionId = data.session?.id
+      if (!sessionId) return
+
+      const commitment: Commitment = {
+        id: generateId(),
+        checkInSessionId: sessionId,
+        content: commitmentArgs.content,
+        category: commitmentArgs.category,
+        extractedAt: new Date().toISOString(),
+      }
+
+      void (async () => {
+        try {
+          await db.commitments.put(fromCommitment(commitment))
+        } catch (error) {
+          console.warn("[useCheckIn] Failed to persist commitment:", error)
+        }
+      })()
+    },
+    [data.session?.id]
+  )
+
   const handlers: CheckInSessionGeminiHandlers = {
     onConnected,
     onDisconnected,
     onError,
+    onCommitment,
   }
 
   return {

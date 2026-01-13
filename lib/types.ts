@@ -326,6 +326,8 @@ export interface RecoveryBlock {
 
 export type CoachVoice = 'warm' | 'professional' | 'minimal'
 
+export type AccountabilityMode = "supportive" | "balanced" | "accountability"
+
 // Gemini TTS voice options (30 prebuilt voices)
 // Source: Context7 - /websites/ai_google_dev_gemini-api docs - "Speech generation"
 export type GeminiVoice =
@@ -421,6 +423,7 @@ export interface UserSettings {
   localStorageOnly: boolean
   // Coach preferences
   coachVoice?: CoachVoice
+  accountabilityMode?: AccountabilityMode // Default: "balanced"
   // AI Voice (Gemini TTS)
   selectedGeminiVoice?: GeminiVoice // User's chosen AI assistant voice
   // Appearance
@@ -616,6 +619,30 @@ export interface CheckInSession {
   // Audio data for session playback (user's voice only)
   audioData?: number[] // Float32Array serialized for IndexedDB storage
   sampleRate?: number // For playback (default 16000)
+}
+
+// ============================================
+// Commitments (Accountability)
+// ============================================
+
+export type CommitmentCategory = "action" | "habit" | "mindset" | "boundary"
+export type CommitmentOutcome = "completed" | "partial" | "not_done" | "modified"
+
+export interface Commitment {
+  id: string
+  checkInSessionId: string
+  content: string
+  category: CommitmentCategory
+  extractedAt: string
+  followedUpAt?: string
+  outcome?: CommitmentOutcome
+  outcomeNote?: string
+}
+
+export interface CommitmentToolArgs {
+  content: string
+  category: CommitmentCategory
+  timeframe?: string
 }
 
 // ============================================

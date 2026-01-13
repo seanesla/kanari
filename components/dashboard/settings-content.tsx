@@ -6,6 +6,7 @@ import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
 import { GeminiMemorySection } from "./settings-gemini-memory"
 import { SettingsAccountSection } from "./settings-account"
 import { SettingsApiSection } from "./settings-api"
+import { SettingsAccountabilitySection } from "./settings-accountability-section"
 import { SettingsAppearanceSection } from "./settings-appearance"
 import { SettingsCalendarSection } from "./settings-calendar"
 import { SettingsNotificationsSection } from "./settings-notifications"
@@ -15,7 +16,7 @@ import { SettingsTimeZoneSection } from "./settings-timezone"
 import { SettingsVoiceSection } from "./settings-voice-section"
 import { db } from "@/lib/storage/db"
 import { DEFAULT_USER_SETTINGS, createDefaultSettingsRecord } from "@/lib/settings/default-settings"
-import type { GeminiVoice, UserSettings } from "@/lib/types"
+import type { AccountabilityMode, GeminiVoice, UserSettings } from "@/lib/types"
 
 // Pattern doc: docs/error-patterns/settings-schema-drift-and-partial-save.md
 type SettingsDraft = Pick<
@@ -28,6 +29,7 @@ type SettingsDraft = Pick<
   | "localStorageOnly"
   | "geminiApiKey"
   | "selectedGeminiVoice"
+  | "accountabilityMode"
 >
 
 export function SettingsContent() {
@@ -40,6 +42,7 @@ export function SettingsContent() {
     localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
     geminiApiKey: undefined,
     selectedGeminiVoice: undefined,
+    accountabilityMode: DEFAULT_USER_SETTINGS.accountabilityMode,
   })
 
   const [baseline, setBaseline] = useState<SettingsDraft | null>(null)
@@ -58,6 +61,7 @@ export function SettingsContent() {
       localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
       geminiApiKey: undefined,
       selectedGeminiVoice: undefined,
+      accountabilityMode: DEFAULT_USER_SETTINGS.accountabilityMode,
     }
 
     async function loadSettings() {
@@ -72,6 +76,7 @@ export function SettingsContent() {
           localStorageOnly: savedSettings?.localStorageOnly ?? DEFAULT_USER_SETTINGS.localStorageOnly,
           geminiApiKey: savedSettings?.geminiApiKey,
           selectedGeminiVoice: savedSettings?.selectedGeminiVoice as GeminiVoice | undefined,
+          accountabilityMode: (savedSettings?.accountabilityMode as AccountabilityMode | undefined) ?? DEFAULT_USER_SETTINGS.accountabilityMode,
         }
         setDraft(hydrated)
         setBaseline(hydrated)
@@ -92,6 +97,7 @@ export function SettingsContent() {
       geminiApiKey: trimmedKey.length > 0 ? trimmedKey : undefined,
       dailyReminderTime: draft.dailyReminderTime ? draft.dailyReminderTime : undefined,
       selectedGeminiVoice: draft.selectedGeminiVoice ?? undefined,
+      accountabilityMode: draft.accountabilityMode ?? DEFAULT_USER_SETTINGS.accountabilityMode,
     }
   }, [draft])
 
@@ -105,7 +111,8 @@ export function SettingsContent() {
       baseline.autoScheduleRecovery !== normalizedDraft.autoScheduleRecovery ||
       baseline.localStorageOnly !== normalizedDraft.localStorageOnly ||
       baseline.geminiApiKey !== normalizedDraft.geminiApiKey ||
-      baseline.selectedGeminiVoice !== normalizedDraft.selectedGeminiVoice
+      baseline.selectedGeminiVoice !== normalizedDraft.selectedGeminiVoice ||
+      baseline.accountabilityMode !== normalizedDraft.accountabilityMode
     )
   }, [baseline, normalizedDraft])
 
@@ -143,6 +150,7 @@ export function SettingsContent() {
         localStorageOnly: normalizedDraft.localStorageOnly,
         geminiApiKey: normalizedDraft.geminiApiKey,
         selectedGeminiVoice: normalizedDraft.selectedGeminiVoice,
+        accountabilityMode: normalizedDraft.accountabilityMode,
       }
 
       const updated = await db.settings.update("default", updates)
@@ -182,6 +190,14 @@ export function SettingsContent() {
           selectedVoice={draft.selectedGeminiVoice}
           onVoiceChange={(voice) => {
             setDraft((prev) => ({ ...prev, selectedGeminiVoice: voice }))
+            setSaveMessage(null)
+          }}
+        />
+
+        <SettingsAccountabilitySection
+          accountabilityMode={draft.accountabilityMode}
+          onAccountabilityModeChange={(mode) => {
+            setDraft((prev) => ({ ...prev, accountabilityMode: mode }))
             setSaveMessage(null)
           }}
         />

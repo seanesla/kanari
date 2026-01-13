@@ -10,6 +10,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   autoScheduleRecovery: false,
   preferredRecoveryTimes: [],
   localStorageOnly: true,
+  accountabilityMode: "balanced",
   timeZone: DEFAULT_TIME_ZONE,
   hasCompletedOnboarding: false,
 }

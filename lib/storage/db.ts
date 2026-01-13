@@ -2,6 +2,7 @@
 
 import Dexie, { type EntityTable } from "dexie"
 import type {
+  Commitment,
   Recording,
   Suggestion,
   RecoveryBlock,
@@ -61,6 +62,11 @@ export interface DBJournalEntry extends Omit<JournalEntry, "createdAt"> {
   createdAt: Date
 }
 
+export interface DBCommitment extends Omit<Commitment, "extractedAt" | "followedUpAt"> {
+  extractedAt: Date
+  followedUpAt?: Date
+}
+
 // Database class
 class KanariDB extends Dexie {
   recordings!: EntityTable<DBRecording, "id">
@@ -73,6 +79,7 @@ class KanariDB extends Dexie {
   milestoneBadges!: EntityTable<DBMilestoneBadge, "id">
   userProgress!: EntityTable<DBUserProgress, "id">
   journalEntries!: EntityTable<DBJournalEntry, "id">
+  commitments!: EntityTable<DBCommitment, "id">
 
   constructor() {
     super("kanari")
@@ -163,6 +170,21 @@ class KanariDB extends Dexie {
       await tx.table("achievements").clear()
       // userProgress + milestoneBadges are new; created empty on upgrade
     })
+
+    // Version 8: Commitments for accountability follow-up
+    this.version(8).stores({
+      recordings: "id, createdAt, status",
+      suggestions: "id, createdAt, status, category, recordingId, version",
+      recoveryBlocks: "id, suggestionId, scheduledAt, completed",
+      trendData: "id, date",
+      settings: "id",
+      checkInSessions: "id, startedAt, recordingId",
+      achievements: "id, dateISO, type, category, completed, createdAt, seen",
+      milestoneBadges: "id, earnedAt, type, seen",
+      userProgress: "id",
+      journalEntries: "id, createdAt, category, checkInSessionId",
+      commitments: "id, checkInSessionId, extractedAt, outcome",
+    })
   }
 }
 
@@ -249,6 +271,22 @@ export function fromCheckInSession(record: CheckInSession): DBCheckInSession {
     ...record,
     startedAt: new Date(record.startedAt),
     endedAt: record.endedAt ? new Date(record.endedAt) : undefined,
+  }
+}
+
+export function toCommitment(dbRecord: DBCommitment): Commitment {
+  return {
+    ...dbRecord,
+    extractedAt: dbRecord.extractedAt.toISOString(),
+    followedUpAt: dbRecord.followedUpAt?.toISOString(),
+  }
+}
+
+export function fromCommitment(record: Commitment): DBCommitment {
+  return {
+    ...record,
+    extractedAt: new Date(record.extractedAt),
+    followedUpAt: record.followedUpAt ? new Date(record.followedUpAt) : undefined,
   }
 }
 

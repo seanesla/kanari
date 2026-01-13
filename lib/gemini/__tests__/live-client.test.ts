@@ -95,6 +95,7 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
         onUserSpeechEnd: vi.fn(),
         onSilenceChosen: vi.fn(),
         onWidget: vi.fn(),
+        onCommitment: vi.fn(),
         onSendError: vi.fn(),
       },
     }
@@ -234,6 +235,38 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
       modelTurn: { parts: [{ text: "Hello" }] },
     })
     expect(config.events.onModelTranscript).toHaveBeenCalledWith("Hello", false)
+  })
+
+  test("handles record_commitment tool call and acknowledges", async () => {
+    await client.connect()
+
+    getClientInternals(client).handleMessage({
+      toolCall: {
+        functionCalls: [
+          {
+            id: "call_2",
+            name: "record_commitment",
+            args: { content: "I'll take a walk tomorrow", category: "action", timeframe: "tomorrow" },
+          },
+        ],
+      },
+    })
+
+    expect(config.events.onCommitment).toHaveBeenCalledWith({
+      content: "I'll take a walk tomorrow",
+      category: "action",
+      timeframe: "tomorrow",
+    })
+
+    expect(mockSession.sendToolResponse).toHaveBeenCalledWith({
+      functionResponses: [
+        {
+          id: "call_2",
+          name: "record_commitment",
+          response: { acknowledged: true, recorded: true },
+        },
+      ],
+    })
   })
 
   test("streams model text parts as transcript and routes thought parts to thinking", async () => {

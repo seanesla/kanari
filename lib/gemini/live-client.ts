@@ -20,6 +20,7 @@
 
 import {
   BreathingExerciseArgsSchema,
+  CommitmentArgsSchema,
   JournalPromptArgsSchema,
   QuickActionsArgsSchema,
   ScheduleActivityArgsSchema,
@@ -29,7 +30,9 @@ import {
 import { getGeminiApiKey } from "@/lib/utils"
 import { logDebug, logWarn, logError } from "@/lib/logger"
 import type {
+  AccountabilityMode,
   BreathingExerciseToolArgs,
+  CommitmentToolArgs,
   JournalPromptToolArgs,
   QuickActionsToolArgs,
   ScheduleActivityToolArgs,
@@ -49,6 +52,7 @@ export interface SessionContext {
   contextSummary?: SystemContextSummary
   timeContext?: SystemTimeContext
   voiceName?: string // Gemini TTS voice name (e.g., "Aoede", "Sulafat")
+  accountabilityMode?: AccountabilityMode
 }
 
 export type GeminiWidgetEvent =
@@ -84,6 +88,7 @@ export interface LiveClientEvents {
   // Tool/function calling
   onSilenceChosen: (reason: string) => void
   onWidget: (event: GeminiWidgetEvent) => void
+  onCommitment: (commitment: CommitmentToolArgs) => void
 
   // Send failures
   onSendError: (error: Error, type: "audio" | "text" | "audioEnd") => void
@@ -329,7 +334,8 @@ export class GeminiLiveClient {
 
       const systemInstruction = buildCheckInSystemInstruction(
         context?.contextSummary,
-        context?.timeContext
+        context?.timeContext,
+        context?.accountabilityMode
       )
 
       const ai = new GoogleGenAI({ apiKey })
@@ -661,6 +667,32 @@ export class GeminiLiveClient {
             id: fc.id,
             name: fc.name,
             response: { acknowledged: true, shown: true }
+          }])
+        }
+        continue
+      }
+
+      if (fc.name === "record_commitment") {
+        const parsed = CommitmentArgsSchema.safeParse(fc.args ?? {})
+        if (!parsed.success) {
+          logWarn("LiveClient", "Invalid record_commitment args:", parsed.error.issues)
+          if (fc.id) {
+            this.sendToolResponse([{
+              id: fc.id,
+              name: fc.name,
+              response: { acknowledged: false, error: "invalid_args" },
+            }])
+          }
+          continue
+        }
+
+        this.config.events.onCommitment?.(parsed.data)
+
+        if (fc.id) {
+          this.sendToolResponse([{
+            id: fc.id,
+            name: fc.name,
+            response: { acknowledged: true, recorded: true },
           }])
         }
         continue

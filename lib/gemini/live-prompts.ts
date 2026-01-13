@@ -7,7 +7,7 @@
  */
 
 import { Type } from "@google/genai"
-import type { MismatchResult, VoicePatterns, VoiceMetrics } from "@/lib/types"
+import type { AccountabilityMode, Commitment, MismatchResult, Suggestion, VoicePatterns, VoiceMetrics } from "@/lib/types"
 
 /**
  * Tool declaration for intelligent silence
@@ -71,6 +71,25 @@ export const SCHEDULE_ACTIVITY_TOOL = {
       required: ["title", "category", "date", "time", "duration"]
     }
   }]
+}
+
+/**
+ * Tool declaration for recording a user commitment for later follow-up.
+ */
+export const RECORD_COMMITMENT_TOOL = {
+  functionDeclarations: [{
+    name: "record_commitment",
+    description: "Record a user commitment when they express a clear intention to do something specific (e.g., 'I'll take a walk tomorrow', 'I'm going to set a boundary with my manager', 'I'll try the breathing exercise tonight'). Use this ONLY when the user indicates intent or commitment, not when they are brainstorming or describing the past. Keep content short and concrete. Include timeframe when explicitly stated by the user.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        content: { type: Type.STRING, description: "The commitment in the user's words (short, concrete)" },
+        category: { type: Type.STRING, enum: ["action", "habit", "mindset", "boundary"] },
+        timeframe: { type: Type.STRING, description: "Optional timeframe if the user stated one (e.g., 'tomorrow', 'this week', 'tonight')" },
+      },
+      required: ["content", "category"],
+    },
+  }],
 }
 
 /**
@@ -185,6 +204,7 @@ export const SHOW_JOURNAL_PROMPT_TOOL = {
 export const GEMINI_TOOLS = [
   MUTE_RESPONSE_TOOL,
   SCHEDULE_ACTIVITY_TOOL,
+  RECORD_COMMITMENT_TOOL,
   SHOW_BREATHING_EXERCISE_TOOL,
   SHOW_STRESS_GAUGE_TOOL,
   SHOW_QUICK_ACTIONS_TOOL,
@@ -361,6 +381,58 @@ EXAMPLES OF BAD RESPONSES:
 - [Too long] "I understand that you're feeling overwhelmed, and I want you to know that it's completely normal to feel this way sometimes. Many people experience similar feelings, and there are various strategies we can explore together..."
 - [Too prescriptive] "You should definitely take a 10-minute break right now and do some deep breathing."`
 
+export const ACCOUNTABILITY_MODE_PROMPTS: Record<AccountabilityMode, string> = {
+  supportive: `
+
+═══════════════════════════════════════════════════════════════════════════════
+INTERACTION STYLE: SUPPORTIVE LISTENER
+═══════════════════════════════════════════════════════════════════════════════
+
+The user selected SUPPORTIVE mode. Prioritize comfort and emotional safety.
+
+Your approach:
+- Listen, validate, and reflect more than you direct.
+- Do NOT push for deeper discussion or action plans unless the user asks.
+- If the user gives short answers, accept them and offer gentle options (e.g., "Want to keep it light, or go a bit deeper?").
+- If the user declines to explore something, respect it immediately and move on without pressure.
+`,
+  balanced: `
+
+═══════════════════════════════════════════════════════════════════════════════
+INTERACTION STYLE: BALANCED COMPANION
+═══════════════════════════════════════════════════════════════════════════════
+
+The user selected BALANCED mode. Be supportive AND lightly engaging.
+
+Your approach:
+- Ask 1-2 focused follow-up questions when something matters.
+- Gently name recurring themes across check-ins when relevant ("This has come up a few times...").
+- Help the user choose ONE small, realistic next step when it would help (not a long list).
+- If the user resists or seems overwhelmed, offer simpler alternatives instead of pushing.
+`,
+  accountability: `
+
+═══════════════════════════════════════════════════════════════════════════════
+INTERACTION STYLE: ACCOUNTABILITY COACH
+═══════════════════════════════════════════════════════════════════════════════
+
+The user selected ACCOUNTABILITY mode. They WANT you to hold them accountable.
+Be warm, but direct and action-oriented.
+
+Your approach:
+- Actively follow up on previous commitments and accepted suggestions.
+- Ask specific questions about progress, obstacles, and what they will do next.
+- Gently challenge patterns when words and behavior don't align.
+- Push toward a concrete commitment: what, when, where, and what might get in the way.
+- Never shame or scold; if the user opts out, help them adjust the plan to something they will actually do.
+
+Example follow-ups:
+- "You said you'd try the breathing exercise. Did you do it? If not, what got in the way?"
+- "This is the third check-in where work stress comes up. What do you think is really going on?"
+- "Be honest with me—are you going to do this, or do we need a smaller plan?"
+`,
+}
+
 /**
  * Generate context injection for mismatch detection
  * This is sent to Gemini when a mismatch between words and voice is detected
@@ -489,6 +561,8 @@ export interface SystemContextSummary {
   patternSummary: string
   keyObservations: string[]
   contextNotes: string
+  pendingCommitments?: Commitment[]
+  recentSuggestions?: Suggestion[]
 }
 
 /**
@@ -505,9 +579,13 @@ export interface SystemContextSummary {
  */
 export function buildCheckInSystemInstruction(
   contextSummary?: SystemContextSummary,
-  timeContext?: SystemTimeContext
+  timeContext?: SystemTimeContext,
+  accountabilityMode: AccountabilityMode = "balanced"
 ): string {
   let instruction = CHECK_IN_SYSTEM_PROMPT
+
+  // Add accountability mode section
+  instruction += ACCOUNTABILITY_MODE_PROMPTS[accountabilityMode]
 
   // Add time context section
   if (timeContext) {
@@ -541,6 +619,33 @@ ${contextSummary.keyObservations.map(obs => `- ${obs}`).join("\n")}
 
 Things to be aware of:
 ${contextSummary.contextNotes}`
+  }
+
+  // Add follow-up context (only when user opted into more engagement)
+  if (contextSummary && accountabilityMode !== "supportive") {
+    const pendingCommitments = contextSummary.pendingCommitments ?? []
+    const recentSuggestions = contextSummary.recentSuggestions ?? []
+
+    if (pendingCommitments.length > 0 || recentSuggestions.length > 0) {
+      const safeCommitments = pendingCommitments
+        .slice(0, 8)
+        .map((c) => `- [${c.category}] ${sanitizeContextText(c.content).slice(0, 200)}`)
+        .join("\n")
+
+      const safeSuggestions = recentSuggestions
+        .slice(0, 8)
+        .map((s) => `- [${s.status}] [${s.category}] ${sanitizeContextText(s.content).slice(0, 200)}`)
+        .join("\n")
+
+      instruction += `
+
+═══════════════════════════════════════════════════════════════════════════════
+FOLLOW-UP CONTEXT (Use naturally; don't recite verbatim)
+═══════════════════════════════════════════════════════════════════════════════
+
+${pendingCommitments.length > 0 ? `Pending commitments to follow up on:\n${safeCommitments}\n` : ""}
+${recentSuggestions.length > 0 ? `Recently accepted/scheduled suggestions:\n${safeSuggestions}` : ""}`
+    }
   }
 
   // Add AI-initiation instructions

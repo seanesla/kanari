@@ -23,6 +23,7 @@ import {
   type SessionContext,
 } from "@/lib/gemini/live-client"
 import { mergeTranscriptUpdate } from "@/lib/gemini/transcript-merge"
+import type { CommitmentToolArgs } from "@/lib/types"
 
 // ============================================
 // Types
@@ -87,6 +88,8 @@ export interface UseGeminiLiveOptions {
   onSilenceChosen?: (reason: string) => void
   /** Called when Gemini triggers an interactive widget */
   onWidget?: (event: GeminiWidgetEvent) => void
+  /** Called when Gemini records a user commitment */
+  onCommitment?: (commitment: CommitmentToolArgs) => void
   /** Callbacks for speech detection */
   onUserSpeechStart?: () => void
   onUserSpeechEnd?: () => void
@@ -442,6 +445,9 @@ export function useGeminiLive(
           onWidget: (event) => {
             callbacksRef.current.onWidget?.(event)
           },
+          onCommitment: (commitment) => {
+            callbacksRef.current.onCommitment?.(commitment)
+          },
         }
 
         // Create client config.
@@ -621,6 +627,9 @@ export function useGeminiLive(
       },
       onWidget: (event) => {
         callbacksRef.current.onWidget?.(event)
+      },
+      onCommitment: (commitment) => {
+        callbacksRef.current.onCommitment?.(commitment)
       },
     }
 
