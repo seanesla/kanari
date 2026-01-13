@@ -140,15 +140,21 @@ export default function AchievementsPage() {
                 achievementsToday.map((achievement) => (
                   <div key={achievement.id} className="space-y-2">
                     <DailyAchievementCard achievement={achievement} variant="full" showNewIndicator />
-                    {achievement.type === "challenge" && !achievement.completed && !achievement.expired && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void completeAchievement(achievement.id)}
-                        className="w-full"
-                      >
-                        Mark complete
-                      </Button>
+                    {achievement.type === "challenge" && !achievement.expired && (
+                      achievement.completed ? (
+                        <Button variant="outline" size="sm" disabled className="w-full">
+                          Completed
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void completeAchievement(achievement.id)}
+                          className="w-full"
+                        >
+                          Mark complete
+                        </Button>
+                      )
                     )}
                   </div>
                 ))
