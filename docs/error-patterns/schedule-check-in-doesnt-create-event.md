@@ -1,10 +1,11 @@
-# "Schedule a check-in" doesn’t create a calendar event
+# Schedule requests don’t create a calendar event
 
 ## What the error looks like
 
 In an AI voice check-in, the user says something like:
 
 - “Schedule a check-in **today at 10:00 PM**.”
+- “Schedule an appointment **tomorrow at 9:30 PM**.”
 
 But:
 
@@ -15,7 +16,7 @@ But:
 ## Why it happens
 
 - The app relies on Gemini Live function calling (`schedule_activity`) to create scheduled items.
-- Models sometimes do not call the tool for “check-in” phrasing, or may not provide enough structured data for the tool call.
+- Models sometimes do not call the tool for scheduling phrasing, or may not provide enough structured data for the tool call.
 - Separately, the Overview calendar renders **completed check-in sessions** as events at their `startedAt` time, which can be confused with a “scheduled check-in”.
 
 ## How to detect it automatically
@@ -30,5 +31,5 @@ But:
 - Add a conservative client-side fallback:
   - Only auto-schedule when the user provides an **explicit** date (e.g., “today/tomorrow” or `YYYY-MM-DD`) and an **explicit** time (AM/PM or 24h).
   - Give Gemini a short window to call `schedule_activity` first to avoid double scheduling.
+- For non-check-in scheduling, infer a reasonable default title/category/duration from the user's message (and honor an explicit duration like “for 30 minutes” when provided).
 - Make completed check-in markers visually/textually distinct from scheduled items (e.g., prefix with `✓ Check-in`).
-

@@ -155,6 +155,43 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     })
   })
 
+  it("accepts tool args that include AM/PM (e.g., '10:00 PM')", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        // Some model variants incorrectly emit non-24h time strings in tool args.
+        // We should still schedule successfully and normalize the widget time.
+        args: {
+          title: "Appointment",
+          category: "rest",
+          date: "2025-01-01",
+          time: "10:00 PM",
+          duration: 30,
+        },
+      })
+    })
+
+    // Widget should be created immediately (optimistic).
+    expect(result.current[0].widgets[0]?.type).toBe("schedule_activity")
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+    })
+
+    const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as { scheduledFor?: string } | undefined
+    expect(scheduledSuggestion?.scheduledFor).toBeTruthy()
+
+    const scheduledAt = Temporal.Instant.from(scheduledSuggestion!.scheduledFor!).toZonedDateTimeISO("UTC")
+    expect(scheduledAt.hour).toBe(22)
+    expect(scheduledAt.minute).toBe(0)
+
+    // Widget args should be normalized to HH:MM (24h) for consistent UI formatting.
+    expect(result.current[0].widgets[0]?.type).toBe("schedule_activity")
+    expect(result.current[0].widgets[0]?.args.time).toBe("22:00")
+  })
+
   it("uses explicit user-provided time (e.g., 9:30PM) over tool args", async () => {
     const { result } = renderHook(() => useCheckIn())
 
@@ -297,5 +334,129 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it("auto-schedules explicit appointment requests when user provides an explicit date/time", async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date("2026-01-09T21:54:16Z"))
+
+      const { result } = renderHook(() => useCheckIn())
+
+      act(() => {
+        geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+        result.current[1].sendTextMessage("Schedule an appointment today at 10:00 PM for 30 minutes.")
+      })
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500) // Wait past the fallback window (1200ms)
+      })
+
+      await act(async () => {
+        // Flush the async persistence path.
+        await Promise.resolve()
+      })
+
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+
+      const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as { scheduledFor?: string; content?: string } | undefined
+      expect(scheduledSuggestion?.scheduledFor).toBeTruthy()
+      expect(scheduledSuggestion?.content?.toLowerCase()).toContain("appointment")
+
+      // Shows a confirmation widget and does NOT end the conversation.
+      expect(result.current[0].widgets.some((w) => w.type === "schedule_activity" && w.status === "scheduled")).toBe(true)
+      const confirmation = result.current[0].messages.find((m) => m.role === "assistant" && /scheduled/i.test(m.content))
+      expect(confirmation?.content.toLowerCase()).toContain("appointment")
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("does not double-schedule when the fallback runs first and the model calls schedule_activity later", async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date("2026-01-09T21:54:16Z"))
+
+      const { result } = renderHook(() => useCheckIn())
+
+      act(() => {
+        geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+        result.current[1].sendTextMessage("Schedule an appointment today at 10:00 PM for 30 minutes.")
+      })
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500) // Wait past the fallback window (1200ms)
+      })
+
+      await act(async () => {
+        // Flush the async persistence path.
+        await Promise.resolve()
+      })
+
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+      expect(addSuggestionMock).toHaveBeenCalledTimes(1)
+
+      // Now the model "late" tool call arrives (should be ignored/deduped).
+      act(() => {
+        geminiCallbacks?.onWidget?.({
+          widget: "schedule_activity",
+          args: {
+            title: "Appointment",
+            category: "rest",
+            date: "2026-01-09",
+            time: "22:00",
+            duration: 30,
+          },
+        })
+      })
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+      expect(addSuggestionMock).toHaveBeenCalledTimes(1)
+
+      expect(result.current[0].widgets.filter((w) => w.type === "schedule_activity")).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("dedupes duplicate schedule_activity tool calls (same time)", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Appointment",
+          category: "rest",
+          date: "2025-01-01",
+          time: "22:00",
+          duration: 30,
+        },
+      })
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Appointment",
+          category: "rest",
+          date: "2025-01-01",
+          time: "22:00",
+          duration: 30,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(addSuggestionMock).toHaveBeenCalledTimes(1)
+    expect(result.current[0].widgets.filter((w) => w.type === "schedule_activity")).toHaveLength(1)
   })
 })

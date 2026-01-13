@@ -11,12 +11,19 @@ interface CheckInMarkerProps {
 }
 
 // Fix 7: Theme-aware colors using semantic Tailwind classes
-// Low stress (0-30) = green, moderate (30-60) = amber, high (60+) = red
+// Low stress (0-33) = green, moderate (34-66) = amber, high (67+) = red
 function getScoreColor(score: number | undefined): string {
   if (score === undefined) return 'bg-muted-foreground/50'
-  if (score < 30) return 'bg-emerald-500'
-  if (score < 60) return 'bg-amber-500'
+  if (score < 34) return 'bg-emerald-500'
+  if (score < 67) return 'bg-amber-500'
   return 'bg-rose-500'
+}
+
+function scoreToBand(score: number | undefined): 'low' | 'medium' | 'high' | 'unknown' {
+  if (score === undefined) return 'unknown'
+  if (score < 34) return 'low'
+  if (score < 67) return 'medium'
+  return 'high'
 }
 
 export function CheckInMarker({ session, className }: CheckInMarkerProps) {
@@ -27,7 +34,7 @@ export function CheckInMarker({ session, className }: CheckInMarkerProps) {
   const fatigueColor = useMemo(() => getScoreColor(fatigueScore), [fatigueScore])
 
   // Fix 4: Build accessible label for screen readers
-  const ariaLabel = `Check-in. Stress: ${stressScore ?? 'unknown'}. Fatigue: ${fatigueScore ?? 'unknown'}. Click for details.`
+  const ariaLabel = `Check-in. Stress: ${scoreToBand(stressScore)}. Fatigue: ${scoreToBand(fatigueScore)}. Click for details.`
 
   return (
     <div

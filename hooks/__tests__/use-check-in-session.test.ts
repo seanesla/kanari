@@ -224,7 +224,7 @@ describe("useCheckIn session lifecycle", () => {
     expect(onSessionEnd).toHaveBeenCalledWith(expect.objectContaining({ endedAt: expect.any(String) }))
   })
 
-  it("finalizes and calls onSessionEnd when Gemini disconnects unexpectedly after user participation", async () => {
+  it("attempts to reconnect when Gemini disconnects unexpectedly after user participation", async () => {
     const onSessionEnd = vi.fn()
     const { result } = renderHook(() => useCheckIn({ onSessionEnd }))
 
@@ -249,11 +249,102 @@ describe("useCheckIn session lifecycle", () => {
       geminiCallbacks?.onDisconnected?.("network lost")
     })
 
-    await waitFor(() => {
-      expect(result.current[0].state).toBe("complete")
+    expect(connectMock).toHaveBeenCalledTimes(2)
+    expect(result.current[0].state).not.toBe("complete")
+    expect(onSessionEnd).not.toHaveBeenCalled()
+  })
+
+  it("does not finalize the session when a disconnect happens right after scheduling (reconnects instead)", async () => {
+    const onSessionEnd = vi.fn()
+    const { result } = renderHook(() => useCheckIn({ onSessionEnd }))
+
+    await act(async () => {
+      await result.current[1].startSession()
     })
 
-    expect(onSessionEnd).toHaveBeenCalledWith(expect.objectContaining({ endedAt: expect.any(String) }))
+    // AI-first: unlock user input after the assistant starts.
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("hello", false)
+    })
+
+    act(() => {
+      result.current[1].sendTextMessage("Schedule a check-in today at 10:00 PM.")
+    })
+
+    // Simulate Gemini calling the schedule tool (this is the action that currently
+    // causes some sessions to drop and get auto-finalized).
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Check-in",
+          category: "rest",
+          date: "2026-01-09",
+          time: "22:00",
+          duration: 20,
+        },
+      })
+    })
+
+    act(() => {
+      geminiCallbacks?.onDisconnected?.("Session closed")
+    })
+
+    await waitFor(() => {
+      expect(connectMock).toHaveBeenCalledTimes(2)
+    })
+
+    expect(result.current[0].state).not.toBe("complete")
+    expect(onSessionEnd).not.toHaveBeenCalled()
+  })
+
+  it("does not auto-complete when a disconnect happens after scheduling (even if not immediate)", async () => {
+    vi.useFakeTimers()
+    try {
+      const onSessionEnd = vi.fn()
+      const { result } = renderHook(() => useCheckIn({ onSessionEnd }))
+
+      await act(async () => {
+        await result.current[1].startSession()
+      })
+
+      // AI-first: unlock user input after the assistant starts.
+      act(() => {
+        geminiCallbacks?.onModelTranscript?.("hello", false)
+      })
+
+      act(() => {
+        result.current[1].sendTextMessage("Schedule an appointment tomorrow at 9:30 PM.")
+      })
+
+      act(() => {
+        geminiCallbacks?.onWidget?.({
+          widget: "schedule_activity",
+          args: {
+            title: "Appointment",
+            category: "rest",
+            date: "2026-01-10",
+            time: "21:30",
+            duration: 30,
+          },
+        })
+      })
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(6000)
+      })
+
+      act(() => {
+        geminiCallbacks?.onDisconnected?.("network lost")
+      })
+
+      expect(connectMock).toHaveBeenCalledTimes(2)
+
+      expect(result.current[0].state).not.toBe("complete")
+      expect(onSessionEnd).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("preserves an active session and resets local state", async () => {

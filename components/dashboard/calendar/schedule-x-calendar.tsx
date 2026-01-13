@@ -54,6 +54,15 @@ interface ScheduleXWeekCalendarInnerProps extends ScheduleXWeekCalendarProps {
   timeZone: string
 }
 
+type MetricBand = 'low' | 'medium' | 'high'
+
+function scoreToBand(score: number): MetricBand {
+  if (!Number.isFinite(score)) return 'medium'
+  if (score < 34) return 'low'
+  if (score < 67) return 'medium'
+  return 'high'
+}
+
 // Helper to map Suggestion to Schedule-X event format
 function suggestionToEvent(
   suggestion: Suggestion,
@@ -130,7 +139,7 @@ function checkInToEvent(session: CheckInSession, timeZone: string): CheckInEvent
   const stressScore = session.acousticMetrics?.stressScore
   const fatigueScore = session.acousticMetrics?.fatigueScore
   const metrics = stressScore !== undefined
-    ? `S:${stressScore} F:${fatigueScore ?? '?'}`
+    ? `S: ${scoreToBand(stressScore)} • F: ${fatigueScore !== undefined ? scoreToBand(fatigueScore) : '?'}`
     : null
   const title = metrics ? `✓ Check-in • ${metrics}` : '✓ Check-in'
 

@@ -135,6 +135,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
   // Context fingerprint for session preservation
   const contextFingerprintRef = useRef<string | null>(null)
   const startConversationSentRef = useRef(false)
+  const sessionContextRef = useRef<SessionContext | null>(null)
 
   // Abort/cleanup coordination for in-flight startSession work.
   // Without this, async preflight can continue after unmount and spin up
@@ -329,6 +330,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
           ...(contextSummary ? { contextSummary } : {}),
           ...(voiceName ? { voiceName } : {}),
         }
+        sessionContextRef.current = sessionContext
 
         // Connect to Gemini with voice context
         await withTimeout(
@@ -479,9 +481,36 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
     }
   }, [audio, callbacksRef, data.messages, data.mismatchCount, data.session, dispatch, gemini, playbackControls])
 
+  const reconnectInProgressRef = useRef(false)
+
+  const attemptReconnect = useCallback(async (): Promise<boolean> => {
+    if (reconnectInProgressRef.current) return false
+    reconnectInProgressRef.current = true
+
+    try {
+      // Preserve the existing session + UI history; only re-establish Gemini.
+      dispatch({ type: "SET_INIT_PHASE", phase: "connecting_gemini" })
+      dispatch({ type: "SET_CONNECTING" })
+
+      const context = sessionContextRef.current ?? undefined
+      await withTimeout(
+        gemini.connect(context),
+        30_000,
+        "Gemini reconnect timed out. Check your network and API key, then try again."
+      )
+      return true
+    } catch (error) {
+      console.error("[useCheckIn] Reconnect failed:", error)
+      return false
+    } finally {
+      reconnectInProgressRef.current = false
+    }
+  }, [dispatch, gemini])
+
   const cancelSession = useCallback(() => {
     startSessionAbortRef.current = true
     startConversationSentRef.current = false
+    sessionContextRef.current = null
     audio.cleanupAudioCapture()
     playbackControls.cleanup()
     gemini.disconnect()
@@ -617,16 +646,25 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
   const onConnected = useCallback(() => {
     dispatch({ type: "SET_READY" })
-    dispatch({ type: "SET_INIT_PHASE", phase: "waiting_ai_response" })
-    dispatch({ type: "SET_AI_GREETING" })
 
-    // Trigger AI to speak first by sending the conversation start signal.
-    // The system instruction tells the AI to greet the user when it receives this.
-    if (!startConversationSentRef.current) {
-      startConversationSentRef.current = true
-      gemini.sendText("[START_CONVERSATION]")
+    // Fresh session: enforce "AI speaks first".
+    // Reconnect path: preserve the ongoing conversation state (do not re-greet).
+    const hasAnyMessages = data.messages.length > 0
+    if (!hasAnyMessages) {
+      dispatch({ type: "SET_INIT_PHASE", phase: "waiting_ai_response" })
+      dispatch({ type: "SET_AI_GREETING" })
+
+      // Trigger AI to speak first by sending the conversation start signal.
+      // The system instruction tells the AI to greet the user when it receives this.
+      if (!startConversationSentRef.current) {
+        startConversationSentRef.current = true
+        gemini.sendText("[START_CONVERSATION]")
+      }
+      return
     }
-  }, [dispatch, gemini])
+
+    dispatch({ type: "SET_LISTENING" })
+  }, [data.messages.length, dispatch, gemini])
 
   const onDisconnected = useCallback(
     (reason: string) => {
@@ -671,8 +709,22 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
             error: reason || "Connection lost before you could respond",
           })
         } else {
-          // Finalize the session (compute metrics, fire persistence callbacks) like an explicit end-call.
-          void endSession()
+          // Unexpected disconnect during an active session: prefer reconnecting so the user can
+          // keep talking in the same check-in (especially important after scheduling tool calls).
+          // Pattern doc: docs/error-patterns/schedule-activity-disconnect-ends-session.md
+          void (async () => {
+            const reconnected = await attemptReconnect()
+            if (reconnected) return
+
+            // If we cannot reconnect, surface an error (do not auto-complete the session).
+            // Users can explicitly end the check-in if they want to save it.
+            audio.cleanupAudioCapture()
+            playbackControls.cleanup()
+            dispatch({
+              type: "SET_ERROR",
+              error: reason || "Connection lost",
+            })
+          })()
         }
       } else if (currentState !== "complete" && currentState !== "error") {
         // Disconnected during initialization - show error
@@ -688,11 +740,11 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
     },
     [
       audio,
+      attemptReconnect,
       data.currentUserTranscript,
       data.messages,
       data.session?.acousticMetrics,
       dispatch,
-      endSession,
       playbackControls,
       stateRef,
     ]

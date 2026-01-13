@@ -116,19 +116,19 @@ describe("FullCalendarView", () => {
     expect(scheduledEvent.title).toMatch(/\.\.\.$/)
     expect(scheduledEvent.start).toBe("2026-01-09T10:00:00+00:00")
     expect(scheduledEvent.end).toBe("2026-01-09T10:30:00+00:00")
-    expect(scheduledEvent.backgroundColor).toBe("#14532d")
+    expect(scheduledEvent.backgroundColor).toBe("rgba(34, 197, 94, 0.10)")
     expect(scheduledEvent.borderColor).toBe("#22c55e")
     expect(scheduledEvent.textColor).toBe("#dcfce7")
 
     const completedEvent = events.find((e) => e.id === "completed-s2") as EventInput
     expect(completedEvent.title).toMatch(/^✓ /)
-    expect(completedEvent.backgroundColor).toBe("#374151")
+    expect(completedEvent.backgroundColor).toBe("rgba(107, 114, 128, 0.10)")
     expect(completedEvent.borderColor).toBe("#6b7280")
     expect(completedEvent.textColor).toBe("#9ca3af")
 
     const checkInEvent = events.find((e) => e.id === "checkin-c1") as EventInput
-    expect(checkInEvent.title).toBe("✓ Check-in • S:42 F:70")
-    expect(checkInEvent.backgroundColor).toBe("#78350f")
+    expect(checkInEvent.title).toBe("✓ Check-in • S: medium • F: high")
+    expect(checkInEvent.backgroundColor).toBe("rgba(245, 158, 11, 0.10)")
     expect(checkInEvent.borderColor).toBe("#f59e0b")
     expect(checkInEvent.textColor).toBe("#fef3c7")
     expect(checkInEvent.classNames).toEqual(["checkin-event"])
@@ -191,5 +191,57 @@ describe("FullCalendarView", () => {
 
     const secondEventsRef = (lastFullCalendarProps?.events ?? null) as EventInput[] | null
     expect(secondEventsRef).toBe(firstEventsRef)
+  })
+
+  it("uses event.startStr (floating) for drag-and-drop rescheduling to avoid timezone shifts", async () => {
+    const onEventUpdate = vi.fn()
+    const { FullCalendarView } = await import("../fullcalendar-view")
+
+    render(
+      <FullCalendarView
+        scheduledSuggestions={[
+          {
+            id: "s1",
+            content: "Appointment",
+            rationale: "rationale",
+            duration: 30,
+            category: "rest",
+            status: "scheduled",
+            createdAt: "2026-01-01T00:00:00Z",
+            scheduledFor: "2026-01-09T10:00:00Z",
+          },
+        ]}
+        onEventUpdate={onEventUpdate}
+      />
+    )
+
+    expect(lastFullCalendarProps).not.toBeNull()
+    const eventDrop = lastFullCalendarProps?.eventDrop as ((arg: unknown) => void) | undefined
+    expect(eventDrop).toEqual(expect.any(Function))
+
+    // Simulate a FullCalendar drop where startStr is a "floating" datetime (no offset),
+    // but the Date instance represents an offset-shifted instant (what would happen if
+    // the calendar interprets the floating time in a different environment timezone).
+    eventDrop?.({
+      event: {
+        start: new Date("2026-01-10T06:00:00.000Z"),
+        startStr: "2026-01-09T22:00:00",
+        extendedProps: {
+          suggestion: {
+            id: "s1",
+            content: "Appointment",
+            rationale: "rationale",
+            duration: 30,
+            category: "rest",
+            status: "scheduled",
+            createdAt: "2026-01-01T00:00:00Z",
+            scheduledFor: "2026-01-09T10:00:00Z",
+          },
+        },
+      },
+    })
+
+    expect(onEventUpdate).toHaveBeenCalledTimes(1)
+    expect(onEventUpdate.mock.calls[0]?.[1]).toBe("2026-01-09T22:00:00Z")
   })
 })

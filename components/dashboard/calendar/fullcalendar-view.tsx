@@ -18,20 +18,48 @@ import { generateDarkVariant, generateLightVariant } from "@/lib/color-utils"
 import { CheckInTooltip } from "./check-in-tooltip"
 import type { Suggestion, CheckInSession, RecoveryBlock, SuggestionCategory } from "@/lib/types"
 
+function hexToRgba(hex: string, alpha: number): string {
+  const cleaned = hex.replace("#", "").trim()
+  const a = Math.max(0, Math.min(1, alpha))
+
+  const parseChannel = (start: number) => Number.parseInt(cleaned.slice(start, start + 2), 16)
+
+  // #rgb
+  if (cleaned.length === 3) {
+    const r = Number.parseInt(cleaned[0]! + cleaned[0]!, 16)
+    const g = Number.parseInt(cleaned[1]! + cleaned[1]!, 16)
+    const b = Number.parseInt(cleaned[2]! + cleaned[2]!, 16)
+    if ([r, g, b].some((v) => Number.isNaN(v))) return `rgba(0, 0, 0, ${a})`
+    return `rgba(${r}, ${g}, ${b}, ${a})`
+  }
+
+  // #rrggbb
+  if (cleaned.length === 6) {
+    const r = parseChannel(0)
+    const g = parseChannel(2)
+    const b = parseChannel(4)
+    if ([r, g, b].some((v) => Number.isNaN(v))) return `rgba(0, 0, 0, ${a})`
+    return `rgba(${r}, ${g}, ${b}, ${a})`
+  }
+
+  return `rgba(0, 0, 0, ${a})`
+}
+
 // Category colors - fixed colors for each category
 const CATEGORY_COLORS: Record<SuggestionCategory, { bg: string; border: string; text: string }> = {
-  exercise: { bg: "#14532d", border: "#22c55e", text: "#dcfce7" },
-  mindfulness: { bg: "#581c87", border: "#a855f7", text: "#f3e8ff" },
-  social: { bg: "#1e3a8a", border: "#3b82f6", text: "#dbeafe" },
-  rest: { bg: "#3730a3", border: "#6366f1", text: "#e0e7ff" },
-  break: { bg: "#78350f", border: "#f59e0b", text: "#fef3c7" }, // Will be overridden by accent
+  // Use translucent, tinted backgrounds so events match the app's glassy UI.
+  exercise: { bg: "rgba(34, 197, 94, 0.10)", border: "#22c55e", text: "#dcfce7" },
+  mindfulness: { bg: "rgba(168, 85, 247, 0.10)", border: "#a855f7", text: "#f3e8ff" },
+  social: { bg: "rgba(59, 130, 246, 0.10)", border: "#3b82f6", text: "#dbeafe" },
+  rest: { bg: "rgba(99, 102, 241, 0.10)", border: "#6366f1", text: "#e0e7ff" },
+  break: { bg: "rgba(245, 158, 11, 0.10)", border: "#f59e0b", text: "#fef3c7" }, // Will be overridden by accent
 }
 
 // Check-in marker colors
-const CHECKIN_COLORS = { bg: "#78350f", border: "#f59e0b", text: "#fef3c7" }
+const CHECKIN_COLORS = { bg: "rgba(245, 158, 11, 0.10)", border: "#f59e0b", text: "#fef3c7" }
 
 // Completed event colors (gray)
-const COMPLETED_COLORS = { bg: "#374151", border: "#6b7280", text: "#9ca3af" }
+const COMPLETED_COLORS = { bg: "rgba(107, 114, 128, 0.10)", border: "#6b7280", text: "#9ca3af" }
 
 const EMPTY_SUGGESTIONS: Suggestion[] = []
 const EMPTY_SESSIONS: CheckInSession[] = []
@@ -67,6 +95,59 @@ interface ExtendedEventProps {
   isCheckIn?: boolean
 }
 
+type MetricBand = "low" | "medium" | "high"
+
+function scoreToBand(score: number): MetricBand {
+  if (!Number.isFinite(score)) return "medium"
+  if (score < 34) return "low"
+  if (score < 67) return "medium"
+  return "high"
+}
+
+function toInstantFromFullCalendarStart(
+  start: Date | null,
+  startStr: string | undefined,
+  timeZone: string
+): string | null {
+  // Pattern doc: docs/error-patterns/fullcalendar-drag-drop-timezone-shift.md
+  const raw = (startStr ?? "").trim()
+
+  if (raw) {
+    const hasOffsetOrZ = /[zZ]|[+-]\d\d:\d\d$/.test(raw)
+    if (hasOffsetOrZ) {
+      try {
+        return Temporal.Instant.from(raw).toString()
+      } catch {
+        // fall through
+      }
+    }
+
+    // FullCalendar may provide a "floating" datetime string without an offset.
+    // Interpret it in the app-selected time zone to avoid environment-dependent shifts.
+    try {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        const zdt = Temporal.PlainDate.from(raw).toZonedDateTime({
+          timeZone,
+          plainTime: Temporal.PlainTime.from("00:00"),
+        })
+        return zdt.toInstant().toString()
+      }
+
+      const plain = Temporal.PlainDateTime.from(raw)
+      return plain.toZonedDateTime(timeZone).toInstant().toString()
+    } catch {
+      // fall through
+    }
+  }
+
+  if (!start) return null
+  try {
+    return Temporal.Instant.from(start.toISOString()).toString()
+  } catch {
+    return null
+  }
+}
+
 // Helper to map Suggestion to FullCalendar event format
 function suggestionToEvent(
   suggestion: Suggestion,
@@ -90,7 +171,7 @@ function suggestionToEvent(
   let colors = CATEGORY_COLORS[suggestion.category]
   if (suggestion.category === "break") {
     colors = {
-      bg: generateDarkVariant(accentColor),
+      bg: hexToRgba(accentColor, 0.10),
       border: accentColor,
       text: generateLightVariant(accentColor),
     }
@@ -128,7 +209,7 @@ function checkInToEvent(session: CheckInSession, timeZone: string): EventInput |
   const stressScore = session.acousticMetrics?.stressScore
   const fatigueScore = session.acousticMetrics?.fatigueScore
   const metrics = stressScore !== undefined
-    ? `S:${stressScore} F:${fatigueScore ?? "?"}`
+    ? `S: ${scoreToBand(stressScore)} • F: ${fatigueScore !== undefined ? scoreToBand(fatigueScore) : "?"}`
     : null
   const title = metrics ? `✓ Check-in • ${metrics}` : "✓ Check-in"
 
@@ -217,11 +298,15 @@ export function FullCalendarView({
     const props = info.event.extendedProps as ExtendedEventProps
 
     if (props.suggestion && onEventUpdate && info.event.start) {
-      // Convert to ISO string
-      const newScheduledFor = Temporal.Instant.from(info.event.start.toISOString()).toString()
+      const newScheduledFor = toInstantFromFullCalendarStart(
+        info.event.start,
+        info.event.startStr,
+        timeZone
+      )
+      if (!newScheduledFor) return
       onEventUpdate(props.suggestion, newScheduledFor)
     }
-  }, [onEventUpdate])
+  }, [onEventUpdate, timeZone])
 
   // Handle date click
   const handleDateClick = useCallback((info: DateClickArg) => {

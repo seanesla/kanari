@@ -12,6 +12,7 @@ import type {
   ScheduleActivityToolArgs,
   Suggestion,
   RecoveryBlock,
+  SuggestionCategory,
 } from "@/lib/types"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 
@@ -59,6 +60,16 @@ function formatTimeHHMM(time: ParsedTime): string {
 function to24Hour(hour12: number, meridiem: "am" | "pm"): number {
   const normalized = hour12 % 12
   return meridiem === "pm" ? normalized + 12 : normalized
+}
+
+function normalizeTimeToHHMM(time: string): string | null {
+  const direct = parseTimeHHMM(time)
+  if (direct) return formatTimeHHMM(direct)
+
+  const explicit = extractExplicitTimeFromText(time)
+  if (explicit) return formatTimeHHMM(explicit)
+
+  return null
 }
 
 function extractExplicitTimeFromText(text: string): ParsedTime | null {
@@ -133,6 +144,97 @@ function isCheckInScheduleRequest(text: string): boolean {
   return input.includes("schedule") && (input.includes("check-in") || input.includes("check in"))
 }
 
+function isScheduleRequest(text: string): boolean {
+  return /\bschedule\b/i.test(text)
+}
+
+function extractDurationMinutesFromText(text: string): number | null {
+  const input = text.toLowerCase()
+
+  // "for 30 minutes", "30 min", "30mins"
+  const minutes = input.match(/\b(\d{1,3})\s*(?:min|mins|minute|minutes|m)\b/)
+  if (minutes) {
+    const value = Number(minutes[1])
+    if (Number.isFinite(value) && value > 0 && value <= 240) return value
+  }
+
+  // "for 1 hour", "2 hours", "1hr", "1 h"
+  const hours = input.match(/\b(\d{1,2})\s*(?:hr|hrs|hour|hours|h)\b/)
+  if (hours) {
+    const value = Number(hours[1])
+    if (Number.isFinite(value) && value > 0 && value <= 12) return value * 60
+  }
+
+  return null
+}
+
+function inferScheduleCategory(text: string): SuggestionCategory {
+  const input = text.toLowerCase()
+
+  if (input.includes("break")) return "break"
+  if (input.includes("walk") || input.includes("run") || input.includes("exercise") || input.includes("gym")) {
+    return "exercise"
+  }
+  if (
+    input.includes("meditate") ||
+    input.includes("meditation") ||
+    input.includes("mindfulness") ||
+    input.includes("breath")
+  ) {
+    return "mindfulness"
+  }
+  if (
+    input.includes("meeting") ||
+    input.includes("meet ") ||
+    input.includes("coffee") ||
+    input.includes("call") ||
+    input.includes("dinner") ||
+    input.includes("lunch")
+  ) {
+    return "social"
+  }
+
+  return "rest"
+}
+
+function inferScheduleTitle(text: string): string {
+  const raw = text.trim()
+  const input = raw.toLowerCase()
+
+  // Prefer quoted titles if present.
+  const quoted = raw.match(/["“]([^"”]{1,60})["”]/)?.[1]?.trim()
+  if (quoted) return quoted
+
+  if (input.includes("check-in") || input.includes("check in")) return "Check-in"
+  if (input.includes("appointment")) return "Appointment"
+  if (input.includes("meeting")) return "Meeting"
+  if (input.includes("break")) return "Break"
+  if (input.includes("walk")) return "Walk"
+
+  return "Scheduled activity"
+}
+
+function inferScheduleDurationMinutes(text: string): number {
+  const explicit = extractDurationMinutesFromText(text)
+  if (explicit) return explicit
+
+  const input = text.toLowerCase()
+  if (input.includes("check-in") || input.includes("check in")) return 20
+  if (input.includes("break")) return 15
+  if (input.includes("exercise") || input.includes("walk") || input.includes("run") || input.includes("gym")) return 10
+  if (input.includes("meditate") || input.includes("meditation") || input.includes("mindfulness") || input.includes("breath")) {
+    return 10
+  }
+  if (input.includes("appointment") || input.includes("meeting")) return 30
+
+  return 30
+}
+
+function clampDurationMinutes(duration: number): number {
+  if (!Number.isFinite(duration)) return 20
+  return Math.max(5, Math.min(240, Math.round(duration)))
+}
+
 function formatZonedDateTimeForMessage(dateISO: string, timeHHMM: string, timeZone: string): string {
   const [year, month, day] = dateISO.split("-").map(Number)
   const [hour, minute] = timeHHMM.split(":").map(Number)
@@ -168,8 +270,11 @@ function formatZonedDateTimeForMessage(dateISO: string, timeHHMM: string, timeZo
 }
 
 function parseZonedDateTimeInstant(date: string, time: string, timeZone: string): string | null {
+  const normalizedTime = normalizeTimeToHHMM(time)
+  if (!normalizedTime) return null
+
   const [yearStr, monthStr, dayStr] = date.split("-")
-  const [hourStr, minuteStr] = time.split(":")
+  const [hourStr, minuteStr] = normalizedTime.split(":")
 
   const year = Number(yearStr)
   const month = Number(monthStr)
@@ -193,7 +298,7 @@ function parseZonedDateTimeInstant(date: string, time: string, timeZone: string)
 
   try {
     // Parse via ISO string to reject overflow dates like 2024-02-31.
-    const plainDateTime = Temporal.PlainDateTime.from(`${yearStr}-${monthStr}-${dayStr}T${hourStr}:${minuteStr}`)
+    const plainDateTime = Temporal.PlainDateTime.from(`${yearStr}-${monthStr}-${dayStr}T${normalizedTime}`)
     const zdt = plainDateTime.toZonedDateTime(timeZone)
     return zdt.toInstant().toString()
   } catch {
@@ -210,6 +315,34 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
   useEffect(() => {
     widgetsRef.current = data.widgets
   }, [data.widgets])
+
+  // ========================================
+  // Scheduling dedupe (prevents double events)
+  // ========================================
+
+  // Pattern doc: docs/error-patterns/schedule-activity-double-schedules.md
+  const scheduledInstantsRef = useRef<Set<string>>(new Set())
+  const lastSessionIdForDedupeRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    const sessionId = data.session?.id ?? null
+    if (sessionId !== lastSessionIdForDedupeRef.current) {
+      scheduledInstantsRef.current.clear()
+      lastSessionIdForDedupeRef.current = sessionId
+    }
+  }, [data.session?.id])
+
+  const isDuplicateScheduledInstant = useCallback((scheduledFor: string): boolean => {
+    return scheduledInstantsRef.current.has(scheduledFor)
+  }, [])
+
+  const markScheduledInstant = useCallback((scheduledFor: string) => {
+    scheduledInstantsRef.current.add(scheduledFor)
+  }, [])
+
+  const unmarkScheduledInstant = useCallback((scheduledFor: string) => {
+    scheduledInstantsRef.current.delete(scheduledFor)
+  }, [])
 
   // ========================================
   // Storage Helpers (dynamic import)
@@ -436,7 +569,8 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           const widgetId = generateId()
           const suggestionId = generateId()
 
-          const scheduledFor = parseZonedDateTimeInstant(args.date as string, args.time as string, timeZone)
+          const normalizedTime = normalizeTimeToHHMM(args.time as string) ?? (args.time as string)
+          const scheduledFor = parseZonedDateTimeInstant(args.date as string, normalizedTime, timeZone)
 
           if (!scheduledFor) {
             dispatch({
@@ -449,7 +583,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
                   title: args.title,
                   category: args.category,
                   date: args.date,
-                  time: args.time,
+                  time: normalizedTime,
                   duration: args.duration,
                 } as ScheduleActivityToolArgs,
                 status: "failed",
@@ -458,6 +592,11 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
             })
             return
           }
+
+          if (isDuplicateScheduledInstant(scheduledFor)) {
+            return
+          }
+          markScheduledInstant(scheduledFor)
 
           const suggestion: Suggestion = {
             id: suggestionId,
@@ -480,7 +619,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
                 title: args.title,
                 category: args.category,
                 date: args.date,
-                time: args.time,
+                time: normalizedTime,
                 duration: args.duration,
               } as ScheduleActivityToolArgs,
               status: "scheduled",
@@ -493,6 +632,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
               await addSuggestionToDb(suggestion)
               await syncSuggestionToCalendar(widgetId, suggestion)
             } catch (error) {
+              unmarkScheduledInstant(scheduledFor)
               dispatch({
                 type: "UPDATE_WIDGET",
                 widgetId,
@@ -580,15 +720,15 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         // Pattern doc: docs/error-patterns/schedule-activity-user-time-mismatch.md
         const lastUserMessage = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? ""
         const userTime = extractExplicitTimeFromText(lastUserMessage)
-        const toolTime = parseTimeHHMM(event.args.time)
+        const normalizedToolTime = normalizeTimeToHHMM(event.args.time)
         const resolvedTime = userTime
           ? formatTimeHHMM(userTime)
-          : event.args.time
+          : normalizedToolTime ?? event.args.time
 
-        // Only override if tool time parses (it always should) and user time is explicit.
-        const resolvedArgs: ScheduleActivityToolArgs = toolTime && userTime
-          ? { ...event.args, time: resolvedTime }
-          : event.args
+        const resolvedArgs: ScheduleActivityToolArgs = {
+          ...event.args,
+          time: resolvedTime,
+        }
 
         const scheduledFor = parseZonedDateTimeInstant(resolvedArgs.date, resolvedArgs.time, timeZone)
         if (!scheduledFor) {
@@ -605,6 +745,11 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           })
           return
         }
+
+        if (isDuplicateScheduledInstant(scheduledFor)) {
+          return
+        }
+        markScheduledInstant(scheduledFor)
 
         const suggestion: Suggestion = {
           id: suggestionId,
@@ -644,6 +789,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
               dispatch({ type: "ADD_MESSAGE", message: confirmationMessage })
             }
           } catch (error) {
+            unmarkScheduledInstant(scheduledFor)
             dispatch({
               type: "UPDATE_WIDGET",
               widgetId,
@@ -734,7 +880,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
     if (!lastUserMessage) return
     if (lastAutoScheduledMessageIdRef.current === lastUserMessage.id) return
 
-    if (!isCheckInScheduleRequest(lastUserMessage.content)) return
+    if (!isScheduleRequest(lastUserMessage.content)) return
 
     const dateISO = extractDateISOFromText(lastUserMessage.content, timeZone)
     const timeParts = extractExplicitTimeFromText(lastUserMessage.content)
@@ -765,12 +911,16 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
       const timeHHMM = formatTimeHHMM(timeParts)
       const scheduledFor = parseZonedDateTimeInstant(dateISO, timeHHMM, timeZone)
 
+      const title = inferScheduleTitle(lastUserMessage.content)
+      const category = inferScheduleCategory(lastUserMessage.content)
+      const duration = clampDurationMinutes(inferScheduleDurationMinutes(lastUserMessage.content))
+
       const args: ScheduleActivityToolArgs = {
-        title: "Check-in",
-        category: "rest",
+        title,
+        category,
         date: dateISO,
         time: timeHHMM,
-        duration: 20,
+        duration,
       }
 
       if (!scheduledFor) {
@@ -788,12 +938,17 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         return
       }
 
+      if (isDuplicateScheduledInstant(scheduledFor)) {
+        return
+      }
+      markScheduledInstant(scheduledFor)
+
       const suggestion: Suggestion = {
         id: suggestionId,
-        content: "Check-in",
-        rationale: "Scheduled check-in reminder",
-        duration: args.duration,
-        category: args.category,
+        content: title,
+        rationale: "Scheduled from chat (fallback)",
+        duration,
+        category,
         status: "scheduled",
         createdAt: now,
         scheduledFor,
@@ -819,12 +974,13 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
             const confirmationMessage: CheckInMessage = {
               id: generateId(),
               role: "assistant",
-              content: `Done — scheduled “Check-in” for ${formatZonedDateTimeForMessage(args.date, args.time, timeZone)}.`,
+              content: `Done — scheduled “${title}” for ${formatZonedDateTimeForMessage(args.date, args.time, timeZone)}.`,
               timestamp: new Date().toISOString(),
             }
             dispatch({ type: "ADD_MESSAGE", message: confirmationMessage })
           }
         } catch (error) {
+          unmarkScheduledInstant(scheduledFor)
           dispatch({
             type: "UPDATE_WIDGET",
             widgetId,

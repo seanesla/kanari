@@ -29,23 +29,22 @@ interface CheckInTooltipProps {
 // Get color class based on score (0-100)
 function getScoreColor(score: number | undefined): string {
   if (score === undefined) return 'text-muted-foreground'
-  if (score < 30) return 'text-green-500'
-  if (score < 60) return 'text-yellow-500'
+  if (score < 34) return 'text-green-500'
+  if (score < 67) return 'text-yellow-500'
   return 'text-red-500'
 }
 
 function getScoreBarColor(score: number | undefined): string {
   if (score === undefined) return 'bg-muted-foreground'
-  if (score < 30) return 'bg-green-500'
-  if (score < 60) return 'bg-yellow-500'
+  if (score < 34) return 'bg-green-500'
+  if (score < 67) return 'bg-yellow-500'
   return 'bg-red-500'
 }
 
 function getScoreLabel(score: number | undefined): string {
   if (score === undefined) return 'Unknown'
-  if (score < 30) return 'Low'
-  if (score < 60) return 'Moderate'
-  if (score < 80) return 'Elevated'
+  if (score < 34) return 'Low'
+  if (score < 67) return 'Medium'
   return 'High'
 }
 
@@ -166,7 +165,7 @@ export function CheckInTooltip({
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Stress</span>
                     <span className={cn('font-medium', getScoreColor(stressScore))}>
-                      {stressScore !== undefined ? stressScore : '—'} · {getScoreLabel(stressScore)}
+                      {getScoreLabel(stressScore)}
                     </span>
                   </div>
                   <div className="h-1.5 rounded-full bg-muted overflow-hidden">
@@ -182,7 +181,7 @@ export function CheckInTooltip({
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Fatigue</span>
                     <span className={cn('font-medium', getScoreColor(fatigueScore))}>
-                      {fatigueScore !== undefined ? fatigueScore : '—'} · {getScoreLabel(fatigueScore)}
+                      {getScoreLabel(fatigueScore)}
                     </span>
                   </div>
                   <div className="h-1.5 rounded-full bg-muted overflow-hidden">

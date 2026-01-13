@@ -30,10 +30,19 @@ interface CheckInListItemProps {
 /**
  * Get a preview string for the check-in item
  */
+function scoreToBand(score: number | undefined): "low" | "medium" | "high" | "unknown" {
+  if (score === undefined) return "unknown"
+  if (score < 34) return "low"
+  if (score < 67) return "medium"
+  return "high"
+}
+
 function getPreviewText(item: HistoryItem): string {
   // AI Chat - show metrics or first user message
   if (item.session.acousticMetrics) {
-    return `Stress: ${item.session.acousticMetrics.stressScore} • Fatigue: ${item.session.acousticMetrics.fatigueScore}`
+    const stress = scoreToBand(item.session.acousticMetrics.stressScore)
+    const fatigue = scoreToBand(item.session.acousticMetrics.fatigueScore)
+    return `Stress: ${stress} • Fatigue: ${fatigue}`
   }
   const firstUserMessage = item.session.messages.find((m) => m.role === "user")
   if (firstUserMessage) {

@@ -24,6 +24,13 @@ interface AIChatDetailViewProps {
   onDelete: () => void
 }
 
+function scoreToBand(score: number | undefined): "low" | "medium" | "high" | "unknown" {
+  if (score === undefined) return "unknown"
+  if (score < 34) return "low"
+  if (score < 67) return "medium"
+  return "high"
+}
+
 export function AIChatDetailView({
   session,
   onDelete,
@@ -57,10 +64,13 @@ export function AIChatDetailView({
     setSeekPosition(position)
   }, [])
 
-  const StressIcon = session.acousticMetrics?.stressLevel
-    ? session.acousticMetrics.stressLevel === "low" || session.acousticMetrics.stressLevel === "moderate"
-      ? TrendingDown
-      : TrendingUp
+  const stressBand = scoreToBand(session.acousticMetrics?.stressScore)
+  const fatigueBand = scoreToBand(session.acousticMetrics?.fatigueScore)
+
+  const StressIcon = stressBand !== "unknown"
+    ? stressBand === "high"
+      ? TrendingUp
+      : TrendingDown
     : Minus
 
   return (
@@ -130,20 +140,14 @@ export function AIChatDetailView({
                   <StressIcon className="h-5 w-5 text-destructive" />
                   <div>
                     <p className="text-xs text-muted-foreground">Stress Level</p>
-                    <p className="text-lg font-semibold">{session.acousticMetrics.stressScore}</p>
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {session.acousticMetrics.stressLevel}
-                    </p>
+                    <p className="text-lg font-semibold capitalize">{stressBand}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
                   <Clock className="h-5 w-5 text-accent" />
                   <div>
                     <p className="text-xs text-muted-foreground">Fatigue Level</p>
-                    <p className="text-lg font-semibold">{session.acousticMetrics.fatigueScore}</p>
-                    <p className="text-xs text-muted-foreground capitalize">
-                      {session.acousticMetrics.fatigueLevel}
-                    </p>
+                    <p className="text-lg font-semibold capitalize">{fatigueBand}</p>
                   </div>
                 </div>
               </div>
