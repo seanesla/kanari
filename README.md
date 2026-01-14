@@ -104,7 +104,7 @@ Uses Gemini 3 Flash for:
 
 | Resource | URL |
 |----------|-----|
-| Live Demo | https://kanari-three.vercel.app |
+| Live Demo | https://kanari.space |
 | Demo Video | `[VIDEO_URL]` |
 | Devpost | `[DEVPOST_URL]` |
 

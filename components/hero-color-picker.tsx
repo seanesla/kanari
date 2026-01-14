@@ -24,6 +24,12 @@ export function HeroColorPicker({ children }: HeroColorPickerProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [showHint, setShowHint] = useState(false)
+  const [mounted, setMounted] = useState(false)
+
+  // Wait for client-side hydration to avoid Radix ID mismatch
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Show hint after a delay, but only after loading animation is done
   useEffect(() => {
@@ -72,6 +78,17 @@ export function HeroColorPicker({ children }: HeroColorPickerProps) {
     if (showHint) {
       setShowHint(false)
     }
+  }
+
+  // During SSR, render just the children to avoid hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="relative inline-block">
+        <div className="relative rounded-2xl px-4 py-2 -mx-4 -my-2">
+          {children}
+        </div>
+      </div>
+    )
   }
 
   return (
