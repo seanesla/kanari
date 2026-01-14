@@ -435,7 +435,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
                   tracking: type === "challenge" ? tracking : undefined,
                 }
               })
-          } catch (aiError) {
+          } catch {
             // Fallback: starter set (still yields something usable offline)
             newDaily = buildStarterAchievements(nowISO, todayISO).slice(0, requestedCount)
           }
