@@ -15,7 +15,7 @@ export function SettingsAccountabilitySection({
   onAccountabilityModeChange,
 }: SettingsAccountabilitySectionProps) {
   return (
-    <div className="rounded-lg border border-border bg-card p-6">
+    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
       <div className="flex items-center gap-2 mb-4">
         <Target className="h-5 w-5 text-accent" />
         <h2 className="text-lg font-semibold font-serif">Check-in Style</h2>

@@ -19,7 +19,7 @@ export function SettingsNotificationsSection({
   const dailyReminderEnabled = Boolean(dailyReminderTime)
 
   return (
-    <div className="rounded-lg border border-border bg-card p-6">
+    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
       <h2 className="mb-6 text-lg font-semibold font-serif">Notifications</h2>
 
       <div className="space-y-6">

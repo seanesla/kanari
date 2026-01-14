@@ -24,7 +24,12 @@ export function CollapsibleSection({
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden">
+      <div
+        className={cn(
+          "rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden transition-all duration-300",
+          isOpen && "border-accent/30 shadow-sm shadow-accent/5"
+        )}
+      >
         <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 hover:bg-muted/10 transition-colors">
           <span className="text-sm font-medium">{title}</span>
           <ChevronDown

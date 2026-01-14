@@ -181,6 +181,28 @@
       transparent 100%
     );
   }
+
+  /* Premium polish: subtle glow on hover */
+  .glow-accent-hover:hover {
+    box-shadow: 0 0 30px -5px oklch(from var(--accent) l c h / 0.2);
+  }
+
+  /* Premium polish: gradient overlay for depth */
+  .gradient-overlay-accent {
+    background: linear-gradient(
+      135deg,
+      oklch(from var(--accent) l c h / 0.03) 0%,
+      transparent 50%
+    );
+  }
+
+  /* Premium polish: interactive card scale */
+  .scale-hover {
+    transition: transform 0.2s ease-out;
+  }
+  .scale-hover:hover {
+    transform: scale(1.005);
+  }
 }
 
 /* Breathing animation for stats */

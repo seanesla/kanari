@@ -17,8 +17,8 @@ import { StressFatigueChart } from "@/components/dashboard/stress-fatigue-chart"
 import { EngagementTracker } from "@/components/dashboard/engagement-tracker"
 import { AnalyticsInsightsSection } from "@/components/dashboard/analytics-insights"
 import { useSceneMode } from "@/lib/scene-context"
-import { DecorativeGrid } from "@/components/ui/decorative-grid"
 import { useTimeZone } from "@/lib/timezone-context"
+import { PageHeader } from "@/components/dashboard/page-header"
 import type { BurnoutPrediction } from "@/lib/types"
 
 export default function AnalyticsPage() {
@@ -191,23 +191,19 @@ export default function AnalyticsPage() {
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
-        {/* Header - min-h-[200px]: ensures consistent grid fade appearance across all dashboard pages */}
-        <div className="relative mb-12 overflow-hidden rounded-lg p-6 min-h-[200px] flex items-center">
-          <DecorativeGrid />
-          <div
-            className={cn(
-              "relative transition-all duration-1000 delay-100",
-              visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-            )}
-          >
-            <h1 className="text-3xl md:text-4xl font-serif leading-[0.95] mb-3">
-              Wellness <span className="text-accent">insights</span>
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
-              Detailed analysis of your stress, fatigue trends, and burnout risk over time.
-            </p>
-          </div>
+      <main className="px-4 md:px-8 lg:px-12 pt-20 pb-8 relative z-10">
+        {/* Header */}
+        <div
+          className={cn(
+            "mb-8 transition-all duration-1000 delay-100",
+            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+          )}
+        >
+          <PageHeader
+            title="Wellness"
+            titleAccent="insights"
+            subtitle="Detailed analysis of your stress, fatigue trends, and burnout risk over time."
+          />
         </div>
 
         {/* Engagement Tracker */}
@@ -317,8 +313,8 @@ export default function AnalyticsPage() {
 
         {/* Charts Section */}
         <div ref={chartsRef} className="relative">
-          <div className="pointer-events-none absolute top-0 right-0 h-96 w-96 rounded-full bg-success/5 blur-3xl" />
-          <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-80 w-80 rounded-full bg-accent/5 blur-3xl" />
+          <div className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-success/3 blur-3xl" />
+          <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-48 w-48 rounded-full bg-accent/3 blur-3xl" />
 
           <div className="relative">
             <div

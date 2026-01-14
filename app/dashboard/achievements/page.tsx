@@ -7,7 +7,7 @@ import { useRecordings, useCheckInSessions } from "@/hooks/use-storage"
 import { useAllSuggestions } from "@/hooks/use-storage"
 import { useAchievements } from "@/hooks/use-achievements"
 import { DailyAchievementCard, CelebrationToastQueue } from "@/components/achievements"
-import { DecorativeGrid } from "@/components/ui/decorative-grid"
+import { PageHeader } from "@/components/dashboard/page-header"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { getDateLabel } from "@/lib/date-utils"
@@ -65,23 +65,22 @@ export default function AchievementsPage() {
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-8 md:px-16 lg:px-20 pt-28 pb-12 relative z-10">
+      {/* Subtle gradient orb for visual depth */}
+      <div className="pointer-events-none absolute top-40 right-10 h-48 w-48 rounded-full bg-accent/3 blur-3xl" />
+
+      <main className="px-4 md:px-8 lg:px-12 pt-20 pb-8 relative z-10">
         {/* Header */}
-        <div className="relative mb-12 overflow-hidden rounded-lg p-6 min-h-[200px] flex items-center">
-          <DecorativeGrid />
-          <div
-            className={cn(
-              "relative transition-all duration-1000 delay-100",
-              visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-            )}
-          >
-            <h1 className="text-3xl md:text-4xl font-serif leading-[0.95] mb-3">
-              Your <span className="text-accent">achievements</span>
-            </h1>
-            <p className="text-sm md:text-base text-muted-foreground leading-relaxed max-w-xl">
-              Milestones you&apos;ve earned on your wellness journey. Achievements are personalized based on your progress.
-            </p>
-          </div>
+        <div
+          className={cn(
+            "mb-8 transition-all duration-1000 delay-100",
+            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+          )}
+        >
+          <PageHeader
+            title="Your"
+            titleAccent="achievements"
+            subtitle="Milestones you've earned on your wellness journey. Achievements are personalized based on your progress."
+          />
         </div>
 
         {/* Achievements Showcase */}
