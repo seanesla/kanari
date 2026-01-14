@@ -25,7 +25,7 @@ export default function SettingsPage() {
         <div
           className={cn(
             "mb-8 transition-all duration-1000 delay-100",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            visible ? "opacity-100" : "opacity-0 translate-y-4"
           )}
         >
           <PageHeader
@@ -38,7 +38,7 @@ export default function SettingsPage() {
         <div
           className={cn(
             "relative transition-all duration-1000 delay-200",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
+            visible ? "opacity-100" : "opacity-0 translate-y-4"
           )}
         >
           <SettingsContent />
