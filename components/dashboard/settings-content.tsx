@@ -1,8 +1,18 @@
 "use client"
 
-import { useEffect, useMemo, useCallback, useRef, useState } from "react"
+import { useEffect, useMemo, useCallback, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { GeminiMemorySection } from "./settings-gemini-memory"
 import { SettingsAccountSection } from "./settings-account"
 import { SettingsApiSection } from "./settings-api"
@@ -32,37 +42,30 @@ type SettingsDraft = Pick<
   | "accountabilityMode"
 >
 
+const DEFAULT_DRAFT: SettingsDraft = {
+  defaultRecordingDuration: DEFAULT_USER_SETTINGS.defaultRecordingDuration,
+  enableVAD: DEFAULT_USER_SETTINGS.enableVAD,
+  enableNotifications: DEFAULT_USER_SETTINGS.enableNotifications,
+  dailyReminderTime: undefined,
+  autoScheduleRecovery: DEFAULT_USER_SETTINGS.autoScheduleRecovery,
+  localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
+  geminiApiKey: undefined,
+  selectedGeminiVoice: undefined,
+  accountabilityMode: DEFAULT_USER_SETTINGS.accountabilityMode,
+}
+
 export function SettingsContent() {
-  const [draft, setDraft] = useState<SettingsDraft>({
-    defaultRecordingDuration: DEFAULT_USER_SETTINGS.defaultRecordingDuration,
-    enableVAD: DEFAULT_USER_SETTINGS.enableVAD,
-    enableNotifications: DEFAULT_USER_SETTINGS.enableNotifications,
-    dailyReminderTime: undefined,
-    autoScheduleRecovery: DEFAULT_USER_SETTINGS.autoScheduleRecovery,
-    localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
-    geminiApiKey: undefined,
-    selectedGeminiVoice: undefined,
-    accountabilityMode: DEFAULT_USER_SETTINGS.accountabilityMode,
-  })
+  const [draft, setDraft] = useState<SettingsDraft>(() => ({ ...DEFAULT_DRAFT }))
 
   const [baseline, setBaseline] = useState<SettingsDraft | null>(null)
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
 
   // Load settings from IndexedDB on mount
   useEffect(() => {
-    const fallback: SettingsDraft = {
-      defaultRecordingDuration: DEFAULT_USER_SETTINGS.defaultRecordingDuration,
-      enableVAD: DEFAULT_USER_SETTINGS.enableVAD,
-      enableNotifications: DEFAULT_USER_SETTINGS.enableNotifications,
-      dailyReminderTime: undefined,
-      autoScheduleRecovery: DEFAULT_USER_SETTINGS.autoScheduleRecovery,
-      localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
-      geminiApiKey: undefined,
-      selectedGeminiVoice: undefined,
-      accountabilityMode: DEFAULT_USER_SETTINGS.accountabilityMode,
-    }
+    const fallback: SettingsDraft = { ...DEFAULT_DRAFT }
 
     async function loadSettings() {
       try {
@@ -116,26 +119,6 @@ export function SettingsContent() {
     )
   }, [baseline, normalizedDraft])
 
-  const [isSaveReminderVisible, setIsSaveReminderVisible] = useState(false)
-  const saveReminderDismissedRef = useRef(false)
-  const prevDirtyRef = useRef(false)
-
-  useEffect(() => {
-    // Show the reminder once per "dirty session" (until saved).
-    if (!prevDirtyRef.current && isDirty) {
-      saveReminderDismissedRef.current = false
-      setIsSaveReminderVisible(true)
-    }
-
-    // Reset when changes are saved.
-    if (!isDirty) {
-      saveReminderDismissedRef.current = false
-      setIsSaveReminderVisible(false)
-    }
-
-    prevDirtyRef.current = isDirty
-  }, [isDirty])
-
   // Save settings to IndexedDB
   const handleSaveSettings = useCallback(async () => {
     setIsSaving(true)
@@ -170,8 +153,14 @@ export function SettingsContent() {
     }
   }, [normalizedDraft])
 
+  const handleResetToDefaults = useCallback(() => {
+    setShowResetConfirm(false)
+    setDraft({ ...DEFAULT_DRAFT })
+    setSaveMessage(null)
+  }, [])
+
   return (
-    <div className="w-full space-y-8">
+    <div className={`w-full space-y-8 ${isDirty ? "pb-24" : ""}`}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 auto-rows-max">
         <SettingsRecordingSection
           enableVAD={draft.enableVAD}
@@ -271,77 +260,76 @@ export function SettingsContent() {
         </div>
       )}
 
-      {/* Unsaved changes reminder */}
-      {isDirty && isSaveReminderVisible && !saveReminderDismissedRef.current && (
-        <div
-          className="fixed bottom-24 right-6 z-50 w-[340px] max-w-[calc(100vw-3rem)] rounded-xl border border-border bg-background/95 backdrop-blur shadow-lg"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="p-4">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 rounded-full bg-accent/10 p-2 text-accent">
-                <AlertCircle className="h-4 w-4" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">Don&apos;t forget to save your changes.</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Your updates won&apos;t be applied until you click Save.
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center justify-end gap-2">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  saveReminderDismissedRef.current = true
-                  setIsSaveReminderVisible(false)
-                }}
-              >
-                Dismiss
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => void handleSaveSettings()}
-                disabled={isSaving}
-              >
-                {isSaving ? "Saving..." : "Save now"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="sticky bottom-4 z-10 rounded-lg bg-background/80 backdrop-blur border border-border/50 px-4 py-4">
+      {/* Reset to Defaults */}
+      <div className="rounded-lg border border-border/50 px-4 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div className="text-sm text-muted-foreground font-sans">
-            {isDirty ? (
-              <span className="font-medium text-foreground">You have unsaved changes.</span>
-            ) : (
-              <span>All changes saved.</span>
-            )}
+            <span className="font-medium text-foreground">Reset all settings</span>
+            <p className="mt-1">
+              This will reset all settings to their default values.
+            </p>
           </div>
 
           <Button
-            onClick={handleSaveSettings}
-            disabled={isSaving || !isDirty}
-            className="w-full sm:w-auto bg-accent text-accent-foreground hover:bg-accent/90"
+            variant="outline"
+            onClick={() => setShowResetConfirm(true)}
+            disabled={isSaving}
+            className="w-full sm:w-auto"
           >
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              "Save Changes"
-            )}
+            Reset to Defaults
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset to defaults?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reset all settings to their default values. Your current settings will be lost.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleResetToDefaults}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Floating Save Bar - appears when there are unsaved changes */}
+      {isDirty && (
+        <div
+          className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur px-4 py-3 shadow-lg"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-sm">
+              <AlertCircle className="h-4 w-4 text-accent" />
+              <span className="font-medium">You have unsaved changes</span>
+            </div>
+            <Button
+              onClick={handleSaveSettings}
+              disabled={isSaving}
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

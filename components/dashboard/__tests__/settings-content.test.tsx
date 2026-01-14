@@ -98,7 +98,7 @@ describe("SettingsContent", () => {
     settingsPut.mockReset()
   })
 
-  it("renders a single Save Changes button", async () => {
+  it("renders a single Save Changes button only when there are unsaved changes", async () => {
     settingsGet.mockResolvedValue({
       id: "default",
       defaultRecordingDuration: 45,
@@ -120,11 +120,22 @@ describe("SettingsContent", () => {
       </SceneProvider>
     )
 
+    // No Save button while clean.
+    expect(screen.queryByRole("button", { name: /save changes/i })).not.toBeInTheDocument()
+
+    // Make a change to dirty the form.
+    await waitFor(() => {
+      expect(screen.getByLabelText(/default check-in duration/i)).toHaveValue("45")
+    })
+    fireEvent.change(screen.getByLabelText(/default check-in duration/i), {
+      target: { value: "60" },
+    })
+
     const buttons = await screen.findAllByRole("button", { name: /save changes/i })
     expect(buttons).toHaveLength(1)
   })
 
-  it("saves all editable settings via the bottom Save Changes button", async () => {
+  it("saves all editable settings via the floating Save Changes bar", async () => {
     settingsGet.mockResolvedValue({
       id: "default",
       defaultRecordingDuration: 45,
@@ -175,7 +186,7 @@ describe("SettingsContent", () => {
     fireEvent.click(screen.getByRole("button", { name: /select aoede/i }))
     expect(screen.getByTestId("selected-voice")).toHaveTextContent("Aoede")
 
-    fireEvent.click(screen.getByRole("button", { name: /save changes/i }))
+    fireEvent.click(await screen.findByRole("button", { name: /save changes/i }))
 
     await waitFor(() => {
       expect(settingsUpdate).toHaveBeenCalled()
@@ -194,11 +205,11 @@ describe("SettingsContent", () => {
     })
   })
 
-  it("shows a popup reminder when there are unsaved changes", async () => {
+  it("resets settings to defaults with confirmation (without auto-saving)", async () => {
     settingsGet.mockResolvedValue({
       id: "default",
       defaultRecordingDuration: 45,
-      enableVAD: true,
+      enableVAD: false,
       enableNotifications: true,
       dailyReminderTime: undefined,
       calendarConnected: false,
@@ -219,25 +230,43 @@ describe("SettingsContent", () => {
       </SceneProvider>
     )
 
-    // Make a change to dirty the form.
+    // Wait for persisted settings to hydrate into the form.
     await waitFor(() => {
       expect(screen.getByLabelText(/default check-in duration/i)).toHaveValue("45")
     })
-    fireEvent.change(screen.getByLabelText(/default check-in duration/i), {
-      target: { value: "60" },
+
+    // Reset to defaults.
+    fireEvent.click(screen.getByRole("button", { name: /reset to defaults/i }))
+    expect(await screen.findByText(/reset to defaults\?/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: /^reset$/i }))
+
+    // Draft should change (and become dirty), but it should not save automatically.
+    expect(settingsUpdate).not.toHaveBeenCalled()
+    expect(await screen.findByText(/you have unsaved changes/i)).toBeInTheDocument()
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/default check-in duration/i)).toHaveValue("30")
     })
 
-    expect(await screen.findByText(/don't forget to save/i)).toBeInTheDocument()
+    expect(screen.getByTestId("selected-voice")).toHaveTextContent("none")
 
-    // Save from the reminder.
-    fireEvent.click(screen.getByRole("button", { name: /save now/i }))
+    // Save defaults.
+    fireEvent.click(screen.getByRole("button", { name: /save changes/i }))
 
     await waitFor(() => {
       expect(settingsUpdate).toHaveBeenCalled()
     })
 
-    await waitFor(() => {
-      expect(screen.queryByText(/don't forget to save/i)).not.toBeInTheDocument()
+    expect(settingsUpdate).toHaveBeenCalledWith("default", {
+      defaultRecordingDuration: 30,
+      enableVAD: true,
+      enableNotifications: false,
+      dailyReminderTime: undefined,
+      localStorageOnly: true,
+      autoScheduleRecovery: false,
+      geminiApiKey: undefined,
+      selectedGeminiVoice: undefined,
+      accountabilityMode: "balanced",
     })
   })
 })
