@@ -1,4 +1,6 @@
 import type {
+  CategoryEffectivenessStats,
+  CategoryStats,
   StressLevel,
   FatigueLevel,
   TrendDirection,
@@ -8,6 +10,7 @@ import type {
   BurnoutPrediction,
   Suggestion,
   GeminiMemoryContext,
+  SuggestionCategory,
 } from "@/lib/types"
 
 /**
@@ -480,11 +483,13 @@ DECISION GUIDELINES:
    - User history shows gaps in certain categories
    - Burnout risk requires additional interventions
 
-LEARNING FROM USER ACTIONS:
-- If user frequently completes "mindfulness" suggestions, lean into that category
-- If user dismisses "exercise" suggestions, try lower-intensity alternatives
-- If user schedules but doesn't complete, suggest shorter durations
-- Respect patterns in user preferences
+LEARNING FROM USER ACTIONS (MUST FOLLOW):
+- The USER ACTION HISTORY will include CATEGORY PREFERENCES (a table), EFFECTIVENESS FEEDBACK, and CATEGORY RULES.
+- Treat CATEGORY RULES as hard constraints when creating NEW suggestions and when deciding whether to UPDATE or DROP existing suggestions.
+- NEVER create NEW suggestions in avoided categories unless the user explicitly requests them.
+- If an existing suggestion is in an avoided category, prefer DROP or UPDATE it into a non-avoided category (unless explicitly requested by the user).
+- When prioritized categories exist, ensure most NEW suggestions come from prioritized categories.
+- Still keep variety within prioritized categories (don't repeat the same exact intervention).
 
 RESPONSE FORMAT:
 Return a JSON object with this structure:
@@ -663,7 +668,26 @@ NO EXISTING SUGGESTIONS - Generate 2-3 new suggestions.`
   }
 
   // Add memory context (user action history)
-  if (memoryContext.completed.length > 0 || memoryContext.dismissed.length > 0) {
+  const categoryStatsEntries = Object.entries(
+    memoryContext.stats.categoryStats
+  ) as Array<[SuggestionCategory, CategoryStats]>
+  const hasCategoryPreferenceData = categoryStatsEntries.some(
+    ([, stats]) => stats.total > 0
+  )
+
+  const effectivenessEntries = Object.entries(
+    memoryContext.stats.effectivenessByCategory
+  ) as Array<[SuggestionCategory, CategoryEffectivenessStats]>
+  const hasEffectivenessFeedback = effectivenessEntries.some(
+    ([, stats]) => stats.totalRatings > 0
+  )
+
+  if (
+    memoryContext.completed.length > 0 ||
+    memoryContext.dismissed.length > 0 ||
+    hasCategoryPreferenceData ||
+    hasEffectivenessFeedback
+  ) {
     prompt += `
 
 USER ACTION HISTORY:`
@@ -686,14 +710,58 @@ ${memoryContext.dismissed
   .join("\n")}`
     }
 
-    if (memoryContext.stats.mostUsedCategory) {
+    // Category preferences table
+    if (hasCategoryPreferenceData) {
+      const sortedCategoryStats = categoryStatsEntries
+        .slice()
+        .sort((a, b) => b[1].completionRate - a[1].completionRate)
+
       prompt += `
-Preferred Category: ${memoryContext.stats.mostUsedCategory}`
+
+CATEGORY PREFERENCES:
+| Category | Completed | Dismissed | Rate | Preference |
+|----------|-----------|-----------|------|------------|
+${sortedCategoryStats
+  .map(
+    ([category, stats]) =>
+      `| ${category} | ${stats.completed} | ${stats.dismissed} | ${stats.completionRate}% | ${stats.preference.toUpperCase()} |`
+  )
+  .join("\n")}`
+
+      // Concrete category rules
+      const prioritized = memoryContext.stats.preferredCategories || []
+      const avoided = memoryContext.stats.avoidedCategories || []
+
+      prompt += `
+
+CATEGORY RULES (MUST FOLLOW):
+- PRIORITIZE categories with >60% completion rate: [${prioritized.length > 0 ? prioritized.join(", ") : "none"}]
+- AVOID categories with >50% dismissal rate: [${avoided.length > 0 ? avoided.join(", ") : "none"}]
+- When adding 2-3 NEW suggestions, at least 2 MUST be from prioritized categories (when any exist)
+- Do NOT add NEW suggestions from avoided categories unless explicitly requested by the user`
+    }
+
+    // Effectiveness feedback
+    if (hasEffectivenessFeedback) {
+      const sortedEffectiveness = effectivenessEntries
+        .filter(([, stats]) => stats.totalRatings > 0)
+        .sort((a, b) => b[1].helpfulRate - a[1].helpfulRate)
+
+      prompt += `
+
+EFFECTIVENESS FEEDBACK:
+${sortedEffectiveness
+  .map(
+    ([category, stats]) =>
+      `- ${category}: ${stats.helpfulRate}% rated helpful (${stats.totalRatings} ratings)`
+  )
+  .join("\n")}`
     }
 
     if (memoryContext.stats.averageCompletionRate > 0) {
       prompt += `
-Completion Rate: ${memoryContext.stats.averageCompletionRate}%`
+
+Overall Completion Rate: ${memoryContext.stats.averageCompletionRate}%`
     }
   }
 

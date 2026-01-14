@@ -186,6 +186,29 @@ export interface EffectivenessFeedback {
 }
 
 // ============================================
+// Suggestion Memory Types
+// ============================================
+
+export type CategoryPreference = "high" | "medium" | "low" | "avoid"
+
+export interface CategoryStats {
+  completed: number
+  dismissed: number
+  total: number
+  /** completed / total (0-100) */
+  completionRate: number
+  preference: CategoryPreference
+}
+
+export interface CategoryEffectivenessStats {
+  totalRatings: number
+  helpfulRatings: number
+  notHelpfulRatings: number
+  /** helpfulRatings / totalRatings (0-100) */
+  helpfulRate: number
+}
+
+// ============================================
 // Diff-Aware Suggestion Types
 // ============================================
 
@@ -235,6 +258,10 @@ export interface GeminiMemoryContext {
     mostUsedCategory: SuggestionCategory | null
     leastUsedCategory: SuggestionCategory | null
     averageCompletionRate: number
+    categoryStats: Record<SuggestionCategory, CategoryStats>
+    preferredCategories: SuggestionCategory[]
+    avoidedCategories: SuggestionCategory[]
+    effectivenessByCategory: Record<SuggestionCategory, CategoryEffectivenessStats>
   }
 }
 

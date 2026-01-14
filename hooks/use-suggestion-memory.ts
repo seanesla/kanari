@@ -2,7 +2,34 @@
 
 import { useCallback, useMemo } from "react"
 import { useAllSuggestions } from "./use-storage"
-import type { GeminiMemoryContext, Suggestion, SuggestionCategory } from "@/lib/types"
+import type {
+  CategoryEffectivenessStats,
+  CategoryPreference,
+  CategoryStats,
+  GeminiMemoryContext,
+  Suggestion,
+  SuggestionCategory,
+} from "@/lib/types"
+
+const ALL_CATEGORIES: SuggestionCategory[] = [
+  "break",
+  "exercise",
+  "mindfulness",
+  "social",
+  "rest",
+]
+
+function deriveCategoryPreference(stats: Pick<CategoryStats, "completed" | "dismissed" | "total">): CategoryPreference {
+  if (stats.total === 0) return "medium"
+
+  const dismissalRate = stats.dismissed / stats.total
+  const completionRate = stats.completed / stats.total
+
+  if (dismissalRate > 0.5) return "avoid"
+  if (completionRate > 0.6) return "high"
+  if (completionRate >= 0.4) return "medium"
+  return "low"
+}
 
 /**
  * Hook for building Gemini memory context from suggestion history.
@@ -16,6 +43,27 @@ export function useSuggestionMemory() {
    * Includes recently completed, dismissed, and scheduled suggestions.
    */
   const buildMemoryContext = useCallback((): GeminiMemoryContext => {
+    const emptyCategoryStats = ALL_CATEGORIES.reduce((acc, category) => {
+      acc[category] = {
+        completed: 0,
+        dismissed: 0,
+        total: 0,
+        completionRate: 0,
+        preference: "medium",
+      }
+      return acc
+    }, {} as Record<SuggestionCategory, CategoryStats>)
+
+    const emptyEffectivenessByCategory = ALL_CATEGORIES.reduce((acc, category) => {
+      acc[category] = {
+        totalRatings: 0,
+        helpfulRatings: 0,
+        notHelpfulRatings: 0,
+        helpfulRate: 0,
+      }
+      return acc
+    }, {} as Record<SuggestionCategory, CategoryEffectivenessStats>)
+
     if (!allSuggestions || allSuggestions.length === 0) {
       return {
         completed: [],
@@ -27,6 +75,10 @@ export function useSuggestionMemory() {
           mostUsedCategory: null,
           leastUsedCategory: null,
           averageCompletionRate: 0,
+          categoryStats: emptyCategoryStats,
+          preferredCategories: [],
+          avoidedCategories: [],
+          effectivenessByCategory: emptyEffectivenessByCategory,
         },
       }
     }
@@ -101,6 +153,80 @@ export function useSuggestionMemory() {
         ? Math.round((totalCompleted / totalActionable) * 100)
         : 0
 
+    // Per-category preference stats
+    const categoryStats = ALL_CATEGORIES.reduce((acc, category) => {
+      const completedCount = allSuggestions.filter(
+        (s) =>
+          (s.status === "completed" || s.status === "accepted") &&
+          s.category === category
+      ).length
+
+      const dismissedCount = allSuggestions.filter(
+        (s) => s.status === "dismissed" && s.category === category
+      ).length
+
+      const total = completedCount + dismissedCount
+      const completionRate =
+        total > 0 ? Math.round((completedCount / total) * 100) : 0
+
+      const stats: CategoryStats = {
+        completed: completedCount,
+        dismissed: dismissedCount,
+        total,
+        completionRate,
+        preference: deriveCategoryPreference({
+          completed: completedCount,
+          dismissed: dismissedCount,
+          total,
+        }),
+      }
+
+      acc[category] = stats
+      return acc
+    }, {} as Record<SuggestionCategory, CategoryStats>)
+
+    const preferredCategories = ALL_CATEGORIES.filter(
+      (category) =>
+        categoryStats[category].total > 0 &&
+        categoryStats[category].completionRate > 60
+    )
+
+    const avoidedCategories = ALL_CATEGORIES.filter((category) => {
+      const stats = categoryStats[category]
+      return stats.total > 0 && stats.dismissed / stats.total > 0.5
+    })
+
+    // Effectiveness feedback (helpful rate) by category
+    const effectivenessByCategory = ALL_CATEGORIES.reduce((acc, category) => {
+      acc[category] = {
+        totalRatings: 0,
+        helpfulRatings: 0,
+        notHelpfulRatings: 0,
+        helpfulRate: 0,
+      }
+      return acc
+    }, {} as Record<SuggestionCategory, CategoryEffectivenessStats>)
+
+    for (const suggestion of allSuggestions) {
+      const rating = suggestion.effectiveness?.rating
+      if (!rating || rating === "skipped") continue
+
+      const effectivenessStats = effectivenessByCategory[suggestion.category]
+      effectivenessStats.totalRatings += 1
+      if (rating === "very_helpful" || rating === "somewhat_helpful") {
+        effectivenessStats.helpfulRatings += 1
+      } else if (rating === "not_helpful") {
+        effectivenessStats.notHelpfulRatings += 1
+      }
+
+      effectivenessStats.helpfulRate =
+        effectivenessStats.totalRatings > 0
+          ? Math.round(
+            (effectivenessStats.helpfulRatings / effectivenessStats.totalRatings) * 100
+          )
+          : 0
+    }
+
     return {
       completed,
       dismissed,
@@ -115,6 +241,10 @@ export function useSuggestionMemory() {
             ? (sortedCategories[sortedCategories.length - 1]?.[0] as SuggestionCategory)
             : null,
         averageCompletionRate,
+        categoryStats,
+        preferredCategories,
+        avoidedCategories,
+        effectivenessByCategory,
       },
     }
   }, [allSuggestions])

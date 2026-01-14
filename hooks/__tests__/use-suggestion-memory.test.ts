@@ -17,6 +17,10 @@ const mockSuggestions: Suggestion[] = [
     status: "accepted",
     createdAt: new Date(NOW.getTime() - 60 * 60 * 1000).toISOString(),
     lastUpdatedAt: new Date(NOW.getTime() - 60 * 60 * 1000).toISOString(),
+    effectiveness: {
+      rating: "skipped",
+      ratedAt: new Date(NOW.getTime() - 60 * 60 * 1000).toISOString(),
+    },
   },
   {
     id: "s-completed",
@@ -28,6 +32,10 @@ const mockSuggestions: Suggestion[] = [
     createdAt: new Date(NOW.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     lastUpdatedAt: new Date(NOW.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     completedAt: new Date(NOW.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    effectiveness: {
+      rating: "very_helpful",
+      ratedAt: new Date(NOW.getTime() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    },
   },
   {
     id: "s-dismissed",
@@ -75,5 +83,20 @@ describe("useSuggestionMemory", () => {
     expect(memoryContext.completed.map((c) => c.content)).toContain("Take a 10 minute walk outside")
     // 2 completed (accepted + completed) out of 4 actionable (completed, accepted, dismissed, scheduled)
     expect(memoryContext.stats.averageCompletionRate).toBe(50)
+
+    // Per-category preferences
+    expect(memoryContext.stats.categoryStats.break.completed).toBe(1)
+    expect(memoryContext.stats.categoryStats.break.completionRate).toBe(100)
+    expect(memoryContext.stats.categoryStats.rest.completed).toBe(1)
+    expect(memoryContext.stats.categoryStats.rest.preference).toBe("high")
+    expect(memoryContext.stats.categoryStats.exercise.dismissed).toBe(1)
+    expect(memoryContext.stats.categoryStats.exercise.preference).toBe("avoid")
+    expect(memoryContext.stats.preferredCategories).toEqual(["break", "rest"])
+    expect(memoryContext.stats.avoidedCategories).toEqual(["exercise"])
+
+    // Effectiveness feedback (skipped is excluded)
+    expect(memoryContext.stats.effectivenessByCategory.rest.totalRatings).toBe(1)
+    expect(memoryContext.stats.effectivenessByCategory.rest.helpfulRate).toBe(100)
+    expect(memoryContext.stats.effectivenessByCategory.break.totalRatings).toBe(0)
   })
 })

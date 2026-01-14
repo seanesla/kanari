@@ -376,6 +376,22 @@ export async function POST(request: NextRequest) {
           mostUsedCategory: null,
           leastUsedCategory: null,
           averageCompletionRate: 0,
+          categoryStats: {
+            break: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
+            exercise: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
+            mindfulness: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
+            social: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
+            rest: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
+          },
+          preferredCategories: [],
+          avoidedCategories: [],
+          effectivenessByCategory: {
+            break: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
+            exercise: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
+            mindfulness: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
+            social: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
+            rest: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
+          },
         },
       }
 
