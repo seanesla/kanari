@@ -4,7 +4,32 @@
  * Mocks browser-specific modules for testing in Node.js environment
  */
 
+import "@testing-library/jest-dom/vitest"
 import { vi } from "vitest"
+
+// Mock next-view-transitions Link for tests (avoids Next runtime resolution issues)
+vi.mock("next-view-transitions", async () => {
+  const React = await import("react")
+  return {
+    Link: ({
+      href,
+      children,
+      ...props
+    }: {
+      href: string
+      children: React.ReactNode
+      [key: string]: unknown
+    }) =>
+      React.createElement(
+        "a",
+        {
+          href,
+          ...props,
+        },
+        children
+      ),
+  }
+})
 
 // Mock Web Audio API modules
 vi.mock("@ricky0123/vad-web", () => ({

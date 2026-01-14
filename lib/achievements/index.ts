@@ -54,3 +54,7 @@ export {
 
 // Export stats collector
 export { collectUserStatsForDailyAchievements } from "./stats-collector"
+
+// UI-friendly helpers (routes + progress labels for trackable challenges)
+export type { AchievementTodayCounts, DailyAchievementAction } from "./tracking-actions"
+export { getDailyAchievementAction, getDailyAchievementProgress } from "./tracking-actions"

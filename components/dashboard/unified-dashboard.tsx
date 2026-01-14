@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { RefreshCw, ChevronsUpDown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/app/dashboard/layout"
@@ -29,12 +30,15 @@ import { KanbanBoard } from "./suggestions/kanban-board"
 import { FullCalendarView } from "./calendar"
 import { SuggestionDetailDialog, ScheduleTimeDialog } from "./suggestions"
 import { CelebrationToastQueue, DailyAchievementCard } from "@/components/achievements"
+import { getDailyAchievementAction, type DailyAchievement } from "@/lib/achievements"
 import type { BurnoutPrediction } from "@/lib/types"
 
 export function UnifiedDashboard() {
   // Animation & responsiveness
   const { shouldAnimate } = useDashboardAnimation()
   const [visible, setVisible] = useState(!shouldAnimate)
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
   const [kanbanExpanded, setKanbanExpanded] = useState(false)
 
@@ -82,7 +86,6 @@ export function UnifiedDashboard() {
     progress: achievementProgress,
     dayCompletion,
     loading: achievementsLoading,
-    completeAchievement,
     celebrationQueue,
     milestoneCelebrationQueue,
     markAchievementSeen,
@@ -111,9 +114,43 @@ export function UnifiedDashboard() {
     }
   }, [shouldAnimate])
 
+  // Deep-link helpers for achievements CTAs (focus suggestions, optionally open schedule flow).
+  useEffect(() => {
+    const focus = searchParams.get("focus")
+    if (focus !== "suggestions") return
+
+    setKanbanExpanded(true)
+
+    // Scroll the kanban area into view once the layout has rendered.
+    requestAnimationFrame(() => {
+      document.getElementById("kanban-section")?.scrollIntoView({ behavior: "smooth", block: "start" })
+    })
+
+    if (searchParams.get("action") === "schedule") {
+      const pending = suggestions.find((s) => s.status === "pending")
+      if (pending) {
+        handlers.handleScheduleFromDialog(pending)
+      }
+    }
+
+    window.history.replaceState({}, "", "/dashboard")
+  }, [handlers, searchParams, suggestions])
+
   const dailyProgressPct = dayCompletion.totalCount > 0
     ? (dayCompletion.completedCount / dayCompletion.totalCount) * 100
     : 0
+
+  const handleAchievementClick = useCallback((achievement: DailyAchievement) => {
+    // Prevent direct completion from the dashboard preview.
+    // See docs/error-patterns/achievements-manual-completion.md
+    if (achievement.type === "challenge" && !achievement.completed && !achievement.expired && achievement.tracking) {
+      const action = getDailyAchievementAction(achievement.tracking.key)
+      router.push(action.href)
+      return
+    }
+
+    router.push("/dashboard/achievements")
+  }, [router])
 
   // Burnout prediction
   const burnoutPrediction: BurnoutPrediction | null = useMemo(() => {
@@ -171,7 +208,7 @@ export function UnifiedDashboard() {
 
   // Kanban content (shared between mobile and desktop)
   const kanbanContent = (
-    <div className="h-full flex flex-col">
+    <div id="kanban-section" className="h-full flex flex-col">
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="min-w-0">
           <h3 className="text-sm font-medium">Suggestions</h3>
@@ -250,7 +287,15 @@ export function UnifiedDashboard() {
         </div>
 
         {/* Daily achievements (compact) */}
-        <div className="mb-4">
+        {/* Entry animation: keep in sync with the dashboard-level visible flag.
+            See docs/error-patterns/dashboard-missing-entry-animation.md */}
+        <div
+          data-testid="dashboard-daily-achievements"
+          className={cn(
+            "mb-4 transition-all duration-1000 delay-150",
+            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          )}
+        >
           <CollapsibleSection title="Today's Achievements" defaultOpen={!isMobile}>
             <div className="space-y-3">
               <div className="flex items-start justify-between gap-3">
@@ -289,11 +334,7 @@ export function UnifiedDashboard() {
                       achievement={achievement}
                       variant="compact"
                       showNewIndicator
-                      onClick={() => {
-                        if (achievement.type === "challenge" && !achievement.completed && !achievement.expired) {
-                          void completeAchievement(achievement.id)
-                        }
-                      }}
+                      onClick={() => handleAchievementClick(achievement)}
                     />
                   ))
                 )}

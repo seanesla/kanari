@@ -103,22 +103,17 @@ export function DailyAchievementCard({
       : null
 
   if (variant === "compact") {
-    return (
-      <motion.button
-        onClick={onClick}
-        className={cn(
-          "relative flex items-center gap-2 px-3 py-2 rounded-lg border transition-all",
-          "hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-accent/50",
-          config.bgColor,
-          borderClass,
-          ringClass,
-          achievement.expired && "opacity-60",
-          className
-        )}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
-        type="button"
-      >
+    const baseClasses = cn(
+      "relative flex items-center gap-2 px-3 py-2 rounded-lg border transition-all",
+      config.bgColor,
+      borderClass,
+      ringClass,
+      achievement.expired && "opacity-60",
+      className
+    )
+
+    const content = (
+      <>
         <span className="text-lg">{achievement.emoji}</span>
         <span className={cn("text-sm font-medium truncate", config.color, shouldStrikeTitle && "line-through opacity-80")}>
           {achievement.title}
@@ -146,6 +141,29 @@ export function DailyAchievementCard({
             />
           </motion.div>
         )}
+      </>
+    )
+
+    if (!onClick) {
+      return (
+        <motion.div className={baseClasses}>
+          {content}
+        </motion.div>
+      )
+    }
+
+    return (
+      <motion.button
+        onClick={onClick}
+        className={cn(
+          baseClasses,
+          "hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-accent/50"
+        )}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        type="button"
+      >
+        {content}
       </motion.button>
     )
   }

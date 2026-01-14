@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Link from "next/link"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { useRecordings, useCheckInSessions } from "@/hooks/use-storage"
@@ -12,6 +13,7 @@ import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { getDateLabel } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
+import { getDailyAchievementAction, getDailyAchievementProgress } from "@/lib/achievements"
 
 export default function AchievementsPage() {
   const { shouldAnimate } = useDashboardAnimation()
@@ -28,6 +30,7 @@ export default function AchievementsPage() {
     error,
     progress,
     todayISO,
+    todayCounts,
     achievementsToday,
     history,
     milestoneBadges,
@@ -35,7 +38,6 @@ export default function AchievementsPage() {
     milestoneCelebrationQueue,
     dayCompletion,
     ensureToday,
-    completeAchievement,
     markAchievementSeen,
     markMilestoneSeen,
   } = useAchievements({ recordings, suggestions, sessions })
@@ -48,7 +50,9 @@ export default function AchievementsPage() {
     }
   }, [shouldAnimate])
 
-  const progressToNextLevel = 100 - (progress.totalPoints % 100)
+  const progressThisLevel = progress.totalPoints % 100
+  const progressToNextLevel = 100 - progressThisLevel
+  const levelProgressPct = (progressThisLevel / 100) * 100
   const dailyProgressPct = dayCompletion.totalCount > 0
     ? (dayCompletion.completedCount / dayCompletion.totalCount) * 100
     : 0
@@ -63,10 +67,15 @@ export default function AchievementsPage() {
 
   const historyDates = Object.keys(historyByDate).sort((a, b) => b.localeCompare(a))
 
+  const currentStreak = progress.currentDailyCompletionStreak ?? 0
+  const longestStreak = progress.longestDailyCompletionStreak ?? 0
+  const nextMilestone = [7, 30, 60, 90].find((d) => d > currentStreak) ?? null
+
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
       {/* Subtle gradient orb for visual depth */}
       <div className="pointer-events-none absolute top-40 right-10 h-48 w-48 rounded-full bg-accent/3 blur-3xl" />
+      <div className="pointer-events-none absolute -top-10 left-10 h-56 w-56 rounded-full bg-accent/5 blur-3xl" />
 
       <main className="px-4 md:px-8 lg:px-12 pt-20 pb-8 relative z-10">
         {/* Header */}
@@ -90,79 +99,165 @@ export default function AchievementsPage() {
             visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
-          {/* Today */}
-          <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6">
-            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-semibold">Today&apos;s Achievements</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Level {progress.level} • {progress.levelTitle} • {progress.totalPoints} pts
-                </p>
-              </div>
-              <div className="text-sm text-muted-foreground sm:text-right">
+          <div className="grid gap-4 lg:grid-cols-3">
+            {/* Today */}
+            <div className="lg:col-span-2 rounded-2xl border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
-                  Daily: <span className="font-medium text-foreground">{dayCompletion.completedCount}/{dayCompletion.totalCount}</span>
+                  <h2 className="text-lg font-semibold">Today&apos;s Focus</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Complete your daily set and keep your streak alive.
+                  </p>
                 </div>
-                <div>
-                  Suggestions: <span className="font-medium text-foreground">{dayCompletion.recommendedActionsCompleted}/{dayCompletion.recommendedActionsRequired}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              <Progress value={dailyProgressPct} />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{dayCompletion.isComplete ? "Day complete" : "Keep going"}</span>
-                <span>{progressToNextLevel} pts to next level</span>
-              </div>
-            </div>
-
-            {error && (
-              <p className="text-sm text-destructive mt-3">
-                {error}
-              </p>
-            )}
-
-            <div className="grid gap-4 mt-5 md:grid-cols-2">
-              {achievementsToday.length === 0 ? (
-                <div className="space-y-3">
-                  <div className="text-sm text-muted-foreground">
-                    {loading ? "Generating today’s achievements…" : "No achievements generated yet."}
+                <div className="text-sm text-muted-foreground sm:text-right">
+                  <div>
+                    Daily:{" "}
+                    <span className="font-medium text-foreground">
+                      {dayCompletion.completedCount}/{dayCompletion.totalCount}
+                    </span>
                   </div>
-                  {!loading && (
-                    <Button variant="outline" size="sm" onClick={() => void ensureToday()}>
-                      Generate today&apos;s achievements
-                    </Button>
-                  )}
+                  <div>
+                    Suggestions:{" "}
+                    <span className="font-medium text-foreground">
+                      {dayCompletion.recommendedActionsCompleted}/{dayCompletion.recommendedActionsRequired}
+                    </span>
+                  </div>
                 </div>
-              ) : (
-                achievementsToday.map((achievement) => (
-                  <div key={achievement.id} className="space-y-2">
-                    <DailyAchievementCard achievement={achievement} variant="full" showNewIndicator />
-                    {achievement.type === "challenge" && !achievement.expired && (
-                      achievement.completed ? (
-                        <Button variant="outline" size="sm" disabled className="w-full">
-                          Completed
-                        </Button>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void completeAchievement(achievement.id)}
-                          className="w-full"
-                        >
-                          Mark complete
-                        </Button>
-                      )
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <Progress value={dailyProgressPct} />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>{dayCompletion.isComplete ? "Day complete" : "Auto-tracked"}</span>
+                  <span>{progressToNextLevel} pts to next level</span>
+                </div>
+              </div>
+
+              {error && (
+                <p className="text-sm text-destructive mt-3">
+                  {error}
+                </p>
+              )}
+
+              <div className="grid gap-4 mt-6 md:grid-cols-2">
+                {achievementsToday.length === 0 ? (
+                  <div className="space-y-3">
+                    <div className="text-sm text-muted-foreground">
+                      {loading ? "Generating today’s achievements…" : "No achievements generated yet."}
+                    </div>
+                    {!loading && (
+                      <Button variant="outline" size="sm" onClick={() => void ensureToday()}>
+                        Generate today&apos;s achievements
+                      </Button>
                     )}
                   </div>
-                ))
-              )}
+                ) : (
+                  achievementsToday.map((achievement) => {
+                    const tracking = achievement.type === "challenge" ? achievement.tracking : undefined
+                    const action = tracking ? getDailyAchievementAction(tracking.key) : null
+                    const trackingProgress = tracking
+                      ? getDailyAchievementProgress({ tracking, counts: todayCounts })
+                      : null
+
+                    const current = trackingProgress ? Math.min(trackingProgress.current, trackingProgress.target) : 0
+                    const target = trackingProgress?.target ?? 0
+                    const pct = target > 0 ? (current / target) * 100 : 0
+
+                    return (
+                      <div key={achievement.id} className="space-y-2">
+                        <DailyAchievementCard achievement={achievement} variant="full" showNewIndicator />
+
+                        {achievement.type === "challenge" && !achievement.completed && !achievement.expired && tracking && action && trackingProgress && (
+                          <div className="rounded-xl border border-border/60 bg-background/25 backdrop-blur px-3 py-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                  <span className="truncate">{trackingProgress.label}</span>
+                                  <span className="tabular-nums text-foreground">
+                                    {current}/{target}
+                                  </span>
+                                </div>
+                                <Progress value={pct} className="mt-2 h-1.5" />
+                              </div>
+                              <Button asChild size="sm" className="shrink-0 bg-accent text-accent-foreground hover:bg-accent/90">
+                                <Link href={action.href}>{action.label}</Link>
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground/80 mt-2">
+                              Completes automatically when you do it.
+                            </p>
+                          </div>
+                        )}
+
+                        {achievement.type === "challenge" && achievement.expired && (
+                          <div className="rounded-xl border border-border/50 bg-muted/20 px-3 py-3">
+                            <p className="text-xs text-muted-foreground">
+                              This challenge expired after the carry-over window.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Progress + Streak */}
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-medium text-muted-foreground">Level</h3>
+                    <p className="text-lg font-semibold truncate">
+                      {progress.level} • {progress.levelTitle}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {progress.totalPoints} total points
+                    </p>
+                  </div>
+                  <div className="h-10 w-10 rounded-xl border border-accent/25 bg-accent/10 flex items-center justify-center text-sm font-semibold text-accent tabular-nums">
+                    {progress.level}
+                  </div>
+                </div>
+
+                <div className="mt-4 space-y-2">
+                  <Progress value={levelProgressPct} />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span className="tabular-nums">{progressThisLevel}/100</span>
+                    <span>{progressToNextLevel} pts to level {progress.level + 1}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+                <h3 className="text-sm font-medium text-muted-foreground">Streak</h3>
+                <div className="mt-2 flex items-baseline justify-between gap-3">
+                  <p className="text-2xl font-semibold tabular-nums">
+                    {currentStreak}d
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Best: <span className="tabular-nums text-foreground">{longestStreak}d</span>
+                  </p>
+                </div>
+                <div className="mt-3 rounded-xl border border-border/60 bg-background/25 px-3 py-3">
+                  <p className="text-xs text-muted-foreground">
+                    {nextMilestone
+                      ? `Next milestone at ${nextMilestone} days.`
+                      : "All milestones unlocked — keep going."}
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <Button asChild variant="outline" size="sm" className="w-full">
+                    <Link href="/dashboard/history?newCheckIn=true">New check-in</Link>
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Milestones */}
-          <div className="mt-6 rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+          <div className="mt-6 rounded-2xl border border-border/70 bg-card/30 backdrop-blur-xl p-6">
             <h2 className="text-lg font-semibold">Milestones</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Earn milestone badges at 7, 30, 60, and 90 days of completed daily sets.
@@ -202,7 +297,7 @@ export default function AchievementsPage() {
           </div>
 
           {/* History */}
-          <div className="mt-6 rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+          <div className="mt-6 rounded-2xl border border-border/70 bg-card/30 backdrop-blur-xl p-6">
             <h2 className="text-lg font-semibold">History</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Your full daily achievements log.

@@ -22,6 +22,7 @@ import {
   type DailyAchievement,
   type MilestoneBadge,
   type MilestoneBadgeType,
+  type AchievementTodayCounts,
   type UserProgress,
 } from "@/lib/achievements"
 import type { CheckInSession, Recording, Suggestion } from "@/lib/types"
@@ -183,6 +184,7 @@ export interface UseAchievementsResult {
   timeZone: string
   todayISO: string
   progress: UserProgress
+  todayCounts: AchievementTodayCounts
   achievementsToday: DailyAchievement[]
   history: DailyAchievement[]
   milestoneBadges: MilestoneBadge[]
@@ -199,7 +201,6 @@ export interface UseAchievementsResult {
   loading: boolean
   error: string | null
   ensureToday: () => Promise<void>
-  completeAchievement: (achievementId: string) => Promise<void>
   markAchievementSeen: (achievementId: string) => Promise<void>
   markMilestoneSeen: (badgeId: string) => Promise<void>
 }
@@ -210,6 +211,10 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const lastEnsureAttemptRef = useRef<string | null>(null)
+  const hasInput = !!input
+  const recordings = input?.recordings
+  const suggestions = input?.suggestions
+  const sessions = input?.sessions
 
   const dbAchievements = useLiveQuery(
     () => db.achievements.orderBy("dateISO").reverse().toArray(),
@@ -250,19 +255,25 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
     return milestoneBadges.filter((b) => !b.seen)
   }, [milestoneBadges])
 
+  const todayCounts: AchievementTodayCounts = useMemo(() => {
+    if (!hasInput || !recordings || !sessions || !suggestions) {
+      return { checkInsToday: 0, suggestionsCompletedToday: 0, suggestionsScheduledToday: 0 }
+    }
+
+    return calculateTodayCounts({
+      recordings,
+      sessions,
+      suggestions,
+      timeZone,
+      todayISO,
+    })
+  }, [hasInput, recordings, sessions, suggestions, timeZone, todayISO])
+
   const dayCompletion = useMemo(() => {
     const totalCount = achievementsToday.length
     const completedCount = achievementsToday.filter((a) => a.completed).length
 
-    const recommendedActionsCompleted = input
-      ? calculateTodayCounts({
-          recordings: input.recordings,
-          sessions: input.sessions,
-          suggestions: input.suggestions,
-          timeZone,
-          todayISO,
-        }).suggestionsCompletedToday
-      : 0
+    const recommendedActionsCompleted = todayCounts.suggestionsCompletedToday
 
     const recommendedActionsRequired = 2
     const completeAllDailyAchievements = totalCount > 0 && completedCount === totalCount
@@ -276,7 +287,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
       completedCount,
       totalCount,
     }
-  }, [achievementsToday, input, timeZone, todayISO])
+  }, [achievementsToday, todayCounts.suggestionsCompletedToday])
 
   // Ensure a default progress record exists (new installs won't have one yet).
   useEffect(() => {
@@ -297,7 +308,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
   }, [timeZone])
 
   const ensureToday = useCallback(async () => {
-    if (!input) return
+    if (!hasInput || !recordings || !sessions || !suggestions) return
 
     setLoading(true)
     setError(null)
@@ -363,9 +374,9 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
           .map(toDailyAchievement)
 
         const stats = collectUserStatsForDailyAchievements({
-          recordings: input.recordings,
-          suggestions: input.suggestions,
-          sessions: input.sessions,
+          recordings,
+          suggestions,
+          sessions,
           recentDailyAchievements,
           progress: progressForStats,
           timeZone,
@@ -492,11 +503,11 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
     } finally {
       setLoading(false)
     }
-  }, [input, timeZone, todayISO])
+  }, [hasInput, recordings, sessions, suggestions, timeZone, todayISO])
 
   // Generate today's achievements on app open (no background jobs).
   useEffect(() => {
-    if (!input) return
+    if (!hasInput) return
     if (loading) return
     if (lastEnsureAttemptRef.current === todayISO) return
 
@@ -506,7 +517,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
     }, 1200)
 
     return () => clearTimeout(timer)
-  }, [input, todayISO, ensureToday, loading])
+  }, [hasInput, todayISO, ensureToday, loading])
 
   const completeAchievement = useCallback(async (achievementId: string) => {
     const nowISO = new Date().toISOString()
@@ -559,7 +570,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
       }
 
       // If completing this achievement finishes the day AND the user did 2+ suggestions, advance streak + milestones.
-      if (!input) return
+      if (!hasInput || !recordings || !sessions || !suggestions) return
       const nowAchievements = await db.achievements
         .where("dateISO")
         .equals(todayISO)
@@ -568,9 +579,9 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
 
       const allComplete = nowAchievements.length > 0 && nowAchievements.every((a) => a.completed)
       const { suggestionsCompletedToday } = calculateTodayCounts({
-        recordings: input.recordings,
-        sessions: input.sessions,
-        suggestions: input.suggestions,
+        recordings,
+        sessions,
+        suggestions,
         timeZone,
         todayISO,
       })
@@ -632,7 +643,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
         // ignore
       }
     }
-  }, [input, timeZone, todayISO])
+  }, [hasInput, recordings, sessions, suggestions, timeZone, todayISO])
 
   const markAchievementSeen = useCallback(async (achievementId: string) => {
     await db.achievements.update(achievementId, { seen: true, seenAt: new Date() })
@@ -644,24 +655,16 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
 
   // Auto-complete measurable challenges when the underlying data changes.
   useEffect(() => {
-    if (!input) return
+    if (!hasInput) return
     const activeChallenges = achievementsToday.filter((a) => a.type === "challenge" && !a.completed && !a.expired && a.tracking)
     if (activeChallenges.length === 0) return
-
-    const { checkInsToday, suggestionsCompletedToday, suggestionsScheduledToday } = calculateTodayCounts({
-      recordings: input.recordings,
-      sessions: input.sessions,
-      suggestions: input.suggestions,
-      timeZone,
-      todayISO,
-    })
 
     const eligible = activeChallenges.filter((a) => {
       const tracking = a.tracking
       if (!tracking) return false
-      if (tracking.key === "do_check_in") return checkInsToday >= tracking.target
-      if (tracking.key === "complete_suggestions") return suggestionsCompletedToday >= tracking.target
-      if (tracking.key === "schedule_suggestion") return suggestionsScheduledToday >= tracking.target
+      if (tracking.key === "do_check_in") return todayCounts.checkInsToday >= tracking.target
+      if (tracking.key === "complete_suggestions") return todayCounts.suggestionsCompletedToday >= tracking.target
+      if (tracking.key === "schedule_suggestion") return todayCounts.suggestionsScheduledToday >= tracking.target
       return false
     })
 
@@ -673,11 +676,11 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
         await completeAchievement(achievement.id)
       }
     })()
-  }, [input, achievementsToday, timeZone, todayISO, completeAchievement])
+  }, [hasInput, achievementsToday, todayCounts, completeAchievement])
 
   // Advance daily completion streak when requirements are met (including the "2 suggestions" rule).
   useEffect(() => {
-    if (!input) return
+    if (!hasInput) return
     if (!dayCompletion.isComplete) return
 
     void (async () => {
@@ -719,12 +722,13 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
         await db.milestoneBadges.add(fromMilestoneBadge(badge))
       })
     })()
-  }, [dayCompletion.isComplete, input, todayISO])
+  }, [dayCompletion.isComplete, hasInput, todayISO])
 
   return {
     timeZone,
     todayISO,
     progress,
+    todayCounts,
     achievementsToday,
     history,
     milestoneBadges,
@@ -734,7 +738,6 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
     loading,
     error,
     ensureToday,
-    completeAchievement,
     markAchievementSeen,
     markMilestoneSeen,
   }
