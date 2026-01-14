@@ -1,6 +1,6 @@
 "use client"
 
-import { Paintbrush } from "lucide-react"
+import { Paintbrush } from "@/lib/icons"
 import { ColorPicker } from "./color-picker"
 import { FontPicker } from "./font-picker"
 

@@ -87,7 +87,6 @@ function buildStarterAchievements(nowISO: string, todayISO: string): DailyAchiev
       title: "First Check-In",
       description: "Complete one check-in today to start building momentum.",
       insight: "Any voice note or AI check-in counts.",
-      emoji: "🎙️",
       points: 20,
       createdAt: nowISO,
       completed: false,
@@ -104,7 +103,6 @@ function buildStarterAchievements(nowISO: string, todayISO: string): DailyAchiev
       title: "Do Two Suggestions",
       description: "Complete two recovery suggestions today (small wins count).",
       insight: "This unlocks daily completion streak progress.",
-      emoji: "✅",
       points: 35,
       createdAt: nowISO,
       completed: false,
@@ -121,7 +119,6 @@ function buildStarterAchievements(nowISO: string, todayISO: string): DailyAchiev
       title: "Welcome Ritual",
       description: "You showed up — let’s make today count.",
       insight: "Daily challenges reset at midnight in your time zone.",
-      emoji: "✨",
       points: 10,
       createdAt: nowISO,
       completed: true,
@@ -132,18 +129,20 @@ function buildStarterAchievements(nowISO: string, todayISO: string): DailyAchiev
   ]
 }
 
-function milestoneDefinitionForStreak(streakDays: number): { type: MilestoneBadgeType; title: string; description: string; emoji: string } | null {
+function milestoneDefinitionForStreak(
+  streakDays: number
+): { type: MilestoneBadgeType; title: string; description: string } | null {
   if (streakDays === 7) {
-    return { type: "7day", title: "7-Day Spark", description: "Seven days of finishing your daily set — consistency unlocked.", emoji: "🔥" }
+    return { type: "7day", title: "7-Day Spark", description: "Seven days of finishing your daily set — consistency unlocked." }
   }
   if (streakDays === 30) {
-    return { type: "30day", title: "30-Day Anchor", description: "A full month of daily completion — sustainable momentum.", emoji: "⚓" }
+    return { type: "30day", title: "30-Day Anchor", description: "A full month of daily completion — sustainable momentum." }
   }
   if (streakDays === 60) {
-    return { type: "60day", title: "60-Day Rhythm", description: "Two months of steady follow-through — your habits have a heartbeat.", emoji: "🎵" }
+    return { type: "60day", title: "60-Day Rhythm", description: "Two months of steady follow-through — your habits have a heartbeat." }
   }
   if (streakDays === 90) {
-    return { type: "90day", title: "90-Day Mastery", description: "Ninety days completed — you’re building a resilient baseline.", emoji: "🏆" }
+    return { type: "90day", title: "90-Day Mastery", description: "Ninety days completed — you’re building a resilient baseline." }
   }
   return null
 }
@@ -427,7 +426,6 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
                   title: typeof a.title === "string" ? a.title : "Daily Win",
                   description: typeof a.description === "string" ? a.description : "Make a small move forward today.",
                   insight: typeof a.insight === "string" ? a.insight : undefined,
-                  emoji: typeof a.emoji === "string" ? a.emoji : "✨",
                   points,
                   createdAt: nowISO,
                   completed: type === "badge",
@@ -614,7 +612,6 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
         type: milestone.type,
         title: milestone.title,
         description: milestone.description,
-        emoji: milestone.emoji,
         earnedAt: nowISO,
         streakDays: nextStreak,
         seen: false,
@@ -713,7 +710,6 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
           type: milestone.type,
           title: milestone.title,
           description: milestone.description,
-          emoji: milestone.emoji,
           earnedAt: nowISO,
           streakDays: nextStreak,
           seen: false,

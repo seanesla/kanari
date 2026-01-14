@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Globe2 } from "lucide-react"
+import { Globe2 } from "@/lib/icons"
 import { Label } from "@/components/ui/label"
 import { useTimeZone } from "@/lib/timezone-context"
 import { COMMON_TIME_ZONES, formatTimeZoneLabel } from "@/lib/timezone"

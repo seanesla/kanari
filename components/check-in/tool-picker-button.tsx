@@ -6,7 +6,7 @@
  * "+" button that opens a dropdown menu with available tools.
  */
 
-import { Plus } from "lucide-react"
+import { Plus } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,

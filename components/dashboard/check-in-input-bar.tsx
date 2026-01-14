@@ -7,7 +7,7 @@
 
 "use client"
 
-import { Mic } from "lucide-react"
+import { Mic } from "@/lib/icons"
 import { useCursorGlow } from "@/hooks/use-cursor-glow"
 import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
 

@@ -25,7 +25,7 @@
 
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { ThumbsUp, ThumbsDown, Minus, X, Sparkles } from "lucide-react"
+import { ThumbsUp, ThumbsDown, Minus, X, Sparkles } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import {
   Dialog,

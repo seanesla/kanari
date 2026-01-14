@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
-import { Clock, GripVertical, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X } from "lucide-react"
+import { Clock, GripVertical, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { formatScheduledTime } from "@/lib/date-utils"

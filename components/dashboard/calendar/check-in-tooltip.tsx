@@ -12,7 +12,7 @@ import {
   useInteractions,
   FloatingPortal,
 } from '@floating-ui/react'
-import { Mic, Clock, TrendingUp, ArrowRight, X } from 'lucide-react'
+import { Mic, Clock, TrendingUp, ArrowRight, X } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDuration } from '@/lib/date-utils'

@@ -1,6 +1,6 @@
 "use client"
 
-import { Volume2 } from "lucide-react"
+import { Volume2 } from "@/lib/icons"
 import { VoiceList } from "@/components/voice-list"
 import type { GeminiVoice } from "@/lib/types"
 

@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { getDateLabel } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import { getDailyAchievementAction, getDailyAchievementProgress } from "@/lib/achievements"
+import { getMilestoneBadgeIcon } from "@/components/achievements/achievement-icons"
 
 export default function AchievementsPage() {
   const { shouldAnimate } = useDashboardAnimation()
@@ -277,7 +278,10 @@ export default function AchievementsPage() {
                   >
                     <div className="flex items-start gap-3">
                       <div className="h-12 w-12 rounded-lg border border-accent/25 flex items-center justify-center text-2xl">
-                        {badge.emoji}
+                        {(() => {
+                          const { Icon, colorClass } = getMilestoneBadgeIcon(badge.type)
+                          return <Icon className={cn("h-6 w-6", colorClass)} />
+                        })()}
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-2">

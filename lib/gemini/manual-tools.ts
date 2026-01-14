@@ -5,8 +5,8 @@
  * Maps internal Gemini tool names to user-friendly slash commands and forms.
  */
 
-import type { LucideIcon } from "lucide-react"
-import { Wind, Calendar, Gauge, BookOpen } from "lucide-react"
+import type { LucideIcon } from "@/lib/icons"
+import { Wind, Calendar, Gauge, BookOpen } from "@/lib/icons"
 
 // ============================================
 // Types

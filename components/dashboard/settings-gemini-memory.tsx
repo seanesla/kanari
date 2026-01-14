@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Brain, ChevronDown, ChevronUp, Info, CheckCircle2, XCircle, Clock } from "lucide-react"
+import { Brain, ChevronDown, ChevronUp, Info, CheckCircle2, XCircle, Clock } from "@/lib/icons"
 import { useSuggestionMemory } from "@/hooks/use-suggestion-memory"
 import { cn } from "@/lib/utils"
 import { useTimeZone } from "@/lib/timezone-context"

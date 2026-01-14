@@ -1,6 +1,6 @@
 "use client"
 
-import { ChevronLeft, ChevronRight, Calendar } from "lucide-react"
+import { ChevronLeft, ChevronRight, Calendar } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 
 interface CalendarHeaderProps {

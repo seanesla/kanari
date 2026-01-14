@@ -1,7 +1,7 @@
 "use client"
 
 import { Link } from "next-view-transitions"
-import { NotebookPen, ArrowRight } from "lucide-react"
+import { NotebookPen, ArrowRight } from "@/lib/icons"
 import { useJournalEntries } from "@/hooks/use-storage"
 import { formatDate } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"

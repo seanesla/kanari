@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Clock, Coffee, Dumbbell, Brain, Users, Moon } from "lucide-react"
+import { Clock, Coffee, Dumbbell, Brain, Users, Moon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import type { Suggestion, SuggestionCategory } from "@/lib/types"

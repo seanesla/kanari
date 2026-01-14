@@ -17,7 +17,7 @@
  */
 
 import { useRouter } from "next/navigation"
-import { Mic } from "lucide-react"
+import { Mic } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { useSceneMode } from "@/lib/scene-context"
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { Calendar } from "lucide-react"
+import { Calendar } from "@/lib/icons"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 

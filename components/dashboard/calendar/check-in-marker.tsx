@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { Mic } from 'lucide-react'
+import { Mic } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import type { CheckInSession } from '@/lib/types'
 

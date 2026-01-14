@@ -7,7 +7,7 @@
 
 "use client"
 
-import { MessageSquare } from "lucide-react"
+import { MessageSquare } from "@/lib/icons"
 import { motion } from "framer-motion"
 import { SidebarMenuButton } from "@/components/ui/sidebar"
 import { Checkbox } from "@/components/ui/checkbox"

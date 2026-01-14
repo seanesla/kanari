@@ -9,7 +9,7 @@
 
 import { useState, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Mic } from "lucide-react"
+import { MessageSquare, Mic } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { CheckInDialog } from "./check-in-dialog"
 import type { CheckInSession } from "@/lib/types"

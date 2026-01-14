@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { Sparkles, ChevronDown, ChevronRight, Brain } from "lucide-react"
+import { Sparkles, ChevronDown, ChevronRight, Brain } from "@/lib/icons"
 import { createGeminiHeaders } from "@/lib/utils"
 
 interface ThinkingDisplayProps {

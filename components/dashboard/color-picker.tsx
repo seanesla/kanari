@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { HexColorPicker, HexColorInput } from "react-colorful"
-import { Paintbrush } from "lucide-react"
+import { Paintbrush } from "@/lib/icons"
 import { useSceneMode } from "@/lib/scene-context"
 import { updateCSSVariables } from "@/lib/color-utils"
 import { Label } from "@/components/ui/label"

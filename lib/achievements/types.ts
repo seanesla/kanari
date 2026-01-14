@@ -53,7 +53,6 @@ export interface DailyAchievement {
   title: string
   description: string
   insight?: string
-  emoji: string
   /** AI-assigned points (guardrailed client-side) */
   points: number
   /** When this achievement was generated/awarded */
@@ -99,7 +98,6 @@ export interface MilestoneBadge {
   type: MilestoneBadgeType
   title: string
   description: string
-  emoji: string
   earnedAt: string
   streakDays: number
   seen: boolean

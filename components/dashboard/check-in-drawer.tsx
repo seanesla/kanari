@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { MicOff, AlertCircle, X } from "lucide-react"
+import { MicOff, AlertCircle, X } from "@/lib/icons"
 import { AIChatContent } from "./check-in-ai-chat"
 import type { CheckInSession } from "@/lib/types"
 

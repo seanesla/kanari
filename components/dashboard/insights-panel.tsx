@@ -1,7 +1,7 @@
 "use client"
 
 import { Link } from "next-view-transitions"
-import { ArrowRight, Sparkles } from "lucide-react"
+import { ArrowRight, Sparkles } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"

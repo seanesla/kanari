@@ -82,7 +82,6 @@ vi.mock("@/hooks/use-achievements", () => ({
         category: "consistency",
         title: "Daily Check-in",
         description: "Do a daily check-in today.",
-        emoji: "🎙️",
         points: 20,
         createdAt: "2026-01-14T00:00:00.000Z",
         completed: false,
@@ -188,4 +187,3 @@ describe("UnifiedDashboard achievements preview", () => {
     expect(push).toHaveBeenCalledWith("/dashboard/history?newCheckIn=true")
   })
 })
-

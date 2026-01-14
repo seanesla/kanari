@@ -2,7 +2,7 @@
 
 import { useTransitionRouter } from "next-view-transitions"
 import { useSceneMode } from "@/lib/scene-context"
-import { ArrowUpRight } from "lucide-react"
+import { ArrowUpRight } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 
 interface EnterButtonProps {

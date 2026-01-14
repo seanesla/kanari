@@ -1,7 +1,7 @@
 "use client"
 
 import { Temporal } from "temporal-polyfill"
-import { CalendarCheck, CalendarX } from "lucide-react"
+import { CalendarCheck, CalendarX } from "@/lib/icons"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTimeZone } from "@/lib/timezone-context"

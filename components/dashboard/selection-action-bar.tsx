@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, AnimatePresence } from "framer-motion"
-import { Trash2, CheckSquare, X } from "lucide-react"
+import { Trash2, CheckSquare, X } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { GlassPanel } from "@/components/ui/glass-panel"
 

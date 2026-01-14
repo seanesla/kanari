@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Loader2, RefreshCw, Trash2, User } from "lucide-react"
+import { Loader2, RefreshCw, Trash2, User } from "@/lib/icons"
 import { useClearAllData } from "@/hooks/use-storage"
 import { db } from "@/lib/storage/db"
 

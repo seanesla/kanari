@@ -17,7 +17,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Clock, Plus, MessageSquare, Sparkles, CheckSquare } from "lucide-react"
+import { Clock, Plus, MessageSquare, Sparkles, CheckSquare } from "@/lib/icons"
 import { useDashboardAnimation } from "../layout"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"

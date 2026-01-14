@@ -1,7 +1,7 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Key, Loader2 } from "lucide-react"
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Key, Loader2 } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { verifyGeminiApiKey } from "@/lib/gemini/client"

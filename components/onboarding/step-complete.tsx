@@ -13,7 +13,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { CheckCircle2, Sparkles, ArrowRight } from "lucide-react"
+import { CheckCircle2, Sparkles, ArrowRight } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { useSceneMode } from "@/lib/scene-context"
 

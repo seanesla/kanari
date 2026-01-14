@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { RefreshCw, ChevronsUpDown } from "lucide-react"
+import { RefreshCw, ChevronsUpDown } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/app/dashboard/layout"
 import {

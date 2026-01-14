@@ -9,7 +9,7 @@
 "use client"
 
 import { useCallback, useMemo, useState } from "react"
-import { MessageSquare, Calendar, AlertCircle, Trash2, Clock, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { MessageSquare, Calendar, AlertCircle, Trash2, Clock, TrendingUp, TrendingDown, Minus } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MessageBubble } from "@/components/check-in/message-bubble"

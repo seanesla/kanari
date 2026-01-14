@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Clock, Calendar, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X, CalendarPlus, ChevronDown, Info, AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { Clock, Calendar, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X, CalendarPlus, ChevronDown, Info, AlertTriangle, TrendingUp, TrendingDown, Minus } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import {
   Dialog,

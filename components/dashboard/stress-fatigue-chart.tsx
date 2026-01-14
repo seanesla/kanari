@@ -6,7 +6,7 @@ import { ResponsiveLine, type LineSeries, type SliceTooltipProps } from "@nivo/l
 
 // Extended type for series with color
 type ChartSeries = LineSeries & { color: string }
-import { TrendingUp, TrendingDown, Minus, Mic, ChevronDown } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, Mic, ChevronDown } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { getNivoTheme, getChartColors, getAreaFillDefinitions } from "@/lib/chart-theme"
 import { useSceneMode } from "@/lib/scene-context"

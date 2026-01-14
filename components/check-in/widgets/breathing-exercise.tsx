@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { motion } from "framer-motion"
-import { Pause, Play, TimerReset } from "lucide-react"
+import { Pause, Play, TimerReset } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import type { BreathingExerciseType, BreathingExerciseWidgetState } from "@/lib/types"
 import { WidgetContainer } from "./widget-container"

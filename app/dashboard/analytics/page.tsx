@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo, useRef } from "react"
-import { TrendingUp, AlertTriangle, TrendingDown, Minus, ChevronDown } from "lucide-react"
+import { TrendingUp, AlertTriangle, TrendingDown, Minus, ChevronDown } from "@/lib/icons"
 import { motion, AnimatePresence } from "framer-motion"
 import {
   RadialBarChart,

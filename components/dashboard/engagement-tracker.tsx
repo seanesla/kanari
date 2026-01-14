@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { Flame, Target, MessageCircle } from "lucide-react"
+import { Flame, Target, MessageCircle } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useDashboardStats } from "@/hooks/use-storage"
 

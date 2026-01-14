@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, AlertTriangle } from "lucide-react"
+import { CheckCircle2, XCircle, AlertTriangle } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import type { TestStatus } from "@/lib/types"
 

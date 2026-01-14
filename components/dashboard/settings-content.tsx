@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useCallback, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
+import { AlertCircle, CheckCircle2, Loader2 } from "@/lib/icons"
 import {
   AlertDialog,
   AlertDialogAction,

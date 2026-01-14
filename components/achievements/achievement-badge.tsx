@@ -8,34 +8,35 @@
  */
 
 import { motion } from "framer-motion"
-import { CheckCircle2, Clock, Flame, Heart, Sparkles, Target, TrendingUp, Zap } from "lucide-react"
+import { Bonfire, CheckCircle, Clock, Compass, Flash, GraphUp, Heart, Sparks } from "iconoir-react"
 import { cn } from "@/lib/utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import type { DailyAchievement, DailyAchievementCategory } from "@/lib/achievements"
+import { getDailyAchievementIcon } from "./achievement-icons"
 
 const CATEGORY_CONFIG: Record<
   DailyAchievementCategory,
   {
-    icon: typeof Flame
+    icon: typeof Bonfire
     color: string
     bgColor: string
     borderColor: string
   }
 > = {
   consistency: {
-    icon: Flame,
+    icon: Bonfire,
     color: "text-orange-500",
     bgColor: "bg-orange-500/10",
     borderColor: "border-orange-500/30",
   },
   improvement: {
-    icon: TrendingUp,
+    icon: GraphUp,
     color: "text-green-500",
     bgColor: "bg-green-500/10",
     borderColor: "border-green-500/30",
   },
   engagement: {
-    icon: Zap,
+    icon: Flash,
     color: "text-yellow-500",
     bgColor: "bg-yellow-500/10",
     borderColor: "border-yellow-500/30",
@@ -66,6 +67,7 @@ export function DailyAchievementCard({
   const { timeZone } = useTimeZone()
   const config = CATEGORY_CONFIG[achievement.category]
   const CategoryIcon = config.icon
+  const { Icon: AchievementIcon, colorClass: achievementIconColor } = getDailyAchievementIcon(achievement)
 
   const isNew = showNewIndicator && achievement.completed && !achievement.seen
   const isCompleted = achievement.completed
@@ -90,10 +92,10 @@ export function DailyAchievementCard({
   const statusIcon = achievement.expired
     ? Clock
     : isCompleted
-      ? CheckCircle2
+      ? CheckCircle
       : isChallenge
-        ? Target
-        : Sparkles
+        ? Compass
+        : Sparks
 
   const StatusIcon = statusIcon
 
@@ -114,7 +116,7 @@ export function DailyAchievementCard({
 
     const content = (
       <>
-        <span className="text-lg">{achievement.emoji}</span>
+        <AchievementIcon className={cn("h-5 w-5 flex-shrink-0", achievementIconColor)} />
         <span className={cn("text-sm font-medium truncate", config.color, shouldStrikeTitle && "line-through opacity-80")}>
           {achievement.title}
         </span>
@@ -124,7 +126,7 @@ export function DailyAchievementCard({
         </span>
 
         {isCompleted && (
-          <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-emerald-400" />
+          <CheckCircle className="h-4 w-4 flex-shrink-0 text-emerald-400" />
         )}
 
         {isNew && (
@@ -204,10 +206,10 @@ export function DailyAchievementCard({
             borderClass
           )}
         >
-          {achievement.emoji}
+          <AchievementIcon className={cn("h-6 w-6", achievementIconColor)} />
           {isCompleted && !achievement.expired && (
             <span className="absolute -bottom-1 -right-1 h-6 w-6 rounded-full border border-emerald-500/25 bg-emerald-500/10 flex items-center justify-center">
-              <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+              <CheckCircle className="h-4 w-4 text-emerald-400" />
             </span>
           )}
         </div>
@@ -240,7 +242,7 @@ export function DailyAchievementCard({
       {achievement.insight && (
         <div className="mt-3 pt-3 border-t border-border/30">
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Sparkles className="h-3 w-3" />
+            <Sparks className="h-3 w-3" />
             <span>{achievement.insight}</span>
           </div>
         </div>

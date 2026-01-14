@@ -2,7 +2,7 @@
 
 import { useDroppable } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
-import { Inbox, Calendar, CheckCircle2 } from "lucide-react"
+import { Inbox, Calendar, CheckCircle2 } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"

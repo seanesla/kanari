@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo } from "react"
-import { TrendingUp, TrendingDown, Minus, AlertTriangle, Flame } from "lucide-react"
+import { TrendingUp, TrendingDown, Minus, AlertTriangle, Flame } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useDashboardStats, useTrendData } from "@/hooks/use-storage"
 import { predictBurnoutRisk } from "@/lib/ml/forecasting"

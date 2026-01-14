@@ -1,6 +1,6 @@
 "use client"
 
-import { Mic } from "lucide-react"
+import { Mic } from "@/lib/icons"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 

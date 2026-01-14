@@ -10,7 +10,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { User, Sparkles, AlertTriangle, ChevronDown, ChevronRight, VolumeX } from "lucide-react"
+import { User, Sparkles, AlertTriangle, ChevronDown, ChevronRight, VolumeX } from "@/lib/icons"
 import { useTimeZone } from "@/lib/timezone-context"
 import type { CheckInMessage } from "@/lib/types"
 

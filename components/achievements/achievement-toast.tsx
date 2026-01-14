@@ -20,10 +20,11 @@
 
 import { useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { X, Trophy, Sparkles, CheckCircle2 } from "lucide-react"
+import { CheckCircle, Sparks, Trophy, Xmark } from "iconoir-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { DailyAchievementCard } from "./achievement-badge"
+import { getMilestoneBadgeIcon } from "./achievement-icons"
 import type { DailyAchievement, MilestoneBadge } from "@/lib/achievements"
 
 // ============================================
@@ -158,6 +159,8 @@ export function CelebrationToast({
         ? `+${item.achievement.points} points`
         : `+${item.achievement.points} points`
 
+  const milestoneIcon = item.kind === "milestone" ? getMilestoneBadgeIcon(item.milestone.type) : null
+
   return (
     <AnimatePresence>
       {open && (
@@ -196,7 +199,7 @@ export function CelebrationToast({
                   onClick={handleDismiss}
                   className="absolute top-3 right-3 p-1 rounded-full hover:bg-muted transition-colors"
                 >
-                  <X className="h-4 w-4 text-muted-foreground" />
+                  <Xmark className="h-4 w-4 text-muted-foreground" />
                 </button>
 
                 {/* Header */}
@@ -210,7 +213,7 @@ export function CelebrationToast({
                     {item.kind === "milestone" ? (
                       <Trophy className="h-8 w-8 text-accent" />
                     ) : (
-                      <CheckCircle2 className="h-8 w-8 text-accent" />
+                      <CheckCircle className="h-8 w-8 text-accent" />
                     )}
                   </motion.div>
 
@@ -229,7 +232,7 @@ export function CelebrationToast({
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.3 }}
                   >
-                    <Sparkles className="inline h-3 w-3 mr-1" />
+                    <Sparks className="inline h-3 w-3 mr-1" />
                     {subheading}
                   </motion.p>
                 </div>
@@ -246,7 +249,7 @@ export function CelebrationToast({
                     <div className="rounded-xl border border-accent/30 bg-accent/5 p-4">
                       <div className="flex items-start gap-3">
                         <div className="h-12 w-12 rounded-lg border border-accent/30 flex items-center justify-center text-2xl">
-                          {item.milestone.emoji}
+                          {milestoneIcon && <milestoneIcon.Icon className={cn("h-6 w-6", milestoneIcon.colorClass)} />}
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">

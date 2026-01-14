@@ -9,7 +9,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Palette, Check, Sparkles } from "lucide-react"
+import { Palette, Check, Sparkles } from "@/lib/icons"
 import { HexColorPicker, HexColorInput } from "react-colorful"
 import { Button } from "@/components/ui/button"
 import { useSceneMode } from "@/lib/scene-context"

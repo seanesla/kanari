@@ -1,6 +1,6 @@
 "use client"
 
-import { Heart, Shield, Target } from "lucide-react"
+import { Heart, Shield, Target } from "@/lib/icons"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { AccountabilityMode } from "@/lib/types"

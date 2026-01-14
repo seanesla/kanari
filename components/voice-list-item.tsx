@@ -1,6 +1,6 @@
 "use client"
 
-import { Play, Square, Loader2, Check } from "lucide-react"
+import { Play, Square, Loader2, Check } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import type { VoiceInfo } from "@/lib/gemini/voices"

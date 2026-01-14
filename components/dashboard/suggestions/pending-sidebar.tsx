@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import { ChevronDown, ChevronUp, RefreshCw, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X, Filter } from "lucide-react"
+import { ChevronDown, ChevronUp, RefreshCw, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X, Filter } from "@/lib/icons"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"

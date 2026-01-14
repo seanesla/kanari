@@ -1,6 +1,6 @@
 "use client"
 
-import { Shield } from "lucide-react"
+import { Shield } from "@/lib/icons"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 

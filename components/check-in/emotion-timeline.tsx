@@ -25,7 +25,7 @@
 import { useState, useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { ChevronDown, ChevronRight, Info, MessageSquare } from "lucide-react"
+import { ChevronDown, ChevronRight, Info, MessageSquare } from "@/lib/icons"
 import type { GeminiSemanticAnalysis, SemanticSegment, EmotionType } from "@/lib/types"
 
 // ============================================

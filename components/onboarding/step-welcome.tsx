@@ -7,7 +7,7 @@
  */
 
 import { motion } from "framer-motion"
-import { Mic, Brain, Calendar, Shield } from "lucide-react"
+import { Mic, Brain, Calendar, Shield } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { useSceneMode } from "@/lib/scene-context"
 

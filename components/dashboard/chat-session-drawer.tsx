@@ -17,7 +17,7 @@
 import { useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { X, Calendar, MessageSquare, AlertCircle } from "lucide-react"
+import { X, Calendar, MessageSquare, AlertCircle } from "@/lib/icons"
 import { formatDate } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import { MessageBubble } from "@/components/check-in/message-bubble"

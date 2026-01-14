@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Brain, TrendingUp, AlertTriangle, Sparkles, ChevronDown, Info } from "lucide-react"
+import { Brain, TrendingUp, AlertTriangle, Sparkles, ChevronDown, Info } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion"

@@ -3,7 +3,7 @@
 import { Link } from "next-view-transitions"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
-import { Menu, X } from "lucide-react"
+import { Menu, X } from "@/lib/icons"
 
 export function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)

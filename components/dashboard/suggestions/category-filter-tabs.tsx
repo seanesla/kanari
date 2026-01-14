@@ -1,6 +1,6 @@
 "use client"
 
-import { Coffee, Dumbbell, Brain, Users, Moon, Layers } from "lucide-react"
+import { Coffee, Dumbbell, Brain, Users, Moon, Layers } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import type { SuggestionCategory } from "@/lib/types"

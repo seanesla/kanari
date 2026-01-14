@@ -152,7 +152,6 @@ describe("collectUserStatsForDailyAchievements", () => {
         category: "engagement",
         title: "Test Title",
         description: "desc",
-        emoji: "✨",
         points: 10,
         createdAt: "2025-12-27T10:00:00Z",
         completed: true,
@@ -177,4 +176,3 @@ describe("collectUserStatsForDailyAchievements", () => {
     expect(stats.recentDailyTitles).toEqual(["Test Title"])
   })
 })
-

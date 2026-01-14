@@ -1,4 +1,4 @@
-import { Mic, Brain, TrendingUp, Calendar } from "lucide-react"
+import { Mic, Brain, TrendingUp, Calendar } from "@/lib/icons"
 
 export function FeaturesSection() {
   const features = [

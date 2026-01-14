@@ -9,7 +9,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from "react"
-import { Send, Mic, MicOff } from "lucide-react"
+import { Send, Mic, MicOff } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"

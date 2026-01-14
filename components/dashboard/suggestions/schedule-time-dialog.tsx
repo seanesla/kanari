@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useMemo, useEffect, useRef } from "react"
-import { Clock, CalendarPlus, Coffee, Dumbbell, Brain, Users, Moon } from "lucide-react"
+import { Clock, CalendarPlus, Coffee, Dumbbell, Brain, Users, Moon } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import {

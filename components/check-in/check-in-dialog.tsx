@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { X, PhoneOff, MicOff, Square } from "lucide-react"
+import { X, PhoneOff, MicOff, Square } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
 import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
