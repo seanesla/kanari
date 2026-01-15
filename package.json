@@ -112,6 +112,7 @@
     "@types/three": "0.181.0",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.1",
+    "fake-indexeddb": "^6.2.5",
     "globals": "^16.5.0",
     "jsdom": "^27.3.0",
     "postcss": "^8.5",

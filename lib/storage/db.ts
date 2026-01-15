@@ -185,6 +185,23 @@ class KanariDB extends Dexie {
       journalEntries: "id, createdAt, category, checkInSessionId",
       commitments: "id, checkInSessionId, extractedAt, outcome",
     })
+
+    // Version 9: Force an upgrade pass to repair any drifted or partially-created DBs.
+    // Dexie will create any missing object stores/indexes during the upgrade transaction.
+    // See: docs/error-patterns/indexeddb-missing-object-store.md
+    this.version(9).stores({
+      recordings: "id, createdAt, status",
+      suggestions: "id, createdAt, status, category, recordingId, version",
+      recoveryBlocks: "id, suggestionId, scheduledAt, completed",
+      trendData: "id, date",
+      settings: "id",
+      checkInSessions: "id, startedAt, recordingId",
+      achievements: "id, dateISO, type, category, completed, createdAt, seen",
+      milestoneBadges: "id, earnedAt, type, seen",
+      userProgress: "id",
+      journalEntries: "id, createdAt, category, checkInSessionId",
+      commitments: "id, checkInSessionId, extractedAt, outcome",
+    })
   }
 }
 
