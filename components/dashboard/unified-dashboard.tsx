@@ -96,6 +96,8 @@ export function UnifiedDashboard() {
   const {
     selectedSuggestion,
     scheduleDialogSuggestion,
+    pendingDragActive,
+    droppedSuggestion,
     handlers,
   } = useSuggestionWorkflow({
     suggestions,
@@ -266,12 +268,21 @@ export function UnifiedDashboard() {
       checkInSessions={checkInSessions}
       recoveryBlocks={recoveryBlocks}
       onEventClick={handlers.handleSuggestionClick}
+      onTimeSlotClick={handlers.handleTimeSlotClick}
       onEventUpdate={(suggestion, newScheduledFor) => {
         scheduleSuggestion(suggestion.id, newScheduledFor)
       }}
+      onExternalDrop={handlers.handleExternalDrop}
+      pendingDragActive={pendingDragActive}
       className="h-full"
     />
   )
+
+  const scheduleDefaults = useMemo(() => {
+    if (!scheduleDialogSuggestion || !droppedSuggestion) return null
+    if (droppedSuggestion.suggestion.id !== scheduleDialogSuggestion.id) return null
+    return droppedSuggestion
+  }, [droppedSuggestion, scheduleDialogSuggestion])
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
@@ -455,6 +466,9 @@ export function UnifiedDashboard() {
           open={!!scheduleDialogSuggestion}
           onOpenChange={(open) => !open && handlers.closeDialogs()}
           onSchedule={handlers.handleScheduleConfirm}
+          defaultDateISO={scheduleDefaults?.dateISO}
+          defaultHour={scheduleDefaults?.hour}
+          defaultMinute={scheduleDefaults?.minute}
         />
 
         {/* Celebrations */}

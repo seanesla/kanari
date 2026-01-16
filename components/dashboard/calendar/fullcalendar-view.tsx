@@ -148,6 +148,40 @@ function toInstantFromFullCalendarStart(
   }
 }
 
+function toSlotFromFullCalendarDateClick(input: { date: Date; dateStr: string; timeZone: string }): { dateISO: string; hour: number; minute: number } {
+  // Same timezone-shift pattern as drag/drop: prefer `dateStr` over the `Date` instance.
+  // See docs/error-patterns/fullcalendar-drag-drop-timezone-shift.md
+  const raw = (input.dateStr ?? "").trim()
+
+  if (raw) {
+    const hasOffsetOrZ = /[zZ]|[+-]\d\d:\d\d$/.test(raw)
+
+    try {
+      if (hasOffsetOrZ) {
+        const zdt = Temporal.Instant.from(raw).toZonedDateTimeISO(input.timeZone)
+        return { dateISO: zdt.toPlainDate().toString(), hour: zdt.hour, minute: zdt.minute }
+      }
+
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        return { dateISO: raw, hour: 0, minute: 0 }
+      }
+
+      const zdt = Temporal.PlainDateTime.from(raw).toZonedDateTime(input.timeZone)
+      return { dateISO: zdt.toPlainDate().toString(), hour: zdt.hour, minute: zdt.minute }
+    } catch {
+      // fall through
+    }
+  }
+
+  const dateISO = Temporal.PlainDate.from({
+    year: input.date.getFullYear(),
+    month: input.date.getMonth() + 1,
+    day: input.date.getDate(),
+  }).toString()
+
+  return { dateISO, hour: input.date.getHours(), minute: input.date.getMinutes() }
+}
+
 // Helper to map Suggestion to FullCalendar event format
 function suggestionToEvent(
   suggestion: Suggestion,
@@ -311,15 +345,14 @@ export function FullCalendarView({
   // Handle date click
   const handleDateClick = useCallback((info: DateClickArg) => {
     if (onTimeSlotClick) {
-      const date = info.date
-      const dateISO = Temporal.PlainDate.from({
-        year: date.getFullYear(),
-        month: date.getMonth() + 1,
-        day: date.getDate(),
-      }).toString()
-      onTimeSlotClick(dateISO, date.getHours(), date.getMinutes())
+      const { dateISO, hour, minute } = toSlotFromFullCalendarDateClick({
+        date: info.date,
+        dateStr: info.dateStr,
+        timeZone,
+      })
+      onTimeSlotClick(dateISO, hour, minute)
     }
-  }, [onTimeSlotClick])
+  }, [onTimeSlotClick, timeZone])
 
   // Calculate drop target time from mouse position
   const calculateDropTime = useCallback((e: React.DragEvent): { dateISO: string; hour: number; minute: number } | null => {

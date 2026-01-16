@@ -97,6 +97,34 @@ export function ScheduleTimeDialog({
   const datePickerRef = useRef<HTMLDivElement>(null)
   const datePickerInstanceRef = useRef<DatePickerInstance | null>(null)
 
+  // Initialize defaults when `open` is controlled by the parent.
+  // Radix Dialog's `onOpenChange` won't run on programmatic opens, so we must
+  // set date/time defaults in an effect tied to `open`.
+  //
+  // See: docs/error-patterns/controlled-dialog-state-init.md
+  useEffect(() => {
+    if (!open || !suggestion) return
+
+    // Use defaults if provided (from calendar drop), otherwise calculate.
+    if (defaultDateISO !== undefined) {
+      setSelectedDateISO(defaultDateISO)
+      setSelectedHour(String(defaultHour ?? 9))
+      setSelectedMinute(String(defaultMinute ?? 0))
+      return
+    }
+
+    const now = Temporal.Now.zonedDateTimeISO(timeZone)
+    if (now.hour >= 19) {
+      setSelectedDateISO(now.toPlainDate().add({ days: 1 }).toString())
+      setSelectedHour("9")
+    } else {
+      setSelectedDateISO(now.toPlainDate().toString())
+      const nextHour = Math.min(Math.max(now.hour + 1, 8), 20)
+      setSelectedHour(String(nextHour))
+    }
+    setSelectedMinute("0")
+  }, [open, suggestion?.id, defaultDateISO, defaultHour, defaultMinute, timeZone])
+
   // Initialize Schedule-X date picker
   useEffect(() => {
     if (!datePickerRef.current || !open) return
@@ -134,27 +162,7 @@ export function ScheduleTimeDialog({
     }
   }, [open, selectedDateISO, timeZone])
 
-  // Reset state when dialog opens with new suggestion
   const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen && suggestion) {
-      // Use defaults if provided (from calendar drop), otherwise calculate
-      if (defaultDateISO !== undefined) {
-        setSelectedDateISO(defaultDateISO)
-        setSelectedHour(String(defaultHour ?? 9))
-        setSelectedMinute(String(defaultMinute ?? 0))
-      } else {
-        const now = Temporal.Now.zonedDateTimeISO(timeZone)
-        if (now.hour >= 19) {
-          setSelectedDateISO(now.toPlainDate().add({ days: 1 }).toString())
-          setSelectedHour("9")
-        } else {
-          setSelectedDateISO(now.toPlainDate().toString())
-          const nextHour = Math.min(Math.max(now.hour + 1, 8), 20)
-          setSelectedHour(String(nextHour))
-        }
-        setSelectedMinute("0")
-      }
-    }
     onOpenChange(newOpen)
   }
 
@@ -288,7 +296,7 @@ export function ScheduleTimeDialog({
           <Button
             variant="outline"
             size="sm"
-            onClick={() => onOpenChange(false)}
+            onClick={() => handleOpenChange(false)}
           >
             Cancel
           </Button>

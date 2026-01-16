@@ -244,4 +244,30 @@ describe("FullCalendarView", () => {
     expect(onEventUpdate).toHaveBeenCalledTimes(1)
     expect(onEventUpdate.mock.calls[0]?.[1]).toBe("2026-01-09T22:00:00Z")
   })
+
+  it("uses dateStr for time slot clicks to avoid timezone shifts", async () => {
+    const onTimeSlotClick = vi.fn()
+    const { FullCalendarView } = await import("../fullcalendar-view")
+
+    render(<FullCalendarView scheduledSuggestions={[]} onTimeSlotClick={onTimeSlotClick} />)
+
+    expect(lastFullCalendarProps).not.toBeNull()
+    const dateClick = lastFullCalendarProps?.dateClick as ((arg: unknown) => void) | undefined
+    expect(dateClick).toEqual(expect.any(Function))
+
+    // Provide a `date` object that would produce a different wall-clock time if the handler
+    // relied on `Date#getHours()` etc. The handler should prefer the timezone-aware `dateStr`.
+    const fakeDate = {
+      getFullYear: () => 2026,
+      getMonth: () => 0,
+      getDate: () => 16,
+      getHours: () => 2,
+      getMinutes: () => 0,
+    } as unknown as Date
+
+    dateClick?.({ date: fakeDate, dateStr: "2026-01-16T10:15:00Z" })
+
+    expect(onTimeSlotClick).toHaveBeenCalledTimes(1)
+    expect(onTimeSlotClick.mock.calls[0]).toEqual(["2026-01-16", 10, 15])
+  })
 })
