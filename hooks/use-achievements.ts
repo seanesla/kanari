@@ -289,10 +289,51 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
   }, [achievementsToday, todayCounts.suggestionsCompletedToday])
 
   // Ensure a default progress record exists (new installs won't have one yet).
+  // Important: `useLiveQuery()` returns `undefined` while loading, which is the same value
+  // as "record not found". Never `put()` defaults based on the reactive value, or we risk
+  // overwriting existing progress during the initial render.
+  //
+  // See: docs/error-patterns/livequery-default-overwrite.md
   useEffect(() => {
-    if (dbProgress) return
-    void db.userProgress.put(DEFAULT_PROGRESS)
-  }, [dbProgress])
+    let cancelled = false
+
+    void (async () => {
+      // Insert-only, to avoid clobbering existing progress.
+      await db.userProgress.add(DEFAULT_PROGRESS).catch(() => undefined)
+
+      // If a prior build accidentally reset progress to defaults, recover points from
+      // completed achievements (best-effort, never decreases points).
+      try {
+        const current = await db.userProgress.get("default")
+        if (!current || cancelled) return
+        if (current.totalPoints > 0) return
+
+        const achievements = await db.achievements.toArray()
+        const pointsFromAchievements = achievements.reduce((sum, achievement) => {
+          if (!achievement.completed) return sum
+          return sum + Math.max(0, achievement.points ?? 0)
+        }, 0)
+
+        if (pointsFromAchievements <= current.totalPoints) return
+
+        const nextLevel = levelFromPoints(pointsFromAchievements)
+        const repaired: UserProgress = {
+          ...current,
+          totalPoints: pointsFromAchievements,
+          level: nextLevel,
+          levelTitle: nextLevel !== current.level ? fallbackLevelTitle(nextLevel) : current.levelTitle,
+        }
+
+        await db.userProgress.put(repaired)
+      } catch {
+        // ignore
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Keep today's ISO date in sync (midnight rollover).
   useEffect(() => {
@@ -316,88 +357,93 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
       const nowISO = new Date().toISOString()
       const yesterdayISO = shiftDateISO(todayISO, -1)
 
-      let shouldRequestAILevelTitle = false
-      let pendingLevelTitleRequest: {
-        level: number
-        totalPoints: number
-        currentDailyCompletionStreak: number
-        longestDailyCompletionStreak: number
-      } | null = null
+      const pendingLevelTitleRequest = await (async () => {
+        const prep = await db.transaction("rw", db.achievements, db.userProgress, async () => {
+          // See: docs/error-patterns/dexie-transaction-async-boundary.md
+          // We only treat "original today" items as blockers so carry-overs can still be filled in.
+          const existingOriginalTodayCount = await db.achievements
+            .where("dateISO")
+            .equals(todayISO)
+            .filter((a) => !a.expired && a.sourceDateISO === todayISO)
+            .count()
 
-      await db.transaction("rw", db.achievements, db.userProgress, async () => {
-        const existingToday = await db.achievements
-          .where("dateISO")
-          .equals(todayISO)
-          .filter((a) => !a.expired)
-          .toArray()
-
-        // Always set lastGeneratedDateISO the first time we see today's state
-        const currentProgress = (await db.userProgress.get("default")) ?? DEFAULT_PROGRESS
-        if (currentProgress.lastGeneratedDateISO !== todayISO) {
-          await db.userProgress.put({ ...currentProgress, lastGeneratedDateISO: todayISO })
-        }
-
-        if (existingToday.length > 0) return
-
-        // Expire stale challenges (missed carry-over window)
-        const allAchievements = await db.achievements.toArray()
-        for (const raw of allAchievements) {
-          if (raw.type !== "challenge") continue
-          if (raw.completed || raw.expired) continue
-          if (raw.dateISO < yesterdayISO) {
-            await db.achievements.update(raw.id, { expired: true, expiredAt: new Date(nowISO), seen: true })
+          // Always set lastGeneratedDateISO the first time we see today's state.
+          const currentProgress = (await db.userProgress.get("default")) ?? DEFAULT_PROGRESS
+          const isFirstGeneration = !currentProgress.lastGeneratedDateISO
+          if (currentProgress.lastGeneratedDateISO !== todayISO) {
+            await db.userProgress.put({ ...currentProgress, lastGeneratedDateISO: todayISO })
           }
-        }
 
-        // Carry over yesterday's incomplete challenges once; expire already-carried ones.
-        let carryOverCount = 0
-        const yesterday = allAchievements.filter((a) => a.type === "challenge" && a.dateISO === yesterdayISO && !a.completed && !a.expired)
-        for (const ch of yesterday) {
-          if (ch.carriedOver) {
-            await db.achievements.update(ch.id, { expired: true, expiredAt: new Date(nowISO), seen: true })
-            continue
+          if (existingOriginalTodayCount > 0) {
+            return { kind: "noop" as const }
           }
-          await db.achievements.update(ch.id, { dateISO: todayISO, carriedOver: true })
-          carryOverCount += 1
-        }
 
-        const requestedCount = Math.max(0, 3 - carryOverCount)
+          // Expire stale challenges (missed carry-over window)
+          const allAchievements = await db.achievements.toArray()
+          for (const raw of allAchievements) {
+            if (raw.type !== "challenge") continue
+            if (raw.completed || raw.expired) continue
+            if (raw.dateISO < yesterdayISO) {
+              await db.achievements.update(raw.id, { expired: true, expiredAt: new Date(nowISO), seen: true })
+            }
+          }
 
-        const progressForStats = (await db.userProgress.get("default")) ?? DEFAULT_PROGRESS
+          // Carry over yesterday's incomplete challenges once; expire already-carried ones.
+          let carryOverCount = 0
+          const yesterday = allAchievements.filter((a) => a.type === "challenge" && a.dateISO === yesterdayISO && !a.completed && !a.expired)
+          for (const ch of yesterday) {
+            if (ch.carriedOver) {
+              await db.achievements.update(ch.id, { expired: true, expiredAt: new Date(nowISO), seen: true })
+              continue
+            }
+            await db.achievements.update(ch.id, { dateISO: todayISO, carriedOver: true })
+            carryOverCount += 1
+          }
 
-        // Recent titles for dedupe: last 20 achievements (any date)
-        const recentDailyAchievements = allAchievements
-          .slice()
-          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-          .slice(0, 20)
-          .map(toDailyAchievement)
+          const requestedCount = Math.max(0, 3 - carryOverCount)
 
-        const stats = collectUserStatsForDailyAchievements({
-          recordings,
-          suggestions,
-          sessions,
-          recentDailyAchievements,
-          progress: progressForStats,
-          timeZone,
-          todayISO,
-          requestedCount,
-          carryOverCount,
+          // Recent titles for dedupe: last 20 achievements (any date)
+          const recentDailyAchievements = allAchievements
+            .slice()
+            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+            .slice(0, 20)
+            .map(toDailyAchievement)
+
+          const stats = collectUserStatsForDailyAchievements({
+            recordings,
+            suggestions,
+            sessions,
+            recentDailyAchievements,
+            progress: currentProgress,
+            timeZone,
+            todayISO,
+            requestedCount,
+            carryOverCount,
+          })
+
+          return {
+            kind: "generate" as const,
+            requestedCount,
+            isFirstGeneration,
+            stats,
+          }
         })
+
+        if (prep.kind !== "generate") return null
 
         let newDaily: DailyAchievement[] = []
 
-        const isFirstGeneration = !progressForStats.lastGeneratedDateISO
-        if (requestedCount === 0) {
+        if (prep.requestedCount === 0) {
           newDaily = []
-        } else if (isFirstGeneration) {
-          newDaily = buildStarterAchievements(nowISO, todayISO).slice(0, requestedCount)
+        } else if (prep.isFirstGeneration) {
+          newDaily = buildStarterAchievements(nowISO, todayISO).slice(0, prep.requestedCount)
         } else {
           try {
             const headers = await createGeminiHeaders({ "Content-Type": "application/json" })
             const response = await fetch("/api/gemini/achievements", {
               method: "POST",
               headers,
-              body: JSON.stringify(stats),
+              body: JSON.stringify(prep.stats),
             })
 
             if (!response.ok) {
@@ -411,11 +457,14 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
             }
 
             newDaily = (data.achievements as Array<Record<string, unknown>>)
-              .slice(0, requestedCount)
+              .slice(0, prep.requestedCount)
               .map((a) => {
                 const type = a.type === "badge" ? "badge" : "challenge"
                 const points = clampInt(typeof a.points === "number" ? a.points : 20, 10, 80)
-                const tracking = typeof a.tracking === "object" && a.tracking !== null ? (a.tracking as DailyAchievement["tracking"]) : undefined
+                const tracking =
+                  typeof a.tracking === "object" && a.tracking !== null
+                    ? (a.tracking as DailyAchievement["tracking"])
+                    : undefined
 
                 return {
                   id: crypto.randomUUID(),
@@ -437,45 +486,53 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
               })
           } catch {
             // Fallback: starter set (still yields something usable offline)
-            newDaily = buildStarterAchievements(nowISO, todayISO).slice(0, requestedCount)
+            newDaily = buildStarterAchievements(nowISO, todayISO).slice(0, prep.requestedCount)
           }
         }
 
-        if (newDaily.length > 0) {
+        if (newDaily.length === 0) return null
+
+        return db.transaction("rw", db.achievements, db.userProgress, async () => {
+          const existingOriginalTodayCount = await db.achievements
+            .where("dateISO")
+            .equals(todayISO)
+            .filter((a) => !a.expired && a.sourceDateISO === todayISO)
+            .count()
+          if (existingOriginalTodayCount > 0) return null
+
           await db.achievements.bulkAdd(newDaily.map(fromDailyAchievement))
 
           // Award points immediately for badges (they are completed on creation)
           const badgePoints = newDaily.filter((a) => a.completed).reduce((sum, a) => sum + a.points, 0)
-          if (badgePoints > 0) {
-            const updatedProgress = (await db.userProgress.get("default")) ?? DEFAULT_PROGRESS
-            const nextTotal = updatedProgress.totalPoints + badgePoints
-            const nextLevel = levelFromPoints(nextTotal)
-            const leveledUp = nextLevel !== updatedProgress.level
+          if (badgePoints <= 0) return null
 
-            const nextProgress: UserProgress = {
-              ...updatedProgress,
-              totalPoints: nextTotal,
-              level: nextLevel,
-              levelTitle: leveledUp ? fallbackLevelTitle(nextLevel) : updatedProgress.levelTitle,
-              lastLevelUpAt: leveledUp ? nowISO : updatedProgress.lastLevelUpAt,
-            }
+          const updatedProgress = (await db.userProgress.get("default")) ?? DEFAULT_PROGRESS
+          const nextTotal = updatedProgress.totalPoints + badgePoints
+          const nextLevel = levelFromPoints(nextTotal)
+          const leveledUp = nextLevel !== updatedProgress.level
 
-            await db.userProgress.put(nextProgress)
-
-            if (leveledUp) {
-              shouldRequestAILevelTitle = true
-              pendingLevelTitleRequest = {
-                level: nextProgress.level,
-                totalPoints: nextProgress.totalPoints,
-                currentDailyCompletionStreak: nextProgress.currentDailyCompletionStreak,
-                longestDailyCompletionStreak: nextProgress.longestDailyCompletionStreak,
-              }
-            }
+          const nextProgress: UserProgress = {
+            ...updatedProgress,
+            totalPoints: nextTotal,
+            level: nextLevel,
+            levelTitle: leveledUp ? fallbackLevelTitle(nextLevel) : updatedProgress.levelTitle,
+            lastLevelUpAt: leveledUp ? nowISO : updatedProgress.lastLevelUpAt,
           }
-        }
-      })
 
-      if (shouldRequestAILevelTitle && pendingLevelTitleRequest) {
+          await db.userProgress.put(nextProgress)
+
+          if (!leveledUp) return null
+
+          return {
+            level: nextProgress.level,
+            totalPoints: nextProgress.totalPoints,
+            currentDailyCompletionStreak: nextProgress.currentDailyCompletionStreak,
+            longestDailyCompletionStreak: nextProgress.longestDailyCompletionStreak,
+          }
+        })
+      })()
+
+      if (pendingLevelTitleRequest) {
         try {
           const headers = await createGeminiHeaders({ "Content-Type": "application/json" })
           const response = await fetch("/api/gemini/achievements/level-title", {
