@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import { useSceneMode } from "@/lib/scene-context"
 import { useOnboardingGuard } from "@/hooks/use-onboarding"
+import { useDailyReminder } from "@/hooks/use-daily-reminder"
 
 const DashboardAnimationContext = createContext({ shouldAnimate: false })
 export const useDashboardAnimation = () => useContext(DashboardAnimationContext)
@@ -35,6 +36,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { setMode } = useSceneMode()
   const { isReady } = useOnboardingGuard()
   const pathname = usePathname()
+
+  useDailyReminder({ enabled: isReady })
 
   // Ensure scene mode stays in dashboard
   useEffect(() => {

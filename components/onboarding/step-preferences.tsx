@@ -9,6 +9,7 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { Settings, Bell, Clock, Mic } from "@/lib/icons"
+import { useNotifications } from "@/hooks/use-notifications"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -30,13 +31,52 @@ interface StepPreferencesProps {
 
 export function StepPreferences({ initialSettings, onNext, onBack }: StepPreferencesProps) {
   const { accentColor } = useSceneMode()
+  const { isSupported, permission, requestPermission, notify } = useNotifications()
+
   const [enableVAD, setEnableVAD] = useState(initialSettings.enableVAD ?? true)
-  const [enableNotifications, setEnableNotifications] = useState(
-    initialSettings.enableNotifications ?? false
-  )
-  const [recordingDuration, setRecordingDuration] = useState(
-    String(initialSettings.defaultRecordingDuration ?? 30)
-  )
+  const [enableNotifications, setEnableNotifications] = useState(initialSettings.enableNotifications ?? false)
+  const [recordingDuration, setRecordingDuration] = useState(String(initialSettings.defaultRecordingDuration ?? 30))
+
+  const permissionLabel = (() => {
+    if (!isSupported) return "Not supported"
+    if (permission === "granted") return "Allowed"
+    if (permission === "denied") return "Blocked"
+    return "Not enabled"
+  })()
+
+  const handleNotificationsToggle = async (checked: boolean) => {
+    if (!checked) {
+      setEnableNotifications(false)
+      return
+    }
+
+    if (!isSupported) {
+      setEnableNotifications(false)
+      return
+    }
+
+    if (permission === "granted") {
+      setEnableNotifications(true)
+      return
+    }
+
+    if (permission === "denied") {
+      setEnableNotifications(false)
+      return
+    }
+
+    const result = await requestPermission()
+    if (result === "granted") {
+      setEnableNotifications(true)
+      notify("Kanari", {
+        body: "Notifications are enabled. You'll get reminders while Kanari is open.",
+        tag: "kanari-onboarding-notifications",
+      })
+      return
+    }
+
+    setEnableNotifications(false)
+  }
 
   const handleNext = () => {
     onNext({
@@ -168,7 +208,10 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
                 <Bell className="h-5 w-5 text-accent" />
               </motion.div>
               <div>
-                <Label htmlFor="notifications">Daily Reminders</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="notifications">Daily Reminders</Label>
+                  <span className="text-xs text-muted-foreground">{permissionLabel}</span>
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Get reminded to do your daily check-in
                 </p>
@@ -177,7 +220,8 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
             <Switch
               id="notifications"
               checked={enableNotifications}
-              onCheckedChange={setEnableNotifications}
+              disabled={!isSupported}
+              onCheckedChange={handleNotificationsToggle}
             />
           </div>
         </motion.div>

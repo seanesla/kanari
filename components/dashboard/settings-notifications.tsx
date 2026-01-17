@@ -1,7 +1,10 @@
 "use client"
 
+import { useMemo, useState } from "react"
+import { toast } from "sonner"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { useNotifications } from "@/hooks/use-notifications"
 
 interface SettingsNotificationsSectionProps {
   enableNotifications: boolean
@@ -17,6 +20,117 @@ export function SettingsNotificationsSection({
   onDailyReminderTimeChange,
 }: SettingsNotificationsSectionProps) {
   const dailyReminderEnabled = Boolean(dailyReminderTime)
+  const { isSupported, permission, requestPermission, notify } = useNotifications()
+
+  const permissionLabel = useMemo(() => {
+    if (!isSupported) return "Not supported"
+    if (permission === "granted") return "Allowed"
+    if (permission === "denied") return "Blocked"
+    return "Not enabled"
+  }, [isSupported, permission])
+
+  const [isRequesting, setIsRequesting] = useState(false)
+
+  const requestPermissionAndToast = async (): Promise<boolean> => {
+    if (!isSupported) {
+      toast.error("Browser notifications aren't supported", {
+        description: "Try a different browser (Chrome, Edge, Safari) to enable reminders.",
+      })
+      return false
+    }
+
+    if (permission === "denied") {
+      toast.error("Notifications are blocked", {
+        description: "Enable notifications in your browser/site settings, then try again.",
+      })
+      return false
+    }
+
+    if (permission === "granted") return true
+
+    setIsRequesting(true)
+    try {
+      const result = await requestPermission()
+      if (result !== "granted") {
+        toast.error("Notification permission not granted", {
+          description: "We can only remind you if you click 'Allow' in the browser prompt.",
+        })
+        return false
+      }
+
+      notify("Kanari", {
+        body: "Notifications are enabled. You'll get reminders while Kanari is open.",
+        tag: "kanari-notifications-enabled",
+      })
+
+      return true
+    } finally {
+      setIsRequesting(false)
+    }
+  }
+
+  const handleBrowserNotificationsToggle = (checked: boolean) => {
+    if (!checked) {
+      onEnableNotificationsChange(false)
+      return
+    }
+
+    if (!isSupported) {
+      toast.error("Browser notifications aren't supported", {
+        description: "Try a different browser (Chrome, Edge, Safari) to enable alerts.",
+      })
+      onEnableNotificationsChange(false)
+      return
+    }
+
+    if (permission === "granted") {
+      onEnableNotificationsChange(true)
+      return
+    }
+
+    if (permission === "denied") {
+      toast.error("Notifications are blocked", {
+        description: "Enable notifications in your browser/site settings, then try again.",
+      })
+      onEnableNotificationsChange(false)
+      return
+    }
+
+    void requestPermissionAndToast().then((allowed) => {
+      onEnableNotificationsChange(allowed)
+    })
+  }
+
+  const handleDailyReminderToggle = (checked: boolean) => {
+    if (!checked) {
+      onDailyReminderTimeChange(undefined)
+      return
+    }
+
+    if (!isSupported) {
+      toast.error("Browser notifications aren't supported", {
+        description: "Try a different browser (Chrome, Edge, Safari) to enable reminders.",
+      })
+      return
+    }
+
+    if (permission === "granted") {
+      onDailyReminderTimeChange(dailyReminderTime ?? "09:00")
+      return
+    }
+
+    if (permission === "denied") {
+      toast.error("Notifications are blocked", {
+        description: "Enable notifications in your browser/site settings, then try again.",
+      })
+      return
+    }
+
+    void requestPermissionAndToast().then((allowed) => {
+      if (!allowed) return
+      onDailyReminderTimeChange(dailyReminderTime ?? "09:00")
+    })
+  }
 
   return (
     <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
@@ -25,9 +139,12 @@ export function SettingsNotificationsSection({
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <Label htmlFor="enable-notifications" className="text-base font-sans">
-              Browser Notifications
-            </Label>
+            <div className="flex items-center gap-3">
+              <Label htmlFor="enable-notifications" className="text-base font-sans">
+                Browser Notifications
+              </Label>
+              <span className="text-xs text-muted-foreground font-sans">{permissionLabel}</span>
+            </div>
             <p className="text-sm text-muted-foreground font-sans">
               Receive alerts for elevated stress or recovery suggestions
             </p>
@@ -35,7 +152,8 @@ export function SettingsNotificationsSection({
           <Switch
             id="enable-notifications"
             checked={enableNotifications}
-            onCheckedChange={onEnableNotificationsChange}
+            disabled={!isSupported || isRequesting}
+            onCheckedChange={handleBrowserNotificationsToggle}
             aria-label="Browser Notifications"
           />
         </div>
@@ -47,19 +165,14 @@ export function SettingsNotificationsSection({
                 Daily Reminder
               </Label>
               <p className="text-sm text-muted-foreground font-sans">
-                Get a reminder to do your daily check-in
+                Get a reminder to do your daily check-in (while Kanari is open)
               </p>
             </div>
             <Switch
               id="daily-reminder-enabled"
               checked={dailyReminderEnabled}
-              onCheckedChange={(checked) => {
-                if (checked) {
-                  onDailyReminderTimeChange(dailyReminderTime ?? "09:00")
-                } else {
-                  onDailyReminderTimeChange(undefined)
-                }
-              }}
+              disabled={!isSupported || isRequesting}
+              onCheckedChange={handleDailyReminderToggle}
               aria-label="Daily Reminder"
             />
           </div>
@@ -84,4 +197,3 @@ export function SettingsNotificationsSection({
     </div>
   )
 }
-

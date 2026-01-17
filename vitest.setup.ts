@@ -7,6 +7,36 @@
 import "@testing-library/jest-dom/vitest"
 import { vi } from "vitest"
 
+// Minimal Notifications API mock for jsdom tests.
+if (typeof window !== "undefined" && !("Notification" in window)) {
+  class MockNotification {
+    static permission: NotificationPermission = "granted"
+
+    static requestPermission = vi.fn(async () => MockNotification.permission)
+
+    title: string
+    options?: NotificationOptions
+
+    constructor(title: string, options?: NotificationOptions) {
+      this.title = title
+      this.options = options
+    }
+
+    close() {}
+  }
+
+  Object.defineProperty(window, "Notification", {
+    value: MockNotification,
+    configurable: true,
+    writable: true,
+  })
+  Object.defineProperty(globalThis, "Notification", {
+    value: MockNotification,
+    configurable: true,
+    writable: true,
+  })
+}
+
 // Mock next-view-transitions Link for tests (avoids Next runtime resolution issues)
 vi.mock("next-view-transitions", async () => {
   const React = await import("react")
