@@ -66,7 +66,7 @@ Your voice patterns shift days before you consciously feel burnout. kanari detec
 ## Quick Start
 
 ```bash
-git clone [REPOSITORY_URL]
+git clone https://github.com/seanesla/kanari.git
 cd kanari
 pnpm install
 cp .env.example .env.local  # Optional: Google Calendar OAuth

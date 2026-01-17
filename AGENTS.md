@@ -1,5 +1,20 @@
 # AGENTS.md
 
+This file provides guidance to AI coding assistants when working with code in this repository.
+
+## Deployment
+
+**Production:** https://kanari.space
+**Auto-deploys:** Push to `main` triggers Vercel deployment
+**No env vars required:** Users provide Gemini API key via Settings UI
+
+## Naming: Dashboard vs Overview
+
+- **Dashboard** = the route group (`app/dashboard/`) containing all app pages
+- **Overview** = the main page at `/dashboard` (NOT called "Dashboard")
+
+Do NOT rename `OverviewPage` to `DashboardPage` or change "Overview" labels to "Dashboard".
+
 ## Hackathon Context
 
 **Google DeepMind Gemini 3 Hackathon** (Dec 17, 2025 - Feb 9, 2026)
@@ -61,6 +76,13 @@ Note: Gemini API keys are entered by the user in the Settings UI (no server env 
 - `lib/gemini/prompts.ts` and `live-prompts.ts` contain all system prompts
 - Tests in `__tests__/` directories alongside source files
 
+## Error Handling
+
+- Prefer `KanariError` (`lib/errors.ts`) when an error needs a stable `code` and optional structured `context`.
+- Hooks: avoid throwing; use `logError()` and dispatch error state.
+- API routes: return structured JSON errors with appropriate HTTP status codes.
+- Utilities: throw `Error`/`KanariError` with clear, actionable messages.
+
 ## Config Notes
 
 - `next.config.mjs`: `ignoreBuildErrors: true` (dev convenience)
@@ -76,6 +98,13 @@ Fetch up-to-date library documentation via MCP:
 **Attribution:**
 ```typescript
 // Source: Context7 - [library-id] docs - "[topic]"
+```
+
+Example:
+```typescript
+// Source: Context7 - schedule-x/schedule-x docs - "Timed Event Example"
+// https://github.com/schedule-x/schedule-x/blob/main/website/app/docs/calendar/events/page.mdx
+const startDateTime = instant.toZonedDateTimeISO(timeZone)
 ```
 
 # Error fixing workflow
