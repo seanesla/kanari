@@ -21,7 +21,6 @@ import { useAchievements } from "@/hooks/use-achievements"
 import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { DashboardLayout } from "./dashboard-layout"
 import { CollapsibleSection } from "./collapsible-section"
 import { MetricsHeaderBar } from "./metrics-header-bar"
 import { InsightsPanel } from "./insights-panel"
@@ -193,20 +192,18 @@ export function UnifiedDashboard() {
     await regenerateWithDiff(metrics, trend, checkInSessions || [])
   }, [checkInSessions, regenerateWithDiff])
 
-  const { scheduledSuggestions, completedSuggestions, pendingCount } = useMemo(() => {
+  const { scheduledSuggestions, completedSuggestions } = useMemo(() => {
     const scheduledSuggestions: typeof suggestions = []
     const completedSuggestions: typeof suggestions = []
-    let pendingCount = 0
 
     for (const suggestion of suggestions) {
-      if (suggestion.status === "pending") pendingCount += 1
       if (suggestion.status === "scheduled") scheduledSuggestions.push(suggestion)
       if (suggestion.status === "completed") completedSuggestions.push(suggestion)
     }
 
-    return { scheduledSuggestions, completedSuggestions, pendingCount }
+    return { scheduledSuggestions, completedSuggestions }
   }, [suggestions])
-  const scheduledCount = scheduledSuggestions.length
+  const showEmptyState = !suggestionsLoading && suggestions.length === 0
 
   // Kanban content (shared between mobile and desktop)
   const kanbanContent = (
@@ -286,7 +283,7 @@ export function UnifiedDashboard() {
 
   return (
     <div className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-4 md:px-8 lg:px-12 pt-20 pb-8 relative z-10">
+      <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-20 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
         {/* Compact Header with Title + Metrics */}
         <div
           className={cn(
@@ -392,13 +389,17 @@ export function UnifiedDashboard() {
               </CollapsibleSection>
 
               {/* Empty state */}
-              {!suggestionsLoading && scheduledCount === 0 && pendingCount === 0 && (
-                <DashboardLayout
-                  isMobile={isMobile}
-                  showEmptyState={true}
-                  kanban={null}
-                  calendar={null}
-                />
+              {showEmptyState && (
+                <div className="mt-8 text-center">
+                  <p className="text-muted-foreground mb-4">
+                    No suggestions yet. Start a check-in to get personalized recovery recommendations.
+                  </p>
+                  <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+                    <Link href="/dashboard/history?newCheckIn=true">
+                      Check in now
+                    </Link>
+                  </Button>
+                </div>
               )}
             </div>
           ) : (
@@ -431,13 +432,17 @@ export function UnifiedDashboard() {
                 </div>
 
                 {/* Empty state */}
-                {!suggestionsLoading && scheduledCount === 0 && pendingCount === 0 && (
-                  <DashboardLayout
-                    isMobile={isMobile}
-                    showEmptyState={true}
-                    kanban={null}
-                    calendar={null}
-                  />
+                {showEmptyState && (
+                  <div className="mt-8 text-center">
+                    <p className="text-muted-foreground mb-4">
+                      No suggestions yet. Start a check-in to get personalized recovery recommendations.
+                    </p>
+                    <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+                      <Link href="/dashboard/history?newCheckIn=true">
+                        Check in now
+                      </Link>
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>

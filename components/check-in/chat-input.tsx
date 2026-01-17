@@ -212,7 +212,7 @@ export function ChatInput({ onSendText, onTriggerTool, disabled, isMuted, onTogg
         <PopoverContent
           side="top"
           align="start"
-          className="p-0 w-[300px]"
+          className="p-0 w-[min(300px,calc(100vw-2rem))]"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
           <ToolCommandMenu searchValue={searchValue} onSelect={handleToolSelect} />

@@ -466,7 +466,7 @@ function HistoryPageContent() {
   return (
     <div
       className={cn(
-        "h-svh bg-transparent relative overflow-hidden transition-all duration-500",
+        "h-svh bg-transparent relative overflow-hidden transition-all duration-500 pt-[calc(env(safe-area-inset-top)+4rem)] pb-[env(safe-area-inset-bottom)] md:pt-0",
         visible ? "opacity-100" : "opacity-0"
       )}
     >

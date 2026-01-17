@@ -78,7 +78,7 @@ export default function AchievementsPage() {
       <div className="pointer-events-none absolute top-40 right-10 h-48 w-48 rounded-full bg-accent/3 blur-3xl" />
       <div className="pointer-events-none absolute -top-10 left-10 h-56 w-56 rounded-full bg-accent/5 blur-3xl" />
 
-      <main className="px-4 md:px-8 lg:px-12 pt-20 pb-8 relative z-10">
+      <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-20 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
         {/* Header */}
         <div
           className={cn(

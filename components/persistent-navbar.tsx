@@ -359,12 +359,12 @@ export function PersistentNavbar() {
           visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
         )}
       >
-        <div className="flex items-center justify-between px-5 py-4">
+        <div className="flex items-center justify-between px-5 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
           <Link
             href="/"
             className="flex items-center gap-2 text-accent hover:text-accent-light transition-colors"
           >
-            <Logo className="h-[52px] w-auto" />
+            <Logo className="h-11 w-auto" />
           </Link>
 
           <button
@@ -383,7 +383,7 @@ export function PersistentNavbar() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <X className="h-9 w-9" />
+                  <X className="h-8 w-8" />
                 </motion.div>
               ) : (
                 <motion.div
@@ -393,7 +393,7 @@ export function PersistentNavbar() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.15 }}
                 >
-                  <Menu className="h-9 w-9" />
+                  <Menu className="h-8 w-8" />
                 </motion.div>
               )}
             </AnimatePresence>
