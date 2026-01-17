@@ -21,9 +21,9 @@ import { SettingsAppearanceSection } from "./settings-appearance"
 import { SettingsCalendarSection } from "./settings-calendar"
 import { SettingsNotificationsSection } from "./settings-notifications"
 import { SettingsPrivacySection } from "./settings-privacy"
-import { SettingsRecordingSection } from "./settings-recording"
 import { SettingsTimeZoneSection } from "./settings-timezone"
 import { SettingsVoiceSection } from "./settings-voice-section"
+import { SettingsProfileSection } from "./settings-profile-section"
 import { db } from "@/lib/storage/db"
 import { DEFAULT_USER_SETTINGS, createDefaultSettingsRecord } from "@/lib/settings/default-settings"
 import type { AccountabilityMode, GeminiVoice, UserSettings } from "@/lib/types"
@@ -31,8 +31,7 @@ import type { AccountabilityMode, GeminiVoice, UserSettings } from "@/lib/types"
 // Pattern doc: docs/error-patterns/settings-schema-drift-and-partial-save.md
 type SettingsDraft = Pick<
   UserSettings,
-  | "defaultRecordingDuration"
-  | "enableVAD"
+  | "userName"
   | "enableNotifications"
   | "dailyReminderTime"
   | "autoScheduleRecovery"
@@ -43,14 +42,13 @@ type SettingsDraft = Pick<
 >
 
 const DEFAULT_DRAFT: SettingsDraft = {
-  defaultRecordingDuration: DEFAULT_USER_SETTINGS.defaultRecordingDuration,
-  enableVAD: DEFAULT_USER_SETTINGS.enableVAD,
+  userName: DEFAULT_USER_SETTINGS.userName,
   enableNotifications: DEFAULT_USER_SETTINGS.enableNotifications,
-  dailyReminderTime: undefined,
+  dailyReminderTime: DEFAULT_USER_SETTINGS.dailyReminderTime,
   autoScheduleRecovery: DEFAULT_USER_SETTINGS.autoScheduleRecovery,
   localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
-  geminiApiKey: undefined,
-  selectedGeminiVoice: undefined,
+  geminiApiKey: DEFAULT_USER_SETTINGS.geminiApiKey,
+  selectedGeminiVoice: DEFAULT_USER_SETTINGS.selectedGeminiVoice,
   accountabilityMode: DEFAULT_USER_SETTINGS.accountabilityMode,
 }
 
@@ -71,8 +69,7 @@ export function SettingsContent() {
       try {
         const savedSettings = await db.settings.get("default")
         const hydrated: SettingsDraft = {
-          defaultRecordingDuration: savedSettings?.defaultRecordingDuration ?? DEFAULT_USER_SETTINGS.defaultRecordingDuration,
-          enableVAD: savedSettings?.enableVAD ?? DEFAULT_USER_SETTINGS.enableVAD,
+          userName: savedSettings?.userName ?? DEFAULT_USER_SETTINGS.userName,
           enableNotifications: savedSettings?.enableNotifications ?? DEFAULT_USER_SETTINGS.enableNotifications,
           dailyReminderTime: savedSettings?.dailyReminderTime,
           autoScheduleRecovery: savedSettings?.autoScheduleRecovery ?? DEFAULT_USER_SETTINGS.autoScheduleRecovery,
@@ -95,8 +92,10 @@ export function SettingsContent() {
 
   const normalizedDraft = useMemo((): SettingsDraft => {
     const trimmedKey = draft.geminiApiKey?.trim() ?? ""
+    const trimmedName = draft.userName?.trim() ?? ""
     return {
       ...draft,
+      userName: trimmedName.length > 0 ? trimmedName : undefined,
       geminiApiKey: trimmedKey.length > 0 ? trimmedKey : undefined,
       dailyReminderTime: draft.dailyReminderTime ? draft.dailyReminderTime : undefined,
       selectedGeminiVoice: draft.selectedGeminiVoice ?? undefined,
@@ -107,8 +106,7 @@ export function SettingsContent() {
   const isDirty = useMemo(() => {
     if (!baseline) return false
     return (
-      baseline.defaultRecordingDuration !== normalizedDraft.defaultRecordingDuration ||
-      baseline.enableVAD !== normalizedDraft.enableVAD ||
+      baseline.userName !== normalizedDraft.userName ||
       baseline.enableNotifications !== normalizedDraft.enableNotifications ||
       baseline.dailyReminderTime !== normalizedDraft.dailyReminderTime ||
       baseline.autoScheduleRecovery !== normalizedDraft.autoScheduleRecovery ||
@@ -125,8 +123,7 @@ export function SettingsContent() {
     setSaveMessage(null)
     try {
       const updates: Partial<UserSettings> = {
-        defaultRecordingDuration: normalizedDraft.defaultRecordingDuration,
-        enableVAD: normalizedDraft.enableVAD,
+        userName: normalizedDraft.userName,
         enableNotifications: normalizedDraft.enableNotifications,
         dailyReminderTime: normalizedDraft.dailyReminderTime,
         autoScheduleRecovery: normalizedDraft.autoScheduleRecovery,
@@ -162,15 +159,10 @@ export function SettingsContent() {
   return (
     <div className={`w-full space-y-8 ${isDirty ? "pb-24" : ""}`}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 auto-rows-max">
-        <SettingsRecordingSection
-          enableVAD={draft.enableVAD}
-          onEnableVADChange={(checked) => {
-            setDraft((prev) => ({ ...prev, enableVAD: checked }))
-            setSaveMessage(null)
-          }}
-          defaultRecordingDuration={draft.defaultRecordingDuration}
-          onDefaultRecordingDurationChange={(seconds) => {
-            setDraft((prev) => ({ ...prev, defaultRecordingDuration: seconds }))
+        <SettingsProfileSection
+          userName={draft.userName ?? ""}
+          onUserNameChange={(name) => {
+            setDraft((prev) => ({ ...prev, userName: name }))
             setSaveMessage(null)
           }}
         />

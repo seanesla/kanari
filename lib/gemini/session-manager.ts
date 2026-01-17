@@ -132,24 +132,28 @@ class GeminiSessionManager {
       // Create Gemini Live session using SDK
       // Source: Context7 - /googleapis/js-genai docs - "Live.connect"
       // Note: Native audio model requires specific config
-      const session = await ai.live.connect({
-        model: LIVE_MODEL,
-        config: {
-          // Native audio model outputs audio by default
-          responseModalities: [Modality.AUDIO],
-          // Enable output transcription to get actual spoken words
-          // Source: Context7 - /googleapis/js-genai docs - "outputAudioTranscription"
-          outputAudioTranscription: {},
-          // Enable input transcription to get user speech with isFinal flag
-          // Source: Context7 - /googleapis/js-genai docs - "inputAudioTranscription"
-          inputAudioTranscription: {},
-          // System instruction as simple string
-          ...(systemInstruction ? { systemInstruction } : {}),
-          // Tools for function calling (intelligent silence)
-          // Source: Context7 - /googleapis/js-genai docs - "tools config"
-          tools: GEMINI_TOOLS,
-        },
-        callbacks: {
+        const session = await ai.live.connect({
+          model: LIVE_MODEL,
+          config: {
+            // Native audio model outputs audio by default
+            responseModalities: [Modality.AUDIO],
+            // Enable output transcription to get actual spoken words
+            // Source: Context7 - /googleapis/js-genai docs - "outputAudioTranscription"
+            outputAudioTranscription: {},
+            // Enable input transcription to get user speech with isFinal flag
+            // Source: Context7 - /googleapis/js-genai docs - "inputAudioTranscription"
+            inputAudioTranscription: {},
+            // Improve emotional responsiveness + silence handling
+            // Source: Context7 - /googleapis/js-genai docs - "LiveConnectConfig"
+            enableAffectiveDialog: true,
+            proactivity: { proactiveAudio: true },
+            // System instruction as simple string
+            ...(systemInstruction ? { systemInstruction } : {}),
+            // Tools for function calling (intelligent silence)
+            // Source: Context7 - /googleapis/js-genai docs - "tools config"
+            tools: GEMINI_TOOLS,
+          },
+          callbacks: {
           onopen: () => {
             logDebug("SessionManager", `Session ${sessionId} connected`)
             isReady = true

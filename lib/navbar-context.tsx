@@ -8,9 +8,9 @@ export type ActiveSection = "hero" | "features" | "how-it-works" | null
 
 // Onboarding step configuration
 export const ONBOARDING_STEPS = [
-  { id: "welcome", label: "Welcome" },
-  { id: "theme", label: "Theme" },
+  { id: "intro", label: "Intro" },
   { id: "api", label: "API" },
+  { id: "coach", label: "Coach" },
   { id: "prefs", label: "Prefs" },
   { id: "done", label: "Done" },
 ] as const

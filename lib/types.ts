@@ -434,32 +434,44 @@ export type MonoFamily =
   | "Source Code Pro"
 
 export interface UserSettings {
-  // Recording preferences
-  defaultRecordingDuration: number // seconds (30-60)
-  enableVAD: boolean // Voice activity detection
+  // User identity
+  userName?: string // User's preferred name (for personalization)
+
   // Notification preferences
   enableNotifications: boolean
   dailyReminderTime?: string // HH:mm format
+
   // Timezone
   timeZone?: string // IANA timezone id (e.g., "America/Los_Angeles")
+
   // Calendar integration
   calendarConnected: boolean
   autoScheduleRecovery: boolean
   preferredRecoveryTimes: string[] // Array of HH:mm
+
   // Privacy
   localStorageOnly: boolean
+
   // Coach preferences
   coachVoice?: CoachVoice
   accountabilityMode?: AccountabilityMode // Default: "balanced"
+
   // AI Voice (Gemini TTS)
   selectedGeminiVoice?: GeminiVoice // User's chosen AI assistant voice
+
+  // Coach avatar (AI-generated)
+  coachAvatarBase64?: string // base64 PNG (no data: prefix)
+  coachAvatarVoice?: GeminiVoice // Voice used when avatar was generated
+
   // Appearance
   accentColor?: string // Hex color string (e.g., "#d4a574")
   selectedSansFont?: FontFamily
   selectedSerifFont?: SerifFamily
   selectedMonoFont?: MonoFamily
+
   // API Configuration
   geminiApiKey?: string // User's Gemini API key (stored locally)
+
   // Onboarding
   hasCompletedOnboarding?: boolean // Whether user has completed the onboarding flow
   onboardingCompletedAt?: string // ISO timestamp when onboarding was completed

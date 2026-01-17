@@ -12,8 +12,15 @@ import type { MismatchResult, VoiceMetrics, VoicePatterns } from "@/lib/types"
 export function buildSystemContext(options: {
   contextSummary?: SystemContextSummary
   timeContext?: SystemTimeContext
+  accountabilityMode?: Parameters<typeof buildCheckInSystemInstruction>[2]
+  userName?: string
 }): string {
-  return buildCheckInSystemInstruction(options.contextSummary, options.timeContext)
+  return buildCheckInSystemInstruction(
+    options.contextSummary,
+    options.timeContext,
+    options.accountabilityMode,
+    options.userName
+  )
 }
 
 export function buildHistoricalContext(data: CheckInContextData) {

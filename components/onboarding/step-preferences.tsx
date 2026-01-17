@@ -8,20 +8,14 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { Settings, Bell, Clock, Mic } from "@/lib/icons"
+import { Settings, Bell, Heart, Shield, Target } from "@/lib/icons"
 import { useNotifications } from "@/hooks/use-notifications"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useSceneMode } from "@/lib/scene-context"
-import type { UserSettings } from "@/lib/types"
+import type { AccountabilityMode, UserSettings } from "@/lib/types"
 
 interface StepPreferencesProps {
   initialSettings: Partial<UserSettings>
@@ -33,9 +27,14 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
   const { accentColor } = useSceneMode()
   const { isSupported, permission, requestPermission, notify } = useNotifications()
 
-  const [enableVAD, setEnableVAD] = useState(initialSettings.enableVAD ?? true)
-  const [enableNotifications, setEnableNotifications] = useState(initialSettings.enableNotifications ?? false)
-  const [recordingDuration, setRecordingDuration] = useState(String(initialSettings.defaultRecordingDuration ?? 30))
+  const [accountabilityMode, setAccountabilityMode] = useState<AccountabilityMode>(
+    initialSettings.accountabilityMode ?? "balanced"
+  )
+  const [dailyReminderTime, setDailyReminderTime] = useState<string | undefined>(
+    initialSettings.dailyReminderTime
+  )
+
+  const dailyReminderEnabled = Boolean(dailyReminderTime)
 
   const permissionLabel = (() => {
     if (!isSupported) return "Not supported"
@@ -44,45 +43,44 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
     return "Not enabled"
   })()
 
-  const handleNotificationsToggle = async (checked: boolean) => {
+  const handleDailyReminderToggle = async (checked: boolean) => {
     if (!checked) {
-      setEnableNotifications(false)
+      setDailyReminderTime(undefined)
       return
     }
 
     if (!isSupported) {
-      setEnableNotifications(false)
+      setDailyReminderTime(undefined)
       return
     }
 
     if (permission === "granted") {
-      setEnableNotifications(true)
+      setDailyReminderTime(dailyReminderTime ?? "09:00")
       return
     }
 
     if (permission === "denied") {
-      setEnableNotifications(false)
+      setDailyReminderTime(undefined)
       return
     }
 
     const result = await requestPermission()
     if (result === "granted") {
-      setEnableNotifications(true)
+      setDailyReminderTime(dailyReminderTime ?? "09:00")
       notify("Kanari", {
-        body: "Notifications are enabled. You'll get reminders while Kanari is open.",
+        body: "Daily reminders are enabled. You'll get reminders while Kanari is open.",
         tag: "kanari-onboarding-notifications",
       })
       return
     }
 
-    setEnableNotifications(false)
+    setDailyReminderTime(undefined)
   }
 
   const handleNext = () => {
     onNext({
-      enableVAD,
-      enableNotifications,
-      defaultRecordingDuration: parseInt(recordingDuration, 10),
+      accountabilityMode,
+      dailyReminderTime: dailyReminderEnabled ? (dailyReminderTime ?? "09:00") : undefined,
     })
   }
 
@@ -118,80 +116,83 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
 
       {/* Preferences */}
       <motion.div
-        className="space-y-4"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
-        {/* Check-in duration */}
-        <motion.div
-          className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm space-y-3 transition-colors hover:border-accent/30"
-          initial={{ opacity: 0, y: 20, boxShadow: "0 0 0px transparent" }}
-          animate={{ opacity: 1, y: 0, boxShadow: "0 0 0px transparent" }}
-          transition={{ delay: 0.35, type: "spring", stiffness: 300, damping: 25 }}
-          whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
+          className="space-y-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
         >
-          <div className="flex items-center gap-3">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.4, type: "spring", stiffness: 400, damping: 15 }}
-            >
-              <Clock className="h-5 w-5 text-accent" />
-            </motion.div>
-            <div className="flex-1">
-              <Label htmlFor="duration">Default Check-in Duration</Label>
-              <p className="text-sm text-muted-foreground">
-                How long each voice check-in should be
-              </p>
-            </div>
-          </div>
-          <Select value={recordingDuration} onValueChange={setRecordingDuration}>
-            <SelectTrigger id="duration" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="30">30 seconds (recommended)</SelectItem>
-              <SelectItem value="45">45 seconds</SelectItem>
-              <SelectItem value="60">60 seconds</SelectItem>
-            </SelectContent>
-          </Select>
-        </motion.div>
-
-        {/* Voice Activity Detection */}
-        <motion.div
-          className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm transition-colors hover:border-accent/30"
-          initial={{ opacity: 0, y: 20, boxShadow: "0 0 0px transparent" }}
-          animate={{ opacity: 1, y: 0, boxShadow: "0 0 0px transparent" }}
-          transition={{ delay: 0.45, type: "spring", stiffness: 300, damping: 25 }}
-          whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
-        >
-          <div className="flex items-center justify-between">
+          {/* Check-in style */}
+          <motion.div
+            className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm space-y-3 transition-colors hover:border-accent/30"
+            initial={{ opacity: 0, y: 20, boxShadow: "0 0 0px transparent" }}
+            animate={{ opacity: 1, y: 0, boxShadow: "0 0 0px transparent" }}
+            transition={{ delay: 0.35, type: "spring", stiffness: 300, damping: 25 }}
+            whileHover={{ boxShadow: `0 0 20px ${accentColor}10` }}
+          >
             <div className="flex items-center gap-3">
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                transition={{ delay: 0.5, type: "spring", stiffness: 400, damping: 15 }}
+                transition={{ delay: 0.4, type: "spring", stiffness: 400, damping: 15 }}
               >
-                <Mic className="h-5 w-5 text-accent" />
+                <Target className="h-5 w-5 text-accent" />
               </motion.div>
-              <div>
-                <Label htmlFor="vad">Smart Capture</Label>
+              <div className="flex-1">
+                <Label className="text-base">How should we work together?</Label>
                 <p className="text-sm text-muted-foreground">
-                  Automatically detect when you start/stop speaking
+                  Pick a coaching style. You can change this later in Settings.
                 </p>
               </div>
             </div>
-            <Switch
-              id="vad"
-              checked={enableVAD}
-              onCheckedChange={setEnableVAD}
-            />
-          </div>
-        </motion.div>
 
-        {/* Notifications */}
-        <motion.div
+            <RadioGroup
+              value={accountabilityMode}
+              onValueChange={(value) => setAccountabilityMode(value as AccountabilityMode)}
+              className="gap-4"
+            >
+              <div className="flex items-start gap-3 rounded-md border border-border p-4">
+                <RadioGroupItem value="supportive" id="onboarding-accountability-supportive" className="mt-1" />
+                <Label htmlFor="onboarding-accountability-supportive" className="cursor-pointer font-sans">
+                  <div className="flex items-center gap-2">
+                    <Heart className="h-4 w-4 text-accent" />
+                    <span className="font-medium text-foreground">Supportive</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Gentle, validating, and low-pressure.
+                  </p>
+                </Label>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-md border border-border p-4">
+                <RadioGroupItem value="balanced" id="onboarding-accountability-balanced" className="mt-1" />
+                <Label htmlFor="onboarding-accountability-balanced" className="cursor-pointer font-sans">
+                  <div className="flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-accent" />
+                    <span className="font-medium text-foreground">Balanced</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    A mix of empathy and practical next steps.
+                  </p>
+                </Label>
+              </div>
+
+              <div className="flex items-start gap-3 rounded-md border border-border p-4">
+                <RadioGroupItem value="accountability" id="onboarding-accountability-coach" className="mt-1" />
+                <Label htmlFor="onboarding-accountability-coach" className="cursor-pointer font-sans">
+                  <div className="flex items-center gap-2">
+                    <Target className="h-4 w-4 text-accent" />
+                    <span className="font-medium text-foreground">Accountability</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    More direct prompts and follow-through.
+                  </p>
+                </Label>
+              </div>
+            </RadioGroup>
+          </motion.div>
+
+          {/* Notifications */}
+          <motion.div
           className="p-4 rounded-xl border border-border/50 bg-card/30 backdrop-blur-sm transition-colors hover:border-accent/30"
           initial={{ opacity: 0, y: 20, boxShadow: "0 0 0px transparent" }}
           animate={{ opacity: 1, y: 0, boxShadow: "0 0 0px transparent" }}
@@ -219,9 +220,9 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
             </div>
             <Switch
               id="notifications"
-              checked={enableNotifications}
+              checked={dailyReminderEnabled}
               disabled={!isSupported}
-              onCheckedChange={handleNotificationsToggle}
+              onCheckedChange={handleDailyReminderToggle}
             />
           </div>
         </motion.div>

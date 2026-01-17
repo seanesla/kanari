@@ -3,16 +3,28 @@ import type { DBSettings } from "@/lib/storage/db"
 import { DEFAULT_TIME_ZONE } from "@/lib/timezone"
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
-  defaultRecordingDuration: 30,
-  enableVAD: true,
+  userName: undefined,
+
   enableNotifications: false,
+  dailyReminderTime: undefined,
+
   calendarConnected: false,
   autoScheduleRecovery: false,
   preferredRecoveryTimes: [],
+
   localStorageOnly: true,
+
   accountabilityMode: "balanced",
+
+  selectedGeminiVoice: undefined,
+
+  coachAvatarBase64: undefined,
+  coachAvatarVoice: undefined,
+
   timeZone: DEFAULT_TIME_ZONE,
+
   hasCompletedOnboarding: false,
+  onboardingCompletedAt: undefined,
 }
 
 export function createDefaultSettingsRecord(

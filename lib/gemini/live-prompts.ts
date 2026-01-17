@@ -230,6 +230,15 @@ function sanitizeContextText(text: string): string {
     .trim()
 }
 
+function sanitizeUserName(name: string): string {
+  return name
+    .replace(/[\r\n\t]/g, " ")
+    .replace(/[<>[\]]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 60)
+}
+
 /**
  * Validate and return safe acoustic signal
  */
@@ -580,12 +589,29 @@ export interface SystemContextSummary {
 export function buildCheckInSystemInstruction(
   contextSummary?: SystemContextSummary,
   timeContext?: SystemTimeContext,
-  accountabilityMode: AccountabilityMode = "balanced"
+  accountabilityMode: AccountabilityMode = "balanced",
+  userName?: string
 ): string {
   let instruction = CHECK_IN_SYSTEM_PROMPT
 
   // Add accountability mode section
   instruction += ACCOUNTABILITY_MODE_PROMPTS[accountabilityMode]
+
+  // Add optional user name for personalization
+  if (userName && userName.trim().length > 0) {
+    const safeName = sanitizeUserName(userName)
+    if (safeName.length > 0) {
+      instruction += `
+
+═══════════════════════════════════════════════════════════════════════════════
+USER PROFILE
+═══════════════════════════════════════════════════════════════════════════════
+
+User's preferred name: ${safeName}
+
+Use this name naturally in greetings and occasional check-ins. Do not overuse it.`
+    }
+  }
 
   // Add time context section
   if (timeContext) {

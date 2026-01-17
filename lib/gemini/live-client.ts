@@ -53,6 +53,7 @@ export interface SessionContext {
   timeContext?: SystemTimeContext
   voiceName?: string // Gemini TTS voice name (e.g., "Aoede", "Sulafat")
   accountabilityMode?: AccountabilityMode
+  userName?: string
 }
 
 export type GeminiWidgetEvent =
@@ -335,7 +336,8 @@ export class GeminiLiveClient {
       const systemInstruction = buildCheckInSystemInstruction(
         context?.contextSummary,
         context?.timeContext,
-        context?.accountabilityMode
+        context?.accountabilityMode,
+        context?.userName
       )
 
       const ai = new GoogleGenAI({ apiKey })
@@ -350,17 +352,19 @@ export class GeminiLiveClient {
           }
         : undefined
 
-      connectPromise = ai.live.connect({
-        model: LIVE_MODEL,
-        config: {
-          responseModalities: [Modality.AUDIO],
-          outputAudioTranscription: {},
-          inputAudioTranscription: {},
-          systemInstruction,
-          tools: GEMINI_TOOLS,
-          ...(speechConfig && { speechConfig }),
-        },
-        callbacks: {
+        connectPromise = ai.live.connect({
+          model: LIVE_MODEL,
+          config: {
+            responseModalities: [Modality.AUDIO],
+            outputAudioTranscription: {},
+            inputAudioTranscription: {},
+            enableAffectiveDialog: true,
+            proactivity: { proactiveAudio: true },
+            systemInstruction,
+            tools: GEMINI_TOOLS,
+            ...(speechConfig && { speechConfig }),
+          },
+          callbacks: {
           onopen: () => {
             logDebug("GeminiLive", "WebSocket opened")
           },

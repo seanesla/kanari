@@ -323,15 +323,17 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         dispatch({ type: "SET_INIT_PHASE", phase: "connecting_gemini" })
         dispatch({ type: "SET_CONNECTING" })
 
-        // Load user's voice preference from settings (fast IndexedDB read)
+        // Load user preferences from settings (fast IndexedDB read)
         let voiceName: string | undefined
         let accountabilityMode: AccountabilityMode | undefined
+        let userName: string | undefined
         try {
           const settings = await db.settings.get("default")
           voiceName = settings?.selectedGeminiVoice
           accountabilityMode = settings?.accountabilityMode ?? "balanced"
+          userName = settings?.userName
         } catch {
-          // If settings read fails, continue without voice preference
+          // If settings read fails, continue with defaults
         }
 
         // Prefer full time context + optional summary (but never block startup indefinitely).
@@ -380,6 +382,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
           ...(extendedContextSummary ? { contextSummary: extendedContextSummary } : {}),
           ...(voiceName ? { voiceName } : {}),
           ...(accountabilityMode ? { accountabilityMode } : {}),
+          ...(userName ? { userName } : {}),
         }
         sessionContextRef.current = sessionContext
 
