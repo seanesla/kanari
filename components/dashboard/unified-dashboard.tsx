@@ -39,7 +39,7 @@ export function UnifiedDashboard() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
-  const [kanbanExpanded, setKanbanExpanded] = useState(false)
+  const [kanbanExpanded, setKanbanExpanded] = useState(true)
 
   // Data hooks
   const storedTrendData = useTrendData(7)
@@ -403,48 +403,46 @@ export function UnifiedDashboard() {
               )}
             </div>
           ) : (
-            /* Desktop Layout: Sidebar + Main Content */
-            <div className="grid grid-cols-[300px_1fr] gap-6 h-[calc(100vh-140px)]">
-              {/* Sidebar: Insights + Journal */}
-              <div className="flex flex-col gap-4 overflow-hidden">
-                <InsightsPanel
-                  session={latestSynthesisSession}
-                  className="flex-1 min-h-0 overflow-auto"
-                />
-                <JournalEntriesPanel className="flex-1 min-h-0 overflow-auto" />
-              </div>
-
-              {/* Main Content: Kanban + Calendar */}
-              <div className="flex flex-col gap-4 overflow-hidden">
-                {/* Kanban */}
-                <div
-                  className={cn(
-                    "rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 overflow-hidden transition-all duration-300",
-                    kanbanExpanded ? "h-[400px]" : "h-[200px]"
-                  )}
-                >
-                  {kanbanContent}
-                </div>
-
-                {/* Calendar */}
-                <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden flex-1">
-                  {calendarContent}
-                </div>
-
-                {/* Empty state */}
-                {showEmptyState && (
-                  <div className="mt-8 text-center">
-                    <p className="text-muted-foreground mb-4">
-                      No suggestions yet. Start a check-in to get personalized recovery recommendations.
-                    </p>
-                    <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-                      <Link href="/dashboard/history?newCheckIn=true">
-                        Check in now
-                      </Link>
-                    </Button>
-                  </div>
+            /* Desktop Layout: Stacked sections (natural page scroll) */
+            <div className="space-y-4">
+              {/* Kanban */}
+              <div
+                className={cn(
+                  "rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 overflow-hidden transition-all duration-300",
+                  kanbanExpanded ? "h-[400px]" : "h-[240px]"
                 )}
+              >
+                {kanbanContent}
               </div>
+
+              {/* Calendar */}
+              <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden h-[70vh] min-h-[520px]">
+                {calendarContent}
+              </div>
+
+              {/* Collapsible Insights */}
+              <CollapsibleSection title="Latest Insights" defaultOpen={false}>
+                <InsightsPanel session={latestSynthesisSession} className="border-0 bg-transparent" />
+              </CollapsibleSection>
+
+              {/* Collapsible Journal */}
+              <CollapsibleSection title="Journal Entries" defaultOpen={false}>
+                <JournalEntriesPanel className="border-0 bg-transparent" />
+              </CollapsibleSection>
+
+              {/* Empty state */}
+              {showEmptyState && (
+                <div className="mt-8 text-center">
+                  <p className="text-muted-foreground mb-4">
+                    No suggestions yet. Start a check-in to get personalized recovery recommendations.
+                  </p>
+                  <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+                    <Link href="/dashboard/history?newCheckIn=true">
+                      Check in now
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </div>

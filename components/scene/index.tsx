@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Canvas } from "@react-three/fiber"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
@@ -12,11 +12,24 @@ import { SceneBackgroundFallback } from "./fallback"
 // Inner component that uses the scene context
 function SceneBackgroundInner() {
   const { mode, scrollProgressRef, isLoading, setIsLoading } = useSceneMode()
+  const [canvasMounted, setCanvasMounted] = useState(true)
 
   const handleAnimationComplete = () => {
     // Small delay after animation completes for smooth transition
     setTimeout(() => setIsLoading(false), 300)
   }
+
+  // Mount/unmount the heavy 3D canvas.
+  // Keep it mounted during transitions so the fade-out still renders.
+  // Unmount it once we are fully in dashboard mode to stop the R3F render loop.
+  useEffect(() => {
+    if (mode === "dashboard") {
+      const timer = window.setTimeout(() => setCanvasMounted(false), 250)
+      return () => window.clearTimeout(timer)
+    }
+
+    setCanvasMounted(true)
+  }, [mode])
 
   // Disable body scroll during loading animation
   useEffect(() => {
@@ -50,17 +63,19 @@ function SceneBackgroundInner() {
   return (
     <>
       <LoadingOverlay visible={isLoading} onAnimationComplete={handleAnimationComplete} />
-      <div className="fixed inset-0 -z-10">
-        <Canvas
-          camera={{ position: [...CAMERA.initialPosition], fov: CAMERA.fov }}
-          dpr={[1, 1.5]}
-          gl={{ antialias: true, alpha: true }}
-        >
-          <color attach="background" args={[SCENE_COLORS.background]} />
-          <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />
-          <Scene scrollProgressRef={scrollProgressRef} mode={mode} />
-        </Canvas>
-      </div>
+      {canvasMounted ? (
+        <div className="fixed inset-0 -z-10">
+          <Canvas
+            camera={{ position: [...CAMERA.initialPosition], fov: CAMERA.fov }}
+            dpr={[1, 1.5]}
+            gl={{ antialias: true, alpha: true }}
+          >
+            <color attach="background" args={[SCENE_COLORS.background]} />
+            <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />
+            <Scene scrollProgressRef={scrollProgressRef} mode={mode} />
+          </Canvas>
+        </div>
+      ) : null}
     </>
   )
 }
