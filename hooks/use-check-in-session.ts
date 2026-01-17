@@ -6,7 +6,7 @@ import { processAudio } from "@/lib/audio/processor"
 import { db, fromCommitment } from "@/lib/storage/db"
 import { computeContextFingerprint } from "@/lib/gemini/context-fingerprint"
 import { fetchCheckInContext, formatContextForAPI } from "@/lib/gemini/check-in-context"
-import { logWarn } from "@/lib/logger"
+import { logDebug, logWarn } from "@/lib/logger"
 import { createGeminiHeaders } from "@/lib/utils"
 import {
   consumePreservedSession,
@@ -397,7 +397,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
         // INITIALIZATION_ABORTED is expected in React StrictMode
         if (err.message === "INITIALIZATION_ABORTED") {
-          console.log("[useCheckIn] Session initialization aborted (StrictMode cleanup)")
+          logDebug("useCheckIn", "Session initialization aborted (StrictMode cleanup)")
           // Cleanup only what was initialized (in reverse order)
           if (captureInitialized) {
             audio.cleanupAudioCapture()
@@ -414,7 +414,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
         // SESSION_SUPERSEDED means a newer session started while this one was initializing.
         if (err.message === "SESSION_SUPERSEDED") {
-          console.log("[useCheckIn] Session superseded by newer initialization")
+          logDebug("useCheckIn", "Session superseded by newer initialization")
           // Don't cleanup - the new session owns the resources now
           // Don't dispatch anything - let the new session handle state
           return
@@ -611,7 +611,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
     // Reset local state (session is now preserved externally)
     dispatch({ type: "RESET" })
 
-    console.log("[useCheckIn] Session preserved")
+    logDebug("useCheckIn", "Session preserved")
   }, [audio, data, dispatch, gemini, playbackControls])
 
   const hasPreservedSession = useCallback(() => {
@@ -680,7 +680,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
       dispatch({ type: "SET_READY" })
       dispatch({ type: "SET_LISTENING" })
 
-      console.log("[useCheckIn] Session resumed successfully")
+      logDebug("useCheckIn", "Session resumed successfully")
     } catch (error) {
       console.error("[useCheckIn] Failed to resume session:", error)
       // If resume fails, clean up and let caller handle
@@ -719,7 +719,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
   const onDisconnected = useCallback(
     (reason: string) => {
-      console.log("[useCheckIn] Disconnected:", reason)
+      logDebug("useCheckIn", "Disconnected", reason)
       const currentState = stateRef.current
       const normalizedReason = (reason || "").toLowerCase()
 

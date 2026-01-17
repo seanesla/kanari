@@ -163,7 +163,7 @@ export function StressFatigueChart({
   emptyStateMessage = "No check-ins yet",
   className,
   expanded = false,
-  onExpandChange,
+  onExpandChange: _onExpandChange,
   aggregatedFeatures,
 }: StressFatigueChartProps) {
   const { accentColor } = useSceneMode()

@@ -245,7 +245,7 @@ function OnboardingNavLinks() {
 }
 
 export function PersistentNavbar() {
-  const pathname = usePathname()
+  const _pathname = usePathname()
   const { isLoading } = useSceneMode()
   const { navbarMode, onboardingStep, setOnboardingStep, highestStepReached } = useNavbar()
   const [visible, setVisible] = useState(false)

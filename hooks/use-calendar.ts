@@ -101,7 +101,7 @@ export function useCalendar(): UseCalendarReturn {
         setIsConnected(false)
         return false
       }
-    } catch (err) {
+    } catch {
       setError("Failed to refresh access token")
       setIsConnected(false)
       return false

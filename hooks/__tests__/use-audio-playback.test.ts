@@ -235,8 +235,8 @@ describe("useAudioPlayback", () => {
     vi.unmock("@/hooks/use-audio-playback")
     const { useAudioPlayback } = await import("@/hooks/use-audio-playback")
 
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const _errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const _warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
 
     const { result } = renderHook(() => useAudioPlayback())
 

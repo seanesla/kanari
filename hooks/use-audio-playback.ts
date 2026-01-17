@@ -15,7 +15,7 @@
 
 import { useReducer, useRef, useCallback, useEffect } from "react"
 import { base64ToInt16 } from "@/lib/audio/pcm-converter"
-import { logWarn } from "@/lib/logger"
+import { logDebug, logWarn } from "@/lib/logger"
 
 // ============================================
 // Types
@@ -275,7 +275,7 @@ export function useAudioPlayback(
       // Note: TypeScript's AudioContextState type is outdated and doesn't include "closed",
       // but the Web Audio API spec includes it: https://webaudio.github.io/web-audio-api/#dom-audiocontextstate
       if ((audioContext.state as string) === "closed") {
-        console.log("[useAudioPlayback] AudioContext closed during initialization, aborting")
+        logDebug("useAudioPlayback", "AudioContext closed during initialization; aborting")
         throw new Error("INITIALIZATION_ABORTED")
       }
 
@@ -287,7 +287,7 @@ export function useAudioPlayback(
 
       // Abort if context was closed during module loading
       if ((audioContext.state as string) === "closed") {
-        console.log("[useAudioPlayback] AudioContext closed during module loading, aborting")
+        logDebug("useAudioPlayback", "AudioContext closed during module loading; aborting")
         throw new Error("INITIALIZATION_ABORTED")
       }
 
@@ -438,7 +438,6 @@ export function useAudioPlayback(
     initializationIdRef.current += 1
 
     // Invalidate this instance so stale worklet messages are ignored
-    const oldInstance = instanceRef.current
     instanceRef.current = {}
 
     // Clear message handler to prevent memory leaks

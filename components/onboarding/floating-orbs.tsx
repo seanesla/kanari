@@ -15,7 +15,6 @@
 import { useMemo } from "react"
 import { Canvas } from "@react-three/fiber"
 import { Sparkles, Float } from "@react-three/drei"
-import * as THREE from "three"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
 

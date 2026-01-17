@@ -312,14 +312,11 @@ export class FeatureExtractor {
     let pauseCount = 0
     let currentPauseDuration = 0
     const pauseDurations: number[] = []
-    let speechDuration = 0
     let silenceDuration = 0
 
     for (let i = 0; i < speechFrames.length; i++) {
       if (speechFrames[i]) {
         // Speech frame
-        speechDuration += frameDuration
-
         // End of pause
         if (i > 0 && !speechFrames[i - 1] && currentPauseDuration > 0) {
           pauseDurations.push(currentPauseDuration)

@@ -69,7 +69,7 @@ export async function POST(
     let apiKey: string
     try {
       apiKey = validateAPIKey(getAPIKeyFromRequest(request))
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: "Gemini API key not configured. Please add your API key in Settings.", code: "CONFIG_ERROR" as const },
         { status: 401 }
@@ -184,7 +184,7 @@ export async function DELETE(
     let body: { sessionId?: string; secret?: string }
     try {
       body = await request.json()
-    } catch (error) {
+    } catch {
       return NextResponse.json(
         { error: "Invalid JSON in request body", code: "CONFIG_ERROR" as const },
         { status: 400 }

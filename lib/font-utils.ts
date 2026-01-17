@@ -1,5 +1,3 @@
-import type { FontFamily, SerifFamily, MonoFamily } from "./types"
-
 export interface FontOption {
   name: string
   variable: string

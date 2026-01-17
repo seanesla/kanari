@@ -15,7 +15,7 @@ class AudioProcessor extends AudioWorkletProcessor {
     }
   }
 
-  process(inputs, outputs, parameters) {
+  process(inputs, _outputs, _parameters) {
     const input = inputs[0]
 
     // Check if we have input data

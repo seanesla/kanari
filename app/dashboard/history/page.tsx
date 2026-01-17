@@ -32,6 +32,7 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
+  SidebarMenuSkeleton,
   SidebarInset,
   SidebarTrigger,
   useSidebar,
@@ -65,6 +66,7 @@ function CheckInsSidebar({
   onFilterChange,
   onNewCheckIn,
   historyItems,
+  isLoading,
   isSelectMode,
   selectedIds,
   onToggleSelect,
@@ -77,6 +79,7 @@ function CheckInsSidebar({
   onFilterChange: (filter: FilterType) => void
   onNewCheckIn: () => void
   historyItems: HistoryItem[]
+  isLoading: boolean
   isSelectMode: boolean
   selectedIds: Set<string>
   onToggleSelect: (id: string, checked: boolean) => void
@@ -143,7 +146,13 @@ function CheckInsSidebar({
 
         {/* Check-in list */}
         <SidebarContent className="px-2">
-          {historyItems.length === 0 ? (
+          {isLoading ? (
+            <div className="py-4">
+              {Array.from({ length: 8 }).map((_, idx) => (
+                <SidebarMenuSkeleton key={idx} showIcon />
+              ))}
+            </div>
+          ) : historyItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
               <Clock className="h-8 w-8 text-muted-foreground/50 mb-3" />
               <p className="text-sm text-muted-foreground">No check-ins yet</p>
@@ -297,7 +306,7 @@ function HistoryPageContent() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
   // Fetch unified history timeline
-  const historyItems = useHistory()
+  const { items: historyItems, isLoading: isHistoryLoading } = useHistory()
 
   // Filter items based on selected filter
   const filteredItems = useMemo(() => {
@@ -479,6 +488,7 @@ function HistoryPageContent() {
           onFilterChange={setFilter}
           onNewCheckIn={handleStartNewCheckIn}
           historyItems={historyItems}
+          isLoading={isHistoryLoading}
           isSelectMode={isSelectMode}
           selectedIds={selectedIds}
           onToggleSelect={handleToggleSelect}
@@ -553,14 +563,18 @@ function HistoryPageContent() {
                     </EmptyMedia>
                     <EmptyHeader>
                       <EmptyTitle>
-                        {historyItems.length === 0
-                          ? "Start your wellness journey"
-                          : "Select a check-in"}
+                        {isHistoryLoading
+                          ? "Loading check-ins…"
+                          : historyItems.length === 0
+                            ? "Start your wellness journey"
+                            : "Select a check-in"}
                       </EmptyTitle>
                       <EmptyDescription>
-                        {historyItems.length === 0
-                          ? "Start an AI check-in to track your stress and energy levels."
-                          : "Choose a check-in from the sidebar to view its details, or start a new one."}
+                        {isHistoryLoading
+                          ? "Fetching your previous check-ins."
+                          : historyItems.length === 0
+                            ? "Start an AI check-in to track your stress and energy levels."
+                            : "Choose a check-in from the sidebar to view its details, or start a new one."}
                       </EmptyDescription>
                     </EmptyHeader>
                     <Button

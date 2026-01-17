@@ -24,13 +24,6 @@ const InlineDataSchema = z.object({
 })
 
 /**
- * Text part schema
- */
-const TextPartSchema = z.object({
-  text: z.string(),
-})
-
-/**
  * Part schema (can be inline data or text)
  */
 const PartSchema = z.union([

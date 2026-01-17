@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch } from "react"
 import { int16ToBase64 } from "@/lib/audio/pcm-converter"
+import { logDebug } from "@/lib/logger"
 import type { CheckInAction } from "./use-check-in-messages"
 
 export interface UseCheckInAudioOptions {
@@ -104,7 +105,7 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
       // Check if we should abort after getUserMedia resolved
       const abortReason = getAbortReason()
       if (abortReason) {
-        console.log(`[useCheckIn] Initialization aborted after getUserMedia (${abortReason})`)
+        logDebug("useCheckIn", `Initialization aborted after getUserMedia (${abortReason})`)
         stream.getTracks().forEach((track) => track.stop())
         // Use different error for superseded vs cleanup
         throw new Error(abortReason === "superseded" ? "SESSION_SUPERSEDED" : "INITIALIZATION_ABORTED")
@@ -124,7 +125,7 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
       // Check abort conditions after resume
       const abortAfterResume = getAbortReason()
       if (abortAfterResume) {
-        console.log(`[useCheckIn] Initialization aborted after audioContext.resume (${abortAfterResume})`)
+        logDebug("useCheckIn", `Initialization aborted after audioContext.resume (${abortAfterResume})`)
         stream.getTracks().forEach((track) => track.stop())
         mediaStreamRef.current = null
         // Check if context isn't already closed (e.g., by concurrent cleanup)
@@ -138,7 +139,7 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
 
       // Also check if context was closed (e.g., by cleanup running during resume)
       if ((audioContext.state as string) === "closed") {
-        console.log("[useCheckIn] AudioContext closed during initialization, aborting")
+        logDebug("useCheckIn", "AudioContext closed during initialization; aborting")
         stream.getTracks().forEach((track) => track.stop())
         mediaStreamRef.current = null
         throw new Error("INITIALIZATION_ABORTED")
@@ -150,7 +151,7 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
       // Check abort conditions after module loading
       const abortAfterModule = getAbortReason()
       if (abortAfterModule) {
-        console.log(`[useCheckIn] Initialization aborted after addModule (${abortAfterModule})`)
+        logDebug("useCheckIn", `Initialization aborted after addModule (${abortAfterModule})`)
         stream.getTracks().forEach((track) => track.stop())
         mediaStreamRef.current = null
         // Check if context isn't already closed (e.g., by concurrent cleanup)
@@ -164,7 +165,7 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
 
       // Also check if context was closed during module loading
       if ((audioContext.state as string) === "closed") {
-        console.log("[useCheckIn] AudioContext closed during module loading, aborting")
+        logDebug("useCheckIn", "AudioContext closed during module loading; aborting")
         stream.getTracks().forEach((track) => track.stop())
         mediaStreamRef.current = null
         throw new Error("INITIALIZATION_ABORTED")

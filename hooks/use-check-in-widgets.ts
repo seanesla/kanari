@@ -139,11 +139,6 @@ function extractDateISOFromText(text: string, timeZone: string): string | null {
   return null
 }
 
-function isCheckInScheduleRequest(text: string): boolean {
-  const input = text.toLowerCase()
-  return input.includes("schedule") && (input.includes("check-in") || input.includes("check in"))
-}
-
 function isScheduleRequest(text: string): boolean {
   return /\bschedule\b/i.test(text)
 }
@@ -308,7 +303,7 @@ function parseZonedDateTimeInstant(date: string, time: string, timeZone: string)
 
 export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckInWidgetsResult {
   const { data, dispatch, sendText, addUserTextMessage } = options
-  const { isConnected: isCalendarConnected, scheduleEvent, deleteEvent } = useLocalCalendar()
+  const { scheduleEvent } = useLocalCalendar()
   const { timeZone } = useTimeZone()
 
   const widgetsRef = useRef(data.widgets)

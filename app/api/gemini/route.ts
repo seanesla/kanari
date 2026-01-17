@@ -519,7 +519,7 @@ export async function GET(request: NextRequest) {
       endpoint: "/api/gemini",
       methods: ["POST"],
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { status: "error", error: "Health check failed" },
       { status: 500 }

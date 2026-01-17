@@ -12,7 +12,7 @@ export function DecorativeGrid({
   opacity = "standard",
   className,
 }: DecorativeGridProps) {
-  const { accentColor } = useSceneMode()
+  const { accentColor: _accentColor } = useSceneMode()
 
   // Brightened for visibility; mask-fade-vertical still handles top/bottom fading
   const gridOpacity = opacity === "light" ? "#ffffff0a" : "#ffffff14"

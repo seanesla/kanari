@@ -6,7 +6,7 @@
  */
 
 import { describe, test, expect } from "vitest"
-import { checkInReducer, initialState, type CheckInAction } from "../use-check-in"
+import { checkInReducer, initialState } from "../use-check-in"
 import type { CheckInMessage, CheckInSession, MismatchResult, AudioFeatures, VoiceMetrics } from "@/lib/types"
 
 // Helper to create mock messages

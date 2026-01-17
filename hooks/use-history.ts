@@ -1,42 +1,38 @@
 /**
  * useHistory Hook
  *
- * Builds a unified, chronologically-sorted timeline of AI chat sessions.
+ * Builds a unified timeline of AI chat sessions.
  */
 
 import { useMemo } from "react"
-import { useCheckInSessions } from "./use-storage"
+import { useCheckInSessionsContext } from "@/lib/check-in-sessions-context"
 import type { HistoryItem, AIChatHistoryItem } from "@/lib/types"
 
 /**
  * Hook to fetch AI chat sessions into a unified, sorted history timeline.
+ * Uses preloaded sessions from context for instant loading.
  *
  * @param limit - Optional: max number of items to return. If not provided, returns all items.
- * @returns Array of HistoryItems sorted chronologically (newest first)
+ * @returns History timeline + loading state
  */
-export function useHistory(limit?: number): HistoryItem[] {
-  // Fetch sessions from IndexedDB
-  const sessions = useCheckInSessions(limit)
+export function useHistory(limit?: number): { items: HistoryItem[]; isLoading: boolean } {
+  const { sessions, isLoading } = useCheckInSessionsContext()
 
-  // Merge, sort, and return the unified timeline
-  const historyItems = useMemo(() => {
-    // Convert sessions to HistoryItems
-    const sessionItems: AIChatHistoryItem[] = sessions.map((session) => ({
+  const limitedSessions = useMemo(() => {
+    if (!limit) return sessions
+    return sessions.slice(0, limit)
+  }, [limit, sessions])
+
+  const items = useMemo(() => {
+    // Provider query already returns newest-first.
+    const sessionItems: AIChatHistoryItem[] = limitedSessions.map((session) => ({
       id: session.id,
       type: "ai_chat",
-      timestamp: session.startedAt, // Sort key
+      timestamp: session.startedAt,
       session,
     }))
+    return sessionItems
+  }, [limitedSessions])
 
-    // Sort chronologically (newest first)
-    const combined = [...sessionItems]
-    combined.sort((a, b) => {
-      // Convert ISO strings to timestamps and sort descending (newest first)
-      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-    })
-
-    return combined
-  }, [sessions])
-
-  return historyItems
+  return { items, isLoading }
 }

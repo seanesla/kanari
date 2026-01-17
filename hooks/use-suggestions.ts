@@ -127,10 +127,9 @@ export function computeHistoricalContext(sessions: CheckInSession[]): Historical
 export function useSuggestions(): UseSuggestionsResult {
   // Get ALL suggestions globally (not recording-bound)
   const allSuggestions = useAllSuggestions()
-  const { memoryContext, getActiveSuggestions, buildMemoryContext } = useSuggestionMemory()
+  const { getActiveSuggestions, buildMemoryContext } = useSuggestionMemory()
   const {
     addSuggestion,
-    addSuggestions,
     updateSuggestion: updateSuggestionInDB,
     deleteSuggestion,
   } = useSuggestionActions()

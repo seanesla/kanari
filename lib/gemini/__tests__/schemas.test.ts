@@ -17,9 +17,6 @@ import {
   StressGaugeArgsSchema,
   QuickActionsArgsSchema,
   JournalPromptArgsSchema,
-  type ServerMessage,
-  type SessionInfo,
-  type AudioInputRequest,
 } from "../schemas"
 
 describe("ServerMessageSchema", () => {

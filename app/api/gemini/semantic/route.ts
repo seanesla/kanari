@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
       methods: ["POST"],
       description: "Analyze audio for emotion detection and semantic content",
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { status: "error", error: "Health check failed" },
       { status: 500 }

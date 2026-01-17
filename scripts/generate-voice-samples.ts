@@ -153,6 +153,10 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+function writeLine(message: string): void {
+  process.stdout.write(`${message}\n`)
+}
+
 /**
  * Generate with retry logic for rate limiting
  */
@@ -170,7 +174,7 @@ async function generateWithRetry(
       if (isRateLimit && attempt < maxRetries) {
         // Wait longer on rate limit (60 seconds + random jitter)
         const waitTime = 60000 + Math.random() * 5000
-        console.log(` ⏳ Rate limited, waiting ${Math.round(waitTime / 1000)}s...`)
+        writeLine(` ⏳ Rate limited, waiting ${Math.round(waitTime / 1000)}s...`)
         await sleep(waitTime)
       } else {
         throw error
@@ -190,9 +194,9 @@ async function main() {
 
   const outputDir = join(process.cwd(), "public", "voices")
 
-  console.log(`Generating ${VOICES.length} voice samples...`)
-  console.log(`Output directory: ${outputDir}`)
-  console.log(`Rate limit: 10 requests/minute (waiting 7s between requests)\n`)
+  writeLine(`Generating ${VOICES.length} voice samples...`)
+  writeLine(`Output directory: ${outputDir}`)
+  writeLine(`Rate limit: 10 requests/minute (waiting 7s between requests)\n`)
 
   let successCount = 0
   let skipCount = 0
@@ -204,7 +208,7 @@ async function main() {
 
     // Skip if already exists
     if (existsSync(filepath)) {
-      console.log(`⏭️  Skipping ${voice} (already exists)`)
+      writeLine(`⏭️  Skipping ${voice} (already exists)`)
       skipCount++
       continue
     }
@@ -213,22 +217,22 @@ async function main() {
       process.stdout.write(`🎤 Generating ${voice}...`)
       const wavData = await generateWithRetry(voice, apiKey)
       writeFileSync(filepath, wavData)
-      console.log(` ✅ ${filename} (${(wavData.length / 1024).toFixed(1)} KB)`)
+      writeLine(` ✅ ${filename} (${(wavData.length / 1024).toFixed(1)} KB)`)
       successCount++
 
       // Rate limiting: wait 7 seconds between requests (10 req/min limit)
       await sleep(7000)
     } catch (error) {
-      console.log(` ❌ Failed`)
+      writeLine(` ❌ Failed`)
       console.error(`   Error: ${error instanceof Error ? error.message : error}`)
       errorCount++
     }
   }
 
-  console.log("\n--- Summary ---")
-  console.log(`✅ Generated: ${successCount}`)
-  console.log(`⏭️  Skipped: ${skipCount}`)
-  console.log(`❌ Failed: ${errorCount}`)
+  writeLine("\n--- Summary ---")
+  writeLine(`✅ Generated: ${successCount}`)
+  writeLine(`⏭️  Skipped: ${skipCount}`)
+  writeLine(`❌ Failed: ${errorCount}`)
 
   if (errorCount > 0) {
     process.exit(1)

@@ -84,7 +84,7 @@ function SceneContent({
  */
 export function Onboarding3DScene({
   currentStep,
-  totalSteps,
+  totalSteps: _totalSteps,
   children,
 }: Onboarding3DSceneProps) {
   // Bridge React context INTO the Canvas (required for Drei Html portals)

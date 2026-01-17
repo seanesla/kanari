@@ -8,7 +8,7 @@
  * - Ensuring audio data integrity during conversion
  */
 
-import { describe, it, expect, vi, beforeAll } from "vitest"
+import { describe, it, expect, vi } from "vitest"
 
 // Unmock the module so we test the real implementation
 // The global vitest.setup.ts mocks this module, but we want to test the actual code

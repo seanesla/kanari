@@ -66,7 +66,7 @@ export function SuggestionDetailDialog({
   onDismiss,
   onComplete,
   onCompleteWithFeedback,
-  isCalendarConnected = false,
+  isCalendarConnected: _isCalendarConnected = false,
   voicePatterns,
   history,
   burnoutPrediction,

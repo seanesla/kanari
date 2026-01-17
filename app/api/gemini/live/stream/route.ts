@@ -13,6 +13,7 @@
 
 import { NextRequest } from "next/server"
 import { sessionManager } from "@/lib/gemini/session-manager"
+import { logDebug } from "@/lib/logger"
 // Note: We don't import LiveServerMessage because we use our own ExtendedServerMessage
 // type that's more flexible with the actual API response format
 
@@ -254,7 +255,7 @@ export async function GET(request: NextRequest) {
 
       // Handle client disconnect via abort signal
       request.signal.addEventListener("abort", () => {
-        console.log(`[SSE] Client disconnected for session ${sessionId}`)
+        logDebug("SSE", "Client disconnected", { sessionId })
         cleanup()
         if (!isClosed) {
           isClosed = true
@@ -274,7 +275,7 @@ export async function GET(request: NextRequest) {
     },
     cancel() {
       isClosed = true
-      console.log(`[SSE] Stream cancelled for session ${sessionId}`)
+      logDebug("SSE", "Stream cancelled", { sessionId })
     },
   })
 

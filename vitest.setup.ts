@@ -88,7 +88,7 @@ vi.mock("@/lib/ml/inference", () => ({
 // Note: To test the actual implementation, use vi.unmock("@/lib/audio/pcm-converter")
 // in your test file (see lib/audio/__tests__/pcm-converter.test.ts for example)
 vi.mock("@/lib/audio/pcm-converter", () => ({
-  int16ToBase64: vi.fn((data) => "base64audiodata=="),
+  int16ToBase64: vi.fn((_data) => "base64audiodata=="),
   base64ToInt16: vi.fn(() => new Int16Array(1024)),
   float32ToInt16: vi.fn(() => new Int16Array(1024)),
   int16ToFloat32: vi.fn(() => new Float32Array(1024)),

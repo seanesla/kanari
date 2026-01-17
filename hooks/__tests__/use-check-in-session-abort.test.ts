@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook } from "@testing-library/react"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 
 type Deferred<T> = {
   promise: Promise<T>
@@ -164,4 +164,3 @@ describe("useCheckIn startSession abort behavior", () => {
     expect(playbackCleanup).not.toHaveBeenCalled()
   })
 })
-

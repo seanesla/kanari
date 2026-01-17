@@ -19,7 +19,6 @@ import { useCheckInAudio } from "./use-check-in-audio"
 import {
   checkInReducer,
   initialState,
-  type CheckInAction,
   type CheckInData,
   type CheckInMessagesCallbacks,
   useCheckInMessages,
