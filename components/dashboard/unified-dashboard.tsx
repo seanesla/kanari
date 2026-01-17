@@ -23,7 +23,6 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { CollapsibleSection } from "./collapsible-section"
 import { MetricsHeaderBar } from "./metrics-header-bar"
-import { InsightsPanel } from "./insights-panel"
 import { JournalEntriesPanel } from "./journal-entries-panel"
 import { KanbanBoard } from "./suggestions/kanban-board"
 import { FullCalendarView } from "./calendar"
@@ -72,12 +71,8 @@ export function UnifiedDashboard() {
     completeSuggestion,
   } = useSuggestions()
 
-  // Check-in sessions for insights
+  // Check-in sessions (for dialog context + calendar)
   const checkInSessions = useCheckInSessions(30)
-
-  const latestSynthesisSession = useMemo(() => {
-    return checkInSessions.find((s) => !!s.synthesis) ?? null
-  }, [checkInSessions])
 
   // Daily achievements (generated on app open)
   const {
@@ -378,13 +373,9 @@ export function UnifiedDashboard() {
                 {calendarContent}
               </div>
 
-              {/* Collapsible Insights */}
-              <CollapsibleSection title="Latest Insights" defaultOpen={false}>
-                <InsightsPanel session={latestSynthesisSession} className="border-0 bg-transparent" />
-              </CollapsibleSection>
 
               {/* Collapsible Journal */}
-              <CollapsibleSection title="Journal Entries" defaultOpen={false}>
+              <CollapsibleSection title="Journal Entries" defaultOpen={true}>
                 <JournalEntriesPanel className="border-0 bg-transparent" />
               </CollapsibleSection>
 
@@ -420,13 +411,9 @@ export function UnifiedDashboard() {
                 {calendarContent}
               </div>
 
-              {/* Collapsible Insights */}
-              <CollapsibleSection title="Latest Insights" defaultOpen={false}>
-                <InsightsPanel session={latestSynthesisSession} className="border-0 bg-transparent" />
-              </CollapsibleSection>
 
               {/* Collapsible Journal */}
-              <CollapsibleSection title="Journal Entries" defaultOpen={false}>
+              <CollapsibleSection title="Journal Entries" defaultOpen={true}>
                 <JournalEntriesPanel className="border-0 bg-transparent" />
               </CollapsibleSection>
 

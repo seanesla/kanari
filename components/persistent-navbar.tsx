@@ -18,7 +18,7 @@ const landingLinks = [
   { id: "how-it-works", href: "#how-it-works", label: "How It Works" },
 ]
 
-// "Overview" not "Dashboard" for /dashboard route (see CLAUDE.md)
+// "Overview" not "Dashboard" for /dashboard route (see AGENTS.md)
 const dashboardLinks = [
   { id: "overview", href: "/dashboard", label: "Overview", exact: true },
   { id: "history", href: "/dashboard/history", label: "Check-ins", exact: false },

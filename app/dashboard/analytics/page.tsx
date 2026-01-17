@@ -15,6 +15,7 @@ import { predictBurnoutRisk } from "@/lib/ml/forecasting"
 import { useDashboardStats, useTrendData, useRecordings, useCheckInSessions } from "@/hooks/use-storage"
 import { StressFatigueChart } from "@/components/dashboard/stress-fatigue-chart"
 import { EngagementTracker } from "@/components/dashboard/engagement-tracker"
+import { InsightsPanel } from "@/components/dashboard/insights-panel"
 import { AnalyticsInsightsSection } from "@/components/dashboard/analytics-insights"
 import { useSceneMode } from "@/lib/scene-context"
 import { useTimeZone } from "@/lib/timezone-context"
@@ -60,6 +61,10 @@ export default function AnalyticsPage() {
   const storedTrendData = useTrendData(7)
   const allRecordings = useRecordings()
   const allSessions = useCheckInSessions()
+
+  const latestSynthesisSession = useMemo(() => {
+    return allSessions.find((s) => !!s.synthesis) ?? null
+  }, [allSessions])
 
   const stats = {
     totalRecordings: dashboardStats.totalRecordings,
@@ -216,10 +221,20 @@ export default function AnalyticsPage() {
           <EngagementTracker />
         </div>
 
+        {/* Insights */}
+        <div
+          className={cn(
+            "mb-8 transition-all duration-1000 delay-250",
+            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+          )}
+        >
+          <InsightsPanel session={latestSynthesisSession} />
+        </div>
+
         {/* AI Insights Section */}
         <div
           className={cn(
-            "mb-16 transition-all duration-1000 delay-250",
+            "mb-16 transition-all duration-1000 delay-275",
             visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
           )}
         >
