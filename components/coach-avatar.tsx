@@ -48,8 +48,13 @@ export function CoachAvatar({
 }: CoachAvatarProps) {
   const [hasError, setHasError] = useState(false)
 
-  // Show fallback if no base64 or if image failed to load
-  const showFallback = !base64 || hasError
+  const looksCorruptedSvg =
+    typeof base64 === "string" &&
+    base64.startsWith("data:image/svg+xml") &&
+    base64.includes("%23%23")
+
+  // Show fallback if no base64, if image failed to load, or if the SVG looks corrupted
+  const showFallback = !base64 || hasError || looksCorruptedSvg
 
   if (showFallback) {
     return (

@@ -11,14 +11,11 @@
 
 import { createAvatar, type Style } from "@dicebear/core"
 import {
-  botttsNeutral,
   loreleiNeutral,
   notionistsNeutral,
-  openPeeps,
-  pixelArtNeutral,
 } from "@dicebear/collection"
 
-import { generateDarkVariant } from "@/lib/color-utils"
+import { DEFAULT_ACCENT, generateDarkVariant } from "@/lib/color-utils"
 import { logDebug, logError } from "@/lib/logger"
 import type { GeminiVoice } from "@/lib/types"
 
@@ -26,19 +23,39 @@ import { getGeminiApiKey } from "./api-utils"
 import { parseGeminiJson } from "./json"
 import { getVoiceStyle } from "./voices"
 
+function normalizeDiceBearHex(color: string) {
+  return (color || "").trim().replace(/^#/, "")
+}
+
+function isDiceBearHex(color: string) {
+  return /^[a-f0-9]{6}$/i.test(color)
+}
+
+function normalizeAccentForDiceBear(accentColor: string) {
+  const raw = (accentColor || DEFAULT_ACCENT).trim()
+  const withHash = raw.startsWith("#") ? raw : `#${raw}`
+  const noHash = normalizeDiceBearHex(withHash)
+
+  if (!isDiceBearHex(noHash)) {
+    return {
+      accentWithHash: DEFAULT_ACCENT,
+      accentNoHash: normalizeDiceBearHex(DEFAULT_ACCENT),
+    }
+  }
+
+  return {
+    accentWithHash: `#${noHash.toLowerCase()}`,
+    accentNoHash: noHash.toLowerCase(),
+  }
+}
+
 type AvatarStyleId =
-  | "botttsNeutral"
   | "loreleiNeutral"
   | "notionistsNeutral"
-  | "openPeeps"
-  | "pixelArtNeutral"
 
 const AVATAR_STYLES: Record<AvatarStyleId, { style: Style<Record<string, unknown>>; label: string }> = {
   notionistsNeutral: { style: notionistsNeutral, label: "Notionist" },
   loreleiNeutral: { style: loreleiNeutral, label: "Lorelei" },
-  openPeeps: { style: openPeeps, label: "Peeps" },
-  botttsNeutral: { style: botttsNeutral, label: "Bot" },
-  pixelArtNeutral: { style: pixelArtNeutral, label: "Pixel" },
 }
 
 function isAvatarStyleId(value: string): value is AvatarStyleId {
@@ -68,8 +85,7 @@ function pickFallbackStyleId(voiceName: GeminiVoice): AvatarStyleId {
   if (["Knowledgeable", "Informative", "Clear", "Even", "Mature"].includes(voiceStyle)) {
     return "notionistsNeutral"
   }
-  if (["Bright", "Upbeat", "Excitable", "Lively"].includes(voiceStyle)) return "botttsNeutral"
-  if (["Casual", "Easy-going", "Friendly", "Youthful"].includes(voiceStyle)) return "openPeeps"
+
 
   return "notionistsNeutral"
 }
@@ -189,31 +205,58 @@ export async function generateCoachAvatar(
   accentColor: string,
   voiceName: GeminiVoice
 ): Promise<AvatarGenerationResult> {
+  const { accentWithHash, accentNoHash } = normalizeAccentForDiceBear(accentColor)
+
   try {
     const fallbackStyleId = pickFallbackStyleId(voiceName)
     const fallbackSeed = sanitizeSeed(`kanari-coach-${voiceName}-${makeNonce(10)}`)
 
     const apiKey = await getGeminiApiKey()
     const recipe = apiKey
-      ? await suggestRecipeWithGemini({ apiKey, accentColor, voiceName })
+      ? await suggestRecipeWithGemini({ apiKey, accentColor: accentWithHash, voiceName })
       : null
 
     const styleId = recipe?.styleId ?? fallbackStyleId
     const seed = recipe?.seed ?? fallbackSeed
 
-    const backgroundA = generateDarkVariant(accentColor)
-    const backgroundB = accentColor
+    const backgroundA = normalizeDiceBearHex(generateDarkVariant(accentWithHash))
+    const backgroundB = accentNoHash
+
+    // Extra guardrail: if something about the accent color is off, fall back to
+    // our default palette rather than generating a broken SVG.
+    const safeBackgroundA = isDiceBearHex(backgroundA)
+      ? backgroundA
+      : normalizeDiceBearHex(generateDarkVariant(DEFAULT_ACCENT))
+
+    const safeBackgroundB = isDiceBearHex(backgroundB)
+      ? backgroundB
+      : normalizeDiceBearHex(DEFAULT_ACCENT)
 
     logDebug("avatar-client", `Generating DiceBear avatar style=${styleId} seed=${seed}`)
 
     const avatar = createAvatar(AVATAR_STYLES[styleId].style, {
       seed,
       size: 512,
+      // IMPORTANT:
+      // backgroundColor items must NOT include a leading '#'.
+      // If they do, DiceBear ends up emitting '##rrggbb' in the SVG which can
+      // make the whole avatar look broken / black.
       backgroundType: ["gradientLinear"],
-      backgroundColor: [backgroundA, backgroundB],
+      backgroundColor: [safeBackgroundA, safeBackgroundB],
     })
 
     const dataUri = avatar.toDataUri()
+
+    // Extremely defensive: in case anything ever slips through, avoid saving a
+    // corrupted SVG that renders as a black circle.
+    if (dataUri.includes("%23%23")) {
+      return {
+        imageBase64: null,
+        mimeType: null,
+        textResponse: null,
+        error: "Avatar generation produced an invalid SVG. Please try again.",
+      }
+    }
 
     return {
       imageBase64: dataUri,
