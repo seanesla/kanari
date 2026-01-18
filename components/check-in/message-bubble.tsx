@@ -10,7 +10,8 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { User, Sparkles, AlertTriangle, ChevronDown, ChevronRight, VolumeX } from "@/lib/icons"
+import { User, AlertTriangle, ChevronDown, ChevronRight, VolumeX } from "@/lib/icons"
+import { CoachAvatar } from "@/components/coach-avatar"
 import { useTimeZone } from "@/lib/timezone-context"
 import type { CheckInMessage } from "@/lib/types"
 
@@ -19,6 +20,8 @@ interface MessageBubbleProps {
   showMismatchIndicator?: boolean
   skipAnimation?: boolean
   className?: string
+  /** Base64-encoded coach avatar image (no data: prefix) */
+  coachAvatar?: string | null
 }
 
 export function MessageBubble({
@@ -26,6 +29,7 @@ export function MessageBubble({
   showMismatchIndicator = true,
   skipAnimation = false,
   className,
+  coachAvatar,
 }: MessageBubbleProps) {
   const { timeZone } = useTimeZone()
   const isUser = message.role === "user"
@@ -57,18 +61,13 @@ export function MessageBubble({
       transition={{ duration: 0.2, ease: "easeOut" }}
     >
       {/* Avatar */}
-      <div
-        className={cn(
-          "flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center",
-          isUser ? "bg-accent/10" : "bg-primary/10"
-        )}
-      >
-        {isUser ? (
+      {isUser ? (
+        <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-accent/10">
           <User className="w-4 h-4 text-accent" />
-        ) : (
-          <Sparkles className="w-4 h-4 text-primary" />
-        )}
-      </div>
+        </div>
+      ) : (
+        <CoachAvatar base64={coachAvatar} size="sm" />
+      )}
 
       {/* Message content */}
       <div className="flex flex-col gap-1">
@@ -161,7 +160,14 @@ export function MessageBubble({
 /**
  * Typing indicator shown while assistant is generating response
  */
-export function TypingIndicator({ className }: { className?: string }) {
+export function TypingIndicator({
+  className,
+  coachAvatar,
+}: {
+  className?: string
+  /** Base64-encoded coach avatar image (no data: prefix) */
+  coachAvatar?: string | null
+}) {
   return (
     <motion.div
       className={cn("flex gap-3 max-w-[85%] mr-auto", className)}
@@ -170,9 +176,7 @@ export function TypingIndicator({ className }: { className?: string }) {
       exit={{ opacity: 0, y: -10 }}
     >
       {/* Avatar */}
-      <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-primary/10">
-        <Sparkles className="w-4 h-4 text-primary" />
-      </div>
+      <CoachAvatar base64={coachAvatar} size="sm" />
 
       {/* Typing dots */}
       <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">

@@ -17,6 +17,7 @@ import { RecordingWaveform } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
 import { formatDate, formatDurationWithUnits } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
+import { useCoachAvatar } from "@/hooks/use-coach-avatar"
 import type { CheckInSession } from "@/lib/types"
 
 interface AIChatDetailViewProps {
@@ -36,6 +37,7 @@ export function AIChatDetailView({
   onDelete,
 }: AIChatDetailViewProps) {
   const { timeZone } = useTimeZone()
+  const { avatarBase64: coachAvatar } = useCoachAvatar()
   // Calculate session duration
   const duration = session.duration ? formatDurationWithUnits(session.duration) : null
 
@@ -188,7 +190,7 @@ export function AIChatDetailView({
             </div>
           ) : (
             session.messages.map((message) => (
-              <MessageBubble key={message.id} message={message} skipAnimation />
+              <MessageBubble key={message.id} message={message} skipAnimation coachAvatar={coachAvatar} />
             ))
           )}
         </div>

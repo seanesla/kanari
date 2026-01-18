@@ -27,6 +27,8 @@ interface ConversationViewProps {
   /** Current assistant thinking/chain-of-thought (streamed during processing) */
   currentAssistantThinking?: string
   className?: string
+  /** Base64-encoded coach avatar image (no data: prefix) */
+  coachAvatar?: string | null
 }
 
 export function ConversationView({
@@ -35,6 +37,7 @@ export function ConversationView({
   currentUserTranscript = "",
   currentAssistantThinking = "",
   className,
+  coachAvatar,
 }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -106,6 +109,7 @@ export function ConversationView({
             key={message.id}
             message={message}
             skipAnimation={message.isStreaming}
+            coachAvatar={coachAvatar}
           />
         ))}
       </AnimatePresence>

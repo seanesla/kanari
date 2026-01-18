@@ -20,6 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { X, ChevronLeft, MessageSquare, Calendar } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useCheckInSessions } from "@/hooks/use-storage"
+import { useCoachAvatar } from "@/hooks/use-coach-avatar"
 import { formatTime, getDateLabel } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import { MessageBubble } from "./message-bubble"
@@ -34,6 +35,7 @@ interface ConversationHistoryProps {
 
 export function ConversationHistory({ onClose, className }: ConversationHistoryProps) {
   const { timeZone } = useTimeZone()
+  const { avatarBase64: coachAvatar } = useCoachAvatar()
   // Fetch the last 20 check-in sessions
   const sessions = useCheckInSessions(20)
 
@@ -136,6 +138,7 @@ export function ConversationHistory({ onClose, className }: ConversationHistoryP
                     key={message.id}
                     message={message}
                     skipAnimation
+                    coachAvatar={coachAvatar}
                   />
                 ))}
               </div>

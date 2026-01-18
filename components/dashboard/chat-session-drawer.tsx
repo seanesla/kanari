@@ -20,6 +20,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { X, Calendar, MessageSquare, AlertCircle } from "@/lib/icons"
 import { formatDate } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
+import { useCoachAvatar } from "@/hooks/use-coach-avatar"
 import { MessageBubble } from "@/components/check-in/message-bubble"
 import type { CheckInSession } from "@/lib/types"
 
@@ -32,6 +33,7 @@ interface ChatSessionDrawerProps {
 
 export function ChatSessionDrawer({ session, onClose }: ChatSessionDrawerProps) {
   const { timeZone } = useTimeZone()
+  const { avatarBase64: coachAvatar } = useCoachAvatar()
   // Handle escape key to close modal
   useEffect(() => {
     if (!session) return
@@ -116,7 +118,7 @@ export function ChatSessionDrawer({ session, onClose }: ChatSessionDrawerProps) 
               ) : (
                 // Message list - use existing MessageBubble component
                 session.messages.map((message) => (
-                  <MessageBubble key={message.id} message={message} skipAnimation />
+                  <MessageBubble key={message.id} message={message} skipAnimation coachAvatar={coachAvatar} />
                 ))
               )}
             </div>

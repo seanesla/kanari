@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
 import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
+import { useCoachAvatar } from "@/hooks/use-coach-avatar"
 import { synthesizeCheckInSession } from "@/lib/gemini/synthesis-client"
 import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
 import { SynthesisScreen } from "@/components/check-in/synthesis-screen"
@@ -75,6 +76,7 @@ export function CheckInDialog({
 }: CheckInDialogProps) {
   const router = useRouter()
   const { addCheckInSession, updateCheckInSession } = useCheckInSessionActions()
+  const { avatarBase64: coachAvatar } = useCoachAvatar()
 
   const canStart = useStrictModeReady(open)
 
@@ -409,6 +411,7 @@ export function CheckInDialog({
                   messages={checkIn.messages}
                   currentUserTranscript={checkIn.currentUserTranscript}
                   currentAssistantThinking={checkIn.currentAssistantThinking}
+                  coachAvatar={coachAvatar}
                 />
 
                 {/* Gemini-triggered widgets */}

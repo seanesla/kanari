@@ -4,6 +4,7 @@
  * Complete Step
  *
  * Final step showing success and redirecting to dashboard.
+ * Shows the coach avatar and personalized greeting with user's name.
  *
  * NOTE: This component is rendered inside a Three.js Html portal, which
  * creates a separate React tree without access to Next.js App Router context.
@@ -15,14 +16,17 @@ import { useState } from "react"
 import { motion } from "framer-motion"
 import { CheckCircle2, Sparkles, ArrowRight } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
+import { CoachAvatar } from "@/components/coach-avatar"
 import { useSceneMode } from "@/lib/scene-context"
+import type { UserSettings } from "@/lib/types"
 
 interface StepCompleteProps {
   onComplete: () => Promise<void>
   onNavigate: () => void
+  settings?: Partial<UserSettings>
 }
 
-export function StepComplete({ onComplete, onNavigate }: StepCompleteProps) {
+export function StepComplete({ onComplete, onNavigate, settings }: StepCompleteProps) {
   const { accentColor } = useSceneMode()
   const [isCompleting, setIsCompleting] = useState(false)
 
@@ -32,22 +36,42 @@ export function StepComplete({ onComplete, onNavigate }: StepCompleteProps) {
     onNavigate()
   }
 
+  // Personalization from settings
+  const userName = settings?.userName
+  const coachVoice = settings?.coachAvatarVoice || settings?.selectedGeminiVoice
+  const avatarBase64 = settings?.coachAvatarBase64
+
+  // Build personalized greeting
+  const greeting = userName
+    ? `Hi ${userName}, I'm ready to help you stay ahead of burnout!`
+    : "I'm ready to help you stay ahead of burnout!"
+
+  const voiceIntro = coachVoice
+    ? `Your coach speaks with the ${coachVoice} voice.`
+    : null
+
   return (
     <div className="space-y-8 text-center">
-      {/* Success animation */}
+      {/* Coach Avatar or Success animation */}
       <motion.div
-        className="inline-flex items-center justify-center h-24 w-24 rounded-full bg-green-500/10 mx-auto"
+        className="flex flex-col items-center gap-4"
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
       >
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 20 }}
-        >
-          <CheckCircle2 className="h-12 w-12 text-green-500" />
-        </motion.div>
+        {avatarBase64 ? (
+          <CoachAvatar base64={avatarBase64} size="xl" className="h-24 w-24" />
+        ) : (
+          <div className="inline-flex items-center justify-center h-24 w-24 rounded-full bg-green-500/10">
+            <motion.div
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 20 }}
+            >
+              <CheckCircle2 className="h-12 w-12 text-green-500" />
+            </motion.div>
+          </div>
+        )}
       </motion.div>
 
       {/* Header */}
@@ -58,7 +82,11 @@ export function StepComplete({ onComplete, onNavigate }: StepCompleteProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          You&apos;re All Set!
+          {userName ? (
+            <>Welcome, <span className="text-accent">{userName}</span>!</>
+          ) : (
+            "You're All Set!"
+          )}
         </motion.h1>
         <motion.p
           className="text-lg text-muted-foreground max-w-md mx-auto"
@@ -66,9 +94,18 @@ export function StepComplete({ onComplete, onNavigate }: StepCompleteProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          Kanari is ready to help you stay ahead of burnout. Start with your first
-          voice check-in to establish your baseline.
+          {greeting}
         </motion.p>
+        {voiceIntro && (
+          <motion.p
+            className="text-sm text-muted-foreground/70"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.45 }}
+          >
+            {voiceIntro}
+          </motion.p>
+        )}
       </div>
 
       {/* Tips */}

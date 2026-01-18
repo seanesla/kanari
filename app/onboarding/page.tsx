@@ -6,6 +6,14 @@
  * Multi-step onboarding flow with 3D floating panels.
  * Camera flies between panels as user navigates steps.
  * All panels exist in 3D space - you physically travel to each one.
+ *
+ * New flow (navbar steps: intro -> api -> coach -> prefs -> done):
+ * - WelcomeSplash: Overlay animation before steps begin
+ * - StepIntro: Name + accent color selection
+ * - StepApiKey: Gemini API key input
+ * - StepMeetCoach: Voice selection + avatar generation
+ * - StepPreferences: Accountability mode + reminders
+ * - StepComplete: Success screen with avatar greeting
  */
 
 import { useState, useEffect, useCallback } from "react"
@@ -15,9 +23,10 @@ import { useNavbar, TOTAL_ONBOARDING_STEPS } from "@/lib/navbar-context"
 import { Onboarding3DScene } from "@/components/onboarding/onboarding-3d-scene"
 import { Onboarding2DScene } from "@/components/onboarding/onboarding-2d-scene"
 import {
-  StepWelcome,
-  StepTheme,
+  WelcomeSplash,
+  StepIntro,
   StepApiKey,
+  StepMeetCoach,
   StepPreferences,
   StepComplete,
 } from "@/components/onboarding"
@@ -33,7 +42,10 @@ export default function OnboardingPage() {
   const prefer2D = usePrefer2DOnboarding()
   const { setMode } = useSceneMode()
 
+  // Pending settings accumulated during onboarding
   const [pendingSettings, setPendingSettings] = useState<Partial<UserSettings>>({})
+  // Welcome splash state
+  const [showSplash, setShowSplash] = useState(true)
 
   // Redirect to dashboard if already onboarded
   useEffect(() => {
@@ -57,21 +69,43 @@ export default function OnboardingPage() {
     setOnboardingStep(Math.max(onboardingStep - 1, 0))
   }, [onboardingStep, setOnboardingStep])
 
+  // Handler for StepIntro (name + accent color)
+  const handleIntroSubmit = useCallback(async (introSettings: Partial<UserSettings>) => {
+    setPendingSettings((prev) => ({ ...prev, ...introSettings }))
+    await updateSettings(introSettings)
+    goNext()
+  }, [updateSettings, goNext])
+
+  // Handler for StepApiKey
   const handleApiKeySubmit = useCallback(async (apiKey: string) => {
     setPendingSettings((prev) => ({ ...prev, geminiApiKey: apiKey }))
     await updateSettings({ geminiApiKey: apiKey })
-    setOnboardingStep(Math.min(onboardingStep + 1, TOTAL_ONBOARDING_STEPS - 1))
-  }, [updateSettings, onboardingStep, setOnboardingStep])
+    goNext()
+  }, [updateSettings, goNext])
 
+  // Handler for StepMeetCoach (voice + avatar)
+  const handleCoachSubmit = useCallback(async (coachSettings: Partial<UserSettings>) => {
+    setPendingSettings((prev) => ({ ...prev, ...coachSettings }))
+    await updateSettings(coachSettings)
+    goNext()
+  }, [updateSettings, goNext])
+
+  // Handler for StepPreferences
   const handlePreferencesSubmit = useCallback(async (prefs: Partial<UserSettings>) => {
     setPendingSettings((prev) => ({ ...prev, ...prefs }))
     await updateSettings(prefs)
-    setOnboardingStep(Math.min(onboardingStep + 1, TOTAL_ONBOARDING_STEPS - 1))
-  }, [updateSettings, onboardingStep, setOnboardingStep])
+    goNext()
+  }, [updateSettings, goNext])
 
+  // Handler for final completion
   const handleComplete = useCallback(async () => {
     await completeOnboarding()
   }, [completeOnboarding])
+
+  // Handle splash completion
+  const handleSplashComplete = useCallback(() => {
+    setShowSplash(false)
+  }, [])
 
   // Show loading state
   if (isLoading) {
@@ -87,41 +121,66 @@ export default function OnboardingPage() {
     return null
   }
 
+  // Merged settings for passing to components
+  const mergedSettings = { ...settings, ...pendingSettings }
+
+  // New flow steps: intro -> api -> coach -> prefs -> done
   const steps = [
-    <StepWelcome key="welcome" onNext={goNext} />,
-    <StepTheme key="theme" onNext={goNext} onBack={goBack} />,
+    // Step 0: Intro (name + accent color)
+    <StepIntro
+      key="intro"
+      initialSettings={mergedSettings}
+      onNext={handleIntroSubmit}
+    />,
+    // Step 1: API Key
     <StepApiKey
       key="apiKey"
-      initialApiKey={settings?.geminiApiKey || pendingSettings.geminiApiKey || ""}
+      initialApiKey={mergedSettings?.geminiApiKey || ""}
       onNext={handleApiKeySubmit}
       onBack={goBack}
-      isActive={onboardingStep === 2}
+      isActive={onboardingStep === 1}
     />,
+    // Step 2: Meet Your Coach (voice + avatar)
+    <StepMeetCoach
+      key="coach"
+      initialSettings={mergedSettings}
+      onNext={handleCoachSubmit}
+      onBack={goBack}
+    />,
+    // Step 3: Preferences (accountability + reminders)
     <StepPreferences
       key="preferences"
-      initialSettings={{ ...settings, ...pendingSettings }}
+      initialSettings={mergedSettings}
       onNext={handlePreferencesSubmit}
       onBack={goBack}
     />,
+    // Step 4: Complete
     <StepComplete
       key="complete"
       onComplete={handleComplete}
       onNavigate={() => router.push("/dashboard")}
+      settings={mergedSettings}
     />,
   ]
 
   // All step components are passed as children - they'll be placed in 3D panels
   if (prefer2D) {
     return (
-      <Onboarding2DScene currentStep={onboardingStep}>
-        {steps}
-      </Onboarding2DScene>
+      <>
+        {showSplash && <WelcomeSplash onComplete={handleSplashComplete} />}
+        <Onboarding2DScene currentStep={onboardingStep}>
+          {steps}
+        </Onboarding2DScene>
+      </>
     )
   }
 
   return (
-    <Onboarding3DScene currentStep={onboardingStep} totalSteps={TOTAL_ONBOARDING_STEPS}>
-      {steps}
-    </Onboarding3DScene>
+    <>
+      {showSplash && <WelcomeSplash onComplete={handleSplashComplete} />}
+      <Onboarding3DScene currentStep={onboardingStep} totalSteps={TOTAL_ONBOARDING_STEPS}>
+        {steps}
+      </Onboarding3DScene>
+    </>
   )
 }
