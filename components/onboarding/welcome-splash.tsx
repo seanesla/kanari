@@ -68,15 +68,7 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
               </motion.h1>
             </motion.div>
 
-            {/* Tagline */}
-            <motion.p
-              className="text-lg md:text-xl text-muted-foreground max-w-md mx-auto"
-              initial={{ y: 10, opacity: 0, filter: "blur(6px)" }}
-              animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-              transition={{ delay: 0.32, duration: 0.7, ease: "easeOut" }}
-            >
-              Your voice knows when you&apos;re heading toward burnout.
-            </motion.p>
+
           </div>
         </motion.div>
       )}

@@ -1,6 +1,5 @@
 "use client"
 
-import { Html } from "@react-three/drei"
 import { useFrame } from "@react-three/fiber"
 import { useEffect, useMemo, useRef } from "react"
 import * as THREE from "three"
@@ -8,6 +7,9 @@ import * as THREE from "three"
 const GATHER_DURATION_S = 2.0
 const HOLD_DURATION_S = 1.6
 const SCATTER_DURATION_S = 1.1
+
+const DRIFT_IN_DURATION_S = 0.5
+const DRIFT_STRENGTH = 0.065
 const TOTAL_DURATION_MS = Math.round((GATHER_DURATION_S + HOLD_DURATION_S + SCATTER_DURATION_S) * 1000)
 
 function clamp01(value: number) {
@@ -204,24 +206,28 @@ export function WelcomeParticles({
       let y = sy
       let z = sz
 
+      const gatherT = clamp01(elapsed / GATHER_DURATION_S)
+      const gatherP = easeOutCubic(gatherT)
+      const driftInT = clamp01((elapsed - GATHER_DURATION_S) / DRIFT_IN_DURATION_S)
+
       if (elapsed < GATHER_DURATION_S) {
-        const t = clamp01(elapsed / GATHER_DURATION_S)
-        const p = easeOutCubic(t)
+        x = THREE.MathUtils.lerp(sx, tx, gatherP)
+        y = THREE.MathUtils.lerp(sy, ty, gatherP)
+        z = THREE.MathUtils.lerp(sz, tz, gatherP)
 
-        x = THREE.MathUtils.lerp(sx, tx, p)
-        y = THREE.MathUtils.lerp(sy, ty, p)
-        z = THREE.MathUtils.lerp(sz, tz, p)
-
-        const swirl = (1 - p) * 0.9
-        x += Math.sin(p * 7 + seed) * swirl
-        y += Math.cos(p * 7 + seed * 0.9) * swirl
-        z += Math.sin(p * 6 + seed * 1.3) * swirl * 0.14
+        // Swirl is strongest early, then eases out cleanly so the word can settle
+        // without a hard "state change".
+        const swirl = Math.pow(1 - gatherP, 2) * 0.9
+        x += Math.sin(gatherP * 7 + seed) * swirl
+        y += Math.cos(gatherP * 7 + seed * 0.9) * swirl
+        z += Math.sin(gatherP * 6 + seed * 1.3) * swirl * 0.14
       } else if (elapsed < GATHER_DURATION_S + HOLD_DURATION_S) {
-        const holdT = elapsed - GATHER_DURATION_S
-        const drift = 0.065
-        x = tx + Math.sin(holdT * 1.3 + seed) * drift
-        y = ty + Math.cos(holdT * 1.1 + seed * 1.1) * drift
-        z = tz + Math.sin(holdT * 0.9 + seed * 0.7) * drift * 0.25
+        const drift = DRIFT_STRENGTH * easeInCubic(driftInT)
+
+        // Use global elapsed time so motion stays continuous across phases.
+        x = tx + Math.sin(elapsed * 1.3 + seed) * drift
+        y = ty + Math.cos(elapsed * 1.1 + seed * 1.1) * drift
+        z = tz + Math.sin(elapsed * 0.9 + seed * 0.7) * drift * 0.25
       } else {
         const scatterT = elapsed - (GATHER_DURATION_S + HOLD_DURATION_S)
         const t = clamp01(scatterT / SCATTER_DURATION_S)
@@ -234,7 +240,25 @@ export function WelcomeParticles({
         x = THREE.MathUtils.lerp(tx, ex, p)
         y = THREE.MathUtils.lerp(ty, ey, p)
         z = THREE.MathUtils.lerp(tz, ez, p)
+
+        // Keep a bit of drift at the start of scatter, then fade it out. This avoids
+        // a visible snap when switching from "hold" to "exit".
+        const driftOut = 1 - easeOutCubic(p)
+        const drift = DRIFT_STRENGTH * easeInCubic(driftInT) * driftOut
+
+        x += Math.sin(elapsed * 1.3 + seed) * drift
+        y += Math.cos(elapsed * 1.1 + seed * 1.1) * drift
+        z += Math.sin(elapsed * 0.9 + seed * 0.7) * drift * 0.25
       }
+
+      // Micro-motion that bridges "gather" -> "hold" smoothly.
+      // - Fades in as the word forms.
+      // - Fades out as the hold drift ramps in.
+      const microBase = 0.012 + (0.5 + 0.5 * Math.sin(seed * 0.13)) * 0.018
+      const micro = microBase * gatherP * (1 - driftInT)
+      x += Math.sin(elapsed * 3.3 + seed * 0.3) * micro
+      y += Math.cos(elapsed * 3.1 + seed * 0.4) * micro
+      z += Math.sin(elapsed * 2.7 + seed * 0.2) * micro
 
       positions[i * 3] = x
       positions[i * 3 + 1] = y
@@ -274,16 +298,7 @@ export function WelcomeParticles({
         />
       </points>
 
-      <Html center position={[0, -1.85, 0]} pointerEvents="none">
-        <div className="pointer-events-none select-none text-center">
-          <div className="font-serif tracking-tight text-6xl md:text-7xl text-outline text-foreground/25">
-            {text}
-          </div>
-          <div className="mt-3 text-sm text-muted-foreground/80 max-w-[22rem] mx-auto">
-            Your voice knows when you&apos;re heading toward burnout.
-          </div>
-        </div>
-      </Html>
+
     </group>
   )
 }

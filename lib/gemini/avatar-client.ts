@@ -16,7 +16,6 @@ import {
   notionistsNeutral,
   openPeeps,
   pixelArtNeutral,
-  shapes,
 } from "@dicebear/collection"
 
 import { generateDarkVariant } from "@/lib/color-utils"
@@ -33,15 +32,13 @@ type AvatarStyleId =
   | "notionistsNeutral"
   | "openPeeps"
   | "pixelArtNeutral"
-  | "shapes"
 
 const AVATAR_STYLES: Record<AvatarStyleId, { style: Style<Record<string, unknown>>; label: string }> = {
-  botttsNeutral: { style: botttsNeutral, label: "Bot" },
   notionistsNeutral: { style: notionistsNeutral, label: "Notionist" },
   loreleiNeutral: { style: loreleiNeutral, label: "Lorelei" },
   openPeeps: { style: openPeeps, label: "Peeps" },
+  botttsNeutral: { style: botttsNeutral, label: "Bot" },
   pixelArtNeutral: { style: pixelArtNeutral, label: "Pixel" },
-  shapes: { style: shapes, label: "Shapes" },
 }
 
 function isAvatarStyleId(value: string): value is AvatarStyleId {
@@ -74,7 +71,7 @@ function pickFallbackStyleId(voiceName: GeminiVoice): AvatarStyleId {
   if (["Bright", "Upbeat", "Excitable", "Lively"].includes(voiceStyle)) return "botttsNeutral"
   if (["Casual", "Easy-going", "Friendly", "Youthful"].includes(voiceStyle)) return "openPeeps"
 
-  return "shapes"
+  return "notionistsNeutral"
 }
 
 type AvatarRecipe = {
