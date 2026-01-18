@@ -101,6 +101,9 @@ export const metadata: Metadata = {
   title: "kanari",
   description: "Your metrics are lying to you.",
   generator: "v0.app",
+  icons: {
+    icon: "/icon.svg",
+  },
 }
 
 export const viewport: Viewport = {

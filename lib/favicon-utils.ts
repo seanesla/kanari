@@ -76,8 +76,15 @@ function svgToDataUrl(svg: string): string {
 
 function setFaviconHref(href: string) {
   // Remove any existing dynamic favicon.
-  const oldLink = document.querySelector<HTMLLinkElement>(DYNAMIC_FAVICON_SELECTOR)
-  if (oldLink) oldLink.remove()
+  const oldDynamic = document.querySelector<HTMLLinkElement>(DYNAMIC_FAVICON_SELECTOR)
+  if (oldDynamic) oldDynamic.remove()
+
+  // Also remove any static icon links (e.g., from Next.js metadata) so the
+  // dynamic one takes precedence. Browsers use the first <link rel="icon">.
+  const staticIcons = document.querySelectorAll<HTMLLinkElement>(
+    'link[rel="icon"]:not([data-dynamic-favicon="true"])'
+  )
+  staticIcons.forEach((el) => el.remove())
 
   const link = document.createElement("link")
   link.rel = "icon"
