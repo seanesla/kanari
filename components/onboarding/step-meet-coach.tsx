@@ -4,8 +4,8 @@
  * Meet Your Coach Step
  *
  * Voice selection and avatar generation step in onboarding.
- * Users pick their AI coach's voice and generate a personalized avatar.
- * Maximum 3 avatar regenerations allowed during onboarding.
+ * Users pick their coach's voice and generate a lightweight 2D avatar.
+ * Uses a prebuilt icon style library (fast + reliable, no paid image models).
  */
 
 import { useState, useCallback } from "react"
@@ -138,7 +138,7 @@ export function StepMeetCoach({ initialSettings, onNext, onBack }: StepMeetCoach
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          Choose a voice for your AI wellness coach, then generate a unique avatar.
+          Choose a voice for your coach, then generate a lightweight icon-style avatar.
         </motion.p>
       </div>
 
@@ -181,9 +181,10 @@ export function StepMeetCoach({ initialSettings, onNext, onBack }: StepMeetCoach
                 {hasAvatar ? "Your Coach Avatar" : "Generate Avatar"}
               </h3>
               <p className="text-xs text-muted-foreground">
-                {hasAvatar
-                  ? `${MAX_REGENERATIONS - regenerationCount} regeneration${MAX_REGENERATIONS - regenerationCount !== 1 ? "s" : ""} remaining`
-                  : "Create a unique avatar based on your chosen voice and color"}
+                 {hasAvatar
+                   ? `${MAX_REGENERATIONS - regenerationCount} regeneration${MAX_REGENERATIONS - regenerationCount !== 1 ? "s" : ""} remaining`
+                   : "Picks a style from a prebuilt library based on your voice + color"}
+
               </p>
             </div>
 

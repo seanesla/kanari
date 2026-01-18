@@ -459,8 +459,8 @@ export interface UserSettings {
   // AI Voice (Gemini TTS)
   selectedGeminiVoice?: GeminiVoice // User's chosen AI assistant voice
 
-  // Coach avatar (AI-generated)
-  coachAvatarBase64?: string // base64 PNG (no data: prefix)
+  // Coach avatar
+  coachAvatarBase64?: string // SVG data URI (preferred) or legacy base64 PNG (no data: prefix)
   coachAvatarVoice?: GeminiVoice // Voice used when avatar was generated
 
   // Appearance

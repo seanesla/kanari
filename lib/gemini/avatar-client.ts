@@ -1,100 +1,178 @@
 /**
- * Avatar Generation Client
+ * Coach Avatar Generator
  *
- * Uses Gemini's multimodal image generation to create personalized coach avatars.
- * The avatar is abstract/minimalist (no human faces), uses the user's accent color,
- * and reflects the selected voice's personality.
+ * Generates lightweight 2D avatars from a prebuilt style library (DiceBear).
  *
- * Source: Context7 - /googleapis/js-genai docs - "Generate Multimodal Image Outputs"
+ * This avoids paid image-generation models and keeps avatar creation fast and
+ * reliable. If the user has a Gemini API key configured, we optionally use
+ * Gemini 3 Flash (text-only) to pick a "recipe" (style + seed) so the avatar
+ * feels tailored without generating pixels from scratch.
  */
 
-import { GoogleGenAI } from "@google/genai"
+import { createAvatar, type Style } from "@dicebear/core"
+import {
+  botttsNeutral,
+  loreleiNeutral,
+  notionistsNeutral,
+  openPeeps,
+  pixelArtNeutral,
+  shapes,
+} from "@dicebear/collection"
+
+import { generateDarkVariant } from "@/lib/color-utils"
+import { logDebug, logError } from "@/lib/logger"
+import type { GeminiVoice } from "@/lib/types"
+
 import { getGeminiApiKey } from "./api-utils"
+import { parseGeminiJson } from "./json"
 import { getVoiceStyle } from "./voices"
 
-import type { GeminiVoice } from "@/lib/types"
-import { logDebug, logError } from "@/lib/logger"
+type AvatarStyleId =
+  | "botttsNeutral"
+  | "loreleiNeutral"
+  | "notionistsNeutral"
+  | "openPeeps"
+  | "pixelArtNeutral"
+  | "shapes"
 
-// Model that supports image generation.
-// Use Imagen for reliable image output (Gemini multimodal image outputs can be flaky across accounts).
-// Source: Context7 - /googleapis/js-genai docs - "models.generateImages"
-const IMAGE_GENERATION_MODEL = "imagen-3.0-generate-002"
-
-/**
- * Voice personality descriptions for avatar generation prompts.
- * Maps voice style descriptors to personality traits for the avatar.
- */
-const VOICE_PERSONALITY_MAP: Record<string, string> = {
-  // Energetic personalities
-  Bright: "vibrant, energetic, radiating positivity",
-  Upbeat: "cheerful, optimistic, encouraging",
-  Excitable: "dynamic, enthusiastic, spirited",
-  Lively: "animated, vivacious, full of life",
-  Forward: "bold, confident, progressive",
-
-  // Calm personalities
-  Soft: "gentle, soothing, peaceful",
-  Warm: "nurturing, comforting, welcoming",
-  Gentle: "tender, caring, delicate",
-  Breezy: "light, carefree, relaxed",
-  "Easy-going": "laid-back, approachable, casual",
-
-  // Professional personalities
-  Informative: "knowledgeable, clear, helpful",
-  Knowledgeable: "wise, insightful, expert",
-  Firm: "steady, reliable, grounded",
-  Clear: "precise, articulate, transparent",
-  Even: "balanced, composed, steady",
-  Mature: "experienced, thoughtful, seasoned",
-
-  // Friendly personalities
-  Friendly: "approachable, amiable, personable",
-  Youthful: "fresh, playful, spirited",
-  Casual: "relaxed, informal, conversational",
-
-  // Expressive personalities
-  Smooth: "flowing, elegant, refined",
-  Breathy: "intimate, ethereal, expressive",
-  Gravelly: "textured, deep, resonant",
+const AVATAR_STYLES: Record<AvatarStyleId, { style: Style<Record<string, unknown>>; label: string }> = {
+  botttsNeutral: { style: botttsNeutral, label: "Bot" },
+  notionistsNeutral: { style: notionistsNeutral, label: "Notionist" },
+  loreleiNeutral: { style: loreleiNeutral, label: "Lorelei" },
+  openPeeps: { style: openPeeps, label: "Peeps" },
+  pixelArtNeutral: { style: pixelArtNeutral, label: "Pixel" },
+  shapes: { style: shapes, label: "Shapes" },
 }
 
-/**
- * Get personality description for a voice.
- */
-function getVoicePersonality(voiceName: GeminiVoice): string {
-  const style = getVoiceStyle(voiceName)
-  return VOICE_PERSONALITY_MAP[style] || "balanced, supportive, understanding"
+function isAvatarStyleId(value: string): value is AvatarStyleId {
+  return value in AVATAR_STYLES
 }
 
-/**
- * Build the avatar generation prompt.
- * Creates an abstract/minimalist avatar that reflects the accent color and voice personality.
- */
-function buildAvatarPrompt(accentColor: string, voiceName: GeminiVoice): string {
-  const personality = getVoicePersonality(voiceName)
+function makeNonce(length = 8) {
+  // Deterministic crypto is unnecessary here; we want quick, varied regenerations.
+  return Math.random().toString(36).slice(2, 2 + length)
+}
+
+function sanitizeSeed(seed: string): string {
+  return seed
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .slice(0, 64)
+}
+
+function pickFallbackStyleId(voiceName: GeminiVoice): AvatarStyleId {
   const voiceStyle = getVoiceStyle(voiceName)
 
-  return `Create an abstract, minimalist avatar icon for a wellness coaching AI assistant.
+  // Keep this simple + stable. The user can always regenerate.
+  if (["Warm", "Gentle", "Soft", "Breathy"].includes(voiceStyle)) return "loreleiNeutral"
+  if (["Knowledgeable", "Informative", "Clear", "Even", "Mature"].includes(voiceStyle)) {
+    return "notionistsNeutral"
+  }
+  if (["Bright", "Upbeat", "Excitable", "Lively"].includes(voiceStyle)) return "botttsNeutral"
+  if (["Casual", "Easy-going", "Friendly", "Youthful"].includes(voiceStyle)) return "openPeeps"
 
-REQUIREMENTS:
-- Abstract geometric or organic shape - NO human faces, NO realistic features
-- Circular composition that works well as a profile avatar
-- Primary color: ${accentColor} (the user's chosen accent color)
-- The design should evoke: ${personality}
-- Style inspiration: ${voiceStyle.toLowerCase()} energy
-- Clean, modern aesthetic suitable for a wellness app
-- Soft gradients and subtle glow effects are encouraged
-- Should feel calming and supportive
-- High contrast for visibility on dark backgrounds
+  return "shapes"
+}
 
-OUTPUT:
-- Square image, 512x512 pixels
-- PNG format with transparency if possible
-- Single cohesive design element, not multiple objects`
+type AvatarRecipe = {
+  styleId: AvatarStyleId
+  seed: string
+}
+
+async function suggestRecipeWithGemini(options: {
+  apiKey: string
+  accentColor: string
+  voiceName: GeminiVoice
+}): Promise<AvatarRecipe | null> {
+  const { apiKey, accentColor, voiceName } = options
+  const voiceStyle = getVoiceStyle(voiceName)
+  const variationToken = makeNonce(6)
+
+  const allowedStyles = Object.entries(AVATAR_STYLES)
+    .map(([id, meta]) => `${id} (${meta.label})`)
+    .join(", ")
+
+  const prompt = [
+    "You are selecting a prebuilt avatar icon style + seed.",
+    "This is NOT image generation. You must choose from the provided styles.",
+    "",
+    `Context:`,
+    `- accentColor: ${accentColor}`,
+    `- coachVoiceName: ${voiceName}`,
+    `- coachVoiceStyle: ${voiceStyle}`,
+    `- variationToken: ${variationToken} (use this to make each pick unique)`,
+    "",
+    `Allowed styles: ${allowedStyles}`,
+    "",
+    "Return JSON only with this exact shape:",
+    '{"styleId":"<one allowed styleId>","seed":"<3-6 lowercase words separated by hyphens>"}',
+  ].join("\n")
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 4500)
+
+  try {
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: "user",
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.8,
+            maxOutputTokens: 120,
+            responseMimeType: "application/json",
+          },
+        }),
+        signal: controller.signal,
+      }
+    )
+
+    if (!response.ok) return null
+
+    const data = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: unknown }> } }>
+    }
+
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+    if (typeof text !== "string") return null
+
+    const parsed = parseGeminiJson<{ styleId?: unknown; seed?: unknown }>(text)
+
+    const styleId = typeof parsed?.styleId === "string" ? parsed.styleId.trim() : ""
+    const seed = typeof parsed?.seed === "string" ? sanitizeSeed(parsed.seed) : ""
+
+    if (!isAvatarStyleId(styleId)) return null
+    if (!seed) return null
+
+    return { styleId, seed }
+  } catch {
+    // If Gemini fails (network, quota, etc) we silently fall back.
+    return null
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 export interface AvatarGenerationResult {
-  /** Base64-encoded PNG image data (no data: prefix) */
+  /**
+   * Avatar image string.
+   *
+   * Historically this was a base64 PNG (no data: prefix).
+   * We now support returning a full SVG data URI (recommended).
+   */
   imageBase64: string | null
   /** MIME type of the generated image */
   mimeType: string | null
@@ -105,141 +183,75 @@ export interface AvatarGenerationResult {
 }
 
 /**
- * Generate a coach avatar using Gemini's image generation.
+ * Generate a coach avatar.
  *
- * @param accentColor - The user's chosen accent color (hex string like "#d4a574")
- * @param voiceName - The selected voice name (used for personality traits)
- * @returns Generated avatar data or error
+ * - Always works offline via DiceBear.
+ * - Optionally uses Gemini 3 Flash (free tier) to pick a style + seed.
  */
 export async function generateCoachAvatar(
   accentColor: string,
   voiceName: GeminiVoice
 ): Promise<AvatarGenerationResult> {
   try {
+    const fallbackStyleId = pickFallbackStyleId(voiceName)
+    const fallbackSeed = sanitizeSeed(`kanari-coach-${voiceName}-${makeNonce(10)}`)
+
     const apiKey = await getGeminiApiKey()
-    if (!apiKey) {
-      return {
-        imageBase64: null,
-        mimeType: null,
-        textResponse: null,
-        error: "No Gemini API key configured. Please add your API key in Settings.",
-      }
-    }
+    const recipe = apiKey
+      ? await suggestRecipeWithGemini({ apiKey, accentColor, voiceName })
+      : null
 
-    logDebug("avatar-client", `Generating avatar for voice=${voiceName}, color=${accentColor}`)
+    const styleId = recipe?.styleId ?? fallbackStyleId
+    const seed = recipe?.seed ?? fallbackSeed
 
-    const ai = new GoogleGenAI({ apiKey })
-    const prompt = buildAvatarPrompt(accentColor, voiceName)
+    const backgroundA = generateDarkVariant(accentColor)
+    const backgroundB = accentColor
 
-    logDebug("avatar-client", `Prompt: ${prompt}`)
+    logDebug("avatar-client", `Generating DiceBear avatar style=${styleId} seed=${seed}`)
 
-    // Prefer the dedicated image endpoint for reliability.
-    // Source: Context7 - /googleapis/js-genai docs - "models.generateImages"
-    const response = await ai.models.generateImages({
-      model: IMAGE_GENERATION_MODEL,
-      prompt,
-      config: {
-        numberOfImages: 1,
-        aspectRatio: "1:1",
-        outputMimeType: "image/png",
-        includeRaiReason: true,
-      },
+    const avatar = createAvatar(AVATAR_STYLES[styleId].style, {
+      seed,
+      size: 512,
+      backgroundType: ["gradientLinear"],
+      backgroundColor: [backgroundA, backgroundB],
     })
 
-    const generated = response.generatedImages?.[0]
-    const image = generated?.image
-    const imageBase64 = image?.imageBytes ?? null
-    const mimeType = image?.mimeType ?? "image/png"
-    const textResponse = generated?.enhancedPrompt ?? null
-
-    if (!imageBase64) {
-      const filteredReason = generated?.raiFilteredReason
-      return {
-        imageBase64: null,
-        mimeType: null,
-        textResponse,
-        error: filteredReason
-          ? `No image was returned: ${filteredReason}`
-          : "No image was generated. The request may have been filtered or the model returned no output.",
-      }
-    }
+    const dataUri = avatar.toDataUri()
 
     return {
-      imageBase64,
-      mimeType,
-      textResponse,
+      imageBase64: dataUri,
+      mimeType: "image/svg+xml",
+      textResponse: recipe ? `gemini: ${styleId}` : `fallback: ${styleId}`,
       error: null,
     }
   } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : "Unknown error during avatar generation"
     logError("avatar-client", "Avatar generation failed", err)
-
-    // Check for specific error types
-    if (errorMessage.includes("API key") || errorMessage.includes("401") || errorMessage.includes("403")) {
-      return {
-        imageBase64: null,
-        mimeType: null,
-        textResponse: null,
-        error: "Invalid API key or missing image-model access. Check your Gemini API key in Settings.",
-      }
-    }
-
-    if (
-      errorMessage.includes("quota") ||
-      errorMessage.includes("rate") ||
-      errorMessage.includes("429")
-    ) {
-      return {
-        imageBase64: null,
-        mimeType: null,
-        textResponse: null,
-        error: "API quota exceeded. Please try again later.",
-      }
-    }
-
-    if (errorMessage.includes("filtered") || errorMessage.includes("safety")) {
-      return {
-        imageBase64: null,
-        mimeType: null,
-        textResponse: null,
-        error: "The request was filtered by content safety. Please try regenerating.",
-      }
-    }
-
-    if (
-      errorMessage.toLowerCase().includes("fetch") ||
-      errorMessage.toLowerCase().includes("network") ||
-      errorMessage.toLowerCase().includes("connection") ||
-      errorMessage.includes("ECONN") ||
-      errorMessage.includes("ENOTFOUND") ||
-      errorMessage.includes("EAI_AGAIN")
-    ) {
-      return {
-        imageBase64: null,
-        mimeType: null,
-        textResponse: null,
-        error: "Avatar generation failed: connection error. Check your network and try again.",
-      }
-    }
+    const message = err instanceof Error ? err.message : "Unknown error during avatar generation"
 
     return {
       imageBase64: null,
       mimeType: null,
       textResponse: null,
-      error: `Avatar generation failed: ${errorMessage}`,
+      error: `Avatar generation failed: ${message}`,
     }
   }
 }
 
 /**
- * Validate that a base64 string is a valid image.
- * Does basic validation without fully decoding.
+ * Validate that an avatar string looks usable.
+ * Supports both:
+ * - SVG data URIs (preferred)
+ * - raw base64 strings (legacy PNG path)
  */
-export function isValidBase64Image(base64: string): boolean {
-  if (!base64 || typeof base64 !== "string") return false
-  // Check minimum length for a valid image
-  if (base64.length < 100) return false
-  // Check for valid base64 characters
+export function isValidBase64Image(value: string): boolean {
+  if (!value || typeof value !== "string") return false
+
+  if (value.startsWith("data:image/")) {
+    return value.length > 50
+  }
+
+  // Legacy base64 (no data: prefix)
+  if (value.length < 100) return false
   const base64Regex = /^[A-Za-z0-9+/=]+$/
-  return base64Regex.test(base64)
+  return base64Regex.test(value)
 }

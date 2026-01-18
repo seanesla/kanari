@@ -12,7 +12,11 @@ import { Sparkles } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 
 interface CoachAvatarProps {
-  /** Base64-encoded PNG image data (no data: prefix) */
+  /**
+   * Avatar image data.
+   * - Legacy: base64-encoded PNG (no data: prefix)
+   * - Current: full image data URI (e.g. data:image/svg+xml;utf8,...)
+   */
   base64?: string | null
   /** Size variant */
   size?: "sm" | "md" | "lg" | "xl"
@@ -63,9 +67,11 @@ export function CoachAvatar({
     )
   }
 
+  const src = base64.startsWith("data:image/") ? base64 : `data:image/png;base64,${base64}`
+
   return (
     <img
-      src={`data:image/png;base64,${base64}`}
+      src={src}
       alt={alt}
       className={cn(
         "rounded-full object-cover flex-shrink-0",
