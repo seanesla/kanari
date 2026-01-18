@@ -7,7 +7,10 @@ import { useOnboardingGuard } from "@/hooks/use-onboarding"
 import { useDailyReminder } from "@/hooks/use-daily-reminder"
 
 const DashboardAnimationContext = createContext({ shouldAnimate: false })
-export const useDashboardAnimation = () => useContext(DashboardAnimationContext)
+
+export function useDashboardAnimation() {
+  return useContext(DashboardAnimationContext)
+}
 
 function DashboardAnimationProvider({
   children,

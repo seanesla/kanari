@@ -14,7 +14,7 @@
 
 import { useState } from "react"
 import { motion } from "framer-motion"
-import { CheckCircle2, Sparkles, ArrowRight } from "@/lib/icons"
+import { Sparkles, ArrowRight } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { CoachAvatar } from "@/components/coach-avatar"
 import { useSceneMode } from "@/lib/scene-context"
@@ -52,26 +52,14 @@ export function StepComplete({ onComplete, onNavigate, settings }: StepCompleteP
 
   return (
     <div className="space-y-8 text-center">
-      {/* Coach Avatar or Success animation */}
+      {/* Coach Avatar */}
       <motion.div
         className="flex flex-col items-center gap-4"
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: "spring", stiffness: 300, damping: 20 }}
       >
-        {avatarBase64 ? (
-          <CoachAvatar base64={avatarBase64} size="xl" className="h-24 w-24" />
-        ) : (
-          <div className="inline-flex items-center justify-center h-24 w-24 rounded-full bg-green-500/10">
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2, type: "spring", stiffness: 300, damping: 20 }}
-            >
-              <CheckCircle2 className="h-12 w-12 text-green-500" />
-            </motion.div>
-          </div>
-        )}
+        <CoachAvatar base64={avatarBase64} size="xl" className="h-24 w-24" />
       </motion.div>
 
       {/* Header */}

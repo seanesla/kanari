@@ -14,7 +14,6 @@ import { Sparkles, RefreshCw, AlertCircle } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { VoiceList } from "@/components/voice-list"
 import { CoachAvatar, CoachAvatarLoading } from "@/components/coach-avatar"
-import { useSceneMode } from "@/lib/scene-context"
 import { generateCoachAvatar } from "@/lib/gemini/avatar-client"
 import type { GeminiVoice, UserSettings } from "@/lib/types"
 
@@ -27,8 +26,6 @@ interface StepMeetCoachProps {
 const MAX_REGENERATIONS = 3
 
 export function StepMeetCoach({ initialSettings, onNext, onBack }: StepMeetCoachProps) {
-  const { accentColor } = useSceneMode()
-
   // Voice selection state
   const [selectedVoice, setSelectedVoice] = useState<GeminiVoice | null>(
     initialSettings?.selectedGeminiVoice || initialSettings?.coachAvatarVoice || null
@@ -59,7 +56,7 @@ export function StepMeetCoach({ initialSettings, onNext, onBack }: StepMeetCoach
     setIsGenerating(true)
     setGenerationError(null)
 
-    const result = await generateCoachAvatar(accentColor, selectedVoice)
+    const result = await generateCoachAvatar(selectedVoice)
 
     if (result.error) {
       setGenerationError(result.error)
@@ -69,7 +66,7 @@ export function StepMeetCoach({ initialSettings, onNext, onBack }: StepMeetCoach
     }
 
     setIsGenerating(false)
-  }, [selectedVoice, accentColor])
+  }, [selectedVoice])
 
   /**
    * Handle voice selection change
@@ -183,8 +180,7 @@ export function StepMeetCoach({ initialSettings, onNext, onBack }: StepMeetCoach
               <p className="text-xs text-muted-foreground">
                  {hasAvatar
                    ? `${MAX_REGENERATIONS - regenerationCount} regeneration${MAX_REGENERATIONS - regenerationCount !== 1 ? "s" : ""} remaining`
-                   : "Picks a style from a prebuilt library based on your voice + color"}
-
+                   : "Picks a style from a prebuilt library based on your selected voice"}
               </p>
             </div>
 

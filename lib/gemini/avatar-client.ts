@@ -15,7 +15,6 @@ import {
   notionistsNeutral,
 } from "@dicebear/collection"
 
-import { DEFAULT_ACCENT, generateDarkVariant } from "@/lib/color-utils"
 import { logDebug, logError } from "@/lib/logger"
 import type { GeminiVoice } from "@/lib/types"
 
@@ -31,22 +30,30 @@ function isDiceBearHex(color: string) {
   return /^[a-f0-9]{6}$/i.test(color)
 }
 
-function normalizeAccentForDiceBear(accentColor: string) {
-  const raw = (accentColor || DEFAULT_ACCENT).trim()
-  const withHash = raw.startsWith("#") ? raw : `#${raw}`
-  const noHash = normalizeDiceBearHex(withHash)
+// Fixed palette pool for avatar backgrounds (6-digit hex, no #)
+const AVATAR_BACKGROUND_PALETTES: Array<[string, string]> = [
+  ["14161a", "2b2f36"], // Dark slate
+  ["1a1d23", "2d3748"], // Blue gray
+  ["2b1b14", "3a2d22"], // Warm brown
+  ["0f1c1a", "1f3430"], // Deep teal
+  ["1a1a1a", "333333"], // Neutral gray
+  ["1c1e26", "2a2e3f"], // Dark blue gray
+]
 
-  if (!isDiceBearHex(noHash)) {
-    return {
-      accentWithHash: DEFAULT_ACCENT,
-      accentNoHash: normalizeDiceBearHex(DEFAULT_ACCENT),
-    }
+// Simple djb2 hash for deterministic selection
+function hashString(str: string): number {
+  let hash = 5381
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) + hash) + str.charCodeAt(i) // hash * 33 + char
   }
+  return Math.abs(hash)
+}
 
-  return {
-    accentWithHash: `#${noHash.toLowerCase()}`,
-    accentNoHash: noHash.toLowerCase(),
-  }
+// Pick a palette deterministically from voice + seed
+function pickAvatarBackground(voiceName: GeminiVoice, seed: string): [string, string] {
+  const input = `${voiceName}|${seed}`
+  const index = hashString(input) % AVATAR_BACKGROUND_PALETTES.length
+  return AVATAR_BACKGROUND_PALETTES[index]
 }
 
 type AvatarStyleId =
@@ -97,10 +104,9 @@ type AvatarRecipe = {
 
 async function suggestRecipeWithGemini(options: {
   apiKey: string
-  accentColor: string
   voiceName: GeminiVoice
 }): Promise<AvatarRecipe | null> {
-  const { apiKey, accentColor, voiceName } = options
+  const { apiKey, voiceName } = options
   const voiceStyle = getVoiceStyle(voiceName)
   const variationToken = makeNonce(6)
 
@@ -113,7 +119,6 @@ async function suggestRecipeWithGemini(options: {
     "This is NOT image generation. You must choose from the provided styles.",
     "",
     `Context:`,
-    `- accentColor: ${accentColor}`,
     `- coachVoiceName: ${voiceName}`,
     `- coachVoiceStyle: ${voiceStyle}`,
     `- variationToken: ${variationToken} (use this to make each pick unique)`,
@@ -200,37 +205,25 @@ export interface AvatarGenerationResult {
  *
  * - Always works offline via DiceBear.
  * - Optionally uses Gemini 3 Flash (free tier) to pick a style + seed.
+ * - Background colors come from a fixed palette pool (not user accent color).
  */
 export async function generateCoachAvatar(
-  accentColor: string,
   voiceName: GeminiVoice
 ): Promise<AvatarGenerationResult> {
-  const { accentWithHash, accentNoHash } = normalizeAccentForDiceBear(accentColor)
-
   try {
     const fallbackStyleId = pickFallbackStyleId(voiceName)
     const fallbackSeed = sanitizeSeed(`kanari-coach-${voiceName}-${makeNonce(10)}`)
 
     const apiKey = await getGeminiApiKey()
     const recipe = apiKey
-      ? await suggestRecipeWithGemini({ apiKey, accentColor: accentWithHash, voiceName })
+      ? await suggestRecipeWithGemini({ apiKey, voiceName })
       : null
 
     const styleId = recipe?.styleId ?? fallbackStyleId
     const seed = recipe?.seed ?? fallbackSeed
 
-    const backgroundA = normalizeDiceBearHex(generateDarkVariant(accentWithHash))
-    const backgroundB = accentNoHash
-
-    // Extra guardrail: if something about the accent color is off, fall back to
-    // our default palette rather than generating a broken SVG.
-    const safeBackgroundA = isDiceBearHex(backgroundA)
-      ? backgroundA
-      : normalizeDiceBearHex(generateDarkVariant(DEFAULT_ACCENT))
-
-    const safeBackgroundB = isDiceBearHex(backgroundB)
-      ? backgroundB
-      : normalizeDiceBearHex(DEFAULT_ACCENT)
+    // Pick background from fixed palette pool (deterministic from voice + seed)
+    const [bgA, bgB] = pickAvatarBackground(voiceName, seed)
 
     logDebug("avatar-client", `Generating DiceBear avatar style=${styleId} seed=${seed}`)
 
@@ -241,8 +234,9 @@ export async function generateCoachAvatar(
       // backgroundColor items must NOT include a leading '#'.
       // If they do, DiceBear ends up emitting '##rrggbb' in the SVG which can
       // make the whole avatar look broken / black.
+      // Colors come from AVATAR_BACKGROUND_PALETTES which are already valid.
       backgroundType: ["gradientLinear"],
-      backgroundColor: [safeBackgroundA, safeBackgroundB],
+      backgroundColor: [bgA, bgB],
     })
 
     const dataUri = avatar.toDataUri()
