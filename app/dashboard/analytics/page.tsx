@@ -201,7 +201,7 @@ export default function AnalyticsPage() {
         <div
           className={cn(
             "mb-8 transition-all duration-1000 delay-100",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
           )}
         >
           <PageHeader
@@ -215,7 +215,7 @@ export default function AnalyticsPage() {
         <div
           className={cn(
             "mb-16 transition-all duration-1000 delay-200",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
           )}
         >
           <EngagementTracker />
@@ -225,7 +225,7 @@ export default function AnalyticsPage() {
         <div
           className={cn(
             "mb-8 transition-all duration-1000 delay-250",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
           )}
         >
           <InsightsPanel session={latestSynthesisSession} />
@@ -235,7 +235,7 @@ export default function AnalyticsPage() {
         <div
           className={cn(
             "mb-16 transition-all duration-1000 delay-275",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
           )}
         >
           <AnalyticsInsightsSection />
@@ -246,7 +246,7 @@ export default function AnalyticsPage() {
           <div
             className={cn(
               "relative mb-16 transition-all duration-1000 delay-300",
-              visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+              visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
             )}
           >
             <div
@@ -335,7 +335,7 @@ export default function AnalyticsPage() {
             <div
               className={cn(
                 "mb-8 transition-all duration-1000 delay-300",
-                chartsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+                chartsVisible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
               )}
             >
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Trends</p>
@@ -348,7 +348,7 @@ export default function AnalyticsPage() {
               <div
                 className={cn(
                   "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
-                  chartsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+                  chartsVisible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
                 )}
                 style={{ transitionDelay: chartsVisible ? "400ms" : "0ms" }}
                 onClick={() => stats.totalRecordings > 0 && setStressChartExpanded(!stressChartExpanded)}
@@ -369,7 +369,7 @@ export default function AnalyticsPage() {
               <div
                 className={cn(
                   "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
-                  chartsVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+                  chartsVisible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
                 )}
                 style={{ transitionDelay: chartsVisible ? "500ms" : "0ms" }}
                 onClick={() => stats.totalRecordings > 0 && setWellnessExpanded(!wellnessExpanded)}

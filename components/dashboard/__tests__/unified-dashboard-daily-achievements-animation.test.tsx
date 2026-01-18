@@ -159,7 +159,7 @@ describe("UnifiedDashboard daily achievements entry animation", () => {
     render(<UnifiedDashboard />)
 
     const block = screen.getByTestId("dashboard-daily-achievements")
-    expect(block).toHaveClass("opacity-0")
+    expect(block).toHaveClass("opacity-95")
 
     act(() => {
       vi.advanceTimersByTime(120)

@@ -283,7 +283,7 @@ export function UnifiedDashboard() {
         <div
           className={cn(
             "mb-6 transition-all duration-1000 delay-100",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
           )}
         >
           <MetricsHeaderBar />
@@ -296,7 +296,7 @@ export function UnifiedDashboard() {
           data-testid="dashboard-daily-achievements"
           className={cn(
             "mb-4 transition-all duration-1000 delay-150",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
           )}
         >
           <CollapsibleSection title="Today's Achievements" defaultOpen={!isMobile}>
@@ -357,7 +357,7 @@ export function UnifiedDashboard() {
         <div
           className={cn(
             "transition-all duration-1000 delay-200",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
           )}
         >
           {isMobile ? (
