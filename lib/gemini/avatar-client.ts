@@ -10,13 +10,15 @@
 
 import { GoogleGenAI } from "@google/genai"
 import { getGeminiApiKey } from "./api-utils"
-import { getVoiceStyle, type VoiceInfo } from "./voices"
+import { getVoiceStyle } from "./voices"
+
 import type { GeminiVoice } from "@/lib/types"
 import { logDebug, logError } from "@/lib/logger"
 
-// Model that supports image generation
-// Source: Context7 - /websites/ai_google_dev_gemini-api docs - "Gemini 2.5 Flash Image Model"
-const IMAGE_GENERATION_MODEL = "gemini-2.5-flash-image"
+// Model that supports image generation.
+// Use Imagen for reliable image output (Gemini multimodal image outputs can be flaky across accounts).
+// Source: Context7 - /googleapis/js-genai docs - "models.generateImages"
+const IMAGE_GENERATION_MODEL = "imagen-3.0-generate-002"
 
 /**
  * Voice personality descriptions for avatar generation prompts.
@@ -131,38 +133,34 @@ export async function generateCoachAvatar(
 
     logDebug("avatar-client", `Prompt: ${prompt}`)
 
-    // Use the interactions API for image generation
-    // Source: Context7 - /googleapis/js-genai docs - "Generate Multimodal Image Outputs"
-    const interaction = await ai.interactions.create({
+    // Prefer the dedicated image endpoint for reliability.
+    // Source: Context7 - /googleapis/js-genai docs - "models.generateImages"
+    const response = await ai.models.generateImages({
       model: IMAGE_GENERATION_MODEL,
-      input: prompt,
-      response_modalities: ["image"],
+      prompt,
+      config: {
+        numberOfImages: 1,
+        aspectRatio: "1:1",
+        outputMimeType: "image/png",
+        includeRaiReason: true,
+      },
     })
 
-    let imageBase64: string | null = null
-    let mimeType: string | null = null
-    let textResponse: string | null = null
-
-    // Process outputs
-    if (interaction.outputs) {
-      for (const output of interaction.outputs) {
-        if (output.type === "image" && output.data) {
-          imageBase64 = output.data
-          mimeType = output.mime_type || "image/png"
-          logDebug("avatar-client", `Generated image mimeType=${mimeType}, dataLength=${imageBase64.length}`)
-        } else if (output.type === "text" && output.text) {
-          textResponse = output.text
-          logDebug("avatar-client", `Text response: ${textResponse}`)
-        }
-      }
-    }
+    const generated = response.generatedImages?.[0]
+    const image = generated?.image
+    const imageBase64 = image?.imageBytes ?? null
+    const mimeType = image?.mimeType ?? "image/png"
+    const textResponse = generated?.enhancedPrompt ?? null
 
     if (!imageBase64) {
+      const filteredReason = generated?.raiFilteredReason
       return {
         imageBase64: null,
         mimeType: null,
         textResponse,
-        error: "No image was generated. The model may not support image output or the request was filtered.",
+        error: filteredReason
+          ? `No image was returned: ${filteredReason}`
+          : "No image was generated. The request may have been filtered or the model returned no output.",
       }
     }
 
@@ -177,16 +175,20 @@ export async function generateCoachAvatar(
     logError("avatar-client", "Avatar generation failed", err)
 
     // Check for specific error types
-    if (errorMessage.includes("API key")) {
+    if (errorMessage.includes("API key") || errorMessage.includes("401") || errorMessage.includes("403")) {
       return {
         imageBase64: null,
         mimeType: null,
         textResponse: null,
-        error: "Invalid API key. Please check your Gemini API key in Settings.",
+        error: "Invalid API key or missing image-model access. Check your Gemini API key in Settings.",
       }
     }
 
-    if (errorMessage.includes("quota") || errorMessage.includes("rate")) {
+    if (
+      errorMessage.includes("quota") ||
+      errorMessage.includes("rate") ||
+      errorMessage.includes("429")
+    ) {
       return {
         imageBase64: null,
         mimeType: null,
@@ -201,6 +203,22 @@ export async function generateCoachAvatar(
         mimeType: null,
         textResponse: null,
         error: "The request was filtered by content safety. Please try regenerating.",
+      }
+    }
+
+    if (
+      errorMessage.toLowerCase().includes("fetch") ||
+      errorMessage.toLowerCase().includes("network") ||
+      errorMessage.toLowerCase().includes("connection") ||
+      errorMessage.includes("ECONN") ||
+      errorMessage.includes("ENOTFOUND") ||
+      errorMessage.includes("EAI_AGAIN")
+    ) {
+      return {
+        imageBase64: null,
+        mimeType: null,
+        textResponse: null,
+        error: "Avatar generation failed: connection error. Check your network and try again.",
       }
     }
 

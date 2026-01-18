@@ -31,10 +31,10 @@ export function Onboarding2DScene({ currentStep, children }: Onboarding2DScenePr
         <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={currentStep}
-            initial={{ opacity: 0, y: 18 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -18 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
+            initial={{ opacity: 0, y: 18, filter: "blur(10px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            exit={{ opacity: 0, y: -18, filter: "blur(8px)" }}
+            transition={{ duration: 0.26, ease: "easeOut" }}
           >
             <div className="rounded-2xl border border-border/50 bg-card/25 backdrop-blur-md p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.06)]">
               {step}

@@ -44,8 +44,8 @@ export default function OnboardingPage() {
 
   // Pending settings accumulated during onboarding
   const [pendingSettings, setPendingSettings] = useState<Partial<UserSettings>>({})
-  // Welcome splash state
-  const [showSplash, setShowSplash] = useState(true)
+  // Welcome state (3D scene intro + 2D fallback overlay)
+  const [showWelcome, setShowWelcome] = useState(true)
 
   // Redirect to dashboard if already onboarded
   useEffect(() => {
@@ -102,9 +102,9 @@ export default function OnboardingPage() {
     await completeOnboarding()
   }, [completeOnboarding])
 
-  // Handle splash completion
-  const handleSplashComplete = useCallback(() => {
-    setShowSplash(false)
+  // Handle welcome completion
+  const handleWelcomeComplete = useCallback(() => {
+    setShowWelcome(false)
   }, [])
 
   // Show loading state
@@ -167,7 +167,7 @@ export default function OnboardingPage() {
   if (prefer2D) {
     return (
       <>
-        {showSplash && <WelcomeSplash onComplete={handleSplashComplete} />}
+        {showWelcome && <WelcomeSplash onComplete={handleWelcomeComplete} />}
         <Onboarding2DScene currentStep={onboardingStep}>
           {steps}
         </Onboarding2DScene>
@@ -177,8 +177,12 @@ export default function OnboardingPage() {
 
   return (
     <>
-      {showSplash && <WelcomeSplash onComplete={handleSplashComplete} />}
-      <Onboarding3DScene currentStep={onboardingStep} totalSteps={TOTAL_ONBOARDING_STEPS}>
+      <Onboarding3DScene
+        currentStep={onboardingStep}
+        totalSteps={TOTAL_ONBOARDING_STEPS}
+        showWelcome={showWelcome}
+        onWelcomeComplete={handleWelcomeComplete}
+      >
         {steps}
       </Onboarding3DScene>
     </>

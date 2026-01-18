@@ -19,19 +19,19 @@ interface WelcomeSplashProps {
 
 export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
   const [isVisible, setIsVisible] = useState(true)
-  const { accentColor } = useSceneMode()
+
+  // Keep this hook here so the splash reflects current theme state.
+  useSceneMode()
 
   useEffect(() => {
-    // Total duration: 1s fade in + 3s hold + 1s fade out = 5s
-    // We start fading out after 4s (1s in + 3s hold)
+    // Total duration: quick fade in + short hold + fade out.
     const fadeOutTimer = setTimeout(() => {
       setIsVisible(false)
-    }, 4000)
+    }, 1800)
 
-    // Complete callback after full animation (5s total)
     const completeTimer = setTimeout(() => {
       onComplete()
-    }, 5000)
+    }, 2200)
 
     return () => {
       clearTimeout(fadeOutTimer)
@@ -47,36 +47,22 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 1, ease: "easeInOut" }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
         >
           <div className="text-center space-y-6">
             {/* Animated logo/brand mark */}
             <motion.div
               className="relative mx-auto"
-              initial={{ scale: 0.8, opacity: 0 }}
+              initial={{ scale: 0.96, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}
+              transition={{ delay: 0.12, duration: 0.55, ease: "easeOut" }}
             >
-              {/* Glowing accent circle */}
-              <motion.div
-                className="absolute inset-0 rounded-full blur-3xl opacity-30"
-                style={{ backgroundColor: accentColor }}
-                animate={{
-                  scale: [1, 1.2, 1],
-                  opacity: [0.3, 0.5, 0.3],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              />
               {/* Brand text */}
               <motion.h1
                 className="text-6xl md:text-8xl font-serif tracking-tight"
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.5, duration: 0.8, ease: "easeOut" }}
+                initial={{ y: 12, opacity: 0, filter: "blur(10px)" }}
+                animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+                transition={{ delay: 0.18, duration: 0.75, ease: "easeOut" }}
               >
                 <span className="text-accent">k</span>anari
               </motion.h1>
@@ -85,9 +71,9 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
             {/* Tagline */}
             <motion.p
               className="text-lg md:text-xl text-muted-foreground max-w-md mx-auto"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.8, duration: 0.8, ease: "easeOut" }}
+              initial={{ y: 10, opacity: 0, filter: "blur(6px)" }}
+              animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
+              transition={{ delay: 0.32, duration: 0.7, ease: "easeOut" }}
             >
               Your voice knows when you&apos;re heading toward burnout.
             </motion.p>

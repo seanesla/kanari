@@ -14,8 +14,9 @@ import React from "react"
 import { Canvas } from "@react-three/fiber"
 import { useContextBridge } from "@react-three/drei"
 import { Starfield, AccentNebula, FloatingGeometry } from "./floating-orbs"
-import { FlyingCamera, PANEL_POSITIONS } from "./flying-camera"
+import { CAMERA_DISTANCE, FlyingCamera, PANEL_POSITIONS } from "./flying-camera"
 import { FloatingPanel } from "./floating-panel"
+import { WelcomeParticles } from "./welcome-particles"
 import { SCENE_COLORS } from "@/lib/constants"
 import { SceneContext, useSceneMode } from "@/lib/scene-context"
 
@@ -23,6 +24,8 @@ interface Onboarding3DSceneProps {
   currentStep: number
   totalSteps: number
   children: React.ReactNode
+  showWelcome?: boolean
+  onWelcomeComplete?: () => void
 }
 
 /**
@@ -31,9 +34,13 @@ interface Onboarding3DSceneProps {
 function SceneContent({
   currentStep,
   children,
+  showWelcome,
+  onWelcomeComplete,
 }: {
   currentStep: number
   children: React.ReactNode
+  showWelcome?: boolean
+  onWelcomeComplete?: () => void
 }) {
   const { accentColor } = useSceneMode()
   const stepComponents = React.Children.toArray(children)
@@ -62,18 +69,25 @@ function SceneContent({
       <FloatingGeometry accentColor={accentColor} />
 
       {/* Camera controller - flies between panel positions */}
-      <FlyingCamera currentStep={currentStep} />
+      <FlyingCamera currentStep={currentStep} showWelcome={Boolean(showWelcome)} />
 
+      {showWelcome && (
+        <WelcomeParticles
+          accentColor={accentColor}
+          onComplete={onWelcomeComplete}
+        />
+      )}
       {/* All panels exist in 3D space */}
-      {PANEL_POSITIONS.map((position, idx) => (
-        <FloatingPanel
-          key={idx}
-          position={position}
-          isActive={idx === currentStep}
-        >
-          {stepComponents[idx] || null}
-        </FloatingPanel>
-      ))}
+      {!showWelcome &&
+        PANEL_POSITIONS.map((position, idx) => (
+          <FloatingPanel
+            key={idx}
+            position={position}
+            isActive={idx === currentStep}
+          >
+            {stepComponents[idx] || null}
+          </FloatingPanel>
+        ))}
     </>
   )
 }
@@ -86,18 +100,20 @@ export function Onboarding3DScene({
   currentStep,
   totalSteps: _totalSteps,
   children,
+  showWelcome,
+  onWelcomeComplete,
 }: Onboarding3DSceneProps) {
   // Bridge React context INTO the Canvas (required for Drei Html portals)
   // Source: Context7 - /pmndrs/drei docs - "useContextBridge"
   const ContextBridge = useContextBridge(SceneContext)
 
-  // Initial camera position (in front of first panel)
+  // Initial camera position.
+  // If we're showing the welcome, we start a bit further back so the particle
+  // formation has room to breathe.
   const initialPosition = PANEL_POSITIONS[0] || [0, 0, 0]
-  const cameraPosition: [number, number, number] = [
-    initialPosition[0],
-    initialPosition[1],
-    initialPosition[2] + 5,
-  ]
+  const cameraPosition: [number, number, number] = showWelcome
+    ? [0, 0, 5 + CAMERA_DISTANCE]
+    : [initialPosition[0], initialPosition[1], initialPosition[2] + CAMERA_DISTANCE]
 
   return (
     <div className="fixed inset-0 z-0">
@@ -113,7 +129,11 @@ export function Onboarding3DScene({
       >
         <color attach="background" args={[SCENE_COLORS.background]} />
         <ContextBridge>
-          <SceneContent currentStep={currentStep}>
+          <SceneContent
+            currentStep={currentStep}
+            showWelcome={showWelcome}
+            onWelcomeComplete={onWelcomeComplete}
+          >
             {children}
           </SceneContent>
         </ContextBridge>
