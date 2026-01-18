@@ -83,7 +83,7 @@ export default function AchievementsPage() {
         <div
           className={cn(
             "mb-8 transition-all duration-1000 delay-100",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
+            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
           )}
         >
           <PageHeader
@@ -97,7 +97,7 @@ export default function AchievementsPage() {
         <div
           className={cn(
             "transition-all duration-1000 delay-200",
-            visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
           )}
         >
           <div className="grid gap-4 lg:grid-cols-3">
