@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useState } from "react"
+import { createContext, useContext, useEffect, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
 import { useSceneMode } from "@/lib/scene-context"
 import { useOnboardingGuard } from "@/hooks/use-onboarding"
@@ -15,21 +15,34 @@ export function useDashboardAnimation() {
 function DashboardAnimationProvider({
   children,
   isReady,
+  pathname,
 }: {
   children: React.ReactNode
   isReady: boolean
+  pathname: string
 }) {
-  const [shouldAnimate, setShouldAnimate] = useState(true) // fresh mount = animate
+  const lastPathnameRef = useRef<string | null>(null)
+  const shouldAnimateThisRender = isReady && lastPathnameRef.current !== pathname
 
-  // Turn off animation window after first 150ms
+  // Update immediately so children see shouldAnimate=true on the first render of a new route.
+  if (shouldAnimateThisRender) {
+    lastPathnameRef.current = pathname
+  }
+
+  const [shouldAnimate, setShouldAnimate] = useState(true)
+
+  // Turn off the animation window after 150ms.
+  // Re-open the window when the pathname changes.
   useEffect(() => {
     if (!isReady) return
+
+    setShouldAnimate(true)
     const timer = setTimeout(() => setShouldAnimate(false), 150)
     return () => clearTimeout(timer)
-  }, [isReady])
+  }, [isReady, pathname])
 
   return (
-    <DashboardAnimationContext.Provider value={{ shouldAnimate }}>
+    <DashboardAnimationContext.Provider value={{ shouldAnimate: shouldAnimateThisRender || shouldAnimate }}>
       {children}
     </DashboardAnimationContext.Provider>
   )
@@ -57,9 +70,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    // Keyed by pathname so each dashboard route gets a fresh animation window.
-    // See docs/error-patterns/dashboard-animation.md
-    <DashboardAnimationProvider key={pathname} isReady={isReady}>
+    <DashboardAnimationProvider isReady={isReady} pathname={pathname}>
       <div className="relative" data-dashboard>
         {children}
       </div>
