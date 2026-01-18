@@ -71,11 +71,13 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
   return (
     <Float
       position={position}
-      // Keep float motion consistent across panels so inactive steps don't feel "heavier".
-      // Freeze only while actively interacting with inputs.
-      speed={isActive && isInteracting ? 0 : 0.5}
-      rotationIntensity={0.02}
-      floatIntensity={0.2}
+      // Drei's Float is intentionally gentle (it uses `t / 4 * speed`).
+      // Use a higher speed/intensity so the motion reads as "floating" (not static),
+      // but keep it consistent across panels. Freeze only while interacting with inputs.
+      speed={isActive && isInteracting ? 0 : 3.2}
+      rotationIntensity={0.25}
+      floatIntensity={1.35}
+      floatingRange={[-0.35, 0.35]}
     >
       {/* React content floats freely - no solid background planes */}
       <Html

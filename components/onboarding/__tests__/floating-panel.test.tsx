@@ -78,7 +78,7 @@ describe("FloatingPanel", () => {
       </FloatingPanel>
     )
 
-    expect(getByTestId("float").dataset.speed).toBe("0.5")
+    expect(getByTestId("float").dataset.speed).toBe("3.2")
 
     fireEvent.focusIn(getByLabelText("api-key"))
 

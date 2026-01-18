@@ -41,8 +41,9 @@ function getQualityTier(): QualityTier {
   const cores = navigator.hardwareConcurrency ?? 6
   const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8
 
-  // Conservative defaults: keep the scene smooth rather than busy.
-  if (cores <= 4 || memory <= 4) return "medium"
+  // Keep low-end devices stable, but don't over-downshift. We still want the
+  // background to be visible and expressive.
+  if (cores <= 2 || memory <= 2) return "medium"
   return "high"
 }
 
@@ -159,29 +160,32 @@ function TwinklingStarPoints({
       const zNorm = (zMax - z) / Math.max(0.0001, zMax - zMin)
 
       // Dim far stars a bit so the scene reads as deep (not flat noise).
+      // Keep the overall floor higher so the effect reads even on dim displays.
       const brightness =
-        (0.38 + Math.random() * 0.62) *
-        THREE.MathUtils.lerp(0.95, 0.6, distNorm) *
-        THREE.MathUtils.lerp(1.0, 0.75, zNorm)
+        (0.55 + Math.random() * 0.75) *
+        THREE.MathUtils.lerp(0.98, 0.72, distNorm) *
+        THREE.MathUtils.lerp(1.0, 0.82, zNorm)
       baseBrightness[i] = brightness
 
       // Higher-brightness stars twinkle a bit more.
-      twinkleAmp[i] = (0.08 + Math.random() * 0.18) * (0.6 + brightness * 0.6)
+      // Increase amplitude so it's visible without feeling like "blinking".
+      twinkleAmp[i] = (0.14 + Math.random() * 0.34) * (0.55 + brightness * 0.45)
 
       // Slow, layered twinkle.
-      freq1[i] = 0.25 + Math.random() * 0.85
-      freq2[i] = 0.12 + Math.random() * 0.55
-      freq3[i] = 0.06 + Math.random() * 0.35
+      freq1[i] = 0.35 + Math.random() * 1.35
+      freq2[i] = 0.16 + Math.random() * 0.9
+      freq3[i] = 0.08 + Math.random() * 0.55
 
       phase1[i] = Math.random() * Math.PI * 2
       phase2[i] = Math.random() * Math.PI * 2
       phase3[i] = Math.random() * Math.PI * 2
 
       // Rare, soft glints (kept subtle to avoid "cheap sparkle" vibes).
-      if (Math.random() < 0.06) {
-        glintFreq[i] = 0.08 + Math.random() * 0.18
+      // Slightly more common/strong so it reads, still not disco.
+      if (Math.random() < 0.10) {
+        glintFreq[i] = 0.10 + Math.random() * 0.24
         glintPhase[i] = Math.random() * Math.PI * 2
-        glintStrength[i] = 0.12 + Math.random() * 0.24
+        glintStrength[i] = 0.18 + Math.random() * 0.36
       } else {
         glintFreq[i] = 0
         glintPhase[i] = 0
@@ -239,8 +243,8 @@ function TwinklingStarPoints({
 
       if (data.glintStrength[i] > 0) {
         const g = 0.5 + 0.5 * Math.sin(t * data.glintFreq[i] + data.glintPhase[i])
-        // Sharpen the peak, but keep intensity modest.
-        twinkle += Math.pow(g, 7) * data.glintStrength[i]
+        // Sharpen the peak, but keep intensity controlled.
+        twinkle += Math.pow(g, 6) * data.glintStrength[i]
       }
 
       const brightness = data.baseBrightness[i] * twinkle
@@ -303,15 +307,15 @@ export function Starfield() {
   const animate = quality !== "low"
   const updateStride = quality === "high" ? 1 : 2
 
-  const smallCount = quality === "high" ? 1050 : quality === "medium" ? 750 : 520
-  const largeCount = quality === "high" ? 220 : quality === "medium" ? 160 : 110
+  const smallCount = quality === "high" ? 1500 : quality === "medium" ? 1100 : 800
+  const largeCount = quality === "high" ? 340 : quality === "medium" ? 240 : 180
 
   return (
     <group>
       <TwinklingStarPoints
         count={smallCount}
-        size={0.065}
-        opacity={0.55}
+        size={0.075}
+        opacity={0.72}
         radius={[14, 52]}
         zRange={[-70, 10]}
         accentColor={accentColor}
@@ -321,8 +325,8 @@ export function Starfield() {
       />
       <TwinklingStarPoints
         count={largeCount}
-        size={0.11}
-        opacity={0.42}
+        size={0.13}
+        opacity={0.60}
         radius={[10, 36]}
         zRange={[-68, 6]}
         accentColor={accentColor}
@@ -344,9 +348,9 @@ export function AccentNebula({ accentColor }: { accentColor: string }) {
   const animate = quality !== "low"
 
   const counts = {
-    primary: quality === "high" ? 140 : quality === "medium" ? 110 : 80,
-    secondary: quality === "high" ? 80 : quality === "medium" ? 60 : 40,
-    dust: quality === "high" ? 70 : quality === "medium" ? 55 : 40,
+    primary: quality === "high" ? 220 : quality === "medium" ? 170 : 120,
+    secondary: quality === "high" ? 120 : quality === "medium" ? 90 : 65,
+    dust: quality === "high" ? 110 : quality === "medium" ? 85 : 60,
   }
 
   const colors = useMemo(() => {
@@ -363,33 +367,33 @@ export function AccentNebula({ accentColor }: { accentColor: string }) {
     <group position={[0, 0, -28]}>
       <Sparkles
         count={counts.primary}
-        speed={animate ? 0.22 : 0}
-        opacity={0.55}
+        speed={animate ? 0.42 : 0}
+        opacity={0.75}
         color={accentColor}
-        size={2.6}
-        scale={[20, 20, 75]}
-        noise={[0.55, 0.45, 0.35]}
+        size={3.4}
+        scale={[22, 22, 78]}
+        noise={[0.65, 0.55, 0.45]}
       />
 
       <Sparkles
         count={counts.secondary}
-        speed={animate ? 0.14 : 0}
-        opacity={0.26}
+        speed={animate ? 0.26 : 0}
+        opacity={0.42}
         color={colors.soft}
-        size={4.6}
-        scale={[30, 30, 88]}
-        noise={[0.25, 0.2, 0.25]}
+        size={5.4}
+        scale={[32, 32, 90]}
+        noise={[0.35, 0.28, 0.32]}
       />
 
-      {/* Subtle cosmic dust - adds depth without shouting for attention */}
+      {/* Cosmic dust - still subtle, but actually visible now. */}
       <Sparkles
         count={counts.dust}
-        speed={animate ? 0.06 : 0}
-        opacity={0.14}
+        speed={animate ? 0.12 : 0}
+        opacity={0.22}
         color={colors.dust}
-        size={1.2}
-        scale={[34, 34, 90]}
-        noise={[0.18, 0.18, 0.18]}
+        size={1.5}
+        scale={[36, 36, 92]}
+        noise={[0.22, 0.22, 0.22]}
       />
     </group>
   )
@@ -399,6 +403,9 @@ export function ShootingStars({ accentColor }: { accentColor: string }) {
   const quality = useMemo(() => getQualityTier(), [])
   const reduceMotion = quality === "low"
 
+  // Allocate a few more particles on higher tiers for a nicer streak.
+  const trailPoints = quality === "high" ? 32 : quality === "medium" ? 28 : 24
+
   const pointsRef = useRef<THREE.Points | null>(null)
   const positionAttrRef = useRef<THREE.BufferAttribute | null>(null)
   const materialRef = useRef<THREE.PointsMaterial | null>(null)
@@ -407,7 +414,7 @@ export function ShootingStars({ accentColor }: { accentColor: string }) {
     isActive: false,
     startedAt: 0,
     duration: 1,
-    trailPoints: 26,
+    trailPoints,
     maxTrailLength: 9,
     start: new THREE.Vector3(),
     dir: new THREE.Vector3(),
@@ -455,8 +462,8 @@ export function ShootingStars({ accentColor }: { accentColor: string }) {
   }, [])
 
   function scheduleNextSpawn(now: number) {
-    const base = quality === "high" ? 6.5 : 8
-    const jitter = quality === "high" ? 6.5 : 8
+    const base = quality === "high" ? 4.0 : 5.5
+    const jitter = quality === "high" ? 4.5 : 6.0
     stateRef.current.nextSpawnAt = now + base + Math.random() * jitter
   }
 
@@ -525,7 +532,7 @@ export function ShootingStars({ accentColor }: { accentColor: string }) {
     }
 
     positionAttrRef.current.needsUpdate = true
-    materialRef.current.opacity = 0.75 * fade
+    materialRef.current.opacity = 0.9 * fade
 
     if (t >= 1) {
       s.isActive = false
