@@ -12,8 +12,8 @@
 
 import React from "react"
 import { Canvas } from "@react-three/fiber"
-import { useContextBridge } from "@react-three/drei"
-import { Starfield, AccentNebula, FloatingGeometry } from "./floating-orbs"
+import { AdaptiveDpr, useContextBridge } from "@react-three/drei"
+import { Starfield, AccentNebula, ShootingStars, FloatingGeometry } from "./floating-orbs"
 import { CAMERA_DISTANCE, FlyingCamera, PANEL_POSITIONS } from "./flying-camera"
 import { FloatingPanel } from "./floating-panel"
 import { WelcomeParticles } from "./welcome-particles"
@@ -66,6 +66,7 @@ function SceneContent({
       {/* Background elements */}
       <Starfield />
       <AccentNebula accentColor={accentColor} />
+      <ShootingStars accentColor={accentColor} />
       <FloatingGeometry accentColor={accentColor} />
 
       {/* Camera controller - flies between panel positions */}
@@ -127,6 +128,7 @@ export function Onboarding3DScene({
         dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: true }}
       >
+        <AdaptiveDpr />
         <color attach="background" args={[SCENE_COLORS.background]} />
         <ContextBridge>
           <SceneContent

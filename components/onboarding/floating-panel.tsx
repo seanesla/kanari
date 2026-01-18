@@ -71,9 +71,11 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
   return (
     <Float
       position={position}
-      speed={isActive && isInteracting ? 0 : isActive ? 0.6 : 0.3}
-      rotationIntensity={isActive ? 0.03 : 0.01}
-      floatIntensity={isActive ? 0.25 : 0.1}
+      // Keep float motion consistent across panels so inactive steps don't feel "heavier".
+      // Freeze only while actively interacting with inputs.
+      speed={isActive && isInteracting ? 0 : 0.5}
+      rotationIntensity={0.02}
+      floatIntensity={0.2}
     >
       {/* React content floats freely - no solid background planes */}
       <Html
