@@ -50,28 +50,27 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
     if (reduceMotion) return
 
     let raf = 0
+    let alive = true
 
     const tick = () => {
+      if (!alive) return
+
       const t = performance.now() / 1000
 
       // Smooth, non-waypoint drift in a plane.
-      // Keep it subtle: just enough to read as floating.
-      const x =
-        Math.sin((t + floatDelay) * 0.37) * 10 +
-        Math.sin((t + floatDelay * 1.7) * 0.91) * 3
-
-      const y =
-        Math.cos((t + floatDelay * 0.9) * 0.29) * 8 +
-        Math.sin((t + floatDelay * 1.13) * 0.57) * 4
-
+      const x = Math.sin((t + floatDelay) * 0.37) * 10 + Math.sin((t + floatDelay * 1.7) * 0.91) * 3
+      const y = Math.cos((t + floatDelay * 0.9) * 0.29) * 8 + Math.sin((t + floatDelay * 1.13) * 0.57) * 4
       const r = Math.sin((t + floatDelay * 0.6) * 0.18) * 0.25
 
-      el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${r.toFixed(3)}deg)`
+      el.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${r}deg)`
       raf = window.requestAnimationFrame(tick)
     }
 
     raf = window.requestAnimationFrame(tick)
-    return () => window.cancelAnimationFrame(raf)
+    return () => {
+      alive = false
+      window.cancelAnimationFrame(raf)
+    }
   }, [floatDelay])
 
   return (

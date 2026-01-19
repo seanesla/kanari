@@ -252,6 +252,7 @@
 }
 
 /* View transitions */
+/* View transitions */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 0.48s;
@@ -263,6 +264,20 @@
 
 ::view-transition-new(root) {
   animation-name: fade-in;
+}
+
+/* Safari safety: disable view transitions when we detect Safari. */
+.disable-view-transitions::view-transition-old(root),
+.disable-view-transitions::view-transition-new(root) {
+  animation-duration: 0s !important;
+}
+
+.disable-view-transitions::view-transition-old(root) {
+  animation-name: none !important;
+}
+
+.disable-view-transitions::view-transition-new(root) {
+  animation-name: none !important;
 }
 
 @keyframes fade-out {
