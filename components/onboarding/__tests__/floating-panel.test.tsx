@@ -61,35 +61,29 @@ describe("FloatingPanel", () => {
   })
 
   it("uses a responsive wrapper width for small screens", () => {
-    const { getByText } = render(
+    const { getByTestId } = render(
       <FloatingPanel position={[0, 0, 0]} isActive>
         <div>Content</div>
       </FloatingPanel>
     )
 
-    const inner = getByText("Content")
-    const wrapper = inner.closest("[data-floating-paused]") as HTMLElement | null
-    expect(wrapper?.className).toContain("w-[min(480px,calc(100vw-2rem))]")
+    const wrapper = getByTestId("panel-wrapper")
+    expect(wrapper.className).toContain("w-[min(480px,calc(100vw-2rem))]")
   })
 
-  it("freezes the float motion while focused within", () => {
+  it("does not stop float motion on focus", () => {
     const { getByLabelText, getByTestId } = render(
       <FloatingPanel position={[0, 0, 0]} isActive>
         <input aria-label="api-key" />
       </FloatingPanel>
     )
 
-    let wrapper = getByLabelText("api-key").closest("[data-floating-paused]") as HTMLElement
-    expect(wrapper.dataset.floatingPaused).toBe("false")
-
-    expect(getByTestId("float").dataset.speed).toBe("1.2")
+    expect(getByTestId("float").dataset.speed).toBe("1.05")
 
     fireEvent.focusIn(getByLabelText("api-key"))
 
-    expect(getByTestId("float").dataset.speed).toBe("0")
-
-    wrapper = getByLabelText("api-key").closest("[data-floating-paused]") as HTMLElement
-    expect(wrapper.dataset.floatingPaused).toBe("true")
+    // We keep motion running to avoid snapping/jumping.
+    expect(getByTestId("float").dataset.speed).toBe("1.05")
   })
 
   it("renders the active panel without CSS3D transforms", () => {
@@ -121,26 +115,24 @@ describe("FloatingPanel", () => {
   })
 
   it("avoids a no-op transform on the active panel wrapper", () => {
-    const { getByText } = render(
+    const { getByTestId } = render(
       <FloatingPanel position={[0, 0, 0]} isActive>
         <div>Content</div>
       </FloatingPanel>
     )
 
-    const inner = getByText("Content")
-    const wrapper = inner.closest("[data-floating-paused]") as HTMLElement | null
-    expect(wrapper?.style.transform).toBe("none")
+    const wrapper = getByTestId("panel-wrapper")
+    expect(wrapper.style.transform).toBe("none")
   })
 
   it("scales the inactive panel wrapper", () => {
-    const { getByText } = render(
+    const { getByTestId } = render(
       <FloatingPanel position={[0, 0, 0]} isActive={false}>
         <div>Content</div>
       </FloatingPanel>
     )
 
-    const inner = getByText("Content")
-    const wrapper = inner.closest("[data-floating-paused]") as HTMLElement | null
-    expect(wrapper?.style.transform).toBe("scale(0.95)")
+    const wrapper = getByTestId("panel-wrapper")
+    expect(wrapper.style.transform).toBe("scale(0.95)")
   })
 })

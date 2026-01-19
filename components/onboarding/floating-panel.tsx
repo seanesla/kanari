@@ -19,8 +19,7 @@
  */
 
 import { Html, Float, useContextBridge } from "@react-three/drei"
-import { useCallback, useMemo, useRef, useState } from "react"
-import type { FocusEvent } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { SceneContext } from "@/lib/scene-context"
 
 interface FloatingPanelProps {
@@ -32,50 +31,58 @@ interface FloatingPanelProps {
 export function FloatingPanel({ position, children, isActive }: FloatingPanelProps) {
   // Bridge context INTO the Html portal (separate from Canvas bridge)
   const ContextBridge = useContextBridge(SceneContext)
-  const wrapperRef = useRef<HTMLDivElement | null>(null)
-  const [isInteracting, setIsInteracting] = useState(false)
-
-  const isActiveElementInside = useCallback(() => {
-    const wrapper = wrapperRef.current
-    if (!wrapper) return false
-    const activeEl = document.activeElement
-    return !!(activeEl && wrapper.contains(activeEl))
-  }, [])
-
-  const handleFocusCapture = useCallback(() => {
-    if (isActive) setIsInteracting(true)
-  }, [isActive])
-
-  const handleBlurCapture = useCallback(
-    (e: FocusEvent<HTMLDivElement>) => {
-      if (!isActive) return
-
-      const next = e.relatedTarget as Node | null
-      if (next && wrapperRef.current?.contains(next)) return
-      if (isActiveElementInside()) return
-
-      setIsInteracting(false)
-    },
-    [isActive, isActiveElementInside]
-  )
-
 
   const floatDelay = useMemo(() => {
-    // Stable, deterministic phase offset per panel (same amplitude, different phase).
+    // Stable, deterministic phase offset per panel.
     const [x, y, z] = position
     const seed = Math.abs(x * 13.37 + y * 7.77 + z * 3.33)
-    const duration = 9.5
+    const duration = 12.0
     return -((seed % duration))
   }, [position])
+
+  const motionRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    const el = motionRef.current
+    if (!el) return
+
+    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
+    if (reduceMotion) return
+
+    let raf = 0
+
+    const tick = () => {
+      const t = performance.now() / 1000
+
+      // Smooth, non-waypoint drift in a plane.
+      // Keep it subtle: just enough to read as floating.
+      const x =
+        Math.sin((t + floatDelay) * 0.37) * 10 +
+        Math.sin((t + floatDelay * 1.7) * 0.91) * 3
+
+      const y =
+        Math.cos((t + floatDelay * 0.9) * 0.29) * 8 +
+        Math.sin((t + floatDelay * 1.13) * 0.57) * 4
+
+      const r = Math.sin((t + floatDelay * 0.6) * 0.18) * 0.25
+
+      el.style.transform = `translate3d(${x.toFixed(2)}px, ${y.toFixed(2)}px, 0) rotate(${r.toFixed(3)}deg)`
+      raf = window.requestAnimationFrame(tick)
+    }
+
+    raf = window.requestAnimationFrame(tick)
+    return () => window.cancelAnimationFrame(raf)
+  }, [floatDelay])
 
   return (
     <Float
       position={position}
-      // Rotate in 3D, but keep the card's motion in a 2D plane (handled via CSS).
-      // This avoids the "elevator" up/down feel while still feeling spatial.
-      speed={isActive && isInteracting ? 0 : 1.2}
-      rotationIntensity={0.18}
-      floatIntensity={0}
+      // Gentle 3D drift (this is smooth sine-based motion).
+      // The planar drift is handled separately in the DOM to avoid the "waypoint" feel.
+      speed={1.05}
+      rotationIntensity={0.2}
+      floatIntensity={0.45}
+      floatingRange={[-0.06, 0.06]}
     >
       {/* React content floats freely - no solid background planes */}
       <Html
@@ -98,10 +105,7 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
       >
         <ContextBridge>
             <div
-              ref={wrapperRef}
-              data-floating-paused={String(isActive && isInteracting)}
-              onFocusCapture={handleFocusCapture}
-              onBlurCapture={handleBlurCapture}
+              data-testid="panel-wrapper"
               className="w-[min(480px,calc(100vw-2rem))] pointer-events-auto"
               style={{
                 // iOS Safari can mis-hit-test inputs inside nested transforms.
@@ -110,12 +114,8 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
                 transition: "transform 0.5s ease-out",
               }}
             >
-              <div className="onboarding-float-plane-x" style={{ animationDelay: `${floatDelay}s` }}>
-                <div className="onboarding-float-plane-y" style={{ animationDelay: `${floatDelay * 1.37}s` }}>
-                  <div className="onboarding-float-plane-rot" style={{ animationDelay: `${floatDelay * 0.73}s` }}>
-                    {children}
-                  </div>
-                </div>
+              <div ref={motionRef} style={{ willChange: "transform" }}>
+                {children}
               </div>
             </div>
           </ContextBridge>
