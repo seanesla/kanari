@@ -21,7 +21,7 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
   const [isVisible, setIsVisible] = useState(true)
 
   // Keep this hook here so the splash reflects current theme state.
-  useSceneMode()
+  const { accentColor } = useSceneMode()
 
   useEffect(() => {
     // Total duration: quick fade in + short hold + fade out.
@@ -64,7 +64,7 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
                 animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
                 transition={{ delay: 0.18, duration: 0.75, ease: "easeOut" }}
               >
-                <span className="text-accent">k</span>anari
+                <span style={{ color: accentColor }}>k</span>anari
               </motion.h1>
             </motion.div>
 

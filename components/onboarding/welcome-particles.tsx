@@ -143,7 +143,9 @@ export function WelcomeParticles({
 
       seeds[i] = Math.random() * 1000
 
-      const tint = 0.25 + Math.random() * 0.55
+      // Heavily accent-tinted: these particles are literally forming the brand word.
+      // Keep a little white so it stays crisp on dark backgrounds.
+      const tint = 0.08 + Math.random() * 0.22
       const c = accent.clone().lerp(white, tint)
       colors[i * 3] = c.r
       colors[i * 3 + 1] = c.g

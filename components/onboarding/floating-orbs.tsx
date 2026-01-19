@@ -76,6 +76,79 @@ function createSoftDiscTexture() {
   return texture
 }
 
+function createNebulaTexture() {
+  if (typeof document === "undefined") return null
+
+  const size = 640
+  const canvas = document.createElement("canvas")
+  canvas.width = size
+  canvas.height = size
+
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return null
+
+  ctx.clearRect(0, 0, size, size)
+  ctx.globalCompositeOperation = "lighter"
+
+  // Big soft blobs (keep alphas low; we also use additive blending later)
+  for (let i = 0; i < 28; i++) {
+    const x = Math.random() * size
+    const y = Math.random() * size
+    const r = size * (0.09 + Math.random() * 0.25)
+    const a = 0.06 + Math.random() * 0.14
+
+    ctx.filter = `blur(${Math.round(size * (0.018 + Math.random() * 0.03))}px)`
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+    g.addColorStop(0, `rgba(255, 255, 255, ${a})`)
+    g.addColorStop(1, "rgba(255, 255, 255, 0)")
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  // Filament streaks (subtle structure)
+  for (let i = 0; i < 16; i++) {
+    const x = Math.random() * size
+    const y = Math.random() * size
+    const w = size * (0.25 + Math.random() * 0.55)
+    const h = size * (0.06 + Math.random() * 0.14)
+    const a = 0.035 + Math.random() * 0.08
+    const rot = Math.random() * Math.PI * 2
+
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.rotate(rot)
+    ctx.filter = `blur(${Math.round(size * 0.014)}px)`
+
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, w * 0.5)
+    g.addColorStop(0, `rgba(255, 255, 255, ${a})`)
+    g.addColorStop(1, "rgba(255, 255, 255, 0)")
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.ellipse(0, 0, w * 0.5, h * 0.5, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+
+  ctx.filter = "none"
+
+  // Fade edges so sprites never show hard borders.
+  ctx.globalCompositeOperation = "destination-in"
+  const center = size / 2
+  const mask = ctx.createRadialGradient(center, center, size * 0.08, center, center, size * 0.54)
+  mask.addColorStop(0, "rgba(255, 255, 255, 1)")
+  mask.addColorStop(1, "rgba(255, 255, 255, 0)")
+  ctx.fillStyle = mask
+  ctx.fillRect(0, 0, size, size)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.generateMipmaps = false
+  texture.minFilter = THREE.LinearFilter
+  texture.magFilter = THREE.LinearFilter
+  return texture
+}
+
 interface TwinklingStarPointsProps {
   count: number
   size: number
@@ -347,53 +420,159 @@ export function AccentNebula({ accentColor }: { accentColor: string }) {
   const quality = useMemo(() => getQualityTier(), [])
   const animate = quality !== "low"
 
+  const nebulaTexture = useMemo(() => createNebulaTexture(), [])
+  useEffect(() => {
+    if (!nebulaTexture) return
+    return () => nebulaTexture.dispose()
+  }, [nebulaTexture])
+
   const counts = {
-    primary: quality === "high" ? 220 : quality === "medium" ? 170 : 120,
-    secondary: quality === "high" ? 120 : quality === "medium" ? 90 : 65,
-    dust: quality === "high" ? 110 : quality === "medium" ? 85 : 60,
+    // Sparkle layer: visible particles (accent-tinted dust)
+    sparklesA: quality === "high" ? 190 : quality === "medium" ? 150 : 110,
+    sparklesB: quality === "high" ? 120 : quality === "medium" ? 90 : 65,
+
+    // Sprite layer: the actual "gas cloud" feeling
+    // Higher count + lower alpha spreads it around, especially at distance.
+    sprites: quality === "high" ? 26 : quality === "medium" ? 20 : 14,
   }
 
   const colors = useMemo(() => {
     const accent = new THREE.Color(accentColor)
     const white = new THREE.Color("#ffffff")
 
-    const soft = accent.clone().lerp(white, 0.35)
-    const dust = white.clone().lerp(soft, 0.18)
+    // Match accent, but keep it muted because additive blending stacks fast.
+    // This should read as soft gas, not a light source.
+    const soft = accent.clone().lerp(white, 0.35).multiplyScalar(0.42)
+    const pale = accent.clone().lerp(white, 0.55).multiplyScalar(0.52)
 
-    return { soft, dust }
+    return { soft, pale }
   }, [accentColor])
+
+  const spriteData = useMemo(() => {
+    const positions = new Float32Array(counts.sprites * 3)
+    const scalesX = new Float32Array(counts.sprites)
+    const scalesY = new Float32Array(counts.sprites)
+    const rotations = new Float32Array(counts.sprites)
+    const opacities = new Float32Array(counts.sprites)
+    const phases = new Float32Array(counts.sprites)
+
+    const zMin = -70
+    const zMax = 14
+
+    for (let i = 0; i < counts.sprites; i++) {
+      const z = THREE.MathUtils.randFloat(zMin, zMax)
+      const u = (z - zMin) / Math.max(0.0001, zMax - zMin) // 0..1
+
+      // Two lopsided spines (near + far) so the nebula feels like it continues into distance.
+      const farBlend = u < 0.45 ? 0 : Math.min(1, (u - 0.45) / 0.55)
+
+      // Near spine
+      const xA = THREE.MathUtils.lerp(-11, 7.5, u) + Math.sin(u * 5.1) * 3.4
+      const yA = THREE.MathUtils.lerp(5.5, -4.8, u) + Math.cos(u * 4.6) * 2.8
+
+      // Far spine (shifted + wider)
+      const xB = THREE.MathUtils.lerp(8, -14, u) + Math.sin(u * 3.2 + 1.1) * 4.8
+      const yB = THREE.MathUtils.lerp(-7, 6, u) + Math.cos(u * 3.7 - 0.6) * 3.9
+
+      const xCenter = THREE.MathUtils.lerp(xA, xB, farBlend)
+      const yCenter = THREE.MathUtils.lerp(yA, yB, farBlend)
+
+      // Wider in the far corridor so it doesn't feel concentrated.
+      const spreadX = THREE.MathUtils.lerp(4.6, 9.5, u) + Math.random() * 2.5
+      const spreadY = THREE.MathUtils.lerp(4.0, 8.5, u) + Math.random() * 2.2
+
+      positions[i * 3] = xCenter + THREE.MathUtils.randFloatSpread(spreadX)
+      positions[i * 3 + 1] = yCenter + THREE.MathUtils.randFloatSpread(spreadY)
+      positions[i * 3 + 2] = z
+
+      // Non-uniform scale + rotation breaks the "perfect circle" look.
+      const base = THREE.MathUtils.lerp(16, 34, u) * (0.75 + Math.random() * 0.7)
+      const ax = 0.65 + Math.random() * 1.25
+      const ay = 0.55 + Math.random() * 1.4
+
+      scalesX[i] = base * ax
+      scalesY[i] = base * ay
+      rotations[i] = THREE.MathUtils.randFloat(-Math.PI, Math.PI)
+
+      // Distant clouds should be present but dim.
+      const distanceFade = 1 - u * 0.55
+      const density = 0.55 + 0.35 * Math.sin(u * Math.PI)
+      opacities[i] = (0.028 + Math.random() * 0.05) * density * distanceFade
+
+      phases[i] = Math.random() * Math.PI * 2
+    }
+
+    return { positions, scalesX, scalesY, rotations, opacities, phases }
+  }, [counts.sprites])
+
+  const spriteGroupRef = useRef<THREE.Group | null>(null)
+
+  useFrame((state) => {
+    if (!animate) return
+    if (!spriteGroupRef.current) return
+
+    const t = state.clock.elapsedTime
+
+    // Slow, subtle planar drift (x/y only) so it feels like gas.
+    // Avoid sin/cos at matching rates (it reads as a circular orbit).
+    spriteGroupRef.current.rotation.z = Math.sin(t * 0.043) * 0.018
+    spriteGroupRef.current.rotation.x = Math.cos(t * 0.031) * 0.01
+    spriteGroupRef.current.position.x = Math.sin(t * 0.06) * 0.55 + Math.sin(t * 0.083) * 0.22
+    spriteGroupRef.current.position.y = Math.cos(t * 0.055) * 0.42 + Math.sin(t * 0.071) * 0.18
+
+    spriteGroupRef.current.updateMatrix()
+  })
 
   return (
     <group position={[0, 0, -28]}>
+      {/* Gas cloud sprites (this is the "nebula") */}
+      <group ref={spriteGroupRef} matrixAutoUpdate={false}>
+        {Array.from({ length: counts.sprites }).map((_, i) => (
+            <sprite
+              // eslint-disable-next-line react/no-array-index-key
+              key={i}
+              position={[
+                spriteData.positions[i * 3],
+                spriteData.positions[i * 3 + 1],
+                spriteData.positions[i * 3 + 2],
+              ]}
+              rotation={[0, 0, spriteData.rotations[i]]}
+              scale={[spriteData.scalesX[i], spriteData.scalesY[i], 1]}
+            >
+              <spriteMaterial
+                map={nebulaTexture ?? undefined}
+                transparent
+                depthWrite={false}
+                depthTest
+                blending={THREE.AdditiveBlending}
+                color={colors.soft}
+                opacity={spriteData.opacities[i]}
+                fog={false}
+                toneMapped={false}
+              />
+          </sprite>
+        ))}
+      </group>
+
+      {/* Accent dust that helps sell depth */}
       <Sparkles
-        count={counts.primary}
-        speed={animate ? 0.42 : 0}
-        opacity={0.75}
+        count={counts.sparklesA}
+        speed={animate ? 0.34 : 0}
+        opacity={0.55}
         color={accentColor}
-        size={3.4}
+        size={3.0}
         scale={[22, 22, 78]}
         noise={[0.65, 0.55, 0.45]}
       />
 
       <Sparkles
-        count={counts.secondary}
-        speed={animate ? 0.26 : 0}
-        opacity={0.42}
-        color={colors.soft}
-        size={5.4}
-        scale={[32, 32, 90]}
+        count={counts.sparklesB}
+        speed={animate ? 0.22 : 0}
+        opacity={0.32}
+        color={colors.pale}
+        size={5.1}
+        scale={[30, 30, 88]}
         noise={[0.35, 0.28, 0.32]}
-      />
-
-      {/* Cosmic dust - still subtle, but actually visible now. */}
-      <Sparkles
-        count={counts.dust}
-        speed={animate ? 0.12 : 0}
-        opacity={0.22}
-        color={colors.dust}
-        size={1.5}
-        scale={[36, 36, 92]}
-        noise={[0.22, 0.22, 0.22]}
       />
     </group>
   )

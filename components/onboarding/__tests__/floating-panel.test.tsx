@@ -68,7 +68,8 @@ describe("FloatingPanel", () => {
     )
 
     const inner = getByText("Content")
-    expect(inner.parentElement?.className).toContain("w-[min(480px,calc(100vw-2rem))]")
+    const wrapper = inner.closest("[data-floating-paused]") as HTMLElement | null
+    expect(wrapper?.className).toContain("w-[min(480px,calc(100vw-2rem))]")
   })
 
   it("freezes the float motion while focused within", () => {
@@ -78,11 +79,17 @@ describe("FloatingPanel", () => {
       </FloatingPanel>
     )
 
-    expect(getByTestId("float").dataset.speed).toBe("3.2")
+    let wrapper = getByLabelText("api-key").closest("[data-floating-paused]") as HTMLElement
+    expect(wrapper.dataset.floatingPaused).toBe("false")
+
+    expect(getByTestId("float").dataset.speed).toBe("1.2")
 
     fireEvent.focusIn(getByLabelText("api-key"))
 
     expect(getByTestId("float").dataset.speed).toBe("0")
+
+    wrapper = getByLabelText("api-key").closest("[data-floating-paused]") as HTMLElement
+    expect(wrapper.dataset.floatingPaused).toBe("true")
   })
 
   it("renders the active panel without CSS3D transforms", () => {
@@ -121,7 +128,8 @@ describe("FloatingPanel", () => {
     )
 
     const inner = getByText("Content")
-    expect(inner.parentElement?.style.transform).toBe("none")
+    const wrapper = inner.closest("[data-floating-paused]") as HTMLElement | null
+    expect(wrapper?.style.transform).toBe("none")
   })
 
   it("scales the inactive panel wrapper", () => {
@@ -132,6 +140,7 @@ describe("FloatingPanel", () => {
     )
 
     const inner = getByText("Content")
-    expect(inner.parentElement?.style.transform).toBe("scale(0.95)")
+    const wrapper = inner.closest("[data-floating-paused]") as HTMLElement | null
+    expect(wrapper?.style.transform).toBe("scale(0.95)")
   })
 })

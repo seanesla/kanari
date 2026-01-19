@@ -19,7 +19,7 @@
  */
 
 import { Html, Float, useContextBridge } from "@react-three/drei"
-import { useCallback, useRef, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import type { FocusEvent } from "react"
 import { SceneContext } from "@/lib/scene-context"
 
@@ -59,25 +59,23 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
     [isActive, isActiveElementInside]
   )
 
-  const handlePointerDownCapture = useCallback(() => {
-    if (isActive) setIsInteracting(true)
-  }, [isActive])
 
-  const handlePointerUpOrCancelCapture = useCallback(() => {
-    if (!isActive) return
-    if (!isActiveElementInside()) setIsInteracting(false)
-  }, [isActive, isActiveElementInside])
+  const floatDelay = useMemo(() => {
+    // Stable, deterministic phase offset per panel (same amplitude, different phase).
+    const [x, y, z] = position
+    const seed = Math.abs(x * 13.37 + y * 7.77 + z * 3.33)
+    const duration = 9.5
+    return -((seed % duration))
+  }, [position])
 
   return (
     <Float
       position={position}
-      // Drei's Float is intentionally gentle (it uses `t / 4 * speed`).
-      // Use a higher speed/intensity so the motion reads as "floating" (not static),
-      // but keep it consistent across panels. Freeze only while interacting with inputs.
-      speed={isActive && isInteracting ? 0 : 3.2}
-      rotationIntensity={0.25}
-      floatIntensity={1.35}
-      floatingRange={[-0.35, 0.35]}
+      // Rotate in 3D, but keep the card's motion in a 2D plane (handled via CSS).
+      // This avoids the "elevator" up/down feel while still feeling spatial.
+      speed={isActive && isInteracting ? 0 : 1.2}
+      rotationIntensity={0.18}
+      floatIntensity={0}
     >
       {/* React content floats freely - no solid background planes */}
       <Html
@@ -99,25 +97,29 @@ export function FloatingPanel({ position, children, isActive }: FloatingPanelPro
         }}
       >
         <ContextBridge>
-          <div
-            ref={wrapperRef}
-            onFocusCapture={handleFocusCapture}
-            onBlurCapture={handleBlurCapture}
-            onPointerDownCapture={handlePointerDownCapture}
-            onPointerUpCapture={handlePointerUpOrCancelCapture}
-            onPointerCancelCapture={handlePointerUpOrCancelCapture}
-            className="w-[min(480px,calc(100vw-2rem))] pointer-events-auto"
-            style={{
-              // iOS Safari can mis-hit-test inputs inside nested transforms.
-              // Avoid setting a no-op transform on the active panel.
-              transform: isActive ? "none" : "scale(0.95)",
-              transition: "transform 0.5s ease-out",
-            }}
-          >
-            {children}
-          </div>
-        </ContextBridge>
-      </Html>
-    </Float>
-  )
+            <div
+              ref={wrapperRef}
+              data-floating-paused={String(isActive && isInteracting)}
+              onFocusCapture={handleFocusCapture}
+              onBlurCapture={handleBlurCapture}
+              className="w-[min(480px,calc(100vw-2rem))] pointer-events-auto"
+              style={{
+                // iOS Safari can mis-hit-test inputs inside nested transforms.
+                // Avoid setting a no-op transform on the active panel.
+                transform: isActive ? "none" : "scale(0.95)",
+                transition: "transform 0.5s ease-out",
+              }}
+            >
+              <div className="onboarding-float-plane-x" style={{ animationDelay: `${floatDelay}s` }}>
+                <div className="onboarding-float-plane-y" style={{ animationDelay: `${floatDelay * 1.37}s` }}>
+                  <div className="onboarding-float-plane-rot" style={{ animationDelay: `${floatDelay * 0.73}s` }}>
+                    {children}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ContextBridge>
+        </Html>
+      </Float>
+    )
 }
