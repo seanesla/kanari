@@ -38,6 +38,10 @@ React Tree (context flows):
 
 ## The Fix
 
+Note: When Safari view transitions fail, see `docs/error-patterns/safari-view-transition-timeout.md` for the Safari-only shim.
+
+## The Fix
+
 Use `useContextBridge` from `@react-three/drei` to manually pass context INTO the Html portal:
 
 ```tsx
