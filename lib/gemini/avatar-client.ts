@@ -215,7 +215,7 @@ export async function generateCoachAvatar(
     const fallbackSeed = sanitizeSeed(`kanari-coach-${voiceName}-${makeNonce(10)}`)
 
     const apiKey = await getGeminiApiKey()
-    const recipe = apiKey
+    const recipe = apiKey && apiKey !== "DEMO_MODE"
       ? await suggestRecipeWithGemini({ apiKey, voiceName })
       : null
 

@@ -94,6 +94,7 @@ describe("useAchievements.ensureToday transaction safety", () => {
   it("keeps IndexedDB writes transactional even when Gemini generation runs (no 'committed too early')", async () => {
     vi.doMock("@/lib/utils", () => ({
       createGeminiHeaders: vi.fn(async () => ({ "Content-Type": "application/json" })),
+      getGeminiApiKey: vi.fn(async () => "AIzaTestKey123"),
     }))
 
     Object.defineProperty(globalThis, "fetch", {

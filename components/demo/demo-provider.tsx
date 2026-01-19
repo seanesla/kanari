@@ -314,7 +314,7 @@ export function DemoProvider({ children }: DemoProviderProps) {
     // Update state
     setState((prev) => ({
       ...prev,
-      highlightedElement: step.target,
+      highlightedElement: element ? step.target : null,
       currentPhase: step.phase,
       isNavigating: false,
     }))

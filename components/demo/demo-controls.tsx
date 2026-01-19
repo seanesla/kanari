@@ -21,12 +21,8 @@ export function DemoControls() {
   } = useDemo()
   const [isAutoPlay, setIsAutoPlay] = useState(true)
 
-  if (!isActive) return null
-
   const isComplete = currentStepIndex >= totalSteps
   const isFirstStep = currentStepIndex <= 0
-
-  if (isComplete) return null
 
   useEffect(() => {
     if (!isActive) return
@@ -37,6 +33,9 @@ export function DemoControls() {
     const timerId = window.setTimeout(() => nextStep(), AUTO_ADVANCE_MS)
     return () => window.clearTimeout(timerId)
   }, [isActive, isAutoPlay, currentStepIndex, isComplete, isNavigating, nextStep])
+
+  if (!isActive) return null
+  if (isComplete) return null
 
   return (
     <motion.div

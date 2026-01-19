@@ -15,7 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
 import { getDateKey } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
-import { createGeminiHeaders } from "@/lib/utils"
+import { createGeminiHeaders, getGeminiApiKey } from "@/lib/utils"
 import { db, fromDailyAchievement, toDailyAchievement, fromMilestoneBadge, toMilestoneBadge } from "@/lib/storage/db"
 import {
   collectUserStatsForDailyAchievements,
@@ -356,6 +356,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
     try {
       const nowISO = new Date().toISOString()
       const yesterdayISO = shiftDateISO(todayISO, -1)
+      const apiKey = await getGeminiApiKey()
 
       const pendingLevelTitleRequest = await (async () => {
         const prep = await db.transaction("rw", db.achievements, db.userProgress, async () => {
@@ -439,6 +440,10 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
           newDaily = buildStarterAchievements(nowISO, todayISO).slice(0, prep.requestedCount)
         } else {
           try {
+            if (!apiKey) {
+              throw new Error("Gemini API key not configured")
+            }
+
             const headers = await createGeminiHeaders({ "Content-Type": "application/json" })
             const response = await fetch("/api/gemini/achievements", {
               method: "POST",
@@ -534,6 +539,8 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
 
       if (pendingLevelTitleRequest) {
         try {
+          if (!apiKey) return
+
           const headers = await createGeminiHeaders({ "Content-Type": "application/json" })
           const response = await fetch("/api/gemini/achievements/level-title", {
             method: "POST",

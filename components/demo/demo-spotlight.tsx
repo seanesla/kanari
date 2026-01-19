@@ -81,7 +81,13 @@ export function DemoSpotlight({ targetId }: DemoSpotlightProps) {
           <mask id="spotlight-mask">
             <rect x="0" y="0" width="100%" height="100%" fill="white" />
             <motion.rect
-              initial={{ opacity: 0 }}
+              initial={{
+                x: rect.x,
+                y: rect.y,
+                width: rect.width,
+                height: rect.height,
+                opacity: 0,
+              }}
               animate={{
                 x: rect.x,
                 y: rect.y,

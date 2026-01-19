@@ -40,8 +40,11 @@ export async function createGeminiHeaders(
     }
   }
 
-  // Add API key header if available
-  if (apiKey) {
+  // Add API key header if available.
+  // Note: demo mode seeds a placeholder key ("DEMO_MODE") to avoid forcing judges
+  // through Settings during a demo. That value is intentionally NOT a real Gemini key,
+  // so we should not forward it to server routes (it triggers noisy 401s).
+  if (apiKey && apiKey !== "DEMO_MODE") {
     headers["X-Gemini-Api-Key"] = apiKey
   }
 
