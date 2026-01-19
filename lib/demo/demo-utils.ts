@@ -4,6 +4,58 @@
  * Helper functions for the demo tour system.
  */
 
+type DemoSafeAreas = {
+  top: number
+  bottom: number
+}
+
+/**
+ * Get "blocked" safe areas (px) for demo overlays.
+ *
+ * - `top`: max `rect.bottom` among elements marked with `data-demo-safe-top`
+ * - `bottom`: max `(viewportHeight - rect.top)` among elements marked with `data-demo-safe-bottom`
+ *
+ * SSR-safe: returns zeros when `window` is undefined.
+ */
+export function getDemoSafeAreas(): DemoSafeAreas {
+  if (typeof window === "undefined") return { top: 0, bottom: 0 }
+
+  const viewportHeight = window.innerHeight
+
+  const isEffectivelyVisible = (el: HTMLElement): boolean => {
+    let current: HTMLElement | null = el
+    while (current) {
+      const style = window.getComputedStyle(current)
+      if (style.display === "none") return false
+      if (style.visibility === "hidden") return false
+      if (parseFloat(style.opacity || "1") <= 0) return false
+      if (style.pointerEvents === "none") return false
+      current = current.parentElement
+    }
+    return true
+  }
+
+  const topElements = Array.from(document.querySelectorAll<HTMLElement>("[data-demo-safe-top]"))
+  const bottomElements = Array.from(document.querySelectorAll<HTMLElement>("[data-demo-safe-bottom]"))
+
+  const top = topElements.reduce((max, el) => {
+    if (!isEffectivelyVisible(el)) return max
+    const rect = el.getBoundingClientRect()
+    if (rect.height <= 0 || rect.width <= 0) return max
+    return Math.max(max, rect.bottom)
+  }, 0)
+
+  const bottom = bottomElements.reduce((max, el) => {
+    if (!isEffectivelyVisible(el)) return max
+    const rect = el.getBoundingClientRect()
+    if (rect.height <= 0 || rect.width <= 0) return max
+    return Math.max(max, viewportHeight - rect.top)
+  }, 0)
+
+  return { top, bottom }
+}
+
+
 /**
  * Find an element by its data-demo-id attribute
  */

@@ -47,6 +47,8 @@ export interface DemoState {
   highlightedElement: string | null
   /** Whether we're navigating between pages */
   isNavigating: boolean
+  /** Whether the current step is transitioning (waiting/scrolling) */
+  isTransitioning: boolean
   /** Whether demo data has been seeded */
   hasSeededData: boolean
 }

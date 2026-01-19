@@ -11,8 +11,19 @@ import { useSceneMode } from "@/lib/scene-context"
 import { CheckCircle2, RotateCcw, ArrowRight } from "@/lib/icons"
 
 export function DemoOverlay() {
-  const { isActive, currentStepIndex, totalSteps, highlightedElement, isNavigating, getCurrentStep, stopDemo, goToStep, nextStep, previousStep } =
-    useDemo()
+  const {
+    isActive,
+    currentStepIndex,
+    totalSteps,
+    highlightedElement,
+    isNavigating,
+    isTransitioning,
+    getCurrentStep,
+    stopDemo,
+    goToStep,
+    nextStep,
+    previousStep,
+  } = useDemo()
   const { accentColor } = useSceneMode()
 
   const currentStep = getCurrentStep()
@@ -44,7 +55,7 @@ export function DemoOverlay() {
         return
       }
 
-      if (isNavigating || isComplete) return
+      if (isNavigating || isTransitioning || isComplete) return
 
       if (event.key === "ArrowRight" || event.key === "Enter" || event.key === " ") {
         event.preventDefault()
@@ -60,7 +71,7 @@ export function DemoOverlay() {
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [isActive, isComplete, isNavigating, nextStep, previousStep, stopDemo])
+  }, [isActive, isComplete, isNavigating, isTransitioning, nextStep, previousStep, stopDemo])
 
   if (!isActive) return null
 
@@ -68,11 +79,23 @@ export function DemoOverlay() {
     <>
       <DemoProgress />
 
+      {/*
+        Interaction shield:
+        - Blocks all pointer/touch interactions with the underlying app (including the navbar)
+        - Does NOT visually dim (the spotlight SVG handles dimming + cutout)
+        - Sits below spotlight/tooltip/controls via z-index
+      */}
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 z-[9996] pointer-events-auto touch-none overscroll-none"
+      />
+
+
       {/* Loading overlay during page transitions */}
       <AnimatePresence>
         {isNavigating && (
           <motion.div
-            className="fixed inset-0 z-[10003] flex items-center justify-center bg-background/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[10003] flex items-center justify-center bg-background/80 backdrop-blur-sm pointer-events-auto"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}

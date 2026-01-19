@@ -7,6 +7,7 @@ import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
 interface LiquidGlassNavbarProps {
   children: React.ReactNode
   className?: string
+  [key: `data-${string}`]: unknown
 }
 
 // Generate displacement map data URL for lens refraction effect
@@ -50,7 +51,7 @@ function generateDisplacementMap(width = 256, height = 64): string {
   return canvas.toDataURL("image/png")
 }
 
-export function LiquidGlassNavbar({ children, className = "" }: LiquidGlassNavbarProps) {
+export function LiquidGlassNavbar({ children, className = "", ...props }: LiquidGlassNavbarProps) {
   const [supportsFilter, setSupportsFilter] = useState(false)
   const [displacementMap, setDisplacementMap] = useState<string>("")
   const filterRef = useRef<string>(`liquid-glass-${Math.random().toString(36).slice(2, 9)}`)
@@ -121,6 +122,7 @@ export function LiquidGlassNavbar({ children, className = "" }: LiquidGlassNavba
       )}
 
       <nav
+        {...props}
         className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl ${className}`}
         onMouseMove={(event) => {
           glow.onMouseMove(event)

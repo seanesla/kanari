@@ -99,6 +99,7 @@ const initialState: DemoState = {
   currentPhase: "landing",
   highlightedElement: null,
   isNavigating: false,
+  isTransitioning: false,
   hasSeededData: false,
 }
 
@@ -292,10 +293,18 @@ export function DemoProvider({ children }: DemoProviderProps) {
 
   // Execute step (scroll, highlight, etc.)
   const executeStep = useCallback(async (step: DemoStep) => {
+    // Mark step as transitioning immediately so the UI can pause autoplay + prevent key skips.
+    setState((prev) => ({
+      ...prev,
+      isTransitioning: true,
+      // Keep the previous highlight while we transition. If it disappears (route change),
+      // DemoSpotlight will fall back to a full dim overlay.
+    }))
+
     // If step changes route, do a client navigation (do NOT hard-reload or we lose demo state).
     // See: docs/error-patterns/internal-navigation-window-location-href.md
     if (step.route) {
-      setState((prev) => ({ ...prev, isNavigating: true, highlightedElement: null }))
+      setState((prev) => ({ ...prev, isNavigating: true }))
       router.push(step.route)
     }
 
@@ -304,11 +313,66 @@ export function DemoProvider({ children }: DemoProviderProps) {
       await waitForElement(step.waitFor, 5000)
     }
 
+    const isMobileViewport = () => typeof window !== "undefined" && window.innerWidth < 768
+
+    const isElementVisible = (el: HTMLElement): boolean => {
+      const rect = el.getBoundingClientRect()
+      return rect.width > 0 && rect.height > 0
+    }
+
+    const waitForSelector = (selector: string, timeoutMs: number): Promise<HTMLElement | null> => {
+      return new Promise((resolve) => {
+        const existing = document.querySelector<HTMLElement>(selector)
+        if (existing) {
+          resolve(existing)
+          return
+        }
+
+        const observer = new MutationObserver(() => {
+          const found = document.querySelector<HTMLElement>(selector)
+          if (found) {
+            observer.disconnect()
+            resolve(found)
+          }
+        })
+
+        observer.observe(document.body, { childList: true, subtree: true })
+
+        setTimeout(() => {
+          observer.disconnect()
+          resolve(null)
+        }, timeoutMs)
+      })
+    }
+
+    const ensureMobileHistorySidebarOpen = async (): Promise<void> => {
+      if (!isMobileViewport()) return
+
+      // The History page uses the shared Sidebar + Sheet on mobile. If the Sheet is closed,
+      // the sidebar content (and our demo targets) won't be present in the DOM.
+      const sheetSelector = '[data-slot="sheet-content"][data-mobile="true"]'
+      const alreadyOpen = document.querySelector(sheetSelector)
+      if (alreadyOpen) return
+
+      const triggers = Array.from(document.querySelectorAll<HTMLElement>('[data-sidebar="trigger"]'))
+      const trigger = triggers.find(isElementVisible)
+      if (!trigger) return
+
+      trigger.click()
+      await waitForSelector(sheetSelector, 1500)
+    }
+
+    // For mobile check-in steps, ensure the sidebar sheet is opened before we wait for targets.
+    if (step.target === "demo-checkin-sidebar" || step.target === "demo-new-checkin-button") {
+      await ensureMobileHistorySidebarOpen()
+    }
+
     // Wait for target element
     const element = await waitForElement(step.target, 3000)
     if (element) {
       scrollToElement(element, step.scrollBehavior)
-      await new Promise((resolve) => setTimeout(resolve, 300))
+      // Give smooth scroll time to settle. Spotlight + tooltip track via rAF.
+      await new Promise((resolve) => setTimeout(resolve, step.scrollBehavior === "none" ? 200 : 650))
     }
 
     // Update state
@@ -317,6 +381,7 @@ export function DemoProvider({ children }: DemoProviderProps) {
       highlightedElement: element ? step.target : null,
       currentPhase: step.phase,
       isNavigating: false,
+      isTransitioning: false,
     }))
   }, [router])
 
@@ -330,6 +395,7 @@ export function DemoProvider({ children }: DemoProviderProps) {
           currentStepIndex: nextIndex,
           currentPhase: "complete",
           highlightedElement: null,
+          isTransitioning: false,
         }
       }
       return { ...prev, currentStepIndex: nextIndex }
@@ -361,6 +427,7 @@ export function DemoProvider({ children }: DemoProviderProps) {
       currentPhase: "landing",
       highlightedElement: null,
       isNavigating: false,
+      isTransitioning: false,
       hasSeededData: seeded,
     })
   }, [seedDemoData])

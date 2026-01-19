@@ -15,6 +15,7 @@ export function DemoControls() {
     currentStepIndex,
     totalSteps,
     isNavigating,
+    isTransitioning,
     nextStep,
     previousStep,
     stopDemo,
@@ -28,17 +29,19 @@ export function DemoControls() {
     if (!isActive) return
     if (!isAutoPlay) return
     if (isNavigating) return
+    if (isTransitioning) return
     if (isComplete) return
 
     const timerId = window.setTimeout(() => nextStep(), AUTO_ADVANCE_MS)
     return () => window.clearTimeout(timerId)
-  }, [isActive, isAutoPlay, currentStepIndex, isComplete, isNavigating, nextStep])
+  }, [isActive, isAutoPlay, currentStepIndex, isComplete, isNavigating, isTransitioning, nextStep])
 
   if (!isActive) return null
   if (isComplete) return null
 
   return (
     <motion.div
+      data-demo-safe-bottom
       className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[10001] pointer-events-auto"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -77,15 +80,15 @@ export function DemoControls() {
         {/* Next button */}
         <button
           onClick={nextStep}
-          disabled={isNavigating}
+          disabled={isNavigating || isTransitioning}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-full transition-all disabled:opacity-50"
           style={{
             backgroundColor: accentColor,
             color: "black",
           }}
         >
-          {isNavigating ? "Loading..." : "Next"}
-          {!isNavigating && <ChevronRight className="h-4 w-4" />}
+          {isNavigating || isTransitioning ? "Loading..." : "Next"}
+          {!isNavigating && !isTransitioning && <ChevronRight className="h-4 w-4" />}
         </button>
 
         {/* Exit button */}

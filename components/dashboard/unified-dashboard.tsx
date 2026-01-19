@@ -365,12 +365,12 @@ export function UnifiedDashboard() {
             /* Mobile Layout: Stacked with collapsible panels at bottom */
             <div className="space-y-4">
               {/* Kanban */}
-              <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 h-[240px] overflow-hidden">
+              <div data-demo-id="demo-suggestions-kanban" className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 h-[240px] overflow-hidden">
                 {kanbanContent}
               </div>
 
               {/* Calendar */}
-              <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden h-[60vh]">
+              <div data-demo-id="demo-calendar" className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden h-[60vh]">
                 {calendarContent}
               </div>
 

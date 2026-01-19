@@ -16,6 +16,7 @@ type DemoState = {
   currentStepIndex: number
   totalSteps: number
   isNavigating: boolean
+  isTransitioning: boolean
   nextStep: () => void
   previousStep: () => void
   stopDemo: () => void
@@ -34,6 +35,7 @@ describe("DemoControls hook ordering", () => {
       currentStepIndex: 0,
       totalSteps: 3,
       isNavigating: false,
+      isTransitioning: false,
       nextStep: vi.fn(),
       previousStep: vi.fn(),
       stopDemo: vi.fn(),
