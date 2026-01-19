@@ -10,6 +10,7 @@ import { Footer } from "@/components/footer"
 import { ScrollReveal } from "@/components/scroll-reveal"
 import { KanariTextLogo } from "@/components/kanari-text-logo"
 import { HeroColorPicker } from "@/components/hero-color-picker"
+import { DemoTriggerButton } from "@/components/demo"
 
 export default function LandingPage() {
   const [heroVisible, setHeroVisible] = useState(false)
@@ -38,7 +39,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-transparent overflow-x-hidden">
       {/* Hero */}
-      <section className="relative min-h-screen flex flex-col justify-center px-6 md:px-12">
+      <section className="relative min-h-screen flex flex-col justify-center px-6 md:px-12" data-demo-id="demo-hero">
         <div className="relative z-10 max-w-3xl">
           {/* Brand name - large and prominent, clickable for color picker */}
           <div
@@ -70,11 +71,12 @@ export default function LandingPage() {
           </p>
 
           <div
-            className={`transition-all duration-1000 delay-800 ${
+            className={`flex items-center gap-4 transition-all duration-1000 delay-800 ${
               heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
             }`}
           >
             <EnterButton variant="hero" />
+            <DemoTriggerButton />
           </div>
         </div>
 
@@ -153,7 +155,7 @@ export default function LandingPage() {
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="py-32 px-6 md:px-12 bg-card/50 backdrop-blur-xl">
+      <section id="how-it-works" className="py-32 px-6 md:px-12 bg-card/50 backdrop-blur-xl" data-demo-id="demo-how-it-works">
         <ScrollReveal>
           <div className="max-w-7xl mx-auto">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-16">How It Works</p>

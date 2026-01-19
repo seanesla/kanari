@@ -104,6 +104,7 @@ function CheckInsSidebar({
       collapsible="offcanvas"
       transparent
       className="border-r border-transparent p-3"
+      data-demo-id="demo-checkin-sidebar"
     >
       <div
         className="relative h-full w-full rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 flex flex-col group"
@@ -127,6 +128,7 @@ function CheckInsSidebar({
             <Button
               onClick={onNewCheckIn}
               className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 gap-2"
+              data-demo-id="demo-new-checkin-button"
             >
               <Sparkles className="h-4 w-4" />
               New Check-in
@@ -474,6 +476,7 @@ function HistoryPageContent() {
 
   return (
     <div
+      data-demo-id="demo-history-page"
       className={cn(
         "h-svh bg-transparent relative overflow-hidden transition-all duration-500 pt-[calc(env(safe-area-inset-top)+4rem)] pb-[env(safe-area-inset-bottom)] md:pt-0",
         visible ? "opacity-100" : "opacity-95"

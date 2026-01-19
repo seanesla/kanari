@@ -41,6 +41,7 @@ if (typeof window !== "undefined" && !("Notification" in window)) {
 vi.mock("next-view-transitions", async () => {
   const React = await import("react")
   return {
+    ViewTransitions: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
     Link: ({
       href,
       children,
@@ -58,6 +59,14 @@ vi.mock("next-view-transitions", async () => {
         },
         children
       ),
+    useTransitionRouter: () => ({
+      push: vi.fn(),
+      replace: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      refresh: vi.fn(),
+      prefetch: vi.fn(),
+    }),
   }
 })
 

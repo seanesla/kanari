@@ -73,7 +73,7 @@ export default function AchievementsPage() {
   const nextMilestone = [7, 30, 60, 90].find((d) => d > currentStreak) ?? null
 
   return (
-    <div className="min-h-screen bg-transparent relative overflow-hidden">
+    <div data-demo-id="demo-achievements-page" className="min-h-screen bg-transparent relative overflow-hidden">
       {/* Subtle gradient orb for visual depth */}
       <div className="pointer-events-none absolute top-40 right-10 h-48 w-48 rounded-full bg-accent/3 blur-3xl" />
       <div className="pointer-events-none absolute -top-10 left-10 h-56 w-56 rounded-full bg-accent/5 blur-3xl" />
@@ -102,7 +102,7 @@ export default function AchievementsPage() {
         >
           <div className="grid gap-4 lg:grid-cols-3">
             {/* Today */}
-            <div className="lg:col-span-2 rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+            <div data-demo-id="demo-daily-challenges" className="lg:col-span-2 rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold">Today&apos;s Focus</h2>

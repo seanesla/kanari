@@ -12,6 +12,7 @@ import { PersistentNavbar } from "@/components/persistent-navbar"
 import { ColorSync } from "@/components/color-sync"
 import { IconProvider } from "./icon-provider"
 import { DataPreloader } from "./data-preloader"
+import { DemoProvider, DemoOverlay } from "@/components/demo"
 
 export function Providers({ children }: { children: ReactNode }) {
   return (
@@ -21,11 +22,14 @@ export function Providers({ children }: { children: ReactNode }) {
           <SceneProvider>
             <TimeZoneProvider>
               <ColorSync />
-              <NavbarProvider>
-                <SceneBackground />
-                <PersistentNavbar />
-                {children}
-              </NavbarProvider>
+              <DemoProvider>
+                <NavbarProvider>
+                  <SceneBackground />
+                  <PersistentNavbar />
+                  {children}
+                  <DemoOverlay />
+                </NavbarProvider>
+              </DemoProvider>
             </TimeZoneProvider>
           </SceneProvider>
         </DataPreloader>

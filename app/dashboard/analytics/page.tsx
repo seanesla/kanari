@@ -195,7 +195,7 @@ export default function AnalyticsPage() {
   }, [allRecordings, allSessions])
 
   return (
-    <div className="min-h-screen bg-transparent relative overflow-hidden">
+    <div data-demo-id="demo-analytics-page" className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-20 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
         {/* Header */}
         <div
@@ -244,6 +244,7 @@ export default function AnalyticsPage() {
         {/* Burnout Prediction */}
         {burnoutPrediction && (
           <div
+            data-demo-id="demo-burnout-prediction"
             className={cn(
               "relative mb-16 transition-all duration-1000 delay-300",
               visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
@@ -343,7 +344,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Charts Grid */}
-            <div className="grid md:grid-cols-2 gap-8 items-start">
+            <div data-demo-id="demo-trend-charts" className="grid md:grid-cols-2 gap-8 items-start">
               {/* Chart 1: 7-Day Trend */}
               <div
                 className={cn(

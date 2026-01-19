@@ -277,10 +277,11 @@ export function UnifiedDashboard() {
   }, [droppedSuggestion, scheduleDialogSuggestion])
 
   return (
-    <div className="min-h-screen bg-transparent relative overflow-hidden">
+    <div data-demo-id="demo-dashboard-main" className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-20 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
         {/* Compact Header with Title + Metrics */}
         <div
+          data-demo-id="demo-metrics-header"
           className={cn(
             "mb-6 transition-all duration-1000 delay-100",
             visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
@@ -398,6 +399,7 @@ export function UnifiedDashboard() {
             <div className="space-y-4">
               {/* Kanban */}
               <div
+                data-demo-id="demo-suggestions-kanban"
                 className={cn(
                   "rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 overflow-hidden transition-all duration-300",
                   kanbanExpanded ? "h-[400px]" : "h-[240px]"
@@ -407,7 +409,7 @@ export function UnifiedDashboard() {
               </div>
 
               {/* Calendar */}
-              <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden h-[70vh] min-h-[520px]">
+              <div data-demo-id="demo-calendar" className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden h-[70vh] min-h-[520px]">
                 {calendarContent}
               </div>
 

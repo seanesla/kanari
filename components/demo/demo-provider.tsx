@@ -1,0 +1,412 @@
+"use client"
+
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  type ReactNode,
+} from "react"
+import { useTransitionRouter } from "next-view-transitions"
+import {
+  db,
+  fromCheckInSession,
+  fromTrendData,
+  fromSuggestion,
+  fromDailyAchievement,
+  fromMilestoneBadge,
+  fromJournalEntry,
+  toTrendData,
+} from "@/lib/storage/db"
+import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import type { TrendData } from "@/lib/types"
+import {
+  generateDemoCheckInSessions,
+  generateDemoTrendData,
+  generateDemoSuggestions,
+  generateDemoAchievements,
+  generateDemoMilestoneBadges,
+  generateDemoUserProgress,
+  generateDemoJournalEntries,
+  DEMO_USER_NAME,
+  DEMO_API_KEY,
+} from "@/lib/demo/demo-data"
+import { waitForElement, scrollToElement } from "@/lib/demo/demo-utils"
+import type { DemoState, DemoContextValue, DemoStep } from "./steps/types"
+import { ALL_DEMO_STEPS } from "./steps/all-steps"
+
+const DemoContext = createContext<DemoContextValue | null>(null)
+
+const DEMO_BACKUP_STORAGE_KEY = "kanari_demo_backup_v1"
+
+type DemoBackupV1 = {
+  version: 1
+  createdAtISO: string
+  settings: {
+    existed: boolean
+    userName?: string
+    geminiApiKey?: string
+    hasCompletedOnboarding?: boolean
+    onboardingCompletedAt?: string
+  }
+  userProgress: {
+    existed: boolean
+    record?: unknown
+  }
+  trendData: {
+    previous: TrendData[]
+    missingIds: string[]
+  }
+}
+
+function safeReadDemoBackup(): DemoBackupV1 | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = window.localStorage.getItem(DEMO_BACKUP_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as DemoBackupV1
+    if (parsed?.version !== 1) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function safeWriteDemoBackup(backup: DemoBackupV1): void {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(DEMO_BACKUP_STORAGE_KEY, JSON.stringify(backup))
+  } catch {
+    // Ignore localStorage failures (private mode, quota, etc.)
+  }
+}
+
+function safeClearDemoBackup(): void {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.removeItem(DEMO_BACKUP_STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+const initialState: DemoState = {
+  isActive: false,
+  currentStepIndex: 0,
+  totalSteps: ALL_DEMO_STEPS.length,
+  currentPhase: "landing",
+  highlightedElement: null,
+  isNavigating: false,
+  hasSeededData: false,
+}
+
+interface DemoProviderProps {
+  children: ReactNode
+}
+
+export function DemoProvider({ children }: DemoProviderProps) {
+  const router = useTransitionRouter()
+  const [state, setState] = useState<DemoState>(initialState)
+
+  // Seed demo data into IndexedDB
+  const seedDemoData = useCallback(async () => {
+    try {
+      const sessions = generateDemoCheckInSessions()
+      const trends = generateDemoTrendData()
+      const suggestions = generateDemoSuggestions()
+      const achievements = generateDemoAchievements()
+      const badges = generateDemoMilestoneBadges()
+      const progress = generateDemoUserProgress()
+      const journals = generateDemoJournalEntries()
+
+      // Backup any real user data we're about to overwrite (settings/userProgress/trendData).
+      // This keeps demo mode reversible.
+      // See: docs/error-patterns/demo-mode-overwrites-real-user-data.md
+      if (!safeReadDemoBackup()) {
+        const existingSettings = await db.settings.get("default")
+        const existingProgress = await db.userProgress.get("default")
+
+        const previousTrends: TrendData[] = []
+        const missingTrendIds: string[] = []
+        for (const trend of trends) {
+          const existingTrend = await db.trendData.get(trend.date)
+          if (existingTrend) {
+            previousTrends.push(toTrendData(existingTrend))
+          } else {
+            missingTrendIds.push(trend.date)
+          }
+        }
+
+        safeWriteDemoBackup({
+          version: 1,
+          createdAtISO: new Date().toISOString(),
+          settings: {
+            existed: !!existingSettings,
+            userName: existingSettings?.userName,
+            geminiApiKey: existingSettings?.geminiApiKey,
+            hasCompletedOnboarding: existingSettings?.hasCompletedOnboarding,
+            onboardingCompletedAt: existingSettings?.onboardingCompletedAt,
+          },
+          userProgress: {
+            existed: !!existingProgress,
+            record: existingProgress ?? undefined,
+          },
+          trendData: {
+            previous: previousTrends,
+            missingIds: missingTrendIds,
+          },
+        })
+      }
+
+      // Fast bulk seeding to keep "Watch Demo" snappy for judges.
+      // See: docs/error-patterns/demo-seed-data-bulk-operations.md
+      await db.transaction(
+        "rw",
+        [
+          db.checkInSessions,
+          db.trendData,
+          db.suggestions,
+          db.achievements,
+          db.milestoneBadges,
+          db.userProgress,
+          db.journalEntries,
+          db.settings,
+        ],
+        async () => {
+          await db.checkInSessions.bulkPut(sessions.map(fromCheckInSession))
+          await db.trendData.bulkPut(trends.map(fromTrendData))
+          await db.suggestions.bulkPut(suggestions.map(fromSuggestion))
+          await db.achievements.bulkPut(achievements.map(fromDailyAchievement))
+          await db.milestoneBadges.bulkPut(badges.map(fromMilestoneBadge))
+          await db.userProgress.put(progress)
+          await db.journalEntries.bulkPut(journals.map(fromJournalEntry))
+
+          const existingSettings = await db.settings.get("default")
+          if (existingSettings) {
+            await db.settings.update("default", {
+              userName: DEMO_USER_NAME,
+              geminiApiKey: DEMO_API_KEY,
+              hasCompletedOnboarding: true,
+              onboardingCompletedAt: new Date().toISOString(),
+            })
+          } else {
+            await db.settings.put(
+              createDefaultSettingsRecord({
+                userName: DEMO_USER_NAME,
+                geminiApiKey: DEMO_API_KEY,
+                hasCompletedOnboarding: true,
+                onboardingCompletedAt: new Date().toISOString(),
+              })
+            )
+          }
+        }
+      )
+
+      return true
+    } catch (error) {
+      console.error("[DemoProvider] Failed to seed demo data:", error)
+      return false
+    }
+  }, [])
+
+  // Clean up demo data
+  const cleanupDemoData = useCallback(async () => {
+    try {
+      const backup = safeReadDemoBackup()
+
+      const sessions = await db.checkInSessions.toArray()
+      const demoSessionIds = sessions.filter((s) => s.id.startsWith("demo_")).map((s) => s.id)
+      await db.checkInSessions.bulkDelete(demoSessionIds)
+
+      const suggestions = await db.suggestions.toArray()
+      const demoSuggestionIds = suggestions.filter((s) => s.id.startsWith("demo_")).map((s) => s.id)
+      await db.suggestions.bulkDelete(demoSuggestionIds)
+
+      const achievements = await db.achievements.toArray()
+      const demoAchievementIds = achievements.filter((a) => a.id.startsWith("demo_")).map((a) => a.id)
+      await db.achievements.bulkDelete(demoAchievementIds)
+
+      const badges = await db.milestoneBadges.toArray()
+      const demoBadgeIds = badges.filter((b) => b.id.startsWith("demo_")).map((b) => b.id)
+      await db.milestoneBadges.bulkDelete(demoBadgeIds)
+
+      const journals = await db.journalEntries.toArray()
+      const demoJournalIds = journals.filter((j) => j.id.startsWith("demo_")).map((j) => j.id)
+      await db.journalEntries.bulkDelete(demoJournalIds)
+
+      if (backup) {
+        // Restore any overwritten tables/records.
+        if (backup.trendData.missingIds.length > 0) {
+          await db.trendData.bulkDelete(backup.trendData.missingIds)
+        }
+        if (backup.trendData.previous.length > 0) {
+          await db.trendData.bulkPut(backup.trendData.previous.map(fromTrendData))
+        }
+
+        if (backup.userProgress.existed) {
+          await db.userProgress.put(backup.userProgress.record as Parameters<typeof db.userProgress.put>[0])
+        } else {
+          await db.userProgress.delete("default")
+        }
+
+        if (backup.settings.existed) {
+          await db.settings.update("default", {
+            userName: backup.settings.userName,
+            geminiApiKey: backup.settings.geminiApiKey,
+            hasCompletedOnboarding: backup.settings.hasCompletedOnboarding,
+            onboardingCompletedAt: backup.settings.onboardingCompletedAt,
+          })
+        } else {
+          await db.settings.update("default", {
+            userName: undefined,
+            geminiApiKey: undefined,
+            hasCompletedOnboarding: false,
+            onboardingCompletedAt: undefined,
+          })
+        }
+
+        safeClearDemoBackup()
+      } else {
+        // Best-effort fallback: restore the fields we explicitly changed.
+        await db.settings.update("default", {
+          userName: undefined,
+          hasCompletedOnboarding: false,
+          onboardingCompletedAt: undefined,
+          geminiApiKey: undefined,
+        })
+      }
+    } catch (error) {
+      console.error("[DemoProvider] Failed to cleanup demo data:", error)
+    }
+  }, [])
+
+  // Get current step
+  const getCurrentStep = useCallback((): DemoStep | null => {
+    if (!state.isActive || state.currentStepIndex >= ALL_DEMO_STEPS.length) {
+      return null
+    }
+    return ALL_DEMO_STEPS[state.currentStepIndex]
+  }, [state.isActive, state.currentStepIndex])
+
+  // Execute step (scroll, highlight, etc.)
+  const executeStep = useCallback(async (step: DemoStep) => {
+    // If step changes route, do a client navigation (do NOT hard-reload or we lose demo state).
+    // See: docs/error-patterns/internal-navigation-window-location-href.md
+    if (step.route) {
+      setState((prev) => ({ ...prev, isNavigating: true, highlightedElement: null }))
+      router.push(step.route)
+    }
+
+    // Wait for target element if specified
+    if (step.waitFor) {
+      await waitForElement(step.waitFor, 5000)
+    }
+
+    // Wait for target element
+    const element = await waitForElement(step.target, 3000)
+    if (element) {
+      scrollToElement(element, step.scrollBehavior)
+      await new Promise((resolve) => setTimeout(resolve, 300))
+    }
+
+    // Update state
+    setState((prev) => ({
+      ...prev,
+      highlightedElement: step.target,
+      currentPhase: step.phase,
+      isNavigating: false,
+    }))
+  }, [router])
+
+  // Navigate to next step
+  const nextStep = useCallback(() => {
+    setState((prev) => {
+      const nextIndex = prev.currentStepIndex + 1
+      if (nextIndex >= ALL_DEMO_STEPS.length) {
+        return {
+          ...prev,
+          currentStepIndex: nextIndex,
+          currentPhase: "complete",
+          highlightedElement: null,
+        }
+      }
+      return { ...prev, currentStepIndex: nextIndex }
+    })
+  }, [])
+
+  // Navigate to previous step
+  const previousStep = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      currentStepIndex: Math.max(0, prev.currentStepIndex - 1),
+    }))
+  }, [])
+
+  // Go to specific step
+  const goToStep = useCallback((index: number) => {
+    if (index >= 0 && index < ALL_DEMO_STEPS.length) {
+      setState((prev) => ({ ...prev, currentStepIndex: index }))
+    }
+  }, [])
+
+  // Start demo
+  const startDemo = useCallback(async () => {
+    const seeded = await seedDemoData()
+    setState({
+      isActive: true,
+      currentStepIndex: 0,
+      totalSteps: ALL_DEMO_STEPS.length,
+      currentPhase: "landing",
+      highlightedElement: null,
+      isNavigating: false,
+      hasSeededData: seeded,
+    })
+  }, [seedDemoData])
+
+  // Stop demo
+  const stopDemo = useCallback(() => {
+    cleanupDemoData()
+    setState(initialState)
+    router.push("/")
+  }, [cleanupDemoData, router])
+
+  // Execute step when step index changes
+  useEffect(() => {
+    if (state.isActive && state.currentStepIndex < ALL_DEMO_STEPS.length) {
+      const step = ALL_DEMO_STEPS[state.currentStepIndex]
+      executeStep(step)
+    }
+  }, [state.isActive, state.currentStepIndex, executeStep])
+
+  const contextValue = useMemo<DemoContextValue>(
+    () => ({
+      ...state,
+      startDemo,
+      stopDemo,
+      nextStep,
+      previousStep,
+      goToStep,
+      getCurrentStep,
+    }),
+    [state, startDemo, stopDemo, nextStep, previousStep, goToStep, getCurrentStep]
+  )
+
+  return (
+    <DemoContext.Provider value={contextValue}>{children}</DemoContext.Provider>
+  )
+}
+
+export function useDemo(): DemoContextValue {
+  const context = useContext(DemoContext)
+  if (!context) {
+    throw new Error("useDemo must be used within a DemoProvider")
+  }
+  return context
+}
+
+export function useDemoStatus(): { isActive: boolean } {
+  const context = useContext(DemoContext)
+  return { isActive: context?.isActive ?? false }
+}
