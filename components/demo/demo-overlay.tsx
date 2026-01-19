@@ -1,13 +1,14 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { useEffect } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { useDemo } from "./demo-provider"
 import { DemoSpotlight } from "./demo-spotlight"
 import { DemoTooltip } from "./demo-tooltip"
 import { DemoControls } from "./demo-controls"
 import { DemoProgress } from "./demo-progress"
 import { useSceneMode } from "@/lib/scene-context"
+import { findDemoElement, scrollToElement } from "@/lib/demo/demo-utils"
 import { CheckCircle2, RotateCcw, ArrowRight } from "@/lib/icons"
 
 export function DemoOverlay() {
@@ -28,6 +29,9 @@ export function DemoOverlay() {
 
   const currentStep = getCurrentStep()
   const isComplete = currentStepIndex >= totalSteps
+  const scrollSnapTimeoutRef = useRef<number | null>(null)
+  const scrollSnapHoldRef = useRef(false)
+  const [isExiting, setIsExiting] = useState(false)
 
   useEffect(() => {
     if (!isActive) return
@@ -55,8 +59,7 @@ export function DemoOverlay() {
         return
       }
 
-      if (isNavigating || isTransitioning || isComplete) return
-
+      if (isNavigating || isTransitioning || isComplete || isExiting) return
       if (event.key === "ArrowRight" || event.key === "Enter" || event.key === " ") {
         event.preventDefault()
         nextStep()
@@ -71,7 +74,66 @@ export function DemoOverlay() {
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [isActive, isComplete, isNavigating, isTransitioning, nextStep, previousStep, stopDemo])
+  }, [isActive, isComplete, isNavigating, isTransitioning, isExiting, nextStep, previousStep, stopDemo])
+
+  useEffect(() => {
+    if (!isActive) return
+    if (isNavigating || isTransitioning || isComplete || isExiting) return
+    if (!highlightedElement) return
+
+    const snapBehavior = currentStep?.scrollBehavior || "center"
+    const snapDelayMs = 120
+    const snapHoldMs = 900
+
+    const clearSnapTimeout = () => {
+      if (scrollSnapTimeoutRef.current != null) {
+        window.clearTimeout(scrollSnapTimeoutRef.current)
+        scrollSnapTimeoutRef.current = null
+      }
+    }
+
+    const snapToTarget = () => {
+      if (scrollSnapHoldRef.current) return
+      const target = findDemoElement(highlightedElement)
+      if (!target) return
+
+      scrollSnapHoldRef.current = true
+      scrollToElement(target, snapBehavior)
+
+      window.setTimeout(() => {
+        scrollSnapHoldRef.current = false
+      }, snapHoldMs)
+    }
+
+    const onScroll = () => {
+      if (scrollSnapHoldRef.current) return
+      clearSnapTimeout()
+      scrollSnapTimeoutRef.current = window.setTimeout(snapToTarget, snapDelayMs)
+    }
+
+    window.addEventListener("scroll", onScroll, true)
+    return () => {
+      window.removeEventListener("scroll", onScroll, true)
+      clearSnapTimeout()
+    }
+  }, [
+    isActive,
+    isComplete,
+    isNavigating,
+    isTransitioning,
+    isExiting,
+    highlightedElement,
+    currentStep?.scrollBehavior,
+  ])
+
+  const handleExitToDashboard = useCallback(() => {
+    if (isExiting) return
+    setIsExiting(true)
+
+    window.setTimeout(() => {
+      stopDemo("/dashboard")
+    }, 280)
+  }, [isExiting, stopDemo])
 
   if (!isActive) return null
 
@@ -128,7 +190,7 @@ export function DemoOverlay() {
       </AnimatePresence>
 
       {/* Tooltip with content */}
-      {!isNavigating && (
+      {!isNavigating && !isTransitioning && (
         <DemoTooltip
           targetId={highlightedElement}
           content={currentStep?.content || ""}
@@ -147,15 +209,15 @@ export function DemoOverlay() {
           <motion.div
             className="fixed inset-0 z-[10002] flex items-center justify-center bg-background/90 backdrop-blur-md"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            animate={{ opacity: isExiting ? 0 : 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.28 }}
           >
             <motion.div
               className="max-w-sm mx-4 p-8 rounded-2xl bg-card/50 backdrop-blur-xl text-center border border-foreground/10"
-              initial={{ scale: 0.9, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              transition={{ type: "spring", stiffness: 300, damping: 30, delay: 0.1 }}
+              initial={{ scale: 0.95, y: 10 }}
+              animate={{ scale: isExiting ? 0.97 : 1, y: isExiting ? 6 : 0 }}
+              transition={{ duration: 0.28, ease: [0.22, 0.61, 0.36, 1] }}
             >
               {/* Success icon */}
               <motion.div
@@ -176,17 +238,19 @@ export function DemoOverlay() {
               <div className="flex gap-3 justify-center">
                 <button
                   onClick={() => goToStep(0)}
-                  className="flex items-center gap-2 px-4 py-2 text-sm border border-foreground/20 rounded-full hover:bg-foreground/5 transition-colors"
+                  disabled={isExiting}
+                  className="flex items-center gap-2 px-4 py-2 text-sm border border-foreground/20 rounded-full hover:bg-foreground/5 transition-colors disabled:opacity-60"
                 >
                   <RotateCcw className="w-4 h-4" />
                   Restart
                 </button>
                 <button
-                  onClick={stopDemo}
-                  className="flex items-center gap-2 px-4 py-2 text-sm rounded-full transition-colors"
+                  onClick={handleExitToDashboard}
+                  disabled={isExiting}
+                  className="flex items-center gap-2 px-4 py-2 text-sm rounded-full transition-colors disabled:opacity-80"
                   style={{ backgroundColor: accentColor, color: "black" }}
                 >
-                  Get Started
+                  Go to Dashboard
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

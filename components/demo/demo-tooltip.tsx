@@ -24,6 +24,8 @@ const TOOLTIP_WIDTH = 340
 const TOOLTIP_MIN_HEIGHT = 100
 
 const MOBILE_BREAKPOINT_PX = 640
+const TRACKING_EASE = [0.22, 0.61, 0.36, 1] as const
+const TRACKING_DURATION = 0.22
 
 function roundToDpr(value: number): number {
   if (typeof window === "undefined") return value
@@ -67,7 +69,8 @@ export function DemoTooltip({
   }, [])
 
   const updateIsMobile = useCallback(() => {
-    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT_PX)
+    const next = window.innerWidth < MOBILE_BREAKPOINT_PX
+    setIsMobile((prev) => (prev === next ? prev : next))
   }, [])
 
   // Update tooltip position
@@ -93,20 +96,19 @@ export function DemoTooltip({
     const { x, y } = calculateTooltipPosition(targetRect, optimalPos, TOOLTIP_WIDTH, TOOLTIP_MIN_HEIGHT)
 
     const activeSafeAreas = safeAreasOverride || safeAreas
-
-    // Clamp within safe areas
-    const viewportPaddingX = activeSafeAreas.top
-    const viewportPaddingTop = activeSafeAreas.top
-    const viewportPaddingBottom = activeSafeAreas.bottom
+    const horizontalPadding = 16
+    const verticalPadding = 12
+    const safeTop = activeSafeAreas.top + verticalPadding
+    const safeBottom = activeSafeAreas.bottom + verticalPadding
 
     const clampedX = Math.max(
-      viewportPaddingX,
-      Math.min(x, window.innerWidth - TOOLTIP_WIDTH - viewportPaddingX)
+      horizontalPadding,
+      Math.min(x, window.innerWidth - TOOLTIP_WIDTH - horizontalPadding)
     )
 
     const clampedY = Math.max(
-      viewportPaddingTop,
-      Math.min(y, window.innerHeight - TOOLTIP_MIN_HEIGHT - viewportPaddingBottom)
+      safeTop,
+      Math.min(y, window.innerHeight - TOOLTIP_MIN_HEIGHT - safeBottom)
     )
 
     setCoords({ x: roundToDpr(clampedX), y: roundToDpr(clampedY) })
@@ -134,7 +136,7 @@ export function DemoTooltip({
     if (!isVisible) return
 
     // Let layout settle (route transitions / smooth scroll), then schedule a frame-based update.
-    const timer = window.setTimeout(scheduleUpdate, 250)
+    const timer = window.setTimeout(scheduleUpdate, 120)
     return () => window.clearTimeout(timer)
   }, [isVisible, targetId, scheduleUpdate])
 
@@ -210,7 +212,6 @@ export function DemoTooltip({
     <AnimatePresence mode="wait">
       {isVisible && targetId && (
         <motion.div
-          key={`tooltip-${targetId}`}
           // Anchor to (0,0) so framer-motion `x`/`y` maps to viewport coordinates.
           // See: docs/error-patterns/fixed-overlay-transform-without-inset.md
           className={
@@ -222,9 +223,9 @@ export function DemoTooltip({
           style={
             isMobile
               ? {
-                  paddingLeft: safeAreas.top,
-                  paddingRight: safeAreas.top,
-                  paddingBottom: safeAreas.bottom,
+                  paddingLeft: 16,
+                  paddingRight: 16,
+                  paddingBottom: safeAreas.bottom + 12,
                   willChange: "transform, opacity",
                 }
               : {
@@ -237,9 +238,9 @@ export function DemoTooltip({
               ? { opacity: 0, y: 20 }
               : {
                   opacity: 0,
-                  scale: 0.98,
-                  y: actualPosition === "top" ? 10 : actualPosition === "bottom" ? -10 : 0,
-                  x: actualPosition === "left" ? 10 : actualPosition === "right" ? -10 : 0,
+                  scale: 0.99,
+                  y: actualPosition === "top" ? 8 : actualPosition === "bottom" ? -8 : 0,
+                  x: actualPosition === "left" ? 8 : actualPosition === "right" ? -8 : 0,
                 }
           }
           animate={
@@ -252,8 +253,8 @@ export function DemoTooltip({
                   y: coords.y,
                 }
           }
-          exit={isMobile ? { opacity: 0, y: 20 } : { opacity: 0, scale: 0.98 }}
-          transition={{ type: "spring", stiffness: 260, damping: 34, mass: 0.9 }}
+          exit={isMobile ? { opacity: 0, y: 20 } : { opacity: 0, scale: 0.99 }}
+          transition={{ duration: TRACKING_DURATION, ease: TRACKING_EASE }}
         >
           {/* Glass panel container */}
           <div

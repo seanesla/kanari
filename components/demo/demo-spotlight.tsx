@@ -16,6 +16,10 @@ interface SpotlightRect {
   height: number
 }
 
+const TRACKING_EASE = [0.22, 0.61, 0.36, 1] as const
+const TRACKING_DURATION = 0.22
+const PULSE_DURATION = 2.2
+
 function roundToDpr(value: number): number {
   if (typeof window === "undefined") return value
   const dpr = window.devicePixelRatio || 1
@@ -34,7 +38,6 @@ function roundRectToDpr(rect: SpotlightRect): SpotlightRect {
 export function DemoSpotlight({ targetId }: DemoSpotlightProps) {
   const { accentColor } = useSceneMode()
   const [rect, setRect] = useState<SpotlightRect | null>(null)
-
   const rafIdRef = useRef<number | null>(null)
 
   const requestFrame = useCallback((cb: FrameRequestCallback) => {
@@ -139,8 +142,7 @@ export function DemoSpotlight({ targetId }: DemoSpotlightProps) {
                 height: rect.height,
                 opacity: 1,
               }}
-               transition={{ type: "spring", stiffness: 220, damping: 35, mass: 0.9 }}
-
+              transition={{ duration: TRACKING_DURATION, ease: TRACKING_EASE }}
               rx="12"
               fill="black"
             />
@@ -163,16 +165,15 @@ export function DemoSpotlight({ targetId }: DemoSpotlightProps) {
         className="fixed left-0 top-0 pointer-events-none z-[9999]"
         data-testid="demo-spotlight-glow"
         initial={{ opacity: 0, scale: 0.95 }}
-        animate={{
-          x: rect.x,
-          y: rect.y,
-          width: rect.width,
-          height: rect.height,
-          opacity: 1,
-          scale: 1,
-        }}
-         transition={{ type: "spring", stiffness: 220, damping: 35, mass: 0.9 }}
-
+         animate={{
+           x: rect.x,
+           y: rect.y,
+           width: rect.width,
+           height: rect.height,
+           opacity: 1,
+           scale: 1,
+         }}
+        transition={{ duration: TRACKING_DURATION, ease: TRACKING_EASE }}
         style={{
           borderRadius: "12px",
           boxShadow: `
@@ -195,15 +196,14 @@ export function DemoSpotlight({ targetId }: DemoSpotlightProps) {
           y: rect.y - 4,
           width: rect.width + 8,
           height: rect.height + 8,
-          opacity: [0.3, 0.6, 0.3],
+          opacity: [0.25, 0.5, 0.25],
         }}
         transition={{
-           x: { type: "spring", stiffness: 200, damping: 40, mass: 1 },
-           y: { type: "spring", stiffness: 200, damping: 40, mass: 1 },
-           width: { type: "spring", stiffness: 200, damping: 40, mass: 1 },
-           height: { type: "spring", stiffness: 200, damping: 40, mass: 1 },
-
-          opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+          x: { duration: TRACKING_DURATION, ease: TRACKING_EASE },
+          y: { duration: TRACKING_DURATION, ease: TRACKING_EASE },
+          width: { duration: TRACKING_DURATION, ease: TRACKING_EASE },
+          height: { duration: TRACKING_DURATION, ease: TRACKING_EASE },
+          opacity: { duration: PULSE_DURATION, repeat: Infinity, ease: "easeInOut" },
         }}
         style={{
           borderRadius: "16px",

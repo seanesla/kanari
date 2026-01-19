@@ -7,8 +7,9 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from "react"
+import Image from "next/image"
 import { motion } from "framer-motion"
-import { Key, ExternalLink, CheckCircle2, AlertCircle, Loader2 } from "@/lib/icons"
+import { ExternalLink, CheckCircle2, AlertCircle, Loader2 } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -102,7 +103,7 @@ export function StepApiKey({ initialApiKey = "", onNext, onBack, isActive = true
           animate={{ scale: 1 }}
           transition={{ type: "spring", stiffness: 300, damping: 20 }}
         >
-          <Key className="h-8 w-8 text-accent" />
+          <Image src="/gemini-logo.svg" alt="Gemini" width={40} height={40} priority />
         </motion.div>
         <motion.h1
           className="text-3xl md:text-4xl font-serif"

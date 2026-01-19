@@ -1,7 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import { Brain, ChevronDown, ChevronUp, Info, CheckCircle2, XCircle, Clock } from "@/lib/icons"
+import Image from "next/image"
+import { ChevronDown, ChevronUp, Info, CheckCircle2, XCircle, Clock } from "@/lib/icons"
 import { useSuggestionMemory } from "@/hooks/use-suggestion-memory"
 import { cn } from "@/lib/utils"
 import { useTimeZone } from "@/lib/timezone-context"
@@ -198,7 +199,7 @@ export function GeminiMemorySection() {
   return (
     <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
       <div className="flex items-center gap-2 mb-6">
-        <Brain className="h-5 w-5 text-accent" />
+        <Image src="/gemini-logo.svg" alt="Gemini" width={20} height={20} />
         <h2 className="text-lg font-semibold font-serif">Gemini Memory</h2>
       </div>
 

@@ -19,7 +19,7 @@ type DemoState = {
   isTransitioning: boolean
   nextStep: () => void
   previousStep: () => void
-  stopDemo: () => void
+  stopDemo: (redirectTo?: string) => void
 }
 
 let demoState: DemoState

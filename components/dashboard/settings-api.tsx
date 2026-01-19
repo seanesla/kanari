@@ -1,7 +1,8 @@
 "use client"
 
 import { useCallback, useState } from "react"
-import { AlertCircle, CheckCircle2, Eye, EyeOff, Key, Loader2 } from "@/lib/icons"
+import Image from "next/image"
+import { AlertCircle, CheckCircle2, Eye, EyeOff, Loader2 } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { verifyGeminiApiKey } from "@/lib/gemini/client"
@@ -49,7 +50,7 @@ export function SettingsApiSection({
   return (
     <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
       <div className="flex items-center gap-2 mb-6">
-        <Key className="h-5 w-5 text-accent" />
+        <Image src="/gemini-logo.svg" alt="Gemini" width={20} height={20} />
         <h2 className="text-lg font-semibold font-serif">Gemini API</h2>
       </div>
 

@@ -433,11 +433,14 @@ export function DemoProvider({ children }: DemoProviderProps) {
   }, [seedDemoData])
 
   // Stop demo
-  const stopDemo = useCallback(() => {
-    cleanupDemoData()
-    setState(initialState)
-    router.push("/")
-  }, [cleanupDemoData, router])
+  const stopDemo = useCallback(
+    (redirectTo: string = "/") => {
+      cleanupDemoData()
+      setState(initialState)
+      router.push(redirectTo)
+    },
+    [cleanupDemoData, router]
+  )
 
   // Execute step when step index changes
   useEffect(() => {

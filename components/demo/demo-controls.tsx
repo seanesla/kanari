@@ -93,7 +93,7 @@ export function DemoControls() {
 
         {/* Exit button */}
         <button
-          onClick={stopDemo}
+          onClick={() => stopDemo()}
           className="p-2 rounded-full hover:bg-foreground/10 transition-colors"
           title="Exit demo"
         >

@@ -8,6 +8,7 @@
  */
 
 import { useState } from "react"
+import Image from "next/image"
 import { cn } from "@/lib/utils"
 
 // Pre-generated default coach avatar (DiceBear notionistsNeutral, neutral colors)
@@ -36,6 +37,13 @@ const sizeClasses = {
   xl: "h-16 w-16",
 }
 
+const sizePixels = {
+  sm: 32,
+  md: 40,
+  lg: 48,
+  xl: 64,
+} as const
+
 export function CoachAvatar({
   base64,
   size = "md",
@@ -59,14 +67,17 @@ export function CoachAvatar({
       : `data:image/png;base64,${base64}`
 
   return (
-    <img
+    <Image
       src={src}
       alt={alt}
+      width={sizePixels[size]}
+      height={sizePixels[size]}
       className={cn(
         "rounded-full object-cover flex-shrink-0",
         sizeClasses[size],
         className
       )}
+      unoptimized
       onError={() => setHasError(true)}
     />
   )

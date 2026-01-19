@@ -56,8 +56,8 @@ export interface DemoState {
 export interface DemoContextValue extends DemoState {
   /** Start the demo from the beginning */
   startDemo: () => Promise<void>
-  /** Stop the demo and clean up */
-  stopDemo: () => void
+  /** Stop the demo and clean up (optional redirect) */
+  stopDemo: (redirectTo?: string) => void
   /** Go to next step */
   nextStep: () => void
   /** Go to previous step */

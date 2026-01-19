@@ -28,8 +28,6 @@ export function Providers({ children }: { children: ReactNode }) {
     return () => root.classList.remove("disable-view-transitions")
   }, [])
 
-  const isSafari = typeof navigator !== "undefined" && /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
-
   // next-view-transitions doesn't expose a "disabled" prop. Instead, we add a class
   // that prevents transitions via CSS when we're on Safari.
   return (

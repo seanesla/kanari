@@ -1,3 +1,4 @@
+import Image from "next/image"
 import { Mic, Brain, TrendingUp, Calendar } from "@/lib/icons"
 
 export function FeaturesSection() {
@@ -32,7 +33,10 @@ export function FeaturesSection() {
             Everything you need to stay ahead of burnout
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Privacy-first. Browser-based. Powered by Gemini 3.
+            <span className="inline-flex items-center gap-2">
+              Privacy-first. Browser-based. Powered by Gemini 3.
+              <Image src="/gemini-logo.svg" alt="Gemini" width={16} height={16} />
+            </span>
           </p>
         </div>
 

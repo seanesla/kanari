@@ -107,13 +107,32 @@ export function scrollToElement(
 ): void {
   if (behavior === "none") return
 
-  const options: ScrollIntoViewOptions = {
-    behavior: "smooth",
-    block: behavior === "center" ? "center" : "start",
-    inline: "nearest",
+  const { top: safeTopRaw, bottom: safeBottomRaw } = getDemoSafeAreas()
+  const safeMargin = 12
+  const safeTop = safeTopRaw + safeMargin
+  const safeBottom = safeBottomRaw + safeMargin
+  const viewportHeight = window.innerHeight
+  const rect = element.getBoundingClientRect()
+
+  const safeHeight = Math.max(0, viewportHeight - safeTop - safeBottom)
+  if (safeHeight <= 0) {
+    element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" })
+    return
   }
 
-  element.scrollIntoView(options)
+  let targetTop = window.scrollY
+
+  if (behavior === "center") {
+    const offset = Math.max(0, (safeHeight - rect.height) / 2)
+    targetTop = window.scrollY + rect.top - (safeTop + offset)
+  } else {
+    targetTop = window.scrollY + rect.top - safeTop
+  }
+
+  window.scrollTo({
+    top: Math.max(0, targetTop),
+    behavior: "smooth",
+  })
 }
 
 /**

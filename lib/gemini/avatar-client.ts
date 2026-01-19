@@ -22,14 +22,6 @@ import { getGeminiApiKey } from "./api-utils"
 import { parseGeminiJson } from "./json"
 import { getVoiceStyle } from "./voices"
 
-function normalizeDiceBearHex(color: string) {
-  return (color || "").trim().replace(/^#/, "")
-}
-
-function isDiceBearHex(color: string) {
-  return /^[a-f0-9]{6}$/i.test(color)
-}
-
 // Fixed palette pool for avatar backgrounds (6-digit hex, no #)
 const AVATAR_BACKGROUND_PALETTES: Array<[string, string]> = [
   ["14161a", "2b2f36"], // Dark slate

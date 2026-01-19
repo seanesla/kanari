@@ -529,7 +529,6 @@ export function AccentNebula({ accentColor }: { accentColor: string }) {
       <group ref={spriteGroupRef} matrixAutoUpdate={false}>
         {Array.from({ length: counts.sprites }).map((_, i) => (
             <sprite
-              // eslint-disable-next-line react/no-array-index-key
               key={i}
               position={[
                 spriteData.positions[i * 3],
