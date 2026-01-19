@@ -9,6 +9,25 @@ type DemoSafeAreas = {
   bottom: number
 }
 
+export function isElementVisible(element: HTMLElement): boolean {
+  if (typeof window === "undefined") return false
+
+  const rect = element.getBoundingClientRect()
+  if (rect.width <= 0 || rect.height <= 0) return false
+
+  let current: HTMLElement | null = element
+  while (current) {
+    const style = window.getComputedStyle(current)
+    if (style.display === "none") return false
+    if (style.visibility === "hidden") return false
+    if (parseFloat(style.opacity || "1") <= 0) return false
+    if (style.pointerEvents === "none") return false
+    current = current.parentElement
+  }
+
+  return true
+}
+
 /**
  * Get "blocked" safe areas (px) for demo overlays.
  *
@@ -22,31 +41,18 @@ export function getDemoSafeAreas(): DemoSafeAreas {
 
   const viewportHeight = window.innerHeight
 
-  const isEffectivelyVisible = (el: HTMLElement): boolean => {
-    let current: HTMLElement | null = el
-    while (current) {
-      const style = window.getComputedStyle(current)
-      if (style.display === "none") return false
-      if (style.visibility === "hidden") return false
-      if (parseFloat(style.opacity || "1") <= 0) return false
-      if (style.pointerEvents === "none") return false
-      current = current.parentElement
-    }
-    return true
-  }
-
   const topElements = Array.from(document.querySelectorAll<HTMLElement>("[data-demo-safe-top]"))
   const bottomElements = Array.from(document.querySelectorAll<HTMLElement>("[data-demo-safe-bottom]"))
 
   const top = topElements.reduce((max, el) => {
-    if (!isEffectivelyVisible(el)) return max
+    if (!isElementVisible(el)) return max
     const rect = el.getBoundingClientRect()
     if (rect.height <= 0 || rect.width <= 0) return max
     return Math.max(max, rect.bottom)
   }, 0)
 
   const bottom = bottomElements.reduce((max, el) => {
-    if (!isEffectivelyVisible(el)) return max
+    if (!isElementVisible(el)) return max
     const rect = el.getBoundingClientRect()
     if (rect.height <= 0 || rect.width <= 0) return max
     return Math.max(max, viewportHeight - rect.top)
@@ -60,7 +66,47 @@ export function getDemoSafeAreas(): DemoSafeAreas {
  * Find an element by its data-demo-id attribute
  */
 export function findDemoElement(demoId: string): HTMLElement | null {
-  return document.querySelector(`[data-demo-id="${demoId}"]`)
+  if (typeof window === "undefined") return null
+
+  const candidates = Array.from(document.querySelectorAll<HTMLElement>(`[data-demo-id="${demoId}"]`))
+  if (candidates.length === 0) return null
+
+  // Prefer visible candidates to avoid spotlighting hidden responsive duplicates.
+  // See: docs/error-patterns/demo-highlight-selects-hidden-element.md
+  const visibleCandidates = candidates.filter(isElementVisible)
+  if (visibleCandidates.length === 0) return null
+  if (visibleCandidates.length === 1) return visibleCandidates[0]
+
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
+
+  const getIntersectionArea = (rect: DOMRect): number => {
+    const left = Math.max(rect.left, 0)
+    const top = Math.max(rect.top, 0)
+    const right = Math.min(rect.right, viewportWidth)
+    const bottom = Math.min(rect.bottom, viewportHeight)
+    if (right <= left || bottom <= top) return 0
+    return (right - left) * (bottom - top)
+  }
+
+  const scoredCandidates = visibleCandidates.map((candidate) => {
+    const rect = candidate.getBoundingClientRect()
+    return {
+      candidate,
+      rect,
+      intersection: getIntersectionArea(rect),
+      area: rect.width * rect.height,
+    }
+  })
+
+  const inViewCandidates = scoredCandidates.filter((candidate) => candidate.intersection > 0)
+  const pool = inViewCandidates.length > 0 ? inViewCandidates : scoredCandidates
+
+  return pool.reduce((best, current) => {
+    const currentScore = inViewCandidates.length > 0 ? current.intersection : current.area
+    const bestScore = inViewCandidates.length > 0 ? best.intersection : best.area
+    return currentScore > bestScore ? current : best
+  }).candidate
 }
 
 /**
@@ -88,6 +134,8 @@ export function waitForElement(
     observer.observe(document.body, {
       childList: true,
       subtree: true,
+      attributes: true,
+      attributeFilter: ["style", "class", "data-demo-id"],
     })
 
     // Timeout fallback
@@ -104,8 +152,8 @@ export function waitForElement(
 export function scrollToElement(
   element: HTMLElement,
   behavior: "none" | "center" | "top" = "center"
-): void {
-  if (behavior === "none") return
+): boolean {
+  if (behavior === "none") return false
 
   const { top: safeTopRaw, bottom: safeBottomRaw } = getDemoSafeAreas()
   const safeMargin = 12
@@ -114,10 +162,15 @@ export function scrollToElement(
   const viewportHeight = window.innerHeight
   const rect = element.getBoundingClientRect()
 
+  const maxVisibleTop = safeTop
+  const maxVisibleBottom = viewportHeight - safeBottom
+  const isFullyVisible = rect.top >= maxVisibleTop && rect.bottom <= maxVisibleBottom
+  if (isFullyVisible) return false
+
   const safeHeight = Math.max(0, viewportHeight - safeTop - safeBottom)
   if (safeHeight <= 0) {
     element.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" })
-    return
+    return true
   }
 
   let targetTop = window.scrollY
@@ -129,9 +182,73 @@ export function scrollToElement(
     targetTop = window.scrollY + rect.top - safeTop
   }
 
+  const delta = Math.abs(targetTop - window.scrollY)
+  if (delta < 8) return false
+
   window.scrollTo({
     top: Math.max(0, targetTop),
     behavior: "smooth",
+  })
+
+  return true
+}
+
+export function waitForScrollEnd(timeoutMs = 1000): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve()
+
+  type ScrollWindow = {
+    scrollY: number
+    addEventListener: (
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: AddEventListenerOptions | boolean
+    ) => void
+    removeEventListener: (
+      type: string,
+      listener: EventListenerOrEventListenerObject,
+      options?: EventListenerOptions | boolean
+    ) => void
+    setTimeout: typeof setTimeout
+    clearTimeout: typeof clearTimeout
+  }
+
+  const win = window as unknown as ScrollWindow
+
+  return new Promise((resolve) => {
+    if ("onscrollend" in win) {
+      const handleScrollEnd = () => {
+        win.removeEventListener("scrollend", handleScrollEnd)
+        resolve()
+      }
+      win.addEventListener("scrollend", handleScrollEnd, { once: true })
+      win.setTimeout(() => {
+        win.removeEventListener("scrollend", handleScrollEnd)
+        resolve()
+      }, timeoutMs)
+      return
+    }
+
+    let lastScrollY = win.scrollY
+    let stopCheckId: ReturnType<typeof setTimeout> | null = null
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const checkIfStopped = () => {
+      const currentScrollY = win.scrollY
+      if (currentScrollY === lastScrollY) {
+        if (stopCheckId != null) win.clearTimeout(stopCheckId)
+        if (timeoutId != null) win.clearTimeout(timeoutId)
+        resolve()
+        return
+      }
+      lastScrollY = currentScrollY
+      stopCheckId = win.setTimeout(checkIfStopped, 120)
+    }
+
+    stopCheckId = win.setTimeout(checkIfStopped, 120)
+    timeoutId = win.setTimeout(() => {
+      if (stopCheckId != null) win.clearTimeout(stopCheckId)
+      resolve()
+    }, timeoutMs)
   })
 }
 

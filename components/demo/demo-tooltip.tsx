@@ -1,23 +1,22 @@
 "use client"
 
-import { useEffect, useState, useCallback, useRef } from "react"
+import { useMemo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import {
-  findDemoElement,
-  getElementRect,
   calculateTooltipPosition,
   calculateOptimalPosition,
-  getDemoSafeAreas,
 } from "@/lib/demo/demo-utils"
 import type { TooltipPosition } from "./steps/types"
 
 interface DemoTooltipProps {
-  targetId: string | null
+  targetRect: DOMRect | null
   content: string
   title?: string
   position?: TooltipPosition
   isVisible: boolean
+  safeAreas: { top: number; bottom: number }
+  viewport: { width: number; height: number }
 }
 
 const TOOLTIP_WIDTH = 340
@@ -34,132 +33,51 @@ function roundToDpr(value: number): number {
 }
 
 export function DemoTooltip({
-  targetId,
+  targetRect,
   content,
   title,
   position: preferredPosition,
   isVisible,
+  safeAreas,
+  viewport,
 }: DemoTooltipProps) {
   const { accentColor } = useSceneMode()
-  const [coords, setCoords] = useState({ x: 0, y: 0 })
-  const [actualPosition, setActualPosition] = useState<TooltipPosition>("bottom")
-  const [isMobile, setIsMobile] = useState(() => {
-    if (typeof window === "undefined") return false
-    return window.innerWidth < MOBILE_BREAKPOINT_PX
-  })
+  const isMobile = viewport.width > 0 && viewport.width < MOBILE_BREAKPOINT_PX
 
-  const [safeAreas, setSafeAreas] = useState(() => getDemoSafeAreas())
-  const rafIdRef = useRef<number | null>(null)
-
-  const requestFrame = useCallback((cb: FrameRequestCallback) => {
-    if (typeof window.requestAnimationFrame === "function") {
-      return window.requestAnimationFrame(cb)
+  const { coords, actualPosition } = useMemo(() => {
+    if (!targetRect || isMobile) {
+      return {
+        coords: { x: 0, y: 0 },
+        actualPosition: "bottom" as TooltipPosition,
+      }
     }
 
-    return window.setTimeout(() => cb(Date.now()), 16)
-  }, [])
-
-  const cancelFrame = useCallback((id: number) => {
-    if (typeof window.cancelAnimationFrame === "function") {
-      window.cancelAnimationFrame(id)
-      return
-    }
-
-    window.clearTimeout(id)
-  }, [])
-
-  const updateIsMobile = useCallback(() => {
-    const next = window.innerWidth < MOBILE_BREAKPOINT_PX
-    setIsMobile((prev) => (prev === next ? prev : next))
-  }, [])
-
-  // Update tooltip position
-  const updatePositionNow = useCallback((safeAreasOverride?: { top: number; bottom: number }) => {
-    if (!targetId) return
-
-    const element = findDemoElement(targetId)
-    if (!element) return
-
-    const targetRect = getElementRect(element)
-
-    // Mobile: bottom sheet (no arrow, no target-relative positioning)
-    if (window.innerWidth < MOBILE_BREAKPOINT_PX) {
-      setActualPosition("bottom")
-      setCoords({ x: 0, y: 0 })
-      return
-    }
-
-    // Desktop: Calculate optimal position if not specified
     const optimalPos = preferredPosition || calculateOptimalPosition(targetRect, TOOLTIP_WIDTH, TOOLTIP_MIN_HEIGHT)
-    setActualPosition(optimalPos)
-
     const { x, y } = calculateTooltipPosition(targetRect, optimalPos, TOOLTIP_WIDTH, TOOLTIP_MIN_HEIGHT)
 
-    const activeSafeAreas = safeAreasOverride || safeAreas
     const horizontalPadding = 16
     const verticalPadding = 12
-    const safeTop = activeSafeAreas.top + verticalPadding
-    const safeBottom = activeSafeAreas.bottom + verticalPadding
+    const safeTop = safeAreas.top + verticalPadding
+    const safeBottom = safeAreas.bottom + verticalPadding
 
     const clampedX = Math.max(
       horizontalPadding,
-      Math.min(x, window.innerWidth - TOOLTIP_WIDTH - horizontalPadding)
+      Math.min(x, viewport.width - TOOLTIP_WIDTH - horizontalPadding)
     )
 
     const clampedY = Math.max(
       safeTop,
-      Math.min(y, window.innerHeight - TOOLTIP_MIN_HEIGHT - safeBottom)
+      Math.min(y, viewport.height - TOOLTIP_MIN_HEIGHT - safeBottom)
     )
 
-    setCoords({ x: roundToDpr(clampedX), y: roundToDpr(clampedY) })
-  }, [targetId, preferredPosition, safeAreas])
-
-  const scheduleUpdate = useCallback(() => {
-    if (rafIdRef.current != null) return
-    rafIdRef.current = requestFrame(() => {
-      rafIdRef.current = null
-      updateIsMobile()
-      setSafeAreas((prev) => {
-        const next = getDemoSafeAreas()
-        if (prev.top === next.top && prev.bottom === next.bottom) {
-          updatePositionNow(prev)
-          return prev
-        }
-        updatePositionNow(next)
-        return next
-      })
-    })
-  }, [requestFrame, updateIsMobile, updatePositionNow])
-
-  // Update position on mount and changes
-  useEffect(() => {
-    if (!isVisible) return
-
-    // Let layout settle (route transitions / smooth scroll), then schedule a frame-based update.
-    const timer = window.setTimeout(scheduleUpdate, 120)
-    return () => window.clearTimeout(timer)
-  }, [isVisible, targetId, scheduleUpdate])
-
-  // Listen for resize/scroll
-  useEffect(() => {
-    if (!isVisible) return
-
-    scheduleUpdate()
-
-    window.addEventListener("resize", scheduleUpdate)
-    window.addEventListener("scroll", scheduleUpdate, true)
-
-    return () => {
-      window.removeEventListener("resize", scheduleUpdate)
-      window.removeEventListener("scroll", scheduleUpdate, true)
-      if (rafIdRef.current != null) {
-        cancelFrame(rafIdRef.current)
-        rafIdRef.current = null
-      }
+    return {
+      coords: { x: roundToDpr(clampedX), y: roundToDpr(clampedY) },
+      actualPosition: optimalPos,
     }
-  }, [isVisible, scheduleUpdate])
+  }, [targetRect, isMobile, preferredPosition, safeAreas, viewport])
 
-  // Arrow styles based on position
+  const shouldRender = isVisible && !!targetRect
+
   const getArrowStyles = () => {
     const base = {
       position: "absolute" as const,
@@ -210,10 +128,8 @@ export function DemoTooltip({
 
   return (
     <AnimatePresence mode="wait">
-      {isVisible && targetId && (
+      {shouldRender && (
         <motion.div
-          // Anchor to (0,0) so framer-motion `x`/`y` maps to viewport coordinates.
-          // See: docs/error-patterns/fixed-overlay-transform-without-inset.md
           className={
             isMobile
               ? "fixed inset-x-0 bottom-0 z-[10000] pointer-events-auto"
@@ -256,7 +172,6 @@ export function DemoTooltip({
           exit={isMobile ? { opacity: 0, y: 20 } : { opacity: 0, scale: 0.99 }}
           transition={{ duration: TRACKING_DURATION, ease: TRACKING_EASE }}
         >
-          {/* Glass panel container */}
           <div
             className={
               isMobile
@@ -272,22 +187,16 @@ export function DemoTooltip({
               `,
             }}
           >
-            {/* Title */}
             {title && (
-              <h3
-                className="text-sm font-semibold mb-2"
-                style={{ color: accentColor }}
-              >
+              <h3 className="text-sm font-semibold mb-2" style={{ color: accentColor }}>
                 {title}
               </h3>
             )}
 
-            {/* Content */}
             <p className="text-sm text-foreground/90 leading-relaxed">
               {content}
             </p>
 
-            {/* Arrow */}
             {!isMobile && <div style={getArrowStyles()} />}
           </div>
         </motion.div>

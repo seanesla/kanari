@@ -1,14 +1,14 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { useEffect, useRef, useState, useCallback } from "react"
+import { useEffect, useState, useCallback } from "react"
 import { useDemo } from "./demo-provider"
 import { DemoSpotlight } from "./demo-spotlight"
 import { DemoTooltip } from "./demo-tooltip"
 import { DemoControls } from "./demo-controls"
 import { DemoProgress } from "./demo-progress"
 import { useSceneMode } from "@/lib/scene-context"
-import { findDemoElement, scrollToElement } from "@/lib/demo/demo-utils"
+import { useDemoPosition } from "@/hooks/use-demo-position"
 import { CheckCircle2, RotateCcw, ArrowRight } from "@/lib/icons"
 
 export function DemoOverlay() {
@@ -29,9 +29,11 @@ export function DemoOverlay() {
 
   const currentStep = getCurrentStep()
   const isComplete = currentStepIndex >= totalSteps
-  const scrollSnapTimeoutRef = useRef<number | null>(null)
-  const scrollSnapHoldRef = useRef(false)
   const [isExiting, setIsExiting] = useState(false)
+  const demoPosition = useDemoPosition({
+    targetId: highlightedElement,
+    enabled: isActive,
+  })
 
   useEffect(() => {
     if (!isActive) return
@@ -75,56 +77,6 @@ export function DemoOverlay() {
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [isActive, isComplete, isNavigating, isTransitioning, isExiting, nextStep, previousStep, stopDemo])
-
-  useEffect(() => {
-    if (!isActive) return
-    if (isNavigating || isTransitioning || isComplete || isExiting) return
-    if (!highlightedElement) return
-
-    const snapBehavior = currentStep?.scrollBehavior || "center"
-    const snapDelayMs = 120
-    const snapHoldMs = 900
-
-    const clearSnapTimeout = () => {
-      if (scrollSnapTimeoutRef.current != null) {
-        window.clearTimeout(scrollSnapTimeoutRef.current)
-        scrollSnapTimeoutRef.current = null
-      }
-    }
-
-    const snapToTarget = () => {
-      if (scrollSnapHoldRef.current) return
-      const target = findDemoElement(highlightedElement)
-      if (!target) return
-
-      scrollSnapHoldRef.current = true
-      scrollToElement(target, snapBehavior)
-
-      window.setTimeout(() => {
-        scrollSnapHoldRef.current = false
-      }, snapHoldMs)
-    }
-
-    const onScroll = () => {
-      if (scrollSnapHoldRef.current) return
-      clearSnapTimeout()
-      scrollSnapTimeoutRef.current = window.setTimeout(snapToTarget, snapDelayMs)
-    }
-
-    window.addEventListener("scroll", onScroll, true)
-    return () => {
-      window.removeEventListener("scroll", onScroll, true)
-      clearSnapTimeout()
-    }
-  }, [
-    isActive,
-    isComplete,
-    isNavigating,
-    isTransitioning,
-    isExiting,
-    highlightedElement,
-    currentStep?.scrollBehavior,
-  ])
 
   const handleExitToDashboard = useCallback(() => {
     if (isExiting) return
@@ -185,18 +137,23 @@ export function DemoOverlay() {
       {/* Spotlight on target element */}
       <AnimatePresence mode="wait">
         {!isComplete && !isNavigating && highlightedElement && (
-          <DemoSpotlight targetId={highlightedElement} />
+          <DemoSpotlight
+            rect={demoPosition.targetRect}
+            isScrolling={demoPosition.isScrolling}
+          />
         )}
       </AnimatePresence>
 
       {/* Tooltip with content */}
       {!isNavigating && !isTransitioning && (
         <DemoTooltip
-          targetId={highlightedElement}
+          targetRect={demoPosition.targetRect}
+          safeAreas={demoPosition.safeAreas}
+          viewport={demoPosition.viewport}
           content={currentStep?.content || ""}
           title={currentStep?.title}
           position={currentStep?.position}
-          isVisible={!isComplete && !!currentStep}
+          isVisible={!isComplete && !!currentStep && !!demoPosition.targetRect}
         />
       )}
 

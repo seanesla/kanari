@@ -28,13 +28,13 @@ describe("Demo overlay anchoring", () => {
   })
 
   it("anchors DemoTooltip at viewport origin for x/y positioning", () => {
-    const target = document.createElement("div")
-    target.setAttribute("data-demo-id", "demo-target")
-    document.body.appendChild(target)
+    const rect = new DOMRect(32, 48, 200, 120)
 
     render(
       <DemoTooltip
-        targetId="demo-target"
+        targetRect={rect}
+        safeAreas={{ top: 0, bottom: 0 }}
+        viewport={{ width: 1200, height: 900 }}
         title="Title"
         content="Content"
         isVisible
@@ -47,11 +47,9 @@ describe("Demo overlay anchoring", () => {
   })
 
   it("anchors DemoSpotlight layers at viewport origin for x/y positioning", async () => {
-    const target = document.createElement("div")
-    target.setAttribute("data-demo-id", "demo-target")
-    document.body.appendChild(target)
+    const rect = new DOMRect(32, 48, 200, 120)
 
-    render(<DemoSpotlight targetId="demo-target" />)
+    render(<DemoSpotlight rect={rect} isScrolling={false} />)
 
     await waitFor(() => {
       expect(screen.getByTestId("demo-spotlight-glow")).toBeInTheDocument()
@@ -64,4 +62,3 @@ describe("Demo overlay anchoring", () => {
     expect(screen.getByTestId("demo-spotlight-pulse").className).toContain("top-0")
   })
 })
-

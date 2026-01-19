@@ -33,7 +33,7 @@ import {
   DEMO_USER_NAME,
   DEMO_API_KEY,
 } from "@/lib/demo/demo-data"
-import { waitForElement, scrollToElement } from "@/lib/demo/demo-utils"
+import { waitForElement, scrollToElement, waitForScrollEnd } from "@/lib/demo/demo-utils"
 import type { DemoState, DemoContextValue, DemoStep } from "./steps/types"
 import { ALL_DEMO_STEPS } from "./steps/all-steps"
 
@@ -370,9 +370,10 @@ export function DemoProvider({ children }: DemoProviderProps) {
     // Wait for target element
     const element = await waitForElement(step.target, 3000)
     if (element) {
-      scrollToElement(element, step.scrollBehavior)
-      // Give smooth scroll time to settle. Spotlight + tooltip track via rAF.
-      await new Promise((resolve) => setTimeout(resolve, step.scrollBehavior === "none" ? 200 : 650))
+      const didScroll = scrollToElement(element, step.scrollBehavior)
+      if (didScroll) {
+        await waitForScrollEnd(1000)
+      }
     }
 
     // Update state
