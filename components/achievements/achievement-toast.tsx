@@ -18,7 +18,7 @@
  * ```
  */
 
-import { useEffect, useCallback } from "react"
+import { useEffect, useCallback, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { CheckCircle, Sparks, Trophy, Xmark } from "iconoir-react"
 import { cn } from "@/lib/utils"
@@ -112,6 +112,8 @@ interface CelebrationToastProps {
   onOpenChange: (open: boolean) => void
   /** Callback when user dismisses (to mark as seen) */
   onDismiss?: () => void
+  /** Called after exit animation completes */
+  onAfterClose?: () => void
   /** Auto-dismiss after this many milliseconds (0 = no auto-dismiss) */
   autoDismissMs?: number
 }
@@ -125,6 +127,7 @@ export function CelebrationToast({
   open,
   onOpenChange,
   onDismiss,
+  onAfterClose,
   autoDismissMs = 5000,
 }: CelebrationToastProps) {
   // Auto-dismiss after timeout
@@ -162,7 +165,7 @@ export function CelebrationToast({
   const milestoneIcon = item.kind === "milestone" ? getMilestoneBadgeIcon(item.milestone.type) : null
 
   return (
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={onAfterClose}>
       {open && (
         <>
           {/* Backdrop */}
@@ -306,29 +309,78 @@ export function CelebrationToastQueue({
   onDismissAchievement,
   onDismissMilestone,
 }: CelebrationToastQueueProps) {
-  const currentItem: CelebrationItem | null = milestones[0]
-    ? { kind: "milestone", milestone: milestones[0] }
-    : achievements[0]
-      ? { kind: "achievement", achievement: achievements[0] }
-      : null
+  const [ignoredAchievementIds, setIgnoredAchievementIds] = useState<Set<string>>(() => new Set())
+  const [ignoredMilestoneIds, setIgnoredMilestoneIds] = useState<Set<string>>(() => new Set())
+  const [visibleItem, setVisibleItem] = useState<CelebrationItem | null>(null)
+  const [open, setOpen] = useState(false)
 
-  const handleDismiss = useCallback(() => {
-    if (!currentItem) return
-    if (currentItem.kind === "milestone") {
-      onDismissMilestone(currentItem.milestone.id)
+  const pendingItems: CelebrationItem[] = useMemo(() => {
+    const nextMilestones = milestones
+      .filter((m) => !ignoredMilestoneIds.has(m.id))
+      .map((m) => ({ kind: "milestone" as const, milestone: m }))
+
+    const nextAchievements = achievements
+      .filter((a) => !ignoredAchievementIds.has(a.id))
+      .map((a) => ({ kind: "achievement" as const, achievement: a }))
+
+    return [...nextMilestones, ...nextAchievements]
+  }, [achievements, ignoredAchievementIds, ignoredMilestoneIds, milestones])
+
+  // If there's no visible item (or it disappeared because it got marked seen), show the next.
+  useEffect(() => {
+    if (open) return
+    if (visibleItem) {
+      const visibleId = visibleItem.kind === "milestone" ? visibleItem.milestone.id : visibleItem.achievement.id
+      const stillPending = pendingItems.some((item: CelebrationItem) => {
+        const id = item.kind === "milestone" ? item.milestone.id : item.achievement.id
+        return id === visibleId
+      })
+      if (stillPending) return
+    }
+
+    const next = pendingItems[0] ?? null
+    setVisibleItem(next)
+    setOpen(!!next)
+  }, [open, pendingItems, visibleItem])
+
+  const markIgnoredAndSeen = useCallback(() => {
+    if (!visibleItem) return
+    if (visibleItem.kind === "milestone") {
+      const id = visibleItem.milestone.id
+      setIgnoredMilestoneIds((prev: Set<string>) => {
+        const next = new Set(prev)
+        next.add(id)
+        return next
+      })
+      onDismissMilestone(id)
       return
     }
-    onDismissAchievement(currentItem.achievement.id)
-  }, [currentItem, onDismissAchievement, onDismissMilestone])
+
+    const id = visibleItem.achievement.id
+    setIgnoredAchievementIds((prev: Set<string>) => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+    onDismissAchievement(id)
+  }, [onDismissAchievement, onDismissMilestone, visibleItem])
+
+  const handleAfterClose = useCallback(() => {
+    // Once the exit animation completes, rotate the queue.
+    const next = pendingItems[0] ?? null
+    setVisibleItem(next)
+    setOpen(!!next)
+  }, [pendingItems])
 
   return (
     <CelebrationToast
-      item={currentItem}
-      open={!!currentItem}
-      onOpenChange={(open) => {
-        if (!open) handleDismiss()
+      item={visibleItem}
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen)
       }}
-      onDismiss={handleDismiss}
+      onDismiss={markIgnoredAndSeen}
+      onAfterClose={handleAfterClose}
     />
   )
 }

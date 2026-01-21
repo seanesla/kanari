@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { logError } from "@/lib/logger"
 import type {
   Suggestion,
@@ -20,6 +20,14 @@ import { useAllSuggestions, useSuggestionActions } from "./use-storage"
 import { useSuggestionMemory } from "./use-suggestion-memory"
 import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
 import { createGeminiHeaders } from "@/lib/utils"
+import { useTimeZone } from "@/lib/timezone-context"
+import {
+  computeExpiredSuggestionIds,
+  LAST_SUGGESTION_AUTOGEN_DATE_KEY,
+  LAST_SUGGESTION_ROLLOVER_DATE_KEY,
+  normalizeSuggestionKey,
+  toLocalDateISO,
+} from "@/lib/suggestions/rollover"
 
 /**
  * React hook for managing Gemini-powered recovery suggestions with diff-aware generation.
@@ -128,6 +136,7 @@ export function useSuggestions(): UseSuggestionsResult {
   // Get ALL suggestions globally (not recording-bound)
   const allSuggestions = useAllSuggestions()
   const { getActiveSuggestions, buildMemoryContext } = useSuggestionMemory()
+  const { timeZone } = useTimeZone()
   const {
     addSuggestion,
     updateSuggestion: updateSuggestionInDB,
@@ -138,6 +147,18 @@ export function useSuggestions(): UseSuggestionsResult {
   const [error, setError] = useState<string | null>(null)
   const [updateError, setUpdateError] = useState<string | null>(null)
   const [lastDiffSummary, setLastDiffSummary] = useState<DiffSummary | null>(null)
+
+  // Drive day-boundary checks even if the app stays open.
+  const [dayTick, setDayTick] = useState(0)
+
+  const rolloverInFlightRef = useRef(false)
+  const autogenInFlightRef = useRef(false)
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const id = window.setInterval(() => setDayTick((t) => t + 1), 60_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   const clearUpdateError = useCallback(() => setUpdateError(null), [])
   const clearDiffSummary = useCallback(() => setLastDiffSummary(null), [])
@@ -227,6 +248,14 @@ export function useSuggestions(): UseSuggestionsResult {
       // Process diff response
       const now = new Date().toISOString()
 
+      const existingKeys = new Set(
+        activeSuggestions.map((s) => normalizeSuggestionKey({
+          content: s.content,
+          category: s.category,
+          duration: s.duration,
+        }))
+      )
+
       for (const diffSuggestion of data.suggestions as GeminiDiffSuggestion[]) {
         switch (diffSuggestion.decision) {
           case "keep":
@@ -255,6 +284,15 @@ export function useSuggestions(): UseSuggestionsResult {
           case "new":
             // Add new suggestion
             {
+              const incomingKey = normalizeSuggestionKey({
+                content: diffSuggestion.content,
+                category: diffSuggestion.category,
+                duration: diffSuggestion.duration,
+              })
+
+              // Defensive dedupe: Gemini can occasionally emit duplicates across a single run.
+              if (existingKeys.has(incomingKey)) break
+
               const newSuggestion: Suggestion = {
                 id: diffSuggestion.id,
                 content: diffSuggestion.content,
@@ -267,6 +305,7 @@ export function useSuggestions(): UseSuggestionsResult {
                 lastDecision: "new",
               }
               await addSuggestion(newSuggestion)
+              existingKeys.add(incomingKey)
               break
             }
         }
@@ -283,6 +322,107 @@ export function useSuggestions(): UseSuggestionsResult {
       setLoading(false)
     }
   }, [getActiveSuggestions, buildMemoryContext, updateSuggestionInDB, deleteSuggestion, addSuggestion])
+
+  // Daily rollover:
+  // 1) Remove uncompleted suggestions from previous days (prevents duplicated "daily" tasks).
+  // 2) Auto-generate a fresh set once per day (when possible) based on the latest check-in metrics.
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (typeof indexedDB === "undefined") return
+    if (!timeZone) return
+
+    const nowISO = new Date().toISOString()
+    const { todayISO, expiredSuggestionIds } = computeExpiredSuggestionIds({
+      suggestions: allSuggestions,
+      timeZone,
+      nowISO,
+    })
+
+    const lastRollover = window.localStorage.getItem(LAST_SUGGESTION_ROLLOVER_DATE_KEY)
+    if (lastRollover === todayISO) return
+    if (rolloverInFlightRef.current) return
+    rolloverInFlightRef.current = true
+
+    ;(async () => {
+      if (expiredSuggestionIds.length > 0) {
+        try {
+          const { db } = await import("@/lib/storage/db")
+          await db.transaction("rw", db.suggestions, db.recoveryBlocks, async () => {
+            await db.suggestions.bulkDelete(expiredSuggestionIds)
+            await db.recoveryBlocks.where("suggestionId").anyOf(expiredSuggestionIds).delete()
+          })
+        } catch (err) {
+          logError("Suggestions", "Error rolling over daily suggestions:", err)
+        }
+      }
+
+      window.localStorage.setItem(LAST_SUGGESTION_ROLLOVER_DATE_KEY, todayISO)
+    })().finally(() => {
+      rolloverInFlightRef.current = false
+    })
+  }, [allSuggestions, dayTick, timeZone])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (typeof indexedDB === "undefined") return
+    if (!timeZone) return
+    if (loading) return
+    if (autogenInFlightRef.current) return
+
+    const nowISO = new Date().toISOString()
+    const { todayISO } = computeExpiredSuggestionIds({
+      suggestions: [],
+      timeZone,
+      nowISO,
+    })
+
+    const lastAutogen = window.localStorage.getItem(LAST_SUGGESTION_AUTOGEN_DATE_KEY)
+    if (lastAutogen === todayISO) return
+
+    // Generate once per day only when there are no pending suggestions created today.
+    const hasPendingToday = allSuggestions.some((s) => {
+      if (s.status !== "pending") return false
+      return toLocalDateISO(s.createdAt, timeZone) === todayISO
+    })
+
+    if (hasPendingToday) {
+      window.localStorage.setItem(LAST_SUGGESTION_AUTOGEN_DATE_KEY, todayISO)
+      return
+    }
+
+    autogenInFlightRef.current = true
+    ;(async () => {
+      try {
+        const { db, toCheckInSession } = await import("@/lib/storage/db")
+        const sessionsRaw = await db.checkInSessions.orderBy("startedAt").reverse().limit(30).toArray()
+        const sessions = sessionsRaw.map(toCheckInSession)
+
+        const latest = sessions.find((s) => s.acousticMetrics)
+        if (!latest?.acousticMetrics) return
+
+        const metrics: VoiceMetrics = {
+          stressScore: latest.acousticMetrics.stressScore,
+          stressLevel: latest.acousticMetrics.stressLevel,
+          fatigueScore: latest.acousticMetrics.fatigueScore,
+          fatigueLevel: latest.acousticMetrics.fatigueLevel,
+          confidence: latest.acousticMetrics.confidence,
+          analyzedAt: latest.acousticMetrics.analyzedAt ?? nowISO,
+        }
+
+        const trend: TrendDirection = sessions.length >= 2
+          ? predictBurnoutRisk(sessionsToTrendData(sessions)).trend
+          : "stable"
+
+        await regenerateWithDiff(metrics, trend, sessions)
+      } catch (err) {
+        logError("Suggestions", "Error auto-generating daily suggestions:", err)
+      } finally {
+        window.localStorage.setItem(LAST_SUGGESTION_AUTOGEN_DATE_KEY, todayISO)
+      }
+    })().finally(() => {
+      autogenInFlightRef.current = false
+    })
+  }, [allSuggestions, dayTick, loading, regenerateWithDiff, timeZone])
 
   /**
    * Update suggestion status (persisted to IndexedDB)

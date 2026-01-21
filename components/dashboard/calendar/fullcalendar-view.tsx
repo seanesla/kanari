@@ -18,6 +18,24 @@ import { generateDarkVariant, generateLightVariant } from "@/lib/color-utils"
 import { CheckInTooltip } from "./check-in-tooltip"
 import type { Suggestion, CheckInSession, RecoveryBlock, SuggestionCategory } from "@/lib/types"
 
+function dedupeEventsById(events: EventInput[]): EventInput[] {
+  const seen = new Set<string>()
+  const unique: EventInput[] = []
+  for (const event of events) {
+    const id = typeof event.id === "string" ? event.id : event.id ? String(event.id) : null
+    // If the upstream data contains duplicates (e.g. duplicated suggestions), FullCalendar will
+    // render them as stacked events. De-dupe defensively.
+    if (!id) {
+      unique.push(event)
+      continue
+    }
+    if (seen.has(id)) continue
+    seen.add(id)
+    unique.push(event)
+  }
+  return unique
+}
+
 function hexToRgba(hex: string, alpha: number): string {
   const cleaned = hex.replace("#", "").trim()
   const a = Math.max(0, Math.min(1, alpha))
@@ -301,7 +319,7 @@ export function FullCalendarView({
       .map((session) => checkInToEvent(session, timeZone))
       .filter((event): event is EventInput => event !== null)
 
-    return [...scheduledEvents, ...completedEvents, ...checkInEvents]
+    return dedupeEventsById([...scheduledEvents, ...completedEvents, ...checkInEvents])
   }, [scheduledSuggestions, completedSuggestions, checkInSessions, timeZone, accentColor])
 
   // Handle event click

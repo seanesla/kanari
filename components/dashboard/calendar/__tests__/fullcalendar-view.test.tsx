@@ -4,6 +4,7 @@ import React from "react"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render } from "@testing-library/react"
 import type { EventInput } from "@fullcalendar/core"
+import type { Suggestion, CheckInSession } from "@/lib/types"
 import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -137,7 +138,7 @@ describe("FullCalendarView", () => {
   it("memoizes computed events when inputs are referentially stable", async () => {
     const { FullCalendarView } = await import("../fullcalendar-view")
 
-    const scheduledSuggestions = [
+    const scheduledSuggestions: Suggestion[] = [
       {
         id: "s1",
         content: "Take a short break.",
@@ -150,7 +151,7 @@ describe("FullCalendarView", () => {
       },
     ]
 
-    const completedSuggestions = [
+    const completedSuggestions: Suggestion[] = [
       {
         id: "s2",
         content: "Stretch lightly.",
@@ -163,7 +164,7 @@ describe("FullCalendarView", () => {
       },
     ]
 
-    const checkInSessions = [
+    const checkInSessions: CheckInSession[] = [
       {
         id: "c1",
         startedAt: "2026-01-09T09:00:00Z",
@@ -191,6 +192,41 @@ describe("FullCalendarView", () => {
 
     const secondEventsRef = (lastFullCalendarProps?.events ?? null) as EventInput[] | null
     expect(secondEventsRef).toBe(firstEventsRef)
+  })
+
+  it("dedupes events when suggestions contain duplicate ids", async () => {
+    const { FullCalendarView } = await import("../fullcalendar-view")
+
+    render(
+      <FullCalendarView
+        scheduledSuggestions={[
+          {
+            id: "dup",
+            content: "Morning break.",
+            rationale: "rationale",
+            duration: 10,
+            category: "break",
+            status: "scheduled",
+            createdAt: "2026-01-01T00:00:00Z",
+            scheduledFor: "2026-01-09T10:00:00Z",
+          },
+          {
+            id: "dup",
+            content: "Morning break.",
+            rationale: "rationale",
+            duration: 10,
+            category: "break",
+            status: "scheduled",
+            createdAt: "2026-01-01T00:00:00Z",
+            scheduledFor: "2026-01-09T10:00:00Z",
+          },
+        ] as Suggestion[]}
+      />
+    )
+
+    const events = (lastFullCalendarProps?.events ?? []) as EventInput[]
+    expect(events).toHaveLength(1)
+    expect(events[0]?.id).toBe("dup")
   })
 
   it("uses event.startStr (floating) for drag-and-drop rescheduling to avoid timezone shifts", async () => {
