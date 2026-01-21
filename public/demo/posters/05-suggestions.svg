@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b0f16"/>
+      <stop offset="0.55" stop-color="#0a1220"/>
+      <stop offset="1" stop-color="#070b10"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1180 240) rotate(150) scale(560 560)">
+      <stop stop-color="#22c55e" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#22c55e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orb2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(420 700) rotate(-20) scale(520 520)">
+      <stop stop-color="#60a5fa" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#60a5fa" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#orb)"/>
+  <rect width="1600" height="900" fill="url(#orb2)"/>
+
+  <rect x="70" y="80" width="1460" height="740" rx="40" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.18)"/>
+  <rect x="70" y="80" width="1460" height="64" rx="40" fill="rgba(255,255,255,0.06)"/>
+
+  <text x="120" y="210" fill="rgba(255,255,255,0.96)" font-size="50" font-family="ui-serif, Georgia, Times, serif" font-weight="700">
+    Recovery Suggestions (Kanban)
+  </text>
+  <text x="120" y="256" fill="rgba(255,255,255,0.78)" font-size="18" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace">
+    Poster placeholder - replace with suggestions board.
+  </text>
+
+  <rect x="120" y="310" width="1460" height="510" rx="28" fill="rgba(0,0,0,0.18)" stroke="rgba(255,255,255,0.16)"/>
+  <rect x="160" y="352" width="420" height="18" rx="9" fill="rgba(255,255,255,0.14)"/>
+
+  <rect x="160" y="394" width="430" height="386" rx="24" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)"/>
+  <rect x="610" y="394" width="430" height="386" rx="24" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)"/>
+  <rect x="1060" y="394" width="470" height="386" rx="24" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.12)"/>
+
+  <rect x="190" y="430" width="370" height="96" rx="18" fill="rgba(0,0,0,0.18)"/>
+  <rect x="220" y="460" width="260" height="14" rx="7" fill="rgba(255,255,255,0.08)"/>
+  <rect x="220" y="486" width="310" height="14" rx="7" fill="rgba(255,255,255,0.08)"/>
+
+  <rect x="640" y="430" width="370" height="96" rx="18" fill="rgba(34,197,94,0.14)" stroke="rgba(34,197,94,0.26)"/>
+  <rect x="670" y="460" width="260" height="14" rx="7" fill="rgba(255,255,255,0.10)"/>
+  <rect x="670" y="486" width="310" height="14" rx="7" fill="rgba(255,255,255,0.10)"/>
+
+  <rect x="1090" y="430" width="410" height="96" rx="18" fill="rgba(96,165,250,0.12)" stroke="rgba(96,165,250,0.22)"/>
+  <rect x="1120" y="460" width="280" height="14" rx="7" fill="rgba(255,255,255,0.10)"/>
+  <rect x="1120" y="486" width="330" height="14" rx="7" fill="rgba(255,255,255,0.10)"/>
+</svg>

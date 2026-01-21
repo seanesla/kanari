@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0b1220"/>
+      <stop offset="0.55" stop-color="#0a0f16"/>
+      <stop offset="1" stop-color="#070b10"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1180 260) rotate(150) scale(560 560)">
+      <stop stop-color="#60a5fa" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#60a5fa" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="orb2" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(460 700) rotate(-20) scale(520 520)">
+      <stop stop-color="#22c55e" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#22c55e" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#orb)"/>
+  <rect width="1600" height="900" fill="url(#orb2)"/>
+
+  <rect x="70" y="80" width="1460" height="740" rx="40" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.18)"/>
+  <rect x="70" y="80" width="1460" height="64" rx="40" fill="rgba(255,255,255,0.06)"/>
+
+  <text x="120" y="210" fill="rgba(255,255,255,0.96)" font-size="50" font-family="ui-serif, Georgia, Times, serif" font-weight="700">
+    Coach Personalization (Voice + Avatar)
+  </text>
+  <text x="120" y="256" fill="rgba(255,255,255,0.78)" font-size="18" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace">
+    Poster placeholder - replace with onboarding voice picker + avatar.
+  </text>
+
+  <rect x="120" y="310" width="760" height="510" rx="28" fill="rgba(0,0,0,0.18)" stroke="rgba(255,255,255,0.16)"/>
+  <rect x="160" y="352" width="420" height="18" rx="9" fill="rgba(255,255,255,0.14)"/>
+  <rect x="160" y="400" width="680" height="70" rx="22" fill="rgba(96,165,250,0.14)" stroke="rgba(96,165,250,0.24)"/>
+  <rect x="160" y="490" width="680" height="70" rx="22" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+  <rect x="160" y="580" width="680" height="70" rx="22" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+  <rect x="160" y="670" width="320" height="44" rx="14" fill="rgba(34,197,94,0.18)" stroke="rgba(34,197,94,0.30)"/>
+
+  <rect x="920" y="310" width="610" height="510" rx="28" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.16)"/>
+  <circle cx="1225" cy="480" r="120" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.16)"/>
+  <circle cx="1225" cy="450" r="44" fill="rgba(255,255,255,0.10)"/>
+  <rect x="1145" y="520" width="160" height="130" rx="60" fill="rgba(255,255,255,0.08)"/>
+  <rect x="980" y="690" width="490" height="18" rx="9" fill="rgba(255,255,255,0.10)"/>
+  <rect x="980" y="724" width="420" height="14" rx="7" fill="rgba(255,255,255,0.08)"/>
+</svg>

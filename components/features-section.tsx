@@ -26,7 +26,7 @@ export function FeaturesSection() {
   ]
 
   return (
-    <section id="features" className="py-24 md:py-32">
+    <div className="py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mb-16 max-w-2xl">
           <h2 className="text-3xl font-semibold tracking-tight md:text-4xl text-balance">
@@ -55,6 +55,6 @@ export function FeaturesSection() {
           ))}
         </div>
       </div>
-    </section>
+    </div>
   )
 }

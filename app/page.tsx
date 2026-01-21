@@ -69,7 +69,6 @@ export default function LandingPage() {
           >
             kanari detects early signs of burnout through your voice, predicts risk days ahead, and schedules recovery time automatically.
           </p>
-
           <div
             className={`flex items-center gap-4 transition-all duration-1000 delay-800 ${
               heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"

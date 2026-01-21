@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#081016"/>
+      <stop offset="0.55" stop-color="#0a1220"/>
+      <stop offset="1" stop-color="#070b10"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1220 660) rotate(200) scale(620 620)">
+      <stop stop-color="#f59e0b" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#f59e0b" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#orb)"/>
+
+  <rect x="70" y="80" width="1460" height="740" rx="40" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.18)"/>
+  <rect x="70" y="80" width="1460" height="64" rx="40" fill="rgba(255,255,255,0.06)"/>
+
+  <text x="120" y="210" fill="rgba(255,255,255,0.96)" font-size="50" font-family="ui-serif, Georgia, Times, serif" font-weight="700">
+    Burnout Risk Forecast (3-7 days)
+  </text>
+  <text x="120" y="256" fill="rgba(255,255,255,0.78)" font-size="18" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace">
+    Poster placeholder - replace with analytics forecast + charts.
+  </text>
+
+  <rect x="120" y="310" width="1460" height="210" rx="28" fill="rgba(245,158,11,0.12)" stroke="rgba(245,158,11,0.26)"/>
+  <circle cx="220" cy="415" r="46" fill="rgba(245,158,11,0.18)" stroke="rgba(245,158,11,0.35)"/>
+  <path d="M206 406 L220 380 L234 406" stroke="rgba(255,255,255,0.90)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M220 380 V446" stroke="rgba(255,255,255,0.90)" stroke-width="6" stroke-linecap="round"/>
+  <rect x="310" y="360" width="340" height="18" rx="9" fill="rgba(255,255,255,0.14)"/>
+  <rect x="310" y="396" width="860" height="16" rx="8" fill="rgba(255,255,255,0.08)"/>
+  <rect x="310" y="426" width="760" height="16" rx="8" fill="rgba(255,255,255,0.08)"/>
+  <rect x="310" y="456" width="620" height="16" rx="8" fill="rgba(255,255,255,0.08)"/>
+
+  <rect x="120" y="560" width="760" height="260" rx="28" fill="rgba(0,0,0,0.20)" stroke="rgba(255,255,255,0.16)"/>
+  <rect x="160" y="602" width="380" height="18" rx="9" fill="rgba(255,255,255,0.14)"/>
+  <rect x="160" y="640" width="680" height="140" rx="20" fill="rgba(255,255,255,0.06)"/>
+  <path d="M190 756 C 280 696, 360 744, 450 704 C 540 664, 620 714, 730 684" stroke="rgba(34,197,94,0.75)" stroke-width="6" fill="none" stroke-linecap="round"/>
+  <path d="M190 776 C 280 736, 360 764, 450 744 C 540 724, 620 774, 730 754" stroke="rgba(96,165,250,0.75)" stroke-width="6" fill="none" stroke-linecap="round"/>
+
+  <rect x="920" y="560" width="660" height="260" rx="28" fill="rgba(0,0,0,0.18)" stroke="rgba(255,255,255,0.16)"/>
+  <rect x="960" y="602" width="300" height="18" rx="9" fill="rgba(255,255,255,0.14)"/>
+  <circle cx="1250" cy="700" r="82" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)"/>
+  <path d="M1170 700 A80 80 0 1 1 1330 700" stroke="rgba(245,158,11,0.70)" stroke-width="12" stroke-linecap="round" fill="none"/>
+  <text x="1250" y="712" text-anchor="middle" fill="rgba(245,158,11,0.92)" font-size="34" font-family="ui-serif, Georgia, Times, serif" font-weight="700">78%</text>
+</svg>

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0a0f16"/>
+      <stop offset="0.55" stop-color="#0b1220"/>
+      <stop offset="1" stop-color="#070b10"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(420 680) rotate(-10) scale(560 560)">
+      <stop stop-color="#22c55e" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#22c55e" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <rect width="1600" height="900" fill="url(#orb)"/>
+
+  <rect x="70" y="80" width="1460" height="740" rx="40" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.18)"/>
+  <rect x="70" y="80" width="1460" height="64" rx="40" fill="rgba(255,255,255,0.06)"/>
+
+  <text x="120" y="210" fill="rgba(255,255,255,0.96)" font-size="50" font-family="ui-serif, Georgia, Times, serif" font-weight="700">
+    Calendar Scheduling + Recovery Blocks
+  </text>
+  <text x="120" y="256" fill="rgba(255,255,255,0.78)" font-size="18" font-family="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace">
+    Poster placeholder - replace with calendar + scheduled blocks.
+  </text>
+
+  <rect x="120" y="310" width="1460" height="510" rx="28" fill="rgba(0,0,0,0.18)" stroke="rgba(255,255,255,0.16)"/>
+  <rect x="160" y="352" width="260" height="18" rx="9" fill="rgba(255,255,255,0.14)"/>
+
+  <rect x="160" y="394" width="1410" height="386" rx="24" fill="rgba(0,0,0,0.14)"/>
+  <path d="M160 464 H1570" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  <path d="M160 534 H1570" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  <path d="M160 604 H1570" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  <path d="M160 674 H1570" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+  <path d="M160 744 H1570" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+
+  <rect x="320" y="540" width="320" height="62" rx="16" fill="rgba(34,197,94,0.20)" stroke="rgba(34,197,94,0.34)"/>
+  <rect x="720" y="610" width="420" height="62" rx="16" fill="rgba(96,165,250,0.18)" stroke="rgba(96,165,250,0.28)"/>
+  <rect x="520" y="750" width="520" height="62" rx="16" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.16)"/>
+</svg>
