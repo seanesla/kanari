@@ -263,6 +263,73 @@ describe("useCheckIn session lifecycle", () => {
     expect(onSessionEnd).not.toHaveBeenCalled()
   })
 
+  it("surfaces an error when Gemini disconnects before any user participation", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    act(() => {
+      geminiCallbacks?.onDisconnected?.("network lost")
+    })
+
+    await waitFor(() => {
+      expect(result.current[0].state).toBe("error")
+    })
+
+    expect(connectMock).toHaveBeenCalledTimes(1)
+    expect(result.current[0].error).toBe("network lost")
+  })
+
+  it("ignores manual disconnect events", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    act(() => {
+      geminiCallbacks?.onDisconnected?.("Manual disconnect")
+    })
+
+    expect(connectMock).toHaveBeenCalledTimes(1)
+    expect(result.current[0].state).not.toBe("error")
+    expect(result.current[0].error).toBe(null)
+  })
+
+  it("surfaces an error on invalid-argument disconnects even after user participation", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    // AI-first: unlock user input after the assistant starts.
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("hello", false)
+    })
+
+    act(() => {
+      result.current[1].sendTextMessage("hello")
+    })
+
+    await waitFor(() => {
+      expect(result.current[0].messages.some((m) => m.role === "user" && m.content === "hello")).toBe(true)
+    })
+
+    act(() => {
+      geminiCallbacks?.onDisconnected?.("Invalid argument")
+    })
+
+    await waitFor(() => {
+      expect(result.current[0].state).toBe("error")
+    })
+
+    expect(connectMock).toHaveBeenCalledTimes(1)
+    expect(result.current[0].error).toBe("Invalid argument")
+  })
+
   it("does not finalize the session when a disconnect happens right after scheduling (reconnects instead)", async () => {
     const onSessionEnd = vi.fn()
     const { result } = renderHook(() => useCheckIn({ onSessionEnd }))

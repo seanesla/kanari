@@ -202,6 +202,35 @@ function cleanupStartSessionInit(options: {
   }
 }
 
+function cleanupSessionResources(options: {
+  audio: UseCheckInAudioResult
+  playbackControls: PlaybackControls
+  gemini: GeminiControls
+}): Error[] {
+  const { audio, playbackControls, gemini } = options
+  const cleanupErrors: Error[] = []
+
+  try {
+    audio.cleanupAudioCapture()
+  } catch (error) {
+    cleanupErrors.push(error instanceof Error ? error : new Error("Audio capture cleanup failed"))
+  }
+
+  try {
+    playbackControls.cleanup()
+  } catch (error) {
+    cleanupErrors.push(error instanceof Error ? error : new Error("Playback cleanup failed"))
+  }
+
+  try {
+    gemini.disconnect()
+  } catch (error) {
+    cleanupErrors.push(error instanceof Error ? error : new Error("Gemini disconnect failed"))
+  }
+
+  return cleanupErrors
+}
+
 function computeHasUserParticipation(options: {
   messages: CheckInData["messages"]
   currentUserTranscript: string
@@ -657,25 +686,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         : null
 
       // Cleanup with error handling - continue cleanup even if one fails
-      const cleanupErrors: Error[] = []
-
-      try {
-        audio.cleanupAudioCapture()
-      } catch (error) {
-        cleanupErrors.push(error instanceof Error ? error : new Error("Audio capture cleanup failed"))
-      }
-
-      try {
-        playbackControls.cleanup()
-      } catch (error) {
-        cleanupErrors.push(error instanceof Error ? error : new Error("Playback cleanup failed"))
-      }
-
-      try {
-        gemini.disconnect()
-      } catch (error) {
-        cleanupErrors.push(error instanceof Error ? error : new Error("Gemini disconnect failed"))
-      }
+      const cleanupErrors = cleanupSessionResources({ audio, playbackControls, gemini })
 
       // Log cleanup errors but don't fail the session end
       if (cleanupErrors.length > 0) {
