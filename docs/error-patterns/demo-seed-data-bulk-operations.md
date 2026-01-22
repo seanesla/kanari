@@ -2,7 +2,7 @@
 
 ## What the error looks like
 
-- Clicking `Watch Demo` feels “stuck” on `Loading...` for seconds.
+- Clicking `Feature Tour` feels “stuck” on `Loading...` for seconds.
 - Demo tour starts late, or appears unreliable on slower devices.
 
 ## Why it happens
@@ -19,4 +19,3 @@ Seeding demo data into IndexedDB record-by-record (e.g. `for (...) await db.tabl
 - Search for patterns like:
   - `for (` + `await db.*.put(`
   - many sequential `await db.*.put(` calls in “seed” or “demo” code paths
-

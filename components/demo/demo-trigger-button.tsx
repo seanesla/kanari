@@ -18,7 +18,7 @@ export function DemoTriggerButton({ className }: DemoTriggerButtonProps) {
       )}
     >
       <Play className="h-3 w-3" fill="currentColor" />
-      Watch Demo
+      Feature Tour
     </Link>
   )
 }

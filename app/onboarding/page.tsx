@@ -54,7 +54,7 @@ export default function OnboardingPage() {
     }
   }, [isLoading, hasCompletedOnboarding, router])
 
-  // Hide landing background elements while onboarding (TruthCore, section accents, etc).
+  // Hide landing background elements while onboarding (KanariCore, section accents, etc).
   useEffect(() => {
     setMode("dashboard")
   }, [setMode])

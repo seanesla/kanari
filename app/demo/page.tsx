@@ -301,7 +301,7 @@ function DemoFeatureTour() {
 
   return (
     <motion.div
-      className="min-h-screen overflow-x-hidden bg-background"
+      className="min-h-screen overflow-x-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: isClosing ? 0 : 1 }}
       transition={{ duration: 0.22, ease: "easeOut" }}
@@ -309,6 +309,9 @@ function DemoFeatureTour() {
         if (isClosing) router.push("/")
       }}
     >
+      {/* Dim overlay to soften the Kanari Core background */}
+      <div className="pointer-events-none fixed inset-0 bg-background/80" />
+
       {/* Background atmosphere */}
       <div className="pointer-events-none fixed inset-0">
         <div className="absolute -top-24 left-1/2 h-[520px] w-[780px] -translate-x-1/2 rounded-full bg-accent/12 blur-3xl" />

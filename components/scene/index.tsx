@@ -92,7 +92,7 @@ export default function SceneBackground() {
 
 // Re-export components for potential individual use
 export { Scene } from "./scene-canvas"
-export { TruthCore } from "./truth-core"
+export { KanariCore } from "./kanari-core"
 export { SectionAccent } from "./section-accent"
 export { AmbientParticles } from "./ambient-particles"
 export { ScrollCamera } from "./scroll-camera"

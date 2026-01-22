@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useEffect, type MutableRefObject } from "react"
+import { useEffect, useRef, type MutableRefObject } from "react"
 import { useFrame } from "@react-three/fiber"
 import { MeshTransmissionMaterial } from "@react-three/drei"
 import * as THREE from "three"
@@ -22,21 +22,27 @@ export function KanariCore({ scrollProgressRef, mode }: KanariCoreProps) {
   const ringRefs = useRef<(THREE.Mesh | null)[]>([])
   const opacityRef = useRef(1)
 
-  // Dispose geometries and materials on unmount to prevent memory leaks
   useEffect(() => {
+    const disposeMaterial = (material: THREE.Material | THREE.Material[]) => {
+      if (Array.isArray(material)) {
+        material.forEach((m) => m.dispose())
+        return
+      }
+      material.dispose()
+    }
+
+    const disposeMesh = (mesh: THREE.Mesh | null) => {
+      if (!mesh) return
+      mesh.geometry?.dispose?.()
+      const material = mesh.material as THREE.Material | THREE.Material[] | undefined
+      if (material) disposeMaterial(material)
+    }
+
     return () => {
-      ;[innerRef, middleRef, outerRef].forEach((ref) => {
-        ref.current?.geometry?.dispose()
-        if (ref.current?.material) {
-          ;(ref.current.material as THREE.Material).dispose()
-        }
-      })
-      ringRefs.current.forEach((ring) => {
-        ring?.geometry?.dispose()
-        if (ring?.material) {
-          ;(ring.material as THREE.Material).dispose()
-        }
-      })
+      disposeMesh(innerRef.current)
+      disposeMesh(middleRef.current)
+      disposeMesh(outerRef.current)
+      ringRefs.current.forEach(disposeMesh)
     }
   }, [])
 
@@ -65,16 +71,14 @@ export function KanariCore({ scrollProgressRef, mode }: KanariCoreProps) {
     if (innerRef.current) {
       innerRef.current.rotation.x = t * 0.4
       innerRef.current.rotation.z = t * 0.3
-      if (innerRef.current.material) {
-        (innerRef.current.material as THREE.MeshStandardMaterial).opacity = opacityRef.current
-      }
+      const material = innerRef.current.material
+      if (material && !Array.isArray(material)) material.opacity = opacityRef.current
     }
     if (middleRef.current) {
       middleRef.current.rotation.y = -t * 0.2
       middleRef.current.rotation.x = t * 0.15
-      if (middleRef.current.material) {
-        (middleRef.current.material as THREE.MeshStandardMaterial).opacity = opacityRef.current * 0.6
-      }
+      const material = middleRef.current.material
+      if (material && !Array.isArray(material)) material.opacity = opacityRef.current * 0.6
     }
     if (outerRef.current) {
       outerRef.current.rotation.z = t * 0.08

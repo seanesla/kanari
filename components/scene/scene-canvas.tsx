@@ -5,7 +5,7 @@ import { Environment } from "@react-three/drei"
 import type { SceneMode } from "@/lib/types"
 import { useSceneMode } from "@/lib/scene-context"
 import { SECTION_POSITIONS, SECTION_THRESHOLDS } from "./constants"
-import { TruthCore } from "./truth-core"
+import { KanariCore } from "./kanari-core"
 import { SectionAccent } from "./section-accent"
 import { AmbientParticles } from "./ambient-particles"
 import { ScrollCamera } from "./scroll-camera"
@@ -31,7 +31,7 @@ export function Scene({ scrollProgressRef, mode }: SceneProps) {
       <ScrollCamera scrollProgressRef={scrollProgressRef} mode={mode} />
 
       {/* THE focal point - always visible, transforms with scroll */}
-      <TruthCore scrollProgressRef={scrollProgressRef} mode={mode} />
+      <KanariCore scrollProgressRef={scrollProgressRef} mode={mode} />
 
       {/* Section-specific accents that fade in */}
       <SectionAccent

@@ -13,7 +13,7 @@ export const FOG = {
   far: 40,
 }
 
-// Orbital ring radii for TruthCore
+// Orbital ring radii for KanariCore
 export const ORBITAL_RINGS = [1.6, 2.2, 2.8] as const
 
 // Section accent positions (x, y, z)

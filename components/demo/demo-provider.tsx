@@ -161,7 +161,7 @@ export function DemoProvider({ children }: DemoProviderProps) {
         })
       }
 
-      // Fast bulk seeding to keep "Watch Demo" snappy for judges.
+      // Fast bulk seeding to keep "Feature Tour" snappy for judges.
       // See: docs/error-patterns/demo-seed-data-bulk-operations.md
       await db.transaction(
         "rw",
