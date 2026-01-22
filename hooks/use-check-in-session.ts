@@ -152,6 +152,34 @@ async function preloadSessionContext(options: {
   }
 }
 
+function kickoffContextFingerprintComputation(options: {
+  runId: number
+  startSessionRunIdRef: MutableRefObject<number>
+  unmountedRef: MutableRefObject<boolean>
+  contextFingerprintRef: MutableRefObject<string | null>
+}): void {
+  const { runId, startSessionRunIdRef, unmountedRef, contextFingerprintRef } = options
+
+  // Compute context fingerprint in the background (never block startup).
+  // This is used only for session preservation/resumption.
+  void (async () => {
+    try {
+      const fingerprint = await withTimeout(
+        computeContextFingerprint(),
+        10_000,
+        "Context fingerprint timed out"
+      )
+
+      // Only store if this startSession run is still active.
+      if (!unmountedRef.current && startSessionRunIdRef.current === runId) {
+        contextFingerprintRef.current = fingerprint
+      }
+    } catch (fingerprintError) {
+      console.warn("[useCheckIn] Context fingerprint failed/timed out:", fingerprintError)
+    }
+  })()
+}
+
 function extendContextSummary(options: {
   accountabilityMode: AccountabilityMode | undefined
   contextSummary: SessionContext["contextSummary"] | undefined
@@ -527,23 +555,12 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
           ensureActive()
         }
 
-        // Compute context fingerprint in the background (never block startup).
-        // This is used only for session preservation/resumption.
-        void (async () => {
-          try {
-            const fingerprint = await withTimeout(
-              computeContextFingerprint(),
-              10_000,
-              "Context fingerprint timed out"
-            )
-            // Only store if this startSession run is still active.
-            if (!unmountedRef.current && startSessionRunIdRef.current === runId) {
-              contextFingerprintRef.current = fingerprint
-            }
-          } catch (fingerprintError) {
-            console.warn("[useCheckIn] Context fingerprint failed/timed out:", fingerprintError)
-          }
-        })()
+        kickoffContextFingerprintComputation({
+          runId,
+          startSessionRunIdRef,
+          unmountedRef,
+          contextFingerprintRef,
+        })
 
         await initializeAudioPlayback({ dispatch, playbackControls })
         playbackInitialized = true
