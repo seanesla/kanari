@@ -16,7 +16,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { getAPIKeyFromRequest, validateAPIKey } from "@/lib/gemini/client"
+import { callGeminiAPI, getAPIKeyFromRequest, validateAPIKey, type GeminiRequest } from "@/lib/gemini/client"
 import { parseGeminiJson } from "@/lib/gemini/json"
 import {
   LEVEL_TITLE_RESPONSE_SCHEMA,
@@ -48,11 +48,9 @@ async function generateLevelTitle(apiKey: string, input: {
   currentDailyCompletionStreak: number
   longestDailyCompletionStreak: number
 }): Promise<GeminiLevelTitleResponse> {
-  const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
-
   const userPrompt = generateLevelTitleUserPrompt(input)
 
-  const request = {
+  const request: GeminiRequest = {
     systemInstruction: {
       parts: [{ text: LEVEL_TITLE_SYSTEM_PROMPT }],
     },
@@ -72,35 +70,7 @@ async function generateLevelTitle(apiKey: string, input: {
     },
   }
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 20_000)
-
-  let response: Response
-  try {
-    response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify(request),
-      signal: controller.signal,
-    })
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Gemini API request timed out after 20s")
-    }
-    throw error
-  } finally {
-    clearTimeout(timeoutId)
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Gemini API error (${response.status}): ${errorText}`)
-  }
-
-  const data = await response.json()
+  const data = await callGeminiAPI(apiKey, request, 20_000)
   if (!data.candidates || data.candidates.length === 0) {
     throw new Error("No response from Gemini API")
   }
@@ -174,4 +144,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ status: "error", error: "Health check failed" }, { status: 500 })
   }
 }
-

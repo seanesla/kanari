@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { renderHook, waitFor, act } from "@testing-library/react"
-import { indexedDB as fakeIndexedDB, IDBKeyRange } from "fake-indexeddb"
+import { installFakeIndexedDb, deleteDatabase } from "@/test-utils/indexeddb"
 
 vi.mock("@/lib/timezone-context", () => ({
   useTimeZone: () => ({
@@ -16,26 +16,6 @@ vi.mock("@/lib/timezone-context", () => ({
 }))
 
 const DB_NAME = "kanari"
-
-function installFakeIndexedDb() {
-  Object.defineProperty(globalThis, "indexedDB", {
-    value: fakeIndexedDB,
-    configurable: true,
-  })
-  Object.defineProperty(globalThis, "IDBKeyRange", {
-    value: IDBKeyRange,
-    configurable: true,
-  })
-}
-
-function deleteDatabase(name: string) {
-  return new Promise<void>((resolve, reject) => {
-    const request = fakeIndexedDB.deleteDatabase(name)
-    request.onerror = () => reject(request.error)
-    request.onblocked = () => reject(new Error("deleteDatabase blocked"))
-    request.onsuccess = () => resolve()
-  })
-}
 
 describe("useAchievements.ensureToday transaction safety", () => {
   beforeEach(async () => {

@@ -5,15 +5,26 @@ import type { Dispatch } from "react"
 import type { GeminiWidgetEvent } from "@/lib/gemini/live-client"
 import { useLocalCalendar } from "@/hooks/use-local-calendar"
 import { useTimeZone } from "@/lib/timezone-context"
-import { Temporal } from "temporal-polyfill"
 import type {
   CheckInMessage,
   JournalEntry,
   ScheduleActivityToolArgs,
   Suggestion,
   RecoveryBlock,
-  SuggestionCategory,
 } from "@/lib/types"
+import {
+  clampDurationMinutes,
+  extractDateISOFromText,
+  extractExplicitTimeFromText,
+  formatTimeHHMM,
+  formatZonedDateTimeForMessage,
+  inferScheduleCategory,
+  inferScheduleDurationMinutes,
+  inferScheduleTitle,
+  isScheduleRequest,
+  normalizeTimeToHHMM,
+  parseZonedDateTimeInstant,
+} from "@/lib/scheduling"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 
 export interface UseCheckInWidgetsOptions {
@@ -34,271 +45,6 @@ export interface UseCheckInWidgetsResult {
   saveJournalEntry: (widgetId: string, content: string) => Promise<void>
   triggerManualTool: (toolName: string, args: Record<string, unknown>) => void
   handlers: CheckInWidgetsGeminiHandlers
-}
-
-interface ParsedTime {
-  hour: number
-  minute: number
-}
-
-function parseTimeHHMM(time: string): ParsedTime | null {
-  const [hourStr, minuteStr] = time.split(":")
-  const hour = Number(hourStr)
-  const minute = Number(minuteStr)
-
-  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return null
-  if (hour < 0 || hour > 23) return null
-  if (minute < 0 || minute > 59) return null
-
-  return { hour, minute }
-}
-
-function formatTimeHHMM(time: ParsedTime): string {
-  return `${String(time.hour).padStart(2, "0")}:${String(time.minute).padStart(2, "0")}`
-}
-
-function to24Hour(hour12: number, meridiem: "am" | "pm"): number {
-  const normalized = hour12 % 12
-  return meridiem === "pm" ? normalized + 12 : normalized
-}
-
-function normalizeTimeToHHMM(time: string): string | null {
-  const direct = parseTimeHHMM(time)
-  if (direct) return formatTimeHHMM(direct)
-
-  const explicit = extractExplicitTimeFromText(time)
-  if (explicit) return formatTimeHHMM(explicit)
-
-  return null
-}
-
-function extractExplicitTimeFromText(text: string): ParsedTime | null {
-  // This is intentionally conservative: only treat a time as "explicit" when
-  // the user provides AM/PM (or 24h time with hour>=13). This prevents us from
-  // overriding the model when the user says something ambiguous like "at 9:30".
-  const input = text.toLowerCase()
-
-  const foundTimes = new Map<string, ParsedTime>()
-
-  const push = (t: ParsedTime) => {
-    const key = formatTimeHHMM(t)
-    foundTimes.set(key, t)
-  }
-
-  // e.g. "9:30pm", "9:30 pm", "9.30 p.m."
-  for (const match of input.matchAll(/\b(1[0-2]|0?[1-9])\s*[:.]\s*([0-5]\d)\s*(a\.?m|p\.?m)\b/g)) {
-    const hour12 = Number(match[1])
-    const minute = Number(match[2])
-    const meridiem = match[3]?.startsWith("p") ? "pm" : "am"
-    push({ hour: to24Hour(hour12, meridiem), minute })
-  }
-
-  // e.g. "9 30 pm" (common speech-to-text variant)
-  for (const match of input.matchAll(/\b(1[0-2]|0?[1-9])\s+([0-5]\d)\s*(a\.?m|p\.?m)\b/g)) {
-    const hour12 = Number(match[1])
-    const minute = Number(match[2])
-    const meridiem = match[3]?.startsWith("p") ? "pm" : "am"
-    push({ hour: to24Hour(hour12, meridiem), minute })
-  }
-
-  // e.g. "9pm", "9 pm", "9 p.m."
-  for (const match of input.matchAll(/\b(1[0-2]|0?[1-9])\s*(a\.?m|p\.?m)\b/g)) {
-    const hour12 = Number(match[1])
-    const meridiem = match[2]?.startsWith("p") ? "pm" : "am"
-    push({ hour: to24Hour(hour12, meridiem), minute: 0 })
-  }
-
-  // e.g. "21:30" (24h). Only accept hour>=13 to avoid ambiguity with "9:30".
-  for (const match of input.matchAll(/\b([01]?\d|2[0-3])\s*[:.]\s*([0-5]\d)\b/g)) {
-    const hour = Number(match[1])
-    if (hour < 13) continue
-    const minute = Number(match[2])
-    push({ hour, minute })
-  }
-
-  if (foundTimes.size !== 1) return null
-  return foundTimes.values().next().value ?? null
-}
-
-function extractDateISOFromText(text: string, timeZone: string): string | null {
-  const input = text.toLowerCase()
-
-  const explicitDate = input.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0]
-  if (explicitDate) return explicitDate
-
-  const today = Temporal.Now.zonedDateTimeISO(timeZone).toPlainDate()
-
-  if (input.includes("tomorrow")) {
-    return today.add({ days: 1 }).toString()
-  }
-
-  if (input.includes("today") || input.includes("tonight")) {
-    return today.toString()
-  }
-
-  return null
-}
-
-function isScheduleRequest(text: string): boolean {
-  return /\bschedule\b/i.test(text)
-}
-
-function extractDurationMinutesFromText(text: string): number | null {
-  const input = text.toLowerCase()
-
-  // "for 30 minutes", "30 min", "30mins"
-  const minutes = input.match(/\b(\d{1,3})\s*(?:min|mins|minute|minutes|m)\b/)
-  if (minutes) {
-    const value = Number(minutes[1])
-    if (Number.isFinite(value) && value > 0 && value <= 240) return value
-  }
-
-  // "for 1 hour", "2 hours", "1hr", "1 h"
-  const hours = input.match(/\b(\d{1,2})\s*(?:hr|hrs|hour|hours|h)\b/)
-  if (hours) {
-    const value = Number(hours[1])
-    if (Number.isFinite(value) && value > 0 && value <= 12) return value * 60
-  }
-
-  return null
-}
-
-function inferScheduleCategory(text: string): SuggestionCategory {
-  const input = text.toLowerCase()
-
-  if (input.includes("break")) return "break"
-  if (input.includes("walk") || input.includes("run") || input.includes("exercise") || input.includes("gym")) {
-    return "exercise"
-  }
-  if (
-    input.includes("meditate") ||
-    input.includes("meditation") ||
-    input.includes("mindfulness") ||
-    input.includes("breath")
-  ) {
-    return "mindfulness"
-  }
-  if (
-    input.includes("meeting") ||
-    input.includes("meet ") ||
-    input.includes("coffee") ||
-    input.includes("call") ||
-    input.includes("dinner") ||
-    input.includes("lunch")
-  ) {
-    return "social"
-  }
-
-  return "rest"
-}
-
-function inferScheduleTitle(text: string): string {
-  const raw = text.trim()
-  const input = raw.toLowerCase()
-
-  // Prefer quoted titles if present.
-  const quoted = raw.match(/["“]([^"”]{1,60})["”]/)?.[1]?.trim()
-  if (quoted) return quoted
-
-  if (input.includes("check-in") || input.includes("check in")) return "Check-in"
-  if (input.includes("appointment")) return "Appointment"
-  if (input.includes("meeting")) return "Meeting"
-  if (input.includes("break")) return "Break"
-  if (input.includes("walk")) return "Walk"
-
-  return "Scheduled activity"
-}
-
-function inferScheduleDurationMinutes(text: string): number {
-  const explicit = extractDurationMinutesFromText(text)
-  if (explicit) return explicit
-
-  const input = text.toLowerCase()
-  if (input.includes("check-in") || input.includes("check in")) return 20
-  if (input.includes("break")) return 15
-  if (input.includes("exercise") || input.includes("walk") || input.includes("run") || input.includes("gym")) return 10
-  if (input.includes("meditate") || input.includes("meditation") || input.includes("mindfulness") || input.includes("breath")) {
-    return 10
-  }
-  if (input.includes("appointment") || input.includes("meeting")) return 30
-
-  return 30
-}
-
-function clampDurationMinutes(duration: number): number {
-  if (!Number.isFinite(duration)) return 20
-  return Math.max(5, Math.min(240, Math.round(duration)))
-}
-
-function formatZonedDateTimeForMessage(dateISO: string, timeHHMM: string, timeZone: string): string {
-  const [year, month, day] = dateISO.split("-").map(Number)
-  const [hour, minute] = timeHHMM.split(":").map(Number)
-
-  try {
-    const zdt = Temporal.ZonedDateTime.from({
-      timeZone,
-      year,
-      month,
-      day,
-      hour,
-      minute,
-    })
-
-    return new Intl.DateTimeFormat([], {
-      timeZone,
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(zdt.epochMilliseconds))
-  } catch {
-    const dt = new Date(year, month - 1, day, hour, minute, 0, 0)
-    return dt.toLocaleString([], {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-}
-
-function parseZonedDateTimeInstant(date: string, time: string, timeZone: string): string | null {
-  const normalizedTime = normalizeTimeToHHMM(time)
-  if (!normalizedTime) return null
-
-  const [yearStr, monthStr, dayStr] = date.split("-")
-  const [hourStr, minuteStr] = normalizedTime.split(":")
-
-  const year = Number(yearStr)
-  const month = Number(monthStr)
-  const day = Number(dayStr)
-  const hour = Number(hourStr)
-  const minute = Number(minuteStr)
-
-  if (
-    !Number.isInteger(year) ||
-    !Number.isInteger(month) ||
-    !Number.isInteger(day) ||
-    !Number.isInteger(hour) ||
-    !Number.isInteger(minute)
-  ) {
-    return null
-  }
-
-  if (month < 1 || month > 12) return null
-  if (hour < 0 || hour > 23) return null
-  if (minute < 0 || minute > 59) return null
-
-  try {
-    // Parse via ISO string to reject overflow dates like 2024-02-31.
-    const plainDateTime = Temporal.PlainDateTime.from(`${yearStr}-${monthStr}-${dayStr}T${normalizedTime}`)
-    const zdt = plainDateTime.toZonedDateTime(timeZone)
-    return zdt.toInstant().toString()
-  } catch {
-    return null
-  }
 }
 
 export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckInWidgetsResult {
@@ -343,54 +89,43 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
   // Storage Helpers (dynamic import)
   // ========================================
 
-  const addSuggestionToDb = useCallback(async (suggestion: Suggestion) => {
+  const importStorageDb = useCallback(async () => {
     if (typeof indexedDB === "undefined") {
       throw new Error("IndexedDB not available")
     }
-    const { db, fromSuggestion } = await import("@/lib/storage/db")
-    await db.suggestions.add(fromSuggestion(suggestion))
+    return import("@/lib/storage/db")
   }, [])
+
+  const addSuggestionToDb = useCallback(async (suggestion: Suggestion) => {
+    const { db, fromSuggestion } = await importStorageDb()
+    await db.suggestions.add(fromSuggestion(suggestion))
+  }, [importStorageDb])
 
   const deleteSuggestionFromDb = useCallback(async (suggestionId: string) => {
-    if (typeof indexedDB === "undefined") {
-      throw new Error("IndexedDB not available")
-    }
-    const { db } = await import("@/lib/storage/db")
+    const { db } = await importStorageDb()
     await db.suggestions.delete(suggestionId)
-  }, [])
+  }, [importStorageDb])
 
   const addJournalEntryToDb = useCallback(async (entry: JournalEntry) => {
-    if (typeof indexedDB === "undefined") {
-      throw new Error("IndexedDB not available")
-    }
-    const { db, fromJournalEntry } = await import("@/lib/storage/db")
+    const { db, fromJournalEntry } = await importStorageDb()
     await db.journalEntries.add(fromJournalEntry(entry))
-  }, [])
+  }, [importStorageDb])
 
   const addRecoveryBlockToDb = useCallback(async (block: RecoveryBlock) => {
-    if (typeof indexedDB === "undefined") {
-      throw new Error("IndexedDB not available")
-    }
-    const { db, fromRecoveryBlock } = await import("@/lib/storage/db")
+    const { db, fromRecoveryBlock } = await importStorageDb()
     await db.recoveryBlocks.put(fromRecoveryBlock(block))
-  }, [])
+  }, [importStorageDb])
 
   const getRecoveryBlocksBySuggestionId = useCallback(async (suggestionId: string): Promise<RecoveryBlock[]> => {
-    if (typeof indexedDB === "undefined") {
-      throw new Error("IndexedDB not available")
-    }
-    const { db, toRecoveryBlock } = await import("@/lib/storage/db")
+    const { db, toRecoveryBlock } = await importStorageDb()
     const records = await db.recoveryBlocks.where("suggestionId").equals(suggestionId).toArray()
     return records.map(toRecoveryBlock)
-  }, [])
+  }, [importStorageDb])
 
   const deleteRecoveryBlockFromDb = useCallback(async (recoveryBlockId: string) => {
-    if (typeof indexedDB === "undefined") {
-      throw new Error("IndexedDB not available")
-    }
-    const { db } = await import("@/lib/storage/db")
+    const { db } = await importStorageDb()
     await db.recoveryBlocks.delete(recoveryBlockId)
-  }, [])
+  }, [importStorageDb])
 
   // ========================================
   // Widget Controls

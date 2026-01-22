@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server"
-import { validateAPIKey, getAPIKeyFromRequest } from "@/lib/gemini/client"
+import { callGeminiAPI, validateAPIKey, getAPIKeyFromRequest, type GeminiRequest } from "@/lib/gemini/client"
 import { parseGeminiJson } from "@/lib/gemini/json"
 import {
   DAILY_ACHIEVEMENTS_SYSTEM_PROMPT,
@@ -25,11 +25,9 @@ async function generateAchievements(
   apiKey: string,
   userStats: UserStatsForDailyAchievements
 ): Promise<GeminiDailyAchievementsResponse> {
-  const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
-
   const userPrompt = generateDailyAchievementsUserPrompt(userStats)
 
-  const request = {
+  const request: GeminiRequest = {
     systemInstruction: {
       parts: [{ text: DAILY_ACHIEVEMENTS_SYSTEM_PROMPT }],
     },
@@ -49,35 +47,7 @@ async function generateAchievements(
     },
   }
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 30_000) // 30s timeout
-
-  let response: Response
-  try {
-    response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify(request),
-      signal: controller.signal,
-    })
-  } catch (error) {
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new Error("Gemini API request timed out after 30s")
-    }
-    throw error
-  } finally {
-    clearTimeout(timeoutId)
-  }
-
-  if (!response.ok) {
-    const errorText = await response.text()
-    throw new Error(`Gemini API error (${response.status}): ${errorText}`)
-  }
-
-  const data = await response.json()
+  const data = await callGeminiAPI(apiKey, request, 30_000)
 
   if (!data.candidates || data.candidates.length === 0) {
     throw new Error("No response from Gemini API")

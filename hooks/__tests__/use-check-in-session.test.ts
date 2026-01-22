@@ -49,17 +49,24 @@ beforeEach(async () => {
 
   getClientMock = vi.fn(() => fakeClient)
 
-  const track = {
+  type MockAudioTrack = {
+    stop: () => void
+    readyState: "live" | "ended"
+    kind: "audio"
+    enabled: boolean
+  }
+
+  const track: MockAudioTrack = {
     stop: () => {},
     readyState: "live",
     kind: "audio",
     enabled: true,
-  } satisfies { stop: () => void; readyState: "live" | "ended"; kind: "audio"; enabled: boolean }
+  }
 
   stopMock = vi.fn(() => {
     track.readyState = "ended"
   })
-  track.stop = stopMock
+  track.stop = stopMock as unknown as () => void
 
   const stream = {
     getTracks: () => [track],
@@ -442,7 +449,15 @@ describe("useCheckIn session lifecycle", () => {
 
     const { result } = renderHook(() => useCheckIn())
 
-    await expect(result.current[1].resumePreservedSession()).rejects.toThrow("Preserved connection lost")
+    await act(async () => {
+      try {
+        await result.current[1].resumePreservedSession()
+        throw new Error("Expected resumePreservedSession() to throw")
+      } catch (error) {
+        expect(error).toBeInstanceOf(Error)
+        expect((error as Error).message).toContain("Preserved connection lost")
+      }
+    })
   })
 
   it("cancels a session and resets state", async () => {

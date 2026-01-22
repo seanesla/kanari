@@ -18,6 +18,78 @@ import type {
   EnrichedWellnessContext,
 } from "@/lib/types"
 
+const MAX_REQUEST_BODY_BYTES = 250_000
+
+const VALID_STRESS_LEVELS: StressLevel[] = ["low", "moderate", "elevated", "high"]
+const VALID_FATIGUE_LEVELS: FatigueLevel[] = ["rested", "normal", "tired", "exhausted"]
+const VALID_TRENDS: TrendDirection[] = ["improving", "stable", "declining"]
+
+const VALID_SPEECH_RATES = ["fast", "normal", "slow"] as const
+const VALID_ENERGY_LEVELS = ["high", "moderate", "low"] as const
+const VALID_PAUSE_FREQUENCIES = ["frequent", "normal", "rare"] as const
+const VALID_VOICE_TONES = ["bright", "neutral", "dull"] as const
+
+function buildDefaultVoicePatterns() {
+  return {
+    speechRate: "normal",
+    energyLevel: "moderate",
+    pauseFrequency: "normal",
+    voiceTone: "neutral",
+  } as const
+}
+
+function buildDefaultHistoryContext(stressScore: number, fatigueScore: number) {
+  return {
+    recordingCount: 0,
+    daysOfData: 0,
+    averageStress: stressScore,
+    averageFatigue: fatigueScore,
+    stressChange: "stable",
+    fatigueChange: "stable",
+  } as const
+}
+
+function buildDefaultBurnoutContext() {
+  return {
+    riskLevel: "low",
+    riskScore: 0,
+    predictedDays: 0,
+    factors: [],
+    confidence: 0,
+  } as const
+}
+
+function buildDefaultMemoryContext(): GeminiMemoryContext {
+  return {
+    completed: [],
+    dismissed: [],
+    scheduled: [],
+    stats: {
+      totalCompleted: 0,
+      totalDismissed: 0,
+      mostUsedCategory: null,
+      leastUsedCategory: null,
+      averageCompletionRate: 0,
+      categoryStats: {
+        break: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
+        exercise: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
+        mindfulness: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
+        social: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
+        rest: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
+      },
+      preferredCategories: [],
+      avoidedCategories: [],
+      effectivenessByCategory: {
+        break: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
+        exercise: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
+        mindfulness: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
+        social: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
+        rest: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
+      },
+    },
+  }
+}
+
 /**
  * POST /api/gemini
  *
@@ -58,7 +130,7 @@ import type {
 export async function POST(request: NextRequest) {
   try {
     const contentLength = request.headers.get("content-length")
-    if (contentLength && Number(contentLength) > 250_000) {
+    if (contentLength && Number(contentLength) > MAX_REQUEST_BODY_BYTES) {
       return NextResponse.json({ error: "Request body too large" }, { status: 413 })
     }
 
@@ -103,25 +175,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate categorical values
-    const validStressLevels: StressLevel[] = ["low", "moderate", "elevated", "high"]
-    const validFatigueLevels: FatigueLevel[] = ["rested", "normal", "tired", "exhausted"]
-    const validTrends: TrendDirection[] = ["improving", "stable", "declining"]
-
-    if (!validStressLevels.includes(stressLevel as StressLevel)) {
+    if (!VALID_STRESS_LEVELS.includes(stressLevel as StressLevel)) {
       return NextResponse.json(
         { error: "Invalid stress level" },
         { status: 400 }
       )
     }
 
-    if (!validFatigueLevels.includes(fatigueLevel as FatigueLevel)) {
+    if (!VALID_FATIGUE_LEVELS.includes(fatigueLevel as FatigueLevel)) {
       return NextResponse.json(
         { error: "Invalid fatigue level" },
         { status: 400 }
       )
     }
 
-    if (!validTrends.includes(trend as TrendDirection)) {
+    if (!VALID_TRENDS.includes(trend as TrendDirection)) {
       return NextResponse.json(
         { error: "Invalid trend direction" },
         { status: 400 }
@@ -137,33 +205,28 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      const validSpeechRates = ["fast", "normal", "slow"]
-      const validEnergyLevels = ["high", "moderate", "low"]
-      const validPauseFrequencies = ["frequent", "normal", "rare"]
-      const validVoiceTones = ["bright", "neutral", "dull"]
-
-      if (!validSpeechRates.includes(voicePatterns.speechRate)) {
+      if (!VALID_SPEECH_RATES.includes(voicePatterns.speechRate)) {
         return NextResponse.json(
           { error: "Invalid speech rate. Must be: fast, normal, or slow" },
           { status: 400 }
         )
       }
 
-      if (!validEnergyLevels.includes(voicePatterns.energyLevel)) {
+      if (!VALID_ENERGY_LEVELS.includes(voicePatterns.energyLevel)) {
         return NextResponse.json(
           { error: "Invalid energy level. Must be: high, moderate, or low" },
           { status: 400 }
         )
       }
 
-      if (!validPauseFrequencies.includes(voicePatterns.pauseFrequency)) {
+      if (!VALID_PAUSE_FREQUENCIES.includes(voicePatterns.pauseFrequency)) {
         return NextResponse.json(
           { error: "Invalid pause frequency. Must be: frequent, normal, or rare" },
           { status: 400 }
         )
       }
 
-      if (!validVoiceTones.includes(voicePatterns.voiceTone)) {
+      if (!VALID_VOICE_TONES.includes(voicePatterns.voiceTone)) {
         return NextResponse.json(
           { error: "Invalid voice tone. Must be: bright, neutral, or dull" },
           { status: 400 }
@@ -342,58 +405,15 @@ export async function POST(request: NextRequest) {
         timeOfDay: getTimeOfDay(now.getHours()),
         dayOfWeek: getDayType(now.getDay()),
         voicePatterns: voicePatterns || {
-          speechRate: "normal",
-          energyLevel: "moderate",
-          pauseFrequency: "normal",
-          voiceTone: "neutral",
+          ...buildDefaultVoicePatterns(),
         },
-        history: history || {
-          recordingCount: 0,
-          daysOfData: 0,
-          averageStress: stressScore,
-          averageFatigue: fatigueScore,
-          stressChange: "stable",
-          fatigueChange: "stable",
-        },
-        burnout: burnout || {
-          riskLevel: "low",
-          riskScore: 0,
-          predictedDays: 0,
-          factors: [],
-          confidence: 0,
-        },
+        history: history || buildDefaultHistoryContext(stressScore, fatigueScore),
+        burnout: burnout || buildDefaultBurnoutContext(),
         confidence: confidence ?? 0.8,
       }
 
       // Build default memory context if not provided
-      const memory: GeminiMemoryContext = memoryContext || {
-        completed: [],
-        dismissed: [],
-        scheduled: [],
-        stats: {
-          totalCompleted: 0,
-          totalDismissed: 0,
-          mostUsedCategory: null,
-          leastUsedCategory: null,
-          averageCompletionRate: 0,
-          categoryStats: {
-            break: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
-            exercise: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
-            mindfulness: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
-            social: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
-            rest: { completed: 0, dismissed: 0, total: 0, completionRate: 0, preference: "medium" },
-          },
-          preferredCategories: [],
-          avoidedCategories: [],
-          effectivenessByCategory: {
-            break: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
-            exercise: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
-            mindfulness: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
-            social: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
-            rest: { totalRatings: 0, helpfulRatings: 0, notHelpfulRatings: 0, helpfulRate: 0 },
-          },
-        },
-      }
+      const memory: GeminiMemoryContext = memoryContext || buildDefaultMemoryContext()
 
       // Generate diff-aware prompt
       const userPrompt = generateDiffAwareUserPrompt(

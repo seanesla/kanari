@@ -13,7 +13,7 @@
  * Source: Context7 - /googleapis/js-genai docs - "Live.connect"
  */
 
-import { useReducer, useRef, useCallback, useEffect } from "react"
+import { useReducer, useRef, useCallback, useEffect, type Dispatch, type MutableRefObject } from "react"
 import {
   GeminiLiveClient,
   createLiveClient,
@@ -97,6 +97,99 @@ export interface UseGeminiLiveOptions {
   onConnected?: () => void
   onDisconnected?: (reason: string) => void
   onError?: (error: Error) => void
+}
+
+type LiveClientEventsFactoryOptions = {
+  dispatch: Dispatch<GeminiAction>
+  callbacksRef: MutableRefObject<UseGeminiLiveOptions>
+  mountedRef: MutableRefObject<boolean>
+  onErrorEmitted?: () => void
+}
+
+function createLiveClientEvents({
+  dispatch,
+  callbacksRef,
+  mountedRef,
+  onErrorEmitted,
+}: LiveClientEventsFactoryOptions): Partial<LiveClientEvents> {
+  return {
+    onConnecting: () => {
+      // No-op: connect() already updates state; reattach() assumes connected.
+    },
+    onConnected: () => {
+      if (!mountedRef.current) return
+      dispatch({ type: "READY" })
+      callbacksRef.current.onConnected?.()
+    },
+    onDisconnected: (reason) => {
+      if (!mountedRef.current) return
+      dispatch({ type: "DISCONNECTED" })
+      callbacksRef.current.onDisconnected?.(reason)
+    },
+    onError: (error) => {
+      onErrorEmitted?.()
+      if (!mountedRef.current) return
+      dispatch({ type: "ERROR", error: error.message })
+      callbacksRef.current.onError?.(error)
+    },
+    onAudioChunk: (base64Audio) => {
+      // First audio chunk = model started speaking.
+      if (!mountedRef.current) return
+      dispatch({ type: "MODEL_SPEECH_START" })
+      callbacksRef.current.onAudioChunk?.(base64Audio)
+    },
+    onAudioEnd: () => {
+      if (!mountedRef.current) return
+      dispatch({ type: "MODEL_SPEECH_END" })
+      callbacksRef.current.onAudioEnd?.()
+    },
+    onUserTranscript: (text, isFinal) => {
+      if (!mountedRef.current) return
+      dispatch({ type: "USER_TRANSCRIPT", text, isFinal })
+      callbacksRef.current.onUserTranscript?.(text, isFinal)
+    },
+    onModelTranscript: (text, finished) => {
+      if (!mountedRef.current) return
+      dispatch({ type: "MODEL_TRANSCRIPT", text })
+      callbacksRef.current.onModelTranscript?.(text, finished)
+    },
+    onModelThinking: (text) => {
+      callbacksRef.current.onModelThinking?.(text)
+    },
+    onTurnComplete: () => {
+      if (!mountedRef.current) return
+      dispatch({ type: "MODEL_SPEECH_END" })
+      // Note: Don't clear transcripts here - let useCheckIn manage its own state.
+      // Clearing here was causing race conditions with save logic.
+      callbacksRef.current.onTurnComplete?.()
+    },
+    onInterrupted: () => {
+      if (!mountedRef.current) return
+      dispatch({ type: "MODEL_SPEECH_END" })
+      callbacksRef.current.onInterrupted?.()
+    },
+    onSilenceChosen: (reason) => {
+      if (!mountedRef.current) return
+      dispatch({ type: "MODEL_SPEECH_END" })
+      callbacksRef.current.onSilenceChosen?.(reason)
+    },
+    onUserSpeechStart: () => {
+      if (!mountedRef.current) return
+      dispatch({ type: "USER_SPEECH_START" })
+      callbacksRef.current.onUserSpeechStart?.()
+    },
+    onUserSpeechEnd: () => {
+      if (!mountedRef.current) return
+      dispatch({ type: "USER_SPEECH_END" })
+      callbacksRef.current.onUserSpeechEnd?.()
+    },
+    onWidget: (event) => {
+      callbacksRef.current.onWidget?.(event)
+    },
+    onCommitment: (commitment) => {
+      callbacksRef.current.onCommitment?.(commitment)
+    },
+  }
 }
 
 // ============================================
@@ -375,84 +468,14 @@ export function useGeminiLive(
 
       try {
         // Create event handlers that use refs to avoid stale closures.
-        const events: Partial<LiveClientEvents> = {
-          onConnecting: () => {
-            // Already dispatched START_CONNECTING.
-          },
-          onConnected: () => {
-            if (!mountedRef.current) return
-            dispatch({ type: "READY" })
-            callbacksRef.current.onConnected?.()
-          },
-          onDisconnected: (reason) => {
-            if (!mountedRef.current) return
-            dispatch({ type: "DISCONNECTED" })
-            callbacksRef.current.onDisconnected?.(reason)
-          },
-          onError: (error) => {
+        const events = createLiveClientEvents({
+          dispatch,
+          callbacksRef,
+          mountedRef,
+          onErrorEmitted: () => {
             didEmitError = true
-            if (!mountedRef.current) return
-            dispatch({ type: "ERROR", error: error.message })
-            callbacksRef.current.onError?.(error)
           },
-          onAudioChunk: (base64Audio) => {
-            // First audio chunk = model started speaking.
-            if (!mountedRef.current) return
-            dispatch({ type: "MODEL_SPEECH_START" })
-            callbacksRef.current.onAudioChunk?.(base64Audio)
-          },
-          onAudioEnd: () => {
-            if (!mountedRef.current) return
-            dispatch({ type: "MODEL_SPEECH_END" })
-            callbacksRef.current.onAudioEnd?.()
-          },
-          onUserTranscript: (text, isFinal) => {
-            if (!mountedRef.current) return
-            dispatch({ type: "USER_TRANSCRIPT", text, isFinal })
-            callbacksRef.current.onUserTranscript?.(text, isFinal)
-          },
-          onModelTranscript: (text, finished) => {
-            if (!mountedRef.current) return
-            dispatch({ type: "MODEL_TRANSCRIPT", text })
-            callbacksRef.current.onModelTranscript?.(text, finished)
-          },
-          onModelThinking: (text) => {
-            callbacksRef.current.onModelThinking?.(text)
-          },
-          onTurnComplete: () => {
-            if (!mountedRef.current) return
-            dispatch({ type: "MODEL_SPEECH_END" })
-            // Note: Don't clear transcripts here - let useCheckIn manage its own state.
-            // Clearing here was causing race conditions with save logic.
-            callbacksRef.current.onTurnComplete?.()
-          },
-          onInterrupted: () => {
-            if (!mountedRef.current) return
-            dispatch({ type: "MODEL_SPEECH_END" })
-            callbacksRef.current.onInterrupted?.()
-          },
-          onSilenceChosen: (reason) => {
-            if (!mountedRef.current) return
-            dispatch({ type: "MODEL_SPEECH_END" })
-            callbacksRef.current.onSilenceChosen?.(reason)
-          },
-          onUserSpeechStart: () => {
-            if (!mountedRef.current) return
-            dispatch({ type: "USER_SPEECH_START" })
-            callbacksRef.current.onUserSpeechStart?.()
-          },
-          onUserSpeechEnd: () => {
-            if (!mountedRef.current) return
-            dispatch({ type: "USER_SPEECH_END" })
-            callbacksRef.current.onUserSpeechEnd?.()
-          },
-          onWidget: (event) => {
-            callbacksRef.current.onWidget?.(event)
-          },
-          onCommitment: (commitment) => {
-            callbacksRef.current.onCommitment?.(commitment)
-          },
-        }
+        })
 
         // Create client config.
         const config: LiveClientConfig = { events }
@@ -562,80 +585,7 @@ export function useGeminiLive(
     clientRef.current = client
 
     // Create event handlers using refs (same pattern as connect())
-    const events: Partial<LiveClientEvents> = {
-      onConnecting: () => {
-        // Already connected
-      },
-      onConnected: () => {
-        if (!mountedRef.current) return
-        dispatch({ type: "READY" })
-        callbacksRef.current.onConnected?.()
-      },
-      onDisconnected: (reason) => {
-        if (!mountedRef.current) return
-        dispatch({ type: "DISCONNECTED" })
-        callbacksRef.current.onDisconnected?.(reason)
-      },
-      onError: (error) => {
-        if (!mountedRef.current) return
-        dispatch({ type: "ERROR", error: error.message })
-        callbacksRef.current.onError?.(error)
-      },
-      onAudioChunk: (base64Audio) => {
-        if (!mountedRef.current) return
-        dispatch({ type: "MODEL_SPEECH_START" })
-        callbacksRef.current.onAudioChunk?.(base64Audio)
-      },
-      onAudioEnd: () => {
-        if (!mountedRef.current) return
-        dispatch({ type: "MODEL_SPEECH_END" })
-        callbacksRef.current.onAudioEnd?.()
-      },
-      onUserTranscript: (text, isFinal) => {
-        if (!mountedRef.current) return
-        dispatch({ type: "USER_TRANSCRIPT", text, isFinal })
-        callbacksRef.current.onUserTranscript?.(text, isFinal)
-      },
-      onModelTranscript: (text, finished) => {
-        if (!mountedRef.current) return
-        dispatch({ type: "MODEL_TRANSCRIPT", text })
-        callbacksRef.current.onModelTranscript?.(text, finished)
-      },
-      onModelThinking: (text) => {
-        callbacksRef.current.onModelThinking?.(text)
-      },
-      onTurnComplete: () => {
-        if (!mountedRef.current) return
-        dispatch({ type: "MODEL_SPEECH_END" })
-        callbacksRef.current.onTurnComplete?.()
-      },
-      onInterrupted: () => {
-        if (!mountedRef.current) return
-        dispatch({ type: "MODEL_SPEECH_END" })
-        callbacksRef.current.onInterrupted?.()
-      },
-      onSilenceChosen: (reason) => {
-        if (!mountedRef.current) return
-        dispatch({ type: "MODEL_SPEECH_END" })
-        callbacksRef.current.onSilenceChosen?.(reason)
-      },
-      onUserSpeechStart: () => {
-        if (!mountedRef.current) return
-        dispatch({ type: "USER_SPEECH_START" })
-        callbacksRef.current.onUserSpeechStart?.()
-      },
-      onUserSpeechEnd: () => {
-        if (!mountedRef.current) return
-        dispatch({ type: "USER_SPEECH_END" })
-        callbacksRef.current.onUserSpeechEnd?.()
-      },
-      onWidget: (event) => {
-        callbacksRef.current.onWidget?.(event)
-      },
-      onCommitment: (commitment) => {
-        callbacksRef.current.onCommitment?.(commitment)
-      },
-    }
+    const events = createLiveClientEvents({ dispatch, callbacksRef, mountedRef })
 
     // Reattach handlers to the existing client
     client.reattachEventHandlers(events)

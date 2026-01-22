@@ -38,6 +38,41 @@ const DEFAULT_PROGRESS: UserProgress = {
   lastGeneratedDateISO: null,
 }
 
+type LevelTitleRequest = {
+  level: number
+  totalPoints: number
+  currentDailyCompletionStreak: number
+  longestDailyCompletionStreak: number
+}
+
+async function requestAndPersistAILevelTitle({
+  apiKey,
+  request,
+  requireApiKey,
+}: {
+  apiKey: string | undefined
+  request: LevelTitleRequest
+  requireApiKey: boolean
+}): Promise<void> {
+  if (requireApiKey && !apiKey) return
+
+  const headers = await createGeminiHeaders({ "Content-Type": "application/json" })
+  const response = await fetch("/api/gemini/achievements/level-title", {
+    method: "POST",
+    headers,
+    body: JSON.stringify(request),
+  })
+
+  if (!response.ok) return
+
+  const data = (await response.json()) as { title?: string }
+  const title = typeof data.title === "string" ? data.title.trim() : ""
+  if (!title) return
+
+  const current = (await db.userProgress.get("default")) ?? DEFAULT_PROGRESS
+  await db.userProgress.put({ ...current, levelTitle: title })
+}
+
 function clampInt(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.trunc(value)))
 }
@@ -539,22 +574,11 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
 
       if (pendingLevelTitleRequest) {
         try {
-          if (!apiKey) return
-
-          const headers = await createGeminiHeaders({ "Content-Type": "application/json" })
-          const response = await fetch("/api/gemini/achievements/level-title", {
-            method: "POST",
-            headers,
-            body: JSON.stringify(pendingLevelTitleRequest),
+          await requestAndPersistAILevelTitle({
+            apiKey,
+            request: pendingLevelTitleRequest,
+            requireApiKey: true,
           })
-          if (response.ok) {
-            const data = (await response.json()) as { title?: string }
-            const title = typeof data.title === "string" ? data.title.trim() : ""
-            if (title) {
-              const current = (await db.userProgress.get("default")) ?? DEFAULT_PROGRESS
-              await db.userProgress.put({ ...current, levelTitle: title })
-            }
-          }
         } catch {
           // ignore: fallback title already set
         }
@@ -585,12 +609,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
     const nowISO = new Date().toISOString()
 
     let shouldRequestAILevelTitle = false
-    let pendingLevelTitleRequest: {
-      level: number
-      totalPoints: number
-      currentDailyCompletionStreak: number
-      longestDailyCompletionStreak: number
-    } | null = null
+    let pendingLevelTitleRequest: LevelTitleRequest | null = null
 
     await db.transaction("rw", db.achievements, db.userProgress, db.milestoneBadges, async () => {
       const raw = await db.achievements.get(achievementId)
@@ -686,20 +705,11 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
 
     if (shouldRequestAILevelTitle && pendingLevelTitleRequest) {
       try {
-        const headers = await createGeminiHeaders({ "Content-Type": "application/json" })
-        const response = await fetch("/api/gemini/achievements/level-title", {
-          method: "POST",
-          headers,
-          body: JSON.stringify(pendingLevelTitleRequest),
+        await requestAndPersistAILevelTitle({
+          apiKey: undefined,
+          request: pendingLevelTitleRequest,
+          requireApiKey: false,
         })
-        if (response.ok) {
-          const data = (await response.json()) as { title?: string }
-          const title = typeof data.title === "string" ? data.title.trim() : ""
-          if (title) {
-            const current = (await db.userProgress.get("default")) ?? DEFAULT_PROGRESS
-            await db.userProgress.put({ ...current, levelTitle: title })
-          }
-        }
       } catch {
         // ignore
       }
