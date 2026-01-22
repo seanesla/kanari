@@ -36,7 +36,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   const [selectedSansFont, setSelectedSansFontState] = useState(DEFAULT_SANS)
   const [selectedSerifFont, setSelectedSerifFontState] = useState(DEFAULT_SERIF)
 
-  // Load saved settings (accent color and fonts) from IndexedDB on mount
+  // Load saved settings (accent color, fonts, and animation preference) from IndexedDB on mount
   useEffect(() => {
     db.settings.get("default").then((settings) => {
       if (settings?.accentColor) {
@@ -49,6 +49,10 @@ export function SceneProvider({ children }: { children: ReactNode }) {
       if (settings?.selectedSerifFont) {
         setSelectedSerifFontState(settings.selectedSerifFont)
         updateFontVariable("--font-serif", getFontCssFamily(settings.selectedSerifFont, "serif"))
+      }
+      // Skip startup animation if user has disabled it
+      if (settings?.disableStartupAnimation) {
+        setIsLoading(false)
       }
     }).catch((error) => {
       // IndexedDB not available or error, use defaults

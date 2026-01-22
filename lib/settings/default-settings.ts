@@ -21,6 +21,8 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   coachAvatarBase64: undefined,
   coachAvatarVoice: undefined,
 
+  disableStartupAnimation: false,
+
   timeZone: DEFAULT_TIME_ZONE,
 
   hasCompletedOnboarding: false,

@@ -468,6 +468,7 @@ export interface UserSettings {
   selectedSansFont?: FontFamily
   selectedSerifFont?: SerifFamily
   selectedMonoFont?: MonoFamily
+  disableStartupAnimation?: boolean // Skip the animated logo on app load
 
   // API Configuration
   geminiApiKey?: string // User's Gemini API key (stored locally)

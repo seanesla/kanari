@@ -39,6 +39,7 @@ type SettingsDraft = Pick<
   | "geminiApiKey"
   | "selectedGeminiVoice"
   | "accountabilityMode"
+  | "disableStartupAnimation"
 >
 
 const DEFAULT_DRAFT: SettingsDraft = {
@@ -50,6 +51,7 @@ const DEFAULT_DRAFT: SettingsDraft = {
   geminiApiKey: DEFAULT_USER_SETTINGS.geminiApiKey,
   selectedGeminiVoice: DEFAULT_USER_SETTINGS.selectedGeminiVoice,
   accountabilityMode: DEFAULT_USER_SETTINGS.accountabilityMode,
+  disableStartupAnimation: DEFAULT_USER_SETTINGS.disableStartupAnimation,
 }
 
 export function SettingsContent() {
@@ -77,6 +79,7 @@ export function SettingsContent() {
           geminiApiKey: savedSettings?.geminiApiKey,
           selectedGeminiVoice: savedSettings?.selectedGeminiVoice as GeminiVoice | undefined,
           accountabilityMode: (savedSettings?.accountabilityMode as AccountabilityMode | undefined) ?? DEFAULT_USER_SETTINGS.accountabilityMode,
+          disableStartupAnimation: savedSettings?.disableStartupAnimation ?? DEFAULT_USER_SETTINGS.disableStartupAnimation,
         }
         setDraft(hydrated)
         setBaseline(hydrated)
@@ -113,7 +116,8 @@ export function SettingsContent() {
       baseline.localStorageOnly !== normalizedDraft.localStorageOnly ||
       baseline.geminiApiKey !== normalizedDraft.geminiApiKey ||
       baseline.selectedGeminiVoice !== normalizedDraft.selectedGeminiVoice ||
-      baseline.accountabilityMode !== normalizedDraft.accountabilityMode
+      baseline.accountabilityMode !== normalizedDraft.accountabilityMode ||
+      baseline.disableStartupAnimation !== normalizedDraft.disableStartupAnimation
     )
   }, [baseline, normalizedDraft])
 
@@ -131,6 +135,7 @@ export function SettingsContent() {
         geminiApiKey: normalizedDraft.geminiApiKey,
         selectedGeminiVoice: normalizedDraft.selectedGeminiVoice,
         accountabilityMode: normalizedDraft.accountabilityMode,
+        disableStartupAnimation: normalizedDraft.disableStartupAnimation,
       }
 
       const updated = await db.settings.update("default", updates)
@@ -206,7 +211,13 @@ export function SettingsContent() {
           }}
         />
 
-        <SettingsAppearanceSection />
+        <SettingsAppearanceSection
+          disableStartupAnimation={draft.disableStartupAnimation}
+          onDisableStartupAnimationChange={(checked) => {
+            setDraft((prev) => ({ ...prev, disableStartupAnimation: checked }))
+            setSaveMessage(null)
+          }}
+        />
 
         <SettingsAccountSection isSaving={isSaving} />
 

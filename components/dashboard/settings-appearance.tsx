@@ -3,8 +3,18 @@
 import { Paintbrush } from "@/lib/icons"
 import { ColorPicker } from "./color-picker"
 import { FontPicker } from "./font-picker"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 
-export function SettingsAppearanceSection() {
+interface SettingsAppearanceSectionProps {
+  disableStartupAnimation?: boolean
+  onDisableStartupAnimationChange?: (checked: boolean) => void
+}
+
+export function SettingsAppearanceSection({
+  disableStartupAnimation = false,
+  onDisableStartupAnimationChange,
+}: SettingsAppearanceSectionProps) {
   return (
     <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
       <div className="flex items-center gap-2 mb-6">
@@ -16,6 +26,25 @@ export function SettingsAppearanceSection() {
 
       <div className="mt-6 pt-6 border-t border-border">
         <FontPicker />
+      </div>
+
+      <div className="mt-6 pt-6 border-t border-border">
+        <div className="flex items-center justify-between">
+          <div>
+            <Label htmlFor="disable-startup-animation" className="text-base font-sans">
+              Disable startup animation
+            </Label>
+            <p className="text-sm text-muted-foreground font-sans">
+              Skip the animated logo when loading Kanari
+            </p>
+          </div>
+          <Switch
+            id="disable-startup-animation"
+            checked={disableStartupAnimation}
+            onCheckedChange={onDisableStartupAnimationChange}
+            aria-label="Disable startup animation"
+          />
+        </div>
       </div>
     </div>
   )
