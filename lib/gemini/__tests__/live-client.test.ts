@@ -16,6 +16,8 @@ vi.mock("@/lib/utils", () => ({
 }))
 
 type LiveConnectParams = {
+  model?: string
+  config?: Record<string, unknown>
   callbacks?: {
     onmessage?: (message: unknown) => void
   }
@@ -41,6 +43,7 @@ const mockSession = {
 }
 
 let liveConnectMock: ReturnType<typeof vi.fn>
+let lastGoogleGenAIOptions: Record<string, unknown> | null = null
 
 vi.mock("@google/genai", () => {
   liveConnectMock = vi.fn(async (params: LiveConnectParams) => {
@@ -60,7 +63,8 @@ vi.mock("@google/genai", () => {
 
   class GoogleGenAI {
     live: { connect: typeof liveConnectMock }
-    constructor(_opts: { apiKey: string }) {
+    constructor(opts: Record<string, unknown>) {
+      lastGoogleGenAIOptions = opts
       this.live = { connect: liveConnectMock }
     }
   }
@@ -77,6 +81,7 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    lastGoogleGenAIOptions = null
 
     config = {
       events: {
@@ -116,6 +121,32 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
     expect(client.isReady()).toBe(true)
 
     expect(liveConnectMock).toHaveBeenCalledTimes(1)
+  })
+
+  test("forces v1alpha + falls back when affective dialog is unsupported", async () => {
+    const fallbackSpy = vi.fn()
+    config.events.onAffectiveDialogFallback = fallbackSpy
+
+    liveConnectMock.mockImplementationOnce(async () => {
+      throw new Error(
+        'Invalid JSON payload received. Unknown name "enableAffectiveDialog" at "setup.generation_config": Cannot find field.'
+      )
+    })
+
+    await client.connect()
+
+    expect(lastGoogleGenAIOptions).toEqual(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({ apiVersion: "v1alpha" }),
+      })
+    )
+
+    expect(fallbackSpy).toHaveBeenCalledTimes(1)
+    expect(config.events.onError).not.toHaveBeenCalled()
+
+    expect(liveConnectMock).toHaveBeenCalledTimes(2)
+    expect(liveConnectMock.mock.calls[0]?.[0]?.config?.enableAffectiveDialog).toBe(true)
+    expect(liveConnectMock.mock.calls[1]?.[0]?.config?.enableAffectiveDialog).toBeUndefined()
   })
 
   test("buffers messages delivered before connect() resolves", async () => {

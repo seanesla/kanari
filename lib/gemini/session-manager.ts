@@ -21,7 +21,7 @@ import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from "@go
 import { EventEmitter } from "events"
 import { randomBytes, timingSafeEqual } from "crypto"
 import { GEMINI_TOOLS } from "./live-prompts"
-import { logDebug, logError } from "@/lib/logger"
+import { logDebug, logError, logWarn } from "@/lib/logger"
 
 // Session timeout: 30 minutes (matches Gemini session limit)
 const SESSION_TIMEOUT_MS = 30 * 60 * 1000
@@ -68,7 +68,15 @@ class GeminiSessionManager {
     // Check if we already have a client for this key
     let client = this.clients.get(apiKey)
     if (!client) {
-      client = new GoogleGenAI({ apiKey })
+      // Affective dialog is currently gated behind the Live API v1alpha.
+      // Source: Context7 - /websites/ai_google_dev_gemini-api docs - "Enable Affective Dialog in Gemini Live API"
+      // Pattern doc: docs/error-patterns/gemini-live-affective-dialog-version-drift.md
+      client = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          apiVersion: "v1alpha",
+        },
+      })
       this.clients.set(apiKey, client)
     }
     return client
@@ -132,52 +140,78 @@ class GeminiSessionManager {
       // Create Gemini Live session using SDK
       // Source: Context7 - /googleapis/js-genai docs - "Live.connect"
       // Note: Native audio model requires specific config
-        const session = await ai.live.connect({
+      const callbacks = {
+        onopen: () => {
+          logDebug("SessionManager", `Session ${sessionId} connected`)
+          isReady = true
+          // Also update stored session if it exists (handles race condition)
+          const managed = this.sessions.get(sessionId)
+          if (managed) {
+            managed.isReady = true
+          }
+          emitter.emit("ready")
+        },
+        onmessage: (msg: LiveServerMessage) => {
+          emitter.emit("message", msg)
+        },
+        onerror: (e: ErrorEvent) => {
+          logError("SessionManager", `Session ${sessionId} error: ${e.message || "Session error"}`)
+          emitter.emit("error", new Error(e.message || "Session error"))
+        },
+        onclose: (e: CloseEvent) => {
+          logDebug("SessionManager", `Session ${sessionId} closed: ${e.reason}`)
+          emitter.emit("close")
+          this.removeSession(sessionId)
+        },
+      }
+
+      const baseConfig = {
+        // Native audio model outputs audio by default
+        responseModalities: [Modality.AUDIO],
+        // Enable output transcription to get actual spoken words
+        // Source: Context7 - /googleapis/js-genai docs - "outputAudioTranscription"
+        outputAudioTranscription: {},
+        // Enable input transcription to get user speech with isFinal flag
+        // Source: Context7 - /googleapis/js-genai docs - "inputAudioTranscription"
+        inputAudioTranscription: {},
+        proactivity: { proactiveAudio: true },
+        // System instruction as simple string
+        ...(systemInstruction ? { systemInstruction } : {}),
+        // Tools for function calling (intelligent silence)
+        // Source: Context7 - /googleapis/js-genai docs - "tools config"
+        tools: GEMINI_TOOLS,
+      }
+
+      const isAffectiveDialogUnsupported = (error: unknown): boolean => {
+        const message = error instanceof Error ? error.message : String(error)
+        return message.includes("enableAffectiveDialog") && message.toLowerCase().includes("unknown name")
+      }
+
+      let session: Session
+      try {
+        session = await ai.live.connect({
           model: LIVE_MODEL,
           config: {
-            // Native audio model outputs audio by default
-            responseModalities: [Modality.AUDIO],
-            // Enable output transcription to get actual spoken words
-            // Source: Context7 - /googleapis/js-genai docs - "outputAudioTranscription"
-            outputAudioTranscription: {},
-            // Enable input transcription to get user speech with isFinal flag
-            // Source: Context7 - /googleapis/js-genai docs - "inputAudioTranscription"
-            inputAudioTranscription: {},
+            ...baseConfig,
             // Improve emotional responsiveness + silence handling
             // Source: Context7 - /googleapis/js-genai docs - "LiveConnectConfig"
             enableAffectiveDialog: true,
-            proactivity: { proactiveAudio: true },
-            // System instruction as simple string
-            ...(systemInstruction ? { systemInstruction } : {}),
-            // Tools for function calling (intelligent silence)
-            // Source: Context7 - /googleapis/js-genai docs - "tools config"
-            tools: GEMINI_TOOLS,
           },
-          callbacks: {
-          onopen: () => {
-            logDebug("SessionManager", `Session ${sessionId} connected`)
-            isReady = true
-            // Also update stored session if it exists (handles race condition)
-            const managed = this.sessions.get(sessionId)
-            if (managed) {
-              managed.isReady = true
-            }
-            emitter.emit("ready")
-          },
-          onmessage: (msg: LiveServerMessage) => {
-            emitter.emit("message", msg)
-          },
-          onerror: (e: ErrorEvent) => {
-            logError("SessionManager", `Session ${sessionId} error: ${e.message || "Session error"}`)
-            emitter.emit("error", new Error(e.message || "Session error"))
-          },
-          onclose: (e: CloseEvent) => {
-            logDebug("SessionManager", `Session ${sessionId} closed: ${e.reason}`)
-            emitter.emit("close")
-            this.removeSession(sessionId)
-          },
-        },
-      })
+          callbacks,
+        })
+      } catch (error) {
+        if (!isAffectiveDialogUnsupported(error)) {
+          throw error
+        }
+
+        const message = error instanceof Error ? error.message : "Affective dialog unavailable"
+        logWarn("SessionManager", `Affective dialog unavailable; retrying without: ${message}`)
+        session = await ai.live.connect({
+          model: LIVE_MODEL,
+          config: baseConfig,
+          callbacks,
+        })
+      }
 
       // Set up session timeout
       const timeoutId = setTimeout(() => {

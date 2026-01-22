@@ -1,6 +1,6 @@
 "use client"
 
-import { useTransitionRouter } from "next-view-transitions"
+import { useRouter } from "next/navigation"
 import { useSceneMode } from "@/lib/scene-context"
 import { ArrowUpRight } from "@/lib/icons"
 import { cn } from "@/lib/utils"
@@ -13,7 +13,7 @@ interface EnterButtonProps {
 
 export function EnterButton({ className, variant = "hero", children }: EnterButtonProps) {
   const { setMode } = useSceneMode()
-  const router = useTransitionRouter()
+  const router = useRouter()
 
   const handleClick = () => {
     // Trigger the 3D transition and navigate immediately

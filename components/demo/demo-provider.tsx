@@ -9,7 +9,7 @@ import {
   useMemo,
   type ReactNode,
 } from "react"
-import { useTransitionRouter } from "next-view-transitions"
+import { useRouter } from "next/navigation"
 import {
   db,
   fromCheckInSession,
@@ -108,7 +108,7 @@ interface DemoProviderProps {
 }
 
 export function DemoProvider({ children }: DemoProviderProps) {
-  const router = useTransitionRouter()
+  const router = useRouter()
   const [state, setState] = useState<DemoState>(initialState)
 
   // Seed demo data into IndexedDB

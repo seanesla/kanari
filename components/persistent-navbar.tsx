@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react"
 import { usePathname } from "next/navigation"
-import { Link } from "next-view-transitions"
+import Link from "next/link"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X } from "@/lib/icons"
 import { useSceneMode } from "@/lib/scene-context"

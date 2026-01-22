@@ -1,4 +1,4 @@
-import { Link } from "next-view-transitions"
+import Link from "next/link"
 import { KanariTextLogo } from "@/components/kanari-text-logo"
 
 export function Footer() {

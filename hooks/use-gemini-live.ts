@@ -97,6 +97,9 @@ export interface UseGeminiLiveOptions {
   onConnected?: () => void
   onDisconnected?: (reason: string) => void
   onError?: (error: Error) => void
+
+  /** Called when Gemini falls back from affective dialog to standard mode */
+  onAffectiveDialogFallback?: (reason: string) => void
 }
 
 type LiveClientEventsFactoryOptions = {
@@ -131,6 +134,10 @@ function createLiveClientEvents({
       if (!mountedRef.current) return
       dispatch({ type: "ERROR", error: error.message })
       callbacksRef.current.onError?.(error)
+    },
+
+    onAffectiveDialogFallback: (reason) => {
+      callbacksRef.current.onAffectiveDialogFallback?.(reason)
     },
     onAudioChunk: (base64Audio) => {
       // First audio chunk = model started speaking.

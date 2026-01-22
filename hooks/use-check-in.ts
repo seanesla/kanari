@@ -11,6 +11,7 @@
  */
 
 import { useCallback, useEffect, useReducer, useRef } from "react"
+import { toast } from "sonner"
 import { useAudioPlayback } from "@/hooks/use-audio-playback"
 import { useGeminiLive, type GeminiLiveControls } from "@/hooks/use-gemini-live"
 import type { GeminiLiveClient, SessionContext } from "@/lib/gemini/live-client"
@@ -261,6 +262,13 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
     ...messageHandlersWithAudioSuppression,
     ...widgets.handlers,
     ...session.handlers,
+    onAffectiveDialogFallback: () => {
+      toast.warning("Affective mode unavailable", {
+        description:
+          "We connected in standard mode for this check-in. You can retry later to restore the more emotionally-tuned responses.",
+        duration: 6500,
+      })
+    },
   })
 
   // Keep controls in a ref for sub-hooks.

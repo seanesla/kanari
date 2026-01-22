@@ -1,6 +1,6 @@
 "use client"
 
-import { Link } from "next-view-transitions"
+import Link from "next/link"
 import { NotebookPen, ArrowRight } from "@/lib/icons"
 import { useJournalEntries } from "@/hooks/use-storage"
 import { formatDate } from "@/lib/date-utils"

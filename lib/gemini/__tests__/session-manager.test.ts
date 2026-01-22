@@ -6,10 +6,13 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 
+let connectMock: ReturnType<typeof vi.fn>
+let lastGoogleGenAIOptions: Record<string, unknown> | null = null
+
 describe("GeminiSessionManager", () => {
   // Mock @google/genai module
   vi.mock("@google/genai", () => {
-    const connect = vi.fn(async ({ callbacks }) => {
+    connectMock = vi.fn(async ({ callbacks }) => {
       // Simulate session connection
       setTimeout(() => {
         callbacks?.onopen?.()
@@ -24,9 +27,10 @@ describe("GeminiSessionManager", () => {
 
     return {
       // Must be constructable (used via `new GoogleGenAI(...)`).
-      GoogleGenAI: vi.fn().mockImplementation(function () {
+      GoogleGenAI: vi.fn().mockImplementation(function (opts: Record<string, unknown>) {
+        lastGoogleGenAIOptions = opts
         return {
-          live: { connect },
+          live: { connect: connectMock },
         }
       }),
       Modality: { AUDIO: "audio" },
@@ -43,6 +47,7 @@ describe("GeminiSessionManager", () => {
 
   afterEach(() => {
     vi.clearAllMocks()
+    lastGoogleGenAIOptions = null
   })
 
   it("should create a session with a secret", async () => {
@@ -54,6 +59,34 @@ describe("GeminiSessionManager", () => {
     expect(result).toHaveProperty("secret")
     expect(typeof result.secret).toBe("string")
     expect(result.secret.length).toBeGreaterThan(0)
+  })
+
+  it("uses v1alpha for Live sessions (required for affective dialog)", async () => {
+    const { sessionManager } = await import("@/lib/gemini/session-manager")
+
+    await sessionManager.createSession("test-session-v1alpha", undefined, "test-api-key")
+
+    expect(lastGoogleGenAIOptions).toEqual(
+      expect.objectContaining({
+        httpOptions: expect.objectContaining({ apiVersion: "v1alpha" }),
+      })
+    )
+  })
+
+  it("falls back to standard mode when affective dialog is rejected", async () => {
+    connectMock.mockImplementationOnce(async () => {
+      throw new Error(
+        'Invalid JSON payload received. Unknown name "enableAffectiveDialog" at "setup.generation_config": Cannot find field.'
+      )
+    })
+
+    const { sessionManager } = await import("@/lib/gemini/session-manager")
+
+    await sessionManager.createSession("test-session-fallback", undefined, "test-api-key")
+
+    expect(connectMock).toHaveBeenCalledTimes(2)
+    expect(connectMock.mock.calls[0]?.[0]?.config?.enableAffectiveDialog).toBe(true)
+    expect(connectMock.mock.calls[1]?.[0]?.config?.enableAffectiveDialog).toBeUndefined()
   })
 
   it("should validate correct session secret", async () => {

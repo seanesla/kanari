@@ -118,28 +118,28 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <Providers>
-      <html lang="en" className="dark">
-        <body
-          className={`
-            ${instrumentSans.variable} ${inter.variable} ${dmSans.variable} ${workSans.variable}
-            ${publicSans.variable} ${plusJakartaSans.variable} ${manrope.variable} ${sora.variable}
-            ${outfit.variable} ${quicksand.variable} ${karla.variable} ${nunitoSans.variable}
-            ${poppins.variable} ${raleway.variable} ${rubik.variable} ${sourceSans3.variable}
-            ${montserrat.variable} ${lexend.variable}
-            ${instrumentSerif.variable} ${merriweather.variable} ${lora.variable} ${playfairDisplay.variable}
-            ${ibmPlexSerif.variable} ${spectral.variable} ${crimsonPro.variable} ${libreBaskerville.variable}
-            ${cardo.variable} ${bitter.variable} ${fraunces.variable} ${ebGaramond.variable}
-            font-sans antialiased
-          `}
-        >
+    <html lang="en" className="dark">
+      <body
+        className={`
+          ${instrumentSans.variable} ${inter.variable} ${dmSans.variable} ${workSans.variable}
+          ${publicSans.variable} ${plusJakartaSans.variable} ${manrope.variable} ${sora.variable}
+          ${outfit.variable} ${quicksand.variable} ${karla.variable} ${nunitoSans.variable}
+          ${poppins.variable} ${raleway.variable} ${rubik.variable} ${sourceSans3.variable}
+          ${montserrat.variable} ${lexend.variable}
+          ${instrumentSerif.variable} ${merriweather.variable} ${lora.variable} ${playfairDisplay.variable}
+          ${ibmPlexSerif.variable} ${spectral.variable} ${crimsonPro.variable} ${libreBaskerville.variable}
+          ${cardo.variable} ${bitter.variable} ${fraunces.variable} ${ebGaramond.variable}
+          font-sans antialiased
+        `}
+      >
+        <Providers>
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
           <Toaster position="bottom-right" />
           <Analytics />
-        </body>
-      </html>
-    </Providers>
+        </Providers>
+      </body>
+    </html>
   )
 }

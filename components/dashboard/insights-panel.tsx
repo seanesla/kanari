@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import { Link } from "next-view-transitions"
+import Link from "next/link"
 import { ArrowRight, Sparkles } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -83,4 +83,3 @@ export function InsightsPanel({ session, className }: InsightsPanelProps) {
     </Card>
   )
 }
-

@@ -37,39 +37,6 @@ if (typeof window !== "undefined" && !("Notification" in window)) {
   })
 }
 
-// Mock next-view-transitions Link for tests (avoids Next runtime resolution issues)
-vi.mock("next-view-transitions", async () => {
-  const React = await import("react")
-  return {
-    ViewTransitions: ({ children }: { children: React.ReactNode }) => React.createElement(React.Fragment, null, children),
-    Link: ({
-      href,
-      children,
-      ...props
-    }: {
-      href: string
-      children: React.ReactNode
-      [key: string]: unknown
-    }) =>
-      React.createElement(
-        "a",
-        {
-          href,
-          ...props,
-        },
-        children
-      ),
-    useTransitionRouter: () => ({
-      push: vi.fn(),
-      replace: vi.fn(),
-      back: vi.fn(),
-      forward: vi.fn(),
-      refresh: vi.fn(),
-      prefetch: vi.fn(),
-    }),
-  }
-})
-
 // Mock Web Audio API modules
 vi.mock("@ricky0123/vad-web", () => ({
   MicVAD: vi.fn(),

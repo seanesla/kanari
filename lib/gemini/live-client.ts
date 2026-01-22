@@ -71,6 +71,9 @@ export interface LiveClientEvents {
   onDisconnected: (reason: string) => void
   onError: (error: Error) => void
 
+  // Feature fallbacks
+  onAffectiveDialogFallback: (reason: string) => void
+
   // Audio events
   onAudioChunk: (base64Audio: string) => void
   onAudioEnd: () => void
@@ -330,8 +333,9 @@ export class GeminiLiveClient {
         throw new Error("Gemini API key not configured. Please add your Gemini API key in Settings.")
       }
 
-      const [{ GoogleGenAI, Modality }, { buildCheckInSystemInstruction, GEMINI_TOOLS }] =
-        await Promise.all([import("@google/genai"), import("./live-prompts")])
+      const [{ GoogleGenAI, Modality }, { buildCheckInSystemInstruction, GEMINI_TOOLS }] = await Promise.all(
+        [import("@google/genai"), import("./live-prompts")]
+      )
 
       const systemInstruction = buildCheckInSystemInstruction(
         context?.contextSummary,
@@ -340,7 +344,15 @@ export class GeminiLiveClient {
         context?.userName
       )
 
-      const ai = new GoogleGenAI({ apiKey })
+      // Affective dialog is currently gated behind the Live API v1alpha.
+      // Source: Context7 - /websites/ai_google_dev_gemini-api docs - "Enable Affective Dialog in Gemini Live API"
+      // Pattern doc: docs/error-patterns/gemini-live-affective-dialog-version-drift.md
+      const ai = new GoogleGenAI({
+        apiKey,
+        httpOptions: {
+          apiVersion: "v1alpha",
+        },
+      })
 
       // Build speechConfig if voice is specified
       // Source: Context7 - /googleapis/js-genai docs - "SpeechConfig Interface"
@@ -352,64 +364,106 @@ export class GeminiLiveClient {
           }
         : undefined
 
+      const callbacks = {
+        onopen: () => {
+          logDebug("GeminiLive", "WebSocket opened")
+        },
+        onmessage: (msg: unknown) => {
+          this.handleLiveServerMessage(msg)
+        },
+        onerror: (e: ErrorEvent) => {
+          const message = e.message || "WebSocket error"
+          logError("GeminiLive", "WebSocket error:", message)
+          this.state = "error"
+          this.config.events.onError?.(new Error(message))
+          this.notifyDisconnected(message)
+        },
+        onclose: (e: CloseEvent) => {
+          const reason = e.reason || "Session closed"
+          logDebug("GeminiLive", "WebSocket closed:", reason)
+
+          // Drop session state; user can reconnect to start a new session.
+          this.session = null
+          this.isSessionInitialized = false
+          this.pendingMessages = []
+          this.sessionId = null
+
+          if (this.state !== "error") {
+            this.state = "disconnected"
+          }
+
+          this.notifyDisconnected(reason)
+        },
+      }
+
+      const baseLiveConfig = {
+        responseModalities: [Modality.AUDIO],
+        outputAudioTranscription: {},
+        inputAudioTranscription: {},
+        proactivity: { proactiveAudio: true },
+        systemInstruction,
+        tools: GEMINI_TOOLS,
+        ...(speechConfig && { speechConfig }),
+      }
+
+      const isAffectiveDialogUnsupported = (error: unknown): boolean => {
+        const message = error instanceof Error ? error.message : String(error)
+        return message.includes("enableAffectiveDialog") && message.toLowerCase().includes("unknown name")
+      }
+
+      const clearConnectionTimeout = () => {
+        if (!this.connectionTimeoutId) return
+        clearTimeout(this.connectionTimeoutId)
+        this.connectionTimeoutId = null
+      }
+
+      try {
+        // Attempt #1: connect with affective dialog.
+        clearConnectionTimeout()
+        const timeoutMs = 30000
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          this.connectionTimeoutId = setTimeout(() => {
+            reject(new Error("Connection timeout"))
+          }, timeoutMs)
+        })
+
         connectPromise = ai.live.connect({
           model: LIVE_MODEL,
           config: {
-            responseModalities: [Modality.AUDIO],
-            outputAudioTranscription: {},
-            inputAudioTranscription: {},
+            ...baseLiveConfig,
             enableAffectiveDialog: true,
-            proactivity: { proactiveAudio: true },
-            systemInstruction,
-            tools: GEMINI_TOOLS,
-            ...(speechConfig && { speechConfig }),
           },
-          callbacks: {
-          onopen: () => {
-            logDebug("GeminiLive", "WebSocket opened")
-          },
-          onmessage: (msg: unknown) => {
-            this.handleLiveServerMessage(msg)
-          },
-          onerror: (e: ErrorEvent) => {
-            const message = e.message || "WebSocket error"
-            logError("GeminiLive", "WebSocket error:", message)
-            this.state = "error"
-            this.config.events.onError?.(new Error(message))
-            this.notifyDisconnected(message)
-          },
-          onclose: (e: CloseEvent) => {
-            const reason = e.reason || "Session closed"
-            logDebug("GeminiLive", "WebSocket closed:", reason)
+          callbacks,
+        })
 
-            // Drop session state; user can reconnect to start a new session.
-            this.session = null
-            this.isSessionInitialized = false
-            this.pendingMessages = []
-            this.sessionId = null
+        createdSession = await Promise.race([connectPromise, timeoutPromise])
+      } catch (error) {
+        if (!isAffectiveDialogUnsupported(error)) {
+          throw error
+        }
 
-            if (this.state !== "error") {
-              this.state = "disconnected"
-            }
+        const message = error instanceof Error ? error.message : "Affective dialog unavailable"
+        logWarn("GeminiLive", "Affective dialog unavailable; retrying without:", message)
+        this.config.events.onAffectiveDialogFallback?.(message)
 
-            this.notifyDisconnected(reason)
-          },
-        },
-      })
+        // Attempt #2: connect without the unsupported field.
+        clearConnectionTimeout()
+        const timeoutMs = 30000
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          this.connectionTimeoutId = setTimeout(() => {
+            reject(new Error("Connection timeout"))
+          }, timeoutMs)
+        })
 
-      // Prevent the connect() call from hanging forever in edge cases.
-      const timeoutMs = 30000
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        this.connectionTimeoutId = setTimeout(() => {
-          reject(new Error("Connection timeout"))
-        }, timeoutMs)
-      })
+        connectPromise = ai.live.connect({
+          model: LIVE_MODEL,
+          config: baseLiveConfig,
+          callbacks,
+        })
 
-      createdSession = await Promise.race([connectPromise, timeoutPromise])
-
-      if (this.connectionTimeoutId) {
-        clearTimeout(this.connectionTimeoutId)
-        this.connectionTimeoutId = null
+        createdSession = await Promise.race([connectPromise, timeoutPromise])
+      } finally {
+        clearConnectionTimeout()
       }
 
       if (this.disconnectRequestedDuringConnect) {
