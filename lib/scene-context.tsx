@@ -9,6 +9,38 @@ import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
 
 export type SceneMode = "landing" | "transitioning" | "dashboard"
 
+// localStorage key for instant (synchronous) access to animation preference
+const DISABLE_ANIMATION_KEY = "kanari:disableStartupAnimation"
+
+/**
+ * Read the animation preference from localStorage synchronously.
+ * This must be instant so we can initialize isLoading correctly before first render.
+ */
+function getDisableStartupAnimation(): boolean {
+  if (typeof window === "undefined") return false
+  try {
+    return localStorage.getItem(DISABLE_ANIMATION_KEY) === "true"
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Save the animation preference to localStorage for instant access on next load.
+ */
+export function setDisableStartupAnimationSync(disabled: boolean): void {
+  if (typeof window === "undefined") return
+  try {
+    if (disabled) {
+      localStorage.setItem(DISABLE_ANIMATION_KEY, "true")
+    } else {
+      localStorage.removeItem(DISABLE_ANIMATION_KEY)
+    }
+  } catch {
+    // localStorage not available, ignore
+  }
+}
+
 interface SceneContextValue {
   mode: SceneMode
   setMode: (mode: SceneMode) => void
@@ -31,12 +63,15 @@ export const SceneContext = createContext<SceneContextValue | null>(null)
 export function SceneProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<SceneMode>("landing")
   const scrollProgressRef = useRef(0)
-  const [isLoading, setIsLoading] = useState(true)
+  // Initialize isLoading based on localStorage (synchronous read = no flash)
+  // If animation is disabled, start with isLoading=false so overlay never shows
+  const [isLoading, setIsLoading] = useState(() => !getDisableStartupAnimation())
   const [accentColor, setAccentColorState] = useState(DEFAULT_ACCENT)
   const [selectedSansFont, setSelectedSansFontState] = useState(DEFAULT_SANS)
   const [selectedSerifFont, setSelectedSerifFontState] = useState(DEFAULT_SERIF)
 
-  // Load saved settings (accent color, fonts, and animation preference) from IndexedDB on mount
+  // Load saved settings (accent color and fonts) from IndexedDB on mount
+  // Note: disableStartupAnimation is read from localStorage synchronously (see useState above)
   useEffect(() => {
     db.settings.get("default").then((settings) => {
       if (settings?.accentColor) {
@@ -50,9 +85,9 @@ export function SceneProvider({ children }: { children: ReactNode }) {
         setSelectedSerifFontState(settings.selectedSerifFont)
         updateFontVariable("--font-serif", getFontCssFamily(settings.selectedSerifFont, "serif"))
       }
-      // Skip startup animation if user has disabled it
-      if (settings?.disableStartupAnimation) {
-        setIsLoading(false)
+      // Sync animation preference from IndexedDB to localStorage (for users who had it saved before)
+      if (settings?.disableStartupAnimation !== undefined) {
+        setDisableStartupAnimationSync(settings.disableStartupAnimation)
       }
     }).catch((error) => {
       // IndexedDB not available or error, use defaults

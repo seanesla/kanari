@@ -26,6 +26,7 @@ import { SettingsVoiceSection } from "./settings-voice-section"
 import { SettingsProfileSection } from "./settings-profile-section"
 import { db } from "@/lib/storage/db"
 import { DEFAULT_USER_SETTINGS, createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import { setDisableStartupAnimationSync } from "@/lib/scene-context"
 import type { AccountabilityMode, GeminiVoice, UserSettings } from "@/lib/types"
 
 // Pattern doc: docs/error-patterns/settings-schema-drift-and-partial-save.md
@@ -142,6 +143,9 @@ export function SettingsContent() {
       if (updated === 0) {
         await db.settings.put(createDefaultSettingsRecord(updates))
       }
+
+      // Sync animation preference to localStorage for instant access on next page load
+      setDisableStartupAnimationSync(normalizedDraft.disableStartupAnimation ?? false)
 
       setBaseline(normalizedDraft)
       setSaveMessage({ type: "success", text: "Settings saved successfully!" })
