@@ -78,6 +78,80 @@ function buildFallbackTimeContext(): NonNullable<SessionContext["timeContext"]> 
   }
 }
 
+type ContextPreloadResult = {
+  timeContext: NonNullable<SessionContext["timeContext"]>
+  contextSummary: SessionContext["contextSummary"] | undefined
+  pendingCommitments: Commitment[]
+  recentSuggestions: Suggestion[]
+}
+
+async function preloadSessionContext(options: {
+  fallbackTimeContext: NonNullable<SessionContext["timeContext"]>
+}): Promise<ContextPreloadResult> {
+  const { fallbackTimeContext } = options
+
+  try {
+    const contextData = await fetchCheckInContext()
+
+    const timeContext = {
+      currentTime: contextData.timeContext.currentTime,
+      dayOfWeek: contextData.timeContext.dayOfWeek,
+      timeOfDay: contextData.timeContext.timeOfDay,
+      daysSinceLastCheckIn: contextData.timeContext.daysSinceLastCheckIn,
+    } satisfies NonNullable<SessionContext["timeContext"]>
+
+    // Fetch an optional context summary (Gemini Flash) for a personalized greeting.
+    // Failures here should NOT block the live session starting.
+    let contextSummary: SessionContext["contextSummary"] | undefined
+    try {
+      const requestBody = formatContextForAPI(contextData)
+      const headers = await createGeminiHeaders({ "Content-Type": "application/json" })
+
+      const response = await fetch("/api/gemini/check-in-context", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(requestBody),
+      })
+
+      if (response.ok) {
+        const json = (await response.json()) as { summary?: unknown }
+        const summary = (json as { summary?: unknown }).summary as
+          | { patternSummary?: unknown; keyObservations?: unknown; contextNotes?: unknown }
+          | undefined
+
+        if (
+          summary &&
+          typeof summary.patternSummary === "string" &&
+          Array.isArray(summary.keyObservations) &&
+          typeof summary.contextNotes === "string"
+        ) {
+          contextSummary = {
+            patternSummary: summary.patternSummary,
+            keyObservations: summary.keyObservations as string[],
+            contextNotes: summary.contextNotes,
+          }
+        }
+      }
+    } catch {
+      // Ignore summary failures - timeContext is still valuable.
+    }
+
+    return {
+      timeContext,
+      contextSummary,
+      pendingCommitments: contextData.pendingCommitments ?? [],
+      recentSuggestions: contextData.recentSuggestions ?? [],
+    }
+  } catch {
+    return {
+      timeContext: fallbackTimeContext,
+      contextSummary: undefined,
+      pendingCommitments: [],
+      recentSuggestions: [],
+    }
+  }
+}
+
 function extendContextSummary(options: {
   accountabilityMode: AccountabilityMode | undefined
   contextSummary: SessionContext["contextSummary"] | undefined
@@ -443,68 +517,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
         // Build time context (and optional historical summary) for Gemini systemInstruction.
         // Pattern doc: docs/error-patterns/utc-local-time-mismatch-in-prompts.md
         const fallbackTimeContext = buildFallbackTimeContext()
-        const contextPromise = (async () => {
-          try {
-            const contextData = await fetchCheckInContext()
-
-            const timeContext = {
-              currentTime: contextData.timeContext.currentTime,
-              dayOfWeek: contextData.timeContext.dayOfWeek,
-              timeOfDay: contextData.timeContext.timeOfDay,
-              daysSinceLastCheckIn: contextData.timeContext.daysSinceLastCheckIn,
-            } satisfies NonNullable<SessionContext["timeContext"]>
-
-            // Fetch an optional context summary (Gemini Flash) for a personalized greeting.
-            // Failures here should NOT block the live session starting.
-            let contextSummary: SessionContext["contextSummary"] | undefined
-            try {
-              const requestBody = formatContextForAPI(contextData)
-              const headers = await createGeminiHeaders({ "Content-Type": "application/json" })
-
-              const response = await fetch("/api/gemini/check-in-context", {
-                method: "POST",
-                headers,
-                body: JSON.stringify(requestBody),
-              })
-
-              if (response.ok) {
-                const json = (await response.json()) as { summary?: unknown }
-                const summary = (json as { summary?: unknown }).summary as
-                  | { patternSummary?: unknown; keyObservations?: unknown; contextNotes?: unknown }
-                  | undefined
-
-                if (
-                  summary &&
-                  typeof summary.patternSummary === "string" &&
-                  Array.isArray(summary.keyObservations) &&
-                  typeof summary.contextNotes === "string"
-                ) {
-                  contextSummary = {
-                    patternSummary: summary.patternSummary,
-                    keyObservations: summary.keyObservations as string[],
-                    contextNotes: summary.contextNotes,
-                  }
-                }
-              }
-            } catch {
-              // Ignore summary failures - timeContext is still valuable.
-            }
-
-            return {
-              timeContext,
-              contextSummary,
-              pendingCommitments: contextData.pendingCommitments ?? [],
-              recentSuggestions: contextData.recentSuggestions ?? [],
-            }
-          } catch {
-            return {
-              timeContext: fallbackTimeContext,
-              contextSummary: undefined,
-              pendingCommitments: [],
-              recentSuggestions: [],
-            }
-          }
-        })()
+        const contextPromise = preloadSessionContext({ fallbackTimeContext })
 
         // If this startSession isn't called within a user activation (e.g., auto-start in a useEffect),
         // yield once so React unmount/cleanup (StrictMode) can abort before we allocate AudioContexts/worklets.
