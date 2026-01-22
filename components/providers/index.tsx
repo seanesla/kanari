@@ -1,9 +1,8 @@
 "use client"
-"use client"
 
 import "temporal-polyfill/global"
 
-import { useEffect, type ReactNode } from "react"
+import { useLayoutEffect, type ReactNode } from "react"
 import { ViewTransitions } from "next-view-transitions"
 import { SceneProvider } from "@/lib/scene-context"
 import { applySafariViewTransitionFix } from "@/lib/utils"
@@ -20,7 +19,7 @@ export function Providers({ children }: { children: ReactNode }) {
   // Safari (and some early implementations) can be unstable with View Transitions
   // + portal-heavy UIs (R3F Html/CSS3D). If we detect Safari, disable transitions.
   // Pattern doc: docs/error-patterns/safari-view-transition-timeout.md
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof document === "undefined") return
     const cleanupViewTransition = applySafariViewTransitionFix()
 

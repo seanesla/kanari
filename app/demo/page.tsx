@@ -319,9 +319,9 @@ function DemoFeatureTour() {
         <div className="absolute bottom-[-180px] right-[-140px] h-[520px] w-[680px] rounded-full bg-accent/10 blur-3xl" />
       </div>
 
-      <main className="relative px-6 md:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-24 pb-[calc(env(safe-area-inset-bottom)+2rem)]">
-        <div className="max-w-7xl mx-auto">
-          <header className="flex items-center justify-between gap-4 mb-8">
+      <main className="relative min-h-screen px-6 md:px-12 lg:px-16 pt-[calc(env(safe-area-inset-top)+6.5rem)] md:pt-[8.5rem] pb-[calc(env(safe-area-inset-bottom)+2.5rem)]">
+        <div className="mx-auto flex min-h-[calc(100vh-(env(safe-area-inset-top)+6.5rem)-(env(safe-area-inset-bottom)+2.5rem))] max-w-screen-2xl flex-col">
+          <header className="flex items-center justify-between gap-4 mb-10 md:mb-12">
             <Button
               variant="outline"
               onClick={handleExit}
@@ -346,107 +346,113 @@ function DemoFeatureTour() {
             We avoid that by explicitly unmounting/remounting the slide content and using
             AnimatePresence mode="wait".
           */}
-          <AnimatePresence
-            initial={false}
-            mode="wait"
-            onExitComplete={() => {
-              const next = pendingIndexRef.current
-              pendingIndexRef.current = null
-              setPendingIndex(null)
-              if (typeof next === "number" && next !== index) {
-                setIndex(next)
-              }
-              setShowSlide(true)
-            }}
-          >
-            {showSlide && (
-              <motion.div
-                key={slide.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                className="grid gap-8 lg:grid-cols-12 items-start"
-                onAnimationComplete={() => {
-                  // Slide has finished animating in.
-                  // If the user clicked multiple times during the transition,
-                  // run one more transition to the latest requested slide.
-                  setIsTransitioning(false)
-                  const queued = pendingIndexRef.current
-                  if (typeof queued === "number" && queued !== index) {
-                    setIsTransitioning(true)
-                    setShowSlide(false)
+          <div className="flex-1 flex items-center">
+            <div className="w-full">
+              <AnimatePresence
+                initial={false}
+                mode="wait"
+                onExitComplete={() => {
+                  const next = pendingIndexRef.current
+                  pendingIndexRef.current = null
+                  setPendingIndex(null)
+                  if (typeof next === "number" && next !== index) {
+                    setIndex(next)
                   }
+                  setShowSlide(true)
                 }}
               >
-                {/* Media (left) */}
-                <div className="lg:col-span-7">
-                  <AspectRatio
-                    ratio={16 / 9}
-                    className={cn(
-                      "relative overflow-hidden rounded-2xl border border-border bg-card",
-                      "shadow-[0_18px_60px_rgba(0,0,0,0.22)]"
-                    )}
+                {showSlide && (
+                  <motion.div
+                    key={slide.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                    className="grid gap-10 xl:gap-12 lg:grid-cols-12 items-center"
+                    onAnimationComplete={() => {
+                      // Slide has finished animating in.
+                      // If the user clicked multiple times during the transition,
+                      // run one more transition to the latest requested slide.
+                      setIsTransitioning(false)
+                      const queued = pendingIndexRef.current
+                      if (typeof queued === "number" && queued !== index) {
+                        setIsTransitioning(true)
+                        setShowSlide(false)
+                      }
+                    }}
                   >
-                  {hasPlayableMedia ? (
-                    <video
-                      className="absolute inset-0 h-full w-full object-cover"
-                      controls
-                      playsInline
-                      preload="none"
-                      poster={slide.media.poster}
-                    >
-                      {slide.media.webm && <source src={slide.media.webm} type="video/webm" />}
-                      {slide.media.mp4 && <source src={slide.media.mp4} type="video/mp4" />}
-                      Your browser does not support the video tag.
-                    </video>
-                  ) : (
-                    <Image
-                      src={slide.media.fallbackImage}
-                      alt={`${slide.title} screenshot`}
-                      fill
-                      sizes="(max-width: 1024px) 100vw, 900px"
-                      className="object-cover"
-                      priority
-                    />
-                  )}
+                    {/* Media (left) */}
+                    <div className="lg:col-span-7">
+                      <AspectRatio
+                        ratio={16 / 9}
+                        className={cn(
+                          "relative overflow-hidden rounded-2xl border border-border bg-card",
+                          "shadow-[0_18px_60px_rgba(0,0,0,0.22)]"
+                        )}
+                      >
+                        {hasPlayableMedia ? (
+                          <video
+                            className="absolute inset-0 h-full w-full object-cover"
+                            controls
+                            playsInline
+                            preload="none"
+                            poster={slide.media.poster}
+                          >
+                            {slide.media.webm && <source src={slide.media.webm} type="video/webm" />}
+                            {slide.media.mp4 && <source src={slide.media.mp4} type="video/mp4" />}
+                            Your browser does not support the video tag.
+                          </video>
+                        ) : (
+                          <Image
+                            src={slide.media.fallbackImage}
+                            alt={`${slide.title} screenshot`}
+                            fill
+                            sizes="(max-width: 1024px) 100vw, 900px"
+                            className="object-cover"
+                            priority
+                          />
+                        )}
 
-                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
 
-                  <div className="pointer-events-none absolute left-0 right-0 bottom-0 p-4 md:p-6">
-                    <p className="text-xs text-white/80 font-mono truncate">{slide.media.replaceHint}</p>
-                  </div>
-                </AspectRatio>
-                </div>
+                        <div className="pointer-events-none absolute left-0 right-0 bottom-0 p-4 md:p-6">
+                          <p className="text-xs text-white/80 font-mono truncate">{slide.media.replaceHint}</p>
+                        </div>
+                      </AspectRatio>
+                    </div>
 
-                {/* Description (right) */}
-                <div className="lg:col-span-5 flex flex-col">
-                  <div className="rounded-2xl border border-border bg-background/88 backdrop-blur-xl p-5 md:p-6 shadow-[0_18px_60px_rgba(0,0,0,0.12)]">
-                    <p className="text-xs uppercase tracking-widest text-foreground/70">Feature</p>
-                    <h1 className="mt-3 text-4xl md:text-5xl font-serif leading-[1.05] text-foreground">
-                      {slide.title}
-                    </h1>
-                  <p className="mt-4 text-lg text-foreground/85 leading-relaxed">{slide.subtitle}</p>
+                    {/* Description (right) */}
+                    <div className="lg:col-span-5 flex flex-col">
+                      <div className="rounded-2xl border border-border bg-background/88 backdrop-blur-xl p-6 md:p-8 shadow-[0_18px_60px_rgba(0,0,0,0.12)]">
+                        <p className="text-xs uppercase tracking-widest text-foreground/70">Feature</p>
+                        <h1 className="mt-4 text-4xl md:text-5xl xl:text-6xl font-serif leading-[1.05] text-foreground">
+                          {slide.title}
+                        </h1>
+                        <p className="mt-5 text-lg xl:text-xl text-foreground/85 leading-relaxed">
+                          {slide.subtitle}
+                        </p>
 
-                  <div className="mt-6 rounded-xl border border-border/70 bg-card/60 p-4">
-                    <p className="text-sm font-semibold text-foreground">How it works</p>
-                    <ul className="mt-3 space-y-2 text-sm text-foreground/85">
-                      {slide.bullets.map((b) => (
-                        <li key={b} className="flex items-start gap-2">
-                          <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-accent" />
-                          <span>{b}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                        <div className="mt-8 rounded-xl border border-border/70 bg-card/60 p-5">
+                          <p className="text-sm font-semibold text-foreground">How it works</p>
+                          <ul className="mt-4 space-y-2.5 text-sm text-foreground/85">
+                            {slide.bullets.map((b) => (
+                              <li key={b} className="flex items-start gap-2">
+                                <span className="mt-[6px] h-1.5 w-1.5 rounded-full bg-accent" />
+                                <span>{b}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
 
           {/* Navigation (same layout as before) */}
-          <div className="mt-10 flex flex-col gap-4">
+          <div className="mt-10 md:mt-12 flex flex-col gap-4">
             <div className="flex items-center justify-between gap-3">
               <Button variant="outline" onClick={goPrev} disabled={!canPrev || isClosing} className="min-w-28">
                 <ArrowLeft className="h-4 w-4 mr-2" />

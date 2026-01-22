@@ -2,7 +2,7 @@
 
 import { Play } from "@/lib/icons"
 import { cn } from "@/lib/utils"
-import { Link } from "next-view-transitions"
+import Link from "next/link"
 
 interface DemoTriggerButtonProps {
   className?: string
