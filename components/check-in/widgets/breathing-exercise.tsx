@@ -147,87 +147,87 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
           </div>
         </>
       ) : (
-        <>
-        <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-sm font-medium">
-            {isComplete ? "Done" : phase?.label ?? "Breath"}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">
-            {isComplete ? "Nice work." : `${phaseRemaining}s • ${formatTime(remainingSeconds)} left`}
-          </p>
+        <div className="space-y-5">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium">
+                {isComplete ? "Done" : phase?.label ?? "Breath"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {isComplete ? "Nice work." : `${phaseRemaining}s • ${formatTime(remainingSeconds)} left`}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => setIsRunning((r) => !r)}
+                disabled={isComplete}
+              >
+                {isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                <span className="sr-only">{isRunning ? "Pause" : "Resume"}</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9"
+                onClick={() => {
+                  setIsRunning(true)
+                  setRemainingSeconds(widget.args.duration)
+                  setPhaseIndex(0)
+                  setPhaseRemaining(pattern[0]?.seconds ?? 0)
+                  setPhaseKey((k) => k + 1)
+                }}
+              >
+                <TimerReset className="h-4 w-4" />
+                <span className="sr-only">Restart</span>
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-center">
+            <motion.div
+              key={phaseKey}
+              className="relative h-36 w-36"
+              initial={{ scale: phase?.fromScale ?? 1 }}
+              animate={{ scale: phase?.toScale ?? 1 }}
+              transition={{ duration: phase?.seconds ?? 1, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <div className="absolute inset-0 rounded-full bg-accent/20 blur-2xl" />
+
+              <div
+                className={
+                  "absolute inset-3 rounded-full border border-accent/25 bg-gradient-to-br from-accent/25 via-background/10 to-accent/5 backdrop-blur-xl " +
+                  "shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_18px_45px_rgba(0,0,0,0.25)]"
+                }
+              />
+
+              <motion.div
+                aria-hidden="true"
+                className="absolute inset-3 rounded-full"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+              >
+                <div className="absolute -inset-10 rounded-full bg-gradient-to-r from-transparent via-accent/12 to-transparent blur-2xl" />
+              </motion.div>
+
+              <div className="absolute inset-6 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.16),transparent_60%)]" />
+            </motion.div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+              <p className="font-medium text-foreground">Remaining</p>
+              <p className="mt-0.5">{formatTime(remainingSeconds)}</p>
+            </div>
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+              <p className="font-medium text-foreground">Mode</p>
+              <p className="mt-0.5">{widget.args.type}</p>
+            </div>
+          </div>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9"
-            onClick={() => setIsRunning((r) => !r)}
-            disabled={isComplete}
-          >
-            {isRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-            <span className="sr-only">{isRunning ? "Pause" : "Resume"}</span>
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
-            className="h-9 w-9"
-            onClick={() => {
-              setIsRunning(true)
-              setRemainingSeconds(widget.args.duration)
-              setPhaseIndex(0)
-              setPhaseRemaining(pattern[0]?.seconds ?? 0)
-              setPhaseKey((k) => k + 1)
-            }}
-          >
-            <TimerReset className="h-4 w-4" />
-            <span className="sr-only">Restart</span>
-          </Button>
-        </div>
-      </div>
-
-      <div className="mt-5 flex items-center justify-center">
-        <motion.div
-          key={phaseKey}
-          className="relative h-36 w-36"
-          initial={{ scale: phase?.fromScale ?? 1 }}
-          animate={{ scale: phase?.toScale ?? 1 }}
-          transition={{ duration: phase?.seconds ?? 1, ease: [0.22, 1, 0.36, 1] }}
-        >
-          <div className="absolute inset-0 rounded-full bg-accent/20 blur-2xl" />
-
-          <div
-            className={
-              "absolute inset-3 rounded-full border border-accent/25 bg-gradient-to-br from-accent/25 via-background/10 to-accent/5 backdrop-blur-xl " +
-              "shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_18px_45px_rgba(0,0,0,0.25)]"
-            }
-          />
-
-          <motion.div
-            aria-hidden="true"
-            className="absolute inset-3 rounded-full"
-            animate={{ rotate: 360 }}
-            transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
-          >
-            <div className="absolute -inset-10 rounded-full bg-gradient-to-r from-transparent via-accent/12 to-transparent blur-2xl" />
-          </motion.div>
-
-          <div className="absolute inset-6 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.16),transparent_60%)]" />
-        </motion.div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-        <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
-          <p className="font-medium text-foreground">Remaining</p>
-          <p className="mt-0.5">{formatTime(remainingSeconds)}</p>
-        </div>
-        <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
-          <p className="font-medium text-foreground">Mode</p>
-          <p className="mt-0.5">{widget.args.type}</p>
-        </div>
-      </div>
-        </>
       )}
     </WidgetContainer>
   )

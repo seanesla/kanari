@@ -288,7 +288,6 @@ function HistoryPageContent() {
   // Selection and creation state
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [isCreatingNew, setIsCreatingNew] = useState(false)
-  const [isSessionActive, setIsSessionActive] = useState(false)
   const [autoStartNewCheckIn, setAutoStartNewCheckIn] = useState(false)
 
   // Highlight state for newly created items
@@ -456,7 +455,6 @@ function HistoryPageContent() {
   const handleSessionComplete = useCallback((session: CheckInSession) => {
     setHighlightedItemId(session.id)
     setSelectedItemId(session.id)
-    setIsSessionActive(false)
   }, [])
 
   // Handle starting new check-in
@@ -467,7 +465,6 @@ function HistoryPageContent() {
   }, [])
 
   const handleNewCheckInSessionChange = useCallback((active: boolean) => {
-    setIsSessionActive(active)
     if (active) {
       // Only auto-start once per open.
       setAutoStartNewCheckIn(false)
@@ -477,7 +474,6 @@ function HistoryPageContent() {
   // Handle closing new check-in mode
   const handleCloseNewCheckIn = useCallback(() => {
     setIsCreatingNew(false)
-    setIsSessionActive(false)
     setAutoStartNewCheckIn(false)
   }, [])
 
@@ -537,12 +533,12 @@ function HistoryPageContent() {
                   transition={{ duration: 0.3 }}
                   className="h-full"
                 >
-                   <NewCheckInContent
-                     onClose={handleCloseNewCheckIn}
-                     onSessionComplete={handleSessionComplete}
-                     onSessionChange={handleNewCheckInSessionChange}
-                     autoStart={autoStartNewCheckIn}
-                   />
+                    <NewCheckInContent
+                      onClose={handleCloseNewCheckIn}
+                      onSessionComplete={handleSessionComplete}
+                      onSessionChange={handleNewCheckInSessionChange}
+                      autoStart={autoStartNewCheckIn}
+                    />
                 </motion.div>
               ) : selectedItem ? (
                 <motion.div

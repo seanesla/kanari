@@ -30,7 +30,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { logDebug, logError, logWarn } from "@/lib/logger"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { PhoneOff, MicOff, Square } from "@/lib/icons"
 import { cn } from "@/lib/utils"
@@ -331,102 +331,80 @@ export function AIChatContent({
   const showInitializing = ["initializing", "connecting"].includes(checkIn.state)
   const canInterruptAssistant = checkIn.state === "assistant_speaking"
 
+  const statusDotClass = cn(
+    "w-3 h-3 rounded-full transition-colors",
+    checkIn.state === "user_speaking"
+      ? "bg-green-500"
+      : checkIn.state === "assistant_speaking"
+        ? "bg-blue-500"
+        : checkIn.state === "ai_greeting"
+          ? "bg-blue-500 animate-pulse"
+          : checkIn.state === "listening"
+            ? "bg-accent animate-pulse"
+            : showInitializing || isAutoStarting
+              ? "bg-accent animate-pulse"
+              : "bg-muted"
+  )
+
+  const statusText = (() => {
+    if (checkIn.state === "idle") {
+      return isAutoStarting ? "Starting your check-in..." : "Ready to start"
+    }
+    if (showInitializing) {
+      return checkIn.initPhase ? getInitPhaseLabel(checkIn.initPhase) : "Setting up voice conversation..."
+    }
+    if (checkIn.state === "user_speaking") return "Listening..."
+    if (checkIn.state === "assistant_speaking") return "kanari responding..."
+    if (checkIn.state === "ai_greeting") return "kanari starting..."
+    if (checkIn.state === "processing") return "Thinking..."
+    return "Ready"
+  })()
+
   return (
     <div className="flex h-full overflow-hidden">
-      {/* Main chat content area (full width - no sidebar) */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Main content area with animated state transitions */}
-        <AnimatePresence mode="wait">
-
-        {/* ===== IDLE STATE ===== */}
-        {/* Brief loading state while auto-start effect kicks in */}
-        {checkIn.state === "idle" && (
+        {checkIn.state === "error" ? (
           <motion.div
-            key="idle"
-            className="flex-1 flex flex-col items-center justify-center gap-6 p-8"
+            className="flex-1 flex flex-col items-center justify-center gap-4 p-8"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
           >
-            {isAutoStarting ? (
-              <div className="flex flex-col items-center gap-3">
-                <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-                <p className="text-sm text-muted-foreground text-center">
-                  Starting your check-in...
-                </p>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm text-muted-foreground text-center">
-                  Start a voice check-in when you're ready.
-                </p>
-                <Button onClick={startOrResume} disabled={!canStart}>
-                  {canStart ? "Start" : "Preparing..."}
-                </Button>
-              </>
-            )}
+            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
+              <MicOff className="w-8 h-8 text-red-500" />
+            </div>
+            <div className="text-center max-w-sm">
+              <p className="font-medium text-red-500">Connection Error</p>
+              <p className="text-sm text-muted-foreground mt-1 break-words">
+                {checkIn.error || "Failed to connect. Please try again."}
+              </p>
+            </div>
+            <Button onClick={startOrResume} disabled={!canStart}>
+              Try Again
+            </Button>
           </motion.div>
-        )}
-
-        {/* ===== INITIALIZING STATE ===== */}
-        {/* Shown while connecting to Gemini Live API */}
-        {showInitializing && (
+        ) : checkIn.state === "complete" ? (
           <motion.div
-            key="initializing"
-            className="flex-1 flex flex-col items-center justify-center gap-6 p-8"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <p className="text-sm text-muted-foreground text-center">
-              {checkIn.initPhase ? getInitPhaseLabel(checkIn.initPhase) : "Setting up voice conversation..."}
-            </p>
-          </motion.div>
-        )}
-
-        {/* ===== CONVERSATION STATE ===== */}
-        {/* Main conversation UI with messages and voice indicator */}
-        {showConversation && (
-          <motion.div
-            key="conversation"
             className="flex-1 flex flex-col overflow-hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
           >
-            {/* Compact status indicator with colored dot */}
-            <div
-              className={cn(
-                "flex-shrink-0 flex justify-center border-b py-3",
-                isGlassChrome && "border-white/10"
-              )}
-            >
+            <SynthesisScreen
+              session={completedSession ?? checkIn.session ?? null}
+              synthesis={synthesis}
+              isLoading={isSynthesizing}
+              error={synthesisError}
+              onRetry={completedSession ? () => void runSynthesis(completedSession) : undefined}
+              onViewDashboard={handleViewDashboard}
+              onDone={handleClose}
+            />
+          </motion.div>
+        ) : (
+          <>
+            {/* Status */}
+            <div className={cn("flex-shrink-0 flex justify-center border-b py-3", isGlassChrome && "border-white/10")}>
               <div className="flex items-center gap-2">
-                <div
-                  className={cn(
-                    "w-3 h-3 rounded-full transition-colors",
-                    checkIn.state === "user_speaking"
-                      ? "bg-green-500"           // Green = user talking
-                      : checkIn.state === "assistant_speaking"
-                        ? "bg-blue-500"          // Blue = AI talking
-                        : checkIn.state === "ai_greeting"
-                          ? "bg-blue-500 animate-pulse" // Pulsing blue = AI starting
-                        : checkIn.state === "listening"
-                          ? "bg-accent animate-pulse"  // Pulsing = listening
-                          : "bg-muted"           // Gray = idle
-                  )}
-                />
-                <span className="text-sm text-muted-foreground">
-                  {checkIn.state === "user_speaking"
-                    ? "Listening..."
-                    : checkIn.state === "assistant_speaking"
-                      ? "kanari responding..."
-                      : checkIn.state === "ai_greeting"
-                        ? "kanari starting..."
-                      : checkIn.state === "processing"
-                        ? "Thinking..."
-                        : "Ready"}
-                </span>
+                <div className={statusDotClass} />
+                <span className="text-sm text-muted-foreground">{statusText}</span>
                 {canInterruptAssistant && (
                   <Button
                     type="button"
@@ -446,7 +424,7 @@ export function AIChatContent({
               </div>
             </div>
 
-            {/* Real-time biomarker panel */}
+            {/* Biomarkers */}
             <div
               className={cn(
                 "px-6 py-3 border-b",
@@ -461,20 +439,32 @@ export function AIChatContent({
               />
             </div>
 
-            {/*
-              Message history view
-              Shows all exchanged messages with:
-              - User messages on the right (accent color)
-              - AI messages on the left (muted color)
-              - Live transcription of current speech
-            */}
-            <ConversationView
-              state={checkIn.state}
-              messages={checkIn.messages}
-              currentUserTranscript={checkIn.currentUserTranscript}
-            />
+            {/* Conversation */}
+            {checkIn.state === "idle" ? (
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                  <p className="text-sm">{isAutoStarting ? "Starting your check-in..." : "Tap Start when you're ready"}</p>
+                  <p className="text-xs mt-1 opacity-70">kanari will greet you first</p>
+                </div>
+              </div>
+            ) : showInitializing ? (
+              <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+                <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
+                  <p className="text-sm">
+                    {checkIn.initPhase ? getInitPhaseLabel(checkIn.initPhase) : "Setting up voice conversation..."}
+                  </p>
+                  <p className="text-xs mt-1 opacity-70">This usually takes a few seconds.</p>
+                </div>
+              </div>
+            ) : (
+              <ConversationView
+                state={checkIn.state}
+                messages={checkIn.messages}
+                currentUserTranscript={checkIn.currentUserTranscript}
+              />
+            )}
 
-            {/* Gemini-triggered widgets */}
+            {/* Widgets */}
             {checkIn.widgets.length > 0 && (
               <div
                 className={cn(
@@ -482,151 +472,111 @@ export function AIChatContent({
                   isGlassChrome ? "border-white/10 bg-transparent" : "bg-background/60"
                 )}
               >
-                <AnimatePresence initial={false}>
-                  {checkIn.widgets.map((widget) => {
-                    switch (widget.type) {
-                      case "schedule_activity":
-                        return (
-                          <ScheduleConfirmation
-                            key={widget.id}
-                            widget={widget}
-                            onDismiss={() => controls.dismissWidget(widget.id)}
-                            onUndo={(suggestionId) =>
-                              controls.undoScheduledActivity(widget.id, suggestionId)
-                            }
-                          />
-                        )
-                      case "breathing_exercise":
-                        return (
-                          <BreathingExercise
-                            key={widget.id}
-                            widget={widget}
-                            onDismiss={() => controls.dismissWidget(widget.id)}
-                          />
-                        )
-                      case "stress_gauge":
-                        return (
-                          <StressGauge
-                            key={widget.id}
-                            widget={widget}
-                            onDismiss={() => controls.dismissWidget(widget.id)}
-                          />
-                        )
-                      case "quick_actions":
-                        return (
-                          <QuickActions
-                            key={widget.id}
-                            widget={widget}
-                            onDismiss={() => controls.dismissWidget(widget.id)}
-                            onSelect={(action, label) =>
-                              controls.runQuickAction(widget.id, action, label)
-                            }
-                          />
-                        )
-                      case "journal_prompt":
-                        return (
-                          <JournalPrompt
-                            key={widget.id}
-                            widget={widget}
-                            onDismiss={() => controls.dismissWidget(widget.id)}
-                            onSave={(content) =>
-                              controls.saveJournalEntry(widget.id, content)
-                            }
-                          />
-                        )
-                      default:
-                        return null
-                    }
-                  })}
-                </AnimatePresence>
+                {checkIn.widgets.map((widget) => {
+                  switch (widget.type) {
+                    case "schedule_activity":
+                      return (
+                        <ScheduleConfirmation
+                          key={widget.id}
+                          widget={widget}
+                          onDismiss={() => controls.dismissWidget(widget.id)}
+                          onUndo={(suggestionId) =>
+                            controls.undoScheduledActivity(widget.id, suggestionId)
+                          }
+                        />
+                      )
+                    case "breathing_exercise":
+                      return (
+                        <BreathingExercise
+                          key={widget.id}
+                          widget={widget}
+                          onDismiss={() => controls.dismissWidget(widget.id)}
+                        />
+                      )
+                    case "stress_gauge":
+                      return (
+                        <StressGauge
+                          key={widget.id}
+                          widget={widget}
+                          onDismiss={() => controls.dismissWidget(widget.id)}
+                        />
+                      )
+                    case "quick_actions":
+                      return (
+                        <QuickActions
+                          key={widget.id}
+                          widget={widget}
+                          onDismiss={() => controls.dismissWidget(widget.id)}
+                          onSelect={(action, label) =>
+                            controls.runQuickAction(widget.id, action, label)
+                          }
+                        />
+                      )
+                    case "journal_prompt":
+                      return (
+                        <JournalPrompt
+                          key={widget.id}
+                          widget={widget}
+                          onDismiss={() => controls.dismissWidget(widget.id)}
+                          onSave={(content) =>
+                            controls.saveJournalEntry(widget.id, content)
+                          }
+                        />
+                      )
+                    default:
+                      return null
+                  }
+                })}
               </div>
             )}
-          </motion.div>
-        )}
 
-        {/* ===== ERROR STATE ===== */}
-        {/* Shown when connection fails or other errors occur */}
-        {checkIn.state === "error" && (
-          <motion.div
-            key="error"
-            className="flex-1 flex flex-col items-center justify-center gap-4 p-8"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center">
-              <MicOff className="w-8 h-8 text-red-500" />
-            </div>
-            <div className="text-center max-w-sm">
-              <p className="font-medium text-red-500">Connection Error</p>
-              <p className="text-sm text-muted-foreground mt-1 break-words">
-                {checkIn.error || "Failed to connect. Please try again."}
-              </p>
-            </div>
-            {/* Retry button resets and restarts the session */}
-            <Button onClick={startOrResume} disabled={!canStart}>
-              Try Again
-            </Button>
-          </motion.div>
-        )}
+            {/* Footer */}
+            <div className={cn("flex-shrink-0 border-t", isGlassChrome && "border-white/10")}>
+              <div className="px-4 py-3">
+                <div className="relative mx-auto w-full max-w-2xl">
+                  {showConversation ? (
+                    <>
+                      <div className="pr-20">
+                        <ChatInput
+                          onSendText={(text) => {
+                            if (checkIn.state === "assistant_speaking") {
+                              controls.interruptAssistant()
+                            }
+                            controls.sendTextMessage(text)
+                          }}
+                          onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
+                          disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
+                          isMuted={checkIn.isMuted}
+                          onToggleMute={() => controls.toggleMute()}
+                        />
+                      </div>
 
-        {/* ===== COMPLETE STATE ===== */}
-        {/* Shown after conversation ends successfully */}
-        {checkIn.state === "complete" && (
-          <motion.div
-            key="complete"
-            className="flex-1 flex flex-col overflow-hidden"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <SynthesisScreen
-              session={completedSession ?? checkIn.session ?? null}
-              synthesis={synthesis}
-              isLoading={isSynthesizing}
-              error={synthesisError}
-              onRetry={completedSession ? () => void runSynthesis(completedSession) : undefined}
-              onViewDashboard={handleViewDashboard}
-              onDone={handleClose}
-            />
-          </motion.div>
-        )}
-        </AnimatePresence>
-
-        {/* ===== FOOTER CONTROLS ===== */}
-        {/* Only shown during active conversation (not during init/complete/error) */}
-        {showConversation && (
-          <div className={cn("flex-shrink-0 border-t", isGlassChrome && "border-white/10")}>
-            <div className="px-4 py-3">
-              <div className="relative mx-auto w-full max-w-2xl">
-                {/* Reserve space on the right so the floating hang up button doesn't overlap the bar */}
-                <div className="pr-20">
-                  <ChatInput
-                    onSendText={(text) => {
-                      if (checkIn.state === "assistant_speaking") {
-                        controls.interruptAssistant()
-                      }
-                      controls.sendTextMessage(text)
-                    }}
-                    onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
-                    disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
-                    isMuted={checkIn.isMuted}
-                    onToggleMute={() => controls.toggleMute()}
-                  />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 h-14 w-14 rounded-full shadow-lg"
+                        onClick={handleEndCall}
+                      >
+                        <PhoneOff className="h-6 w-6" />
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      className="w-full h-12 bg-accent text-accent-foreground hover:bg-accent/90"
+                      onClick={startOrResume}
+                      disabled={!canStart || isAutoStarting || showInitializing}
+                    >
+                      {showInitializing || isAutoStarting
+                        ? "Starting..."
+                        : canStart
+                          ? "Start check-in"
+                          : "Preparing..."}
+                    </Button>
+                  )}
                 </div>
-
-                {/* Floating hang up button (outside the input bar) */}
-                <Button
-                  variant="destructive"
-                  size="icon"
-                  className="absolute right-0 top-1/2 -translate-y-1/2 h-14 w-14 rounded-full shadow-lg"
-                  onClick={handleEndCall}
-                >
-                  <PhoneOff className="h-6 w-6" />
-                </Button>
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>
