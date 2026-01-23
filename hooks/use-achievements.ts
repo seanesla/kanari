@@ -77,6 +77,39 @@ function clampInt(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.trunc(value)))
 }
 
+type DailyAchievementDedupeFields = Pick<DailyAchievement, "type" | "title" | "tracking">
+
+function normalizeAchievementTitle(title: string): string {
+  return title.trim().replace(/\s+/g, " ").toLowerCase()
+}
+
+function dailyAchievementDedupeKey(achievement: DailyAchievementDedupeFields): string {
+  if (achievement.type === "challenge" && achievement.tracking) {
+    return `challenge:${achievement.tracking.key}:${achievement.tracking.target}`
+  }
+
+  return `${achievement.type}:${normalizeAchievementTitle(achievement.title)}`
+}
+
+function pickUniqueDailyAchievements(input: {
+  candidates: DailyAchievement[]
+  desiredCount: number
+  excludeKeys?: Set<string>
+}): DailyAchievement[] {
+  const seen = new Set(input.excludeKeys ?? [])
+  const selected: DailyAchievement[] = []
+
+  for (const candidate of input.candidates) {
+    if (selected.length >= input.desiredCount) break
+    const key = dailyAchievementDedupeKey(candidate)
+    if (seen.has(key)) continue
+    seen.add(key)
+    selected.push(candidate)
+  }
+
+  return selected
+}
+
 function shiftDateISO(dateISO: string, deltaDays: number): string {
   const [year, month, day] = dateISO.split("-").map(Number)
   const base = Date.UTC(year, (month ?? 1) - 1, day ?? 1)
@@ -254,19 +287,39 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
     () => db.achievements.orderBy("dateISO").reverse().toArray(),
     []
   )
-  const history: DailyAchievement[] = useMemo(
+  const rawHistory: DailyAchievement[] = useMemo(
     () => (dbAchievements ?? []).map(toDailyAchievement),
     [dbAchievements]
   )
+  const history: DailyAchievement[] = useMemo(() => {
+    const seen = new Set<string>()
+    const deduped: DailyAchievement[] = []
+
+    for (const achievement of rawHistory) {
+      const key = `${achievement.dateISO}:${dailyAchievementDedupeKey(achievement)}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      deduped.push(achievement)
+    }
+
+    return deduped
+  }, [rawHistory])
 
   const achievementsToday = useMemo(() => {
-    return history
+    const sorted = history
       .filter((a) => a.dateISO === todayISO && !a.expired)
       .sort((a, b) => {
         // challenges first, then badges
         if (a.type !== b.type) return a.type === "challenge" ? -1 : 1
         return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
       })
+
+    // Defensive: older builds could create duplicated daily challenges (especially when
+    // a carried-over challenge overlaps the offline starter fallback set). De-dupe at the
+    // view-model layer so auto-completion and point awarding can't double-count.
+    //
+    // See: docs/error-patterns/achievements-duplicate-daily-tasks.md
+    return pickUniqueDailyAchievements({ candidates: sorted, desiredCount: Number.POSITIVE_INFINITY })
   }, [history, todayISO])
 
   const dbMilestones = useLiveQuery(
@@ -472,7 +525,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
         if (prep.requestedCount === 0) {
           newDaily = []
         } else if (prep.isFirstGeneration) {
-          newDaily = buildStarterAchievements(nowISO, todayISO).slice(0, prep.requestedCount)
+          newDaily = buildStarterAchievements(nowISO, todayISO)
         } else {
           try {
             if (!apiKey) {
@@ -497,7 +550,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
             }
 
             newDaily = (data.achievements as Array<Record<string, unknown>>)
-              .slice(0, prep.requestedCount)
+              .slice(0, 12)
               .map((a) => {
                 const type = a.type === "badge" ? "badge" : "challenge"
                 const points = clampInt(typeof a.points === "number" ? a.points : 20, 10, 80)
@@ -526,7 +579,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
               })
           } catch {
             // Fallback: starter set (still yields something usable offline)
-            newDaily = buildStarterAchievements(nowISO, todayISO).slice(0, prep.requestedCount)
+            newDaily = buildStarterAchievements(nowISO, todayISO)
           }
         }
 
@@ -540,10 +593,25 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
             .count()
           if (existingOriginalTodayCount > 0) return null
 
-          await db.achievements.bulkAdd(newDaily.map(fromDailyAchievement))
+          const existingToday = await db.achievements
+            .where("dateISO")
+            .equals(todayISO)
+            .filter((a) => !a.expired)
+            .toArray()
+          const existingKeys = new Set(existingToday.map((a) => dailyAchievementDedupeKey(a)))
+
+          const selected = pickUniqueDailyAchievements({
+            candidates: newDaily,
+            desiredCount: prep.requestedCount,
+            excludeKeys: existingKeys,
+          })
+
+          if (selected.length === 0) return null
+
+          await db.achievements.bulkAdd(selected.map(fromDailyAchievement))
 
           // Award points immediately for badges (they are completed on creation)
-          const badgePoints = newDaily.filter((a) => a.completed).reduce((sum, a) => sum + a.points, 0)
+          const badgePoints = selected.filter((a) => a.completed).reduce((sum, a) => sum + a.points, 0)
           if (badgePoints <= 0) return null
 
           const updatedProgress = (await db.userProgress.get("default")) ?? DEFAULT_PROGRESS
