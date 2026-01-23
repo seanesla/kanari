@@ -305,7 +305,7 @@ export function CheckInDialog({
   const handleViewDashboard = useCallback(() => {
     controls.cancelSession()
     onOpenChange(false)
-    router.push("/dashboard")
+    router.push("/overview")
   }, [controls, onOpenChange, router])
 
   // Determine if we should show the conversation or initialization

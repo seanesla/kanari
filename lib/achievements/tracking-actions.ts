@@ -14,11 +14,11 @@ export interface DailyAchievementAction {
 export function getDailyAchievementAction(key: DailyAchievementTrackingKey): DailyAchievementAction {
   switch (key) {
     case "do_check_in":
-      return { href: "/dashboard/check-ins?newCheckIn=true", label: "Start check-in" }
+      return { href: "/check-ins?newCheckIn=true", label: "Start check-in" }
     case "complete_suggestions":
-      return { href: "/dashboard?focus=suggestions", label: "Open suggestions" }
+      return { href: "/overview?focus=suggestions", label: "Open suggestions" }
     case "schedule_suggestion":
-      return { href: "/dashboard?focus=suggestions&action=schedule", label: "Schedule a suggestion" }
+      return { href: "/overview?focus=suggestions&action=schedule", label: "Schedule a suggestion" }
   }
 }
 

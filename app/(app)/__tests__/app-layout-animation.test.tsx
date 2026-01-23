@@ -3,10 +3,11 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, act } from "@testing-library/react"
-import DashboardLayout, { useDashboardAnimation } from "../layout"
+import AppLayout from "../layout"
+import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 
 // Make pathname dynamic inside mocks
-let currentPath = "/dashboard"
+let currentPath = "/overview"
 
 vi.mock("next/navigation", () => ({
   usePathname: () => currentPath,
@@ -28,7 +29,7 @@ function TestPage() {
 
 describe("Dashboard animation flag", () => {
   beforeEach(() => {
-    currentPath = "/dashboard"
+    currentPath = "/overview"
     vi.useFakeTimers()
   })
 
@@ -39,9 +40,9 @@ describe("Dashboard animation flag", () => {
 
   it("is enabled on initial dashboard load and then disables after the delay", () => {
     render(
-      <DashboardLayout>
+      <AppLayout>
         <TestPage />
-      </DashboardLayout>
+      </AppLayout>
     )
 
     expect(screen.getByTestId("flag").textContent).toBe("true")
@@ -55,9 +56,9 @@ describe("Dashboard animation flag", () => {
 
   it("stays disabled when navigating between dashboard pages", () => {
     const { rerender } = render(
-      <DashboardLayout>
+      <AppLayout>
         <TestPage />
-      </DashboardLayout>
+      </AppLayout>
     )
 
     // Allow the initial animation window to expire
@@ -67,11 +68,11 @@ describe("Dashboard animation flag", () => {
     expect(screen.getByTestId("flag").textContent).toBe("false")
 
     // Simulate navigation to a different dashboard route
-    currentPath = "/dashboard/analytics"
+    currentPath = "/analytics"
     rerender(
-      <DashboardLayout>
+      <AppLayout>
         <TestPage />
-      </DashboardLayout>
+      </AppLayout>
     )
 
     expect(screen.getByTestId("flag").textContent).toBe("false")

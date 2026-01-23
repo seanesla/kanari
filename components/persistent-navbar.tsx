@@ -18,13 +18,13 @@ const landingLinks = [
   { id: "how-it-works", href: "#how-it-works", label: "How It Works" },
 ]
 
-// "Overview" not "Dashboard" for /dashboard route (see AGENTS.md)
+// Main app navigation (overview + feature pages)
 const dashboardLinks = [
-  { id: "overview", href: "/dashboard", label: "Overview", exact: true },
-  { id: "check-ins", href: "/dashboard/check-ins", label: "Check-ins", exact: false },
-  { id: "analytics", href: "/dashboard/analytics", label: "Analytics", exact: false },
-  { id: "achievements", href: "/dashboard/achievements", label: "Achievements", exact: true },
-  { id: "settings", href: "/dashboard/settings", label: "Settings", exact: true },
+  { id: "overview", href: "/overview", label: "Overview", exact: true },
+  { id: "check-ins", href: "/check-ins", label: "Check-ins", exact: false },
+  { id: "analytics", href: "/analytics", label: "Analytics", exact: false },
+  { id: "achievements", href: "/achievements", label: "Achievements", exact: true },
+  { id: "settings", href: "/settings", label: "Settings", exact: true },
 ]
 
 // Glass styling for mobile menu dropdown

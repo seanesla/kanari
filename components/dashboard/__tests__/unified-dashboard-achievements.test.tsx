@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-vi.mock("@/app/dashboard/layout", () => ({
+vi.mock("@/lib/dashboard-animation-context", () => ({
   useDashboardAnimation: () => ({ shouldAnimate: false }),
 }))
 
@@ -184,6 +184,6 @@ describe("UnifiedDashboard achievements preview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Daily Check-in" }))
 
     expect(completeAchievement).not.toHaveBeenCalled()
-    expect(push).toHaveBeenCalledWith("/dashboard/check-ins?newCheckIn=true")
+    expect(push).toHaveBeenCalledWith("/check-ins?newCheckIn=true")
   })
 })

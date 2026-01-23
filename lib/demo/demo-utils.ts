@@ -382,7 +382,7 @@ export function getPhaseLabel(
   const labels: Record<string, string> = {
     landing: "Landing Page",
     onboarding: "Onboarding",
-    dashboard: "Dashboard",
+    dashboard: "Overview",
     checkin: "Check-ins",
     analytics: "Analytics",
     achievements: "Achievements",

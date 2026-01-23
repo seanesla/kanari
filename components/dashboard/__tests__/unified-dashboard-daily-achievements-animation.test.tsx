@@ -10,7 +10,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-vi.mock("@/app/dashboard/layout", () => ({
+vi.mock("@/lib/dashboard-animation-context", () => ({
   useDashboardAnimation: () => ({ shouldAnimate: true }),
 }))
 
@@ -168,4 +168,3 @@ describe("UnifiedDashboard daily achievements entry animation", () => {
     expect(block).toHaveClass("opacity-100")
   })
 })
-

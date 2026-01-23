@@ -13,8 +13,8 @@ const OAUTH_CODE_VERIFIER_COOKIE = "kanari_oauth_code_verifier"
 const OAUTH_RETURN_TO_COOKIE = "kanari_oauth_return_to"
 
 // Allowed redirect paths (security: prevent open redirect attacks)
-const ALLOWED_REDIRECT_PREFIXES = ["/dashboard"]
-const DEFAULT_REDIRECT = "/dashboard"
+const ALLOWED_REDIRECT_PREFIXES = ["/overview", "/check-ins", "/analytics", "/achievements", "/settings"]
+const DEFAULT_REDIRECT = "/overview"
 
 function getSafeRedirectPath(returnTo: string | undefined): string {
   if (!returnTo) return DEFAULT_REDIRECT
@@ -104,7 +104,7 @@ export async function GET(request: NextRequest) {
     console.error("OAuth callback error:", error)
 
     // For errors after cookie reading, we may not have returnTo available
-    // Default to /dashboard in case of unexpected errors
+    // Default to /overview in case of unexpected errors
     const redirectUrl = new URL(DEFAULT_REDIRECT, request.url)
     redirectUrl.searchParams.set("error", "token_exchange_failed")
 

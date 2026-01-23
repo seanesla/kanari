@@ -31,7 +31,7 @@ export const ALL_DEMO_STEPS: DemoStep[] = [
   {
     id: "dashboard-metrics",
     phase: "dashboard",
-    route: "/dashboard",
+    route: "/overview",
     target: "demo-metrics-header",
     title: "Real-time Metrics",
     content: "Your stress and fatigue scores derived from voice biomarkers. Updated with each check-in.",
@@ -62,7 +62,7 @@ export const ALL_DEMO_STEPS: DemoStep[] = [
   {
     id: "checkin-sidebar",
     phase: "checkin",
-    route: "/dashboard/check-ins",
+    route: "/check-ins",
     target: "demo-checkin-sidebar",
     title: "Check-in History",
     content: "Browse previous check-ins. Each shows your wellness scores and full AI conversation.",
@@ -84,7 +84,7 @@ export const ALL_DEMO_STEPS: DemoStep[] = [
   {
     id: "analytics-burnout",
     phase: "analytics",
-    route: "/dashboard/analytics",
+    route: "/analytics",
     target: "demo-burnout-prediction",
     title: "Burnout Forecast",
     content: "AI predicts your burnout risk for the coming week based on voice patterns and trends.",
@@ -106,7 +106,7 @@ export const ALL_DEMO_STEPS: DemoStep[] = [
   {
     id: "achievements-daily",
     phase: "achievements",
-    route: "/dashboard/achievements",
+    route: "/achievements",
     target: "demo-daily-challenges",
     title: "Achievements",
     content: "Complete daily challenges to earn points and badges. Build healthy habits with gamified wellness.",

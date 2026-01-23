@@ -18,7 +18,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { Clock, Plus, MessageSquare, Sparkles, CheckSquare } from "@/lib/icons"
-import { useDashboardAnimation } from "../layout"
+import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyMedia, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
@@ -381,7 +381,7 @@ function HistoryPageContent() {
       setIsCreatingNew(true)
       // This open is NOT from a direct click/tap, so don't auto-start.
       setAutoStartNewCheckIn(false)
-      window.history.replaceState({}, "", "/dashboard/check-ins")
+      window.history.replaceState({}, "", "/check-ins")
     }
   }, [searchParams])
 
@@ -391,7 +391,7 @@ function HistoryPageContent() {
     if (highlightId) {
       setHighlightedItemId(highlightId)
       setSelectedItemId(highlightId)
-      window.history.replaceState({}, "", "/dashboard/check-ins")
+      window.history.replaceState({}, "", "/check-ins")
     }
   }, [searchParams])
 

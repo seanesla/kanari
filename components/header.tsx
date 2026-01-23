@@ -22,8 +22,8 @@ export function Header() {
           <Link href="#how-it-works" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             How it Works
           </Link>
-          <Link href="/dashboard" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Dashboard
+          <Link href="/overview" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            Overview
           </Link>
         </nav>
 
@@ -32,7 +32,7 @@ export function Header() {
             <Link href="/login">Log in</Link>
           </Button>
           <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" asChild>
-            <Link href="/dashboard">Get Started</Link>
+            <Link href="/overview">Get Started</Link>
           </Button>
         </div>
 
@@ -50,15 +50,15 @@ export function Header() {
             <Link href="#how-it-works" className="text-sm text-muted-foreground">
               How it Works
             </Link>
-            <Link href="/dashboard" className="text-sm text-muted-foreground">
-              Dashboard
+            <Link href="/overview" className="text-sm text-muted-foreground">
+              Overview
             </Link>
             <div className="flex gap-2 pt-4">
               <Button variant="ghost" size="sm" className="flex-1" asChild>
                 <Link href="/login">Log in</Link>
               </Button>
               <Button size="sm" className="flex-1 bg-accent text-accent-foreground" asChild>
-                <Link href="/dashboard">Get Started</Link>
+                <Link href="/overview">Get Started</Link>
               </Button>
             </div>
           </nav>

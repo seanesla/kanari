@@ -17,7 +17,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }))
 
-vi.mock("@/app/dashboard/layout", () => ({
+vi.mock("@/lib/dashboard-animation-context", () => ({
   useDashboardAnimation: () => ({ shouldAnimate: false }),
 }))
 
@@ -198,4 +198,3 @@ describe("UnifiedDashboard scheduling wiring", () => {
     expect(lastScheduleDialogProps?.defaultMinute).toBe(15)
   })
 })
-

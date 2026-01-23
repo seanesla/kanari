@@ -78,12 +78,12 @@ export function DemoOverlay() {
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [isActive, isComplete, isNavigating, isTransitioning, isExiting, nextStep, previousStep, stopDemo])
 
-  const handleExitToDashboard = useCallback(() => {
+  const handleExitToOverview = useCallback(() => {
     if (isExiting) return
     setIsExiting(true)
 
     window.setTimeout(() => {
-      stopDemo("/dashboard")
+      stopDemo("/overview")
     }, 280)
   }, [isExiting, stopDemo])
 
@@ -202,12 +202,12 @@ export function DemoOverlay() {
                   Restart
                 </button>
                 <button
-                  onClick={handleExitToDashboard}
+                  onClick={handleExitToOverview}
                   disabled={isExiting}
                   className="flex items-center gap-2 px-4 py-2 text-sm rounded-full transition-colors disabled:opacity-80"
                   style={{ backgroundColor: accentColor, color: "black" }}
                 >
-                  Go to Dashboard
+                  Go to Overview
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </div>

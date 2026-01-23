@@ -373,7 +373,7 @@ export function SynthesisScreen({
           )}
           {onViewDashboard ? (
             <Button onClick={onViewDashboard} className="gap-2">
-              View on Dashboard
+              Go to Overview
               <ArrowRight className="h-4 w-4" />
             </Button>
           ) : null}

@@ -50,7 +50,7 @@ export default function OnboardingPage() {
   // Redirect to dashboard if already onboarded
   useEffect(() => {
     if (!isLoading && hasCompletedOnboarding) {
-      router.replace("/dashboard")
+      router.replace("/overview")
     }
   }, [isLoading, hasCompletedOnboarding, router])
 
@@ -159,7 +159,7 @@ export default function OnboardingPage() {
     <StepComplete
       key="complete"
       onComplete={handleComplete}
-      onNavigate={() => router.push("/dashboard")}
+      onNavigate={() => router.push("/overview")}
       settings={mergedSettings}
     />,
   ]

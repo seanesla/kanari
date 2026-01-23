@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useDashboardAnimation } from "../layout"
+import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 import { cn } from "@/lib/utils"
 import { useRecordings, useCheckInSessions } from "@/hooks/use-storage"
 import { useAllSuggestions } from "@/hooks/use-storage"
@@ -250,7 +250,7 @@ export default function AchievementsPage() {
                 </div>
                 <div className="mt-3">
                   <Button asChild variant="outline" size="sm" className="w-full">
-                    <Link href="/dashboard/check-ins?newCheckIn=true">New check-in</Link>
+                     <Link href="/check-ins?newCheckIn=true">New check-in</Link>
                   </Button>
                 </div>
               </div>

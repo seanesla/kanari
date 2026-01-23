@@ -8,7 +8,7 @@
  *
  * Features:
  * - Uses the user's custom accent color from SceneContext
- * - Navigates to /dashboard/check-ins with ?newCheckIn=true query param
+ * - Navigates to /check-ins with ?newCheckIn=true query param
  * - Responsive: shows just icon on mobile, icon + text on desktop
  *
  * @example
@@ -36,7 +36,7 @@ export function CheckInButton() {
         backgroundColor: accentColor,
         color: "white",
       }}
-      onClick={() => router.push("/dashboard/check-ins?newCheckIn=true")}
+      onClick={() => router.push("/check-ins?newCheckIn=true")}
     >
       <Mic className="h-4 w-4" />
       <span className="hidden sm:inline">Check in</span>

@@ -3,7 +3,7 @@
 /**
  * Complete Step
  *
- * Final step showing success and redirecting to dashboard.
+ * Final step showing success and redirecting to the app.
  * Shows the coach avatar and personalized greeting with user's name.
  *
  * NOTE: This component is rendered inside a Three.js Html portal, which
@@ -30,7 +30,7 @@ export function StepComplete({ onComplete, onNavigate, settings }: StepCompleteP
   const { accentColor } = useSceneMode()
   const [isCompleting, setIsCompleting] = useState(false)
 
-  const handleEnterDashboard = async () => {
+  const handleEnterOverview = async () => {
     setIsCompleting(true)
     await onComplete()
     onNavigate()
@@ -145,17 +145,17 @@ export function StepComplete({ onComplete, onNavigate, settings }: StepCompleteP
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
-          <Button
-            onClick={handleEnterDashboard}
-            size="lg"
-            className="px-8"
-            disabled={isCompleting}
-          >
+            <Button
+              onClick={handleEnterOverview}
+              size="lg"
+              className="px-8"
+              disabled={isCompleting}
+            >
             {isCompleting ? (
               "Loading..."
             ) : (
               <>
-                Enter Dashboard
+                Enter Overview
                 <ArrowRight className="h-4 w-4 ml-2" />
               </>
             )}

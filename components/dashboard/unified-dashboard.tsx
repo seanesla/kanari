@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { RefreshCw, ChevronsUpDown } from "@/lib/icons"
 import { cn } from "@/lib/utils"
-import { useDashboardAnimation } from "@/app/dashboard/layout"
+import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 import {
   useTrendData,
   useRecordings,
@@ -129,7 +129,7 @@ export function UnifiedDashboard() {
       }
     }
 
-    window.history.replaceState({}, "", "/dashboard")
+    window.history.replaceState({}, "", "/overview")
   }, [handlers, searchParams, suggestions])
 
   const dailyProgressPct = dayCompletion.totalCount > 0
@@ -145,7 +145,7 @@ export function UnifiedDashboard() {
       return
     }
 
-    router.push("/dashboard/achievements")
+    router.push("/achievements")
   }, [router])
 
   // Burnout prediction
@@ -346,7 +346,7 @@ export function UnifiedDashboard() {
 
               <div className="flex items-center justify-between text-xs text-muted-foreground">
                 <span>Resets at midnight (local)</span>
-                <Link href="/dashboard/achievements" className="underline underline-offset-4 hover:text-foreground">
+                <Link href="/achievements" className="underline underline-offset-4 hover:text-foreground">
                   View all
                 </Link>
               </div>
@@ -387,7 +387,7 @@ export function UnifiedDashboard() {
                     No suggestions yet. Start a check-in to get personalized recovery recommendations.
                   </p>
                   <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-                    <Link href="/dashboard/check-ins?newCheckIn=true">
+                    <Link href="/check-ins?newCheckIn=true">
                       Check in now
                     </Link>
                   </Button>
@@ -426,7 +426,7 @@ export function UnifiedDashboard() {
                     No suggestions yet. Start a check-in to get personalized recovery recommendations.
                   </p>
                   <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-                    <Link href="/dashboard/check-ins?newCheckIn=true">
+                    <Link href="/check-ins?newCheckIn=true">
                       Check in now
                     </Link>
                   </Button>

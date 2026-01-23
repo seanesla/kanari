@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useDashboardAnimation } from "../layout"
+import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 import { cn } from "@/lib/utils"
 import { SettingsContent } from "@/components/dashboard/settings-content"
 import { PageHeader } from "@/components/dashboard/page-header"

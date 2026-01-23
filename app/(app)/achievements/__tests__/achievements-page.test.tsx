@@ -3,9 +3,9 @@
  */
 import { render, screen } from "@testing-library/react"
 import { describe, it, expect, vi } from "vitest"
-import AchievementsPage from "@/app/dashboard/achievements/page"
+import AchievementsPage from "../page"
 
-vi.mock("@/app/dashboard/layout", () => ({
+vi.mock("@/lib/dashboard-animation-context", () => ({
   useDashboardAnimation: () => ({ shouldAnimate: false }),
 }))
 
@@ -93,6 +93,6 @@ describe("AchievementsPage", () => {
 
     // The UI should route users to the relevant feature (check-in) to complete it.
     const cta = screen.getByRole("link", { name: /start check-in/i })
-    expect(cta).toHaveAttribute("href", "/dashboard/check-ins?newCheckIn=true")
+    expect(cta).toHaveAttribute("href", "/check-ins?newCheckIn=true")
   })
 })

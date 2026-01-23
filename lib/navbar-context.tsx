@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useMemo, type ReactNode } from "react"
 import { usePathname } from "next/navigation"
+import { isAppRoute } from "@/lib/app-routes"
 
 export type NavbarMode = "landing" | "dashboard" | "onboarding"
 export type ActiveSection = "hero" | "features" | "how-it-works" | null
@@ -37,7 +38,7 @@ export function NavbarProvider({ children }: { children: ReactNode }) {
   const [highestStepReached, setHighestStepReached] = useState(0)
 
   // Derive navbar mode from pathname
-  const navbarMode: NavbarMode = pathname.startsWith("/dashboard")
+  const navbarMode: NavbarMode = isAppRoute(pathname)
     ? "dashboard"
     : pathname === "/onboarding"
       ? "onboarding"

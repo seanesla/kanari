@@ -1,6 +1,6 @@
 "use client"
 
-// Overview page (not "Dashboard" - see AGENTS.md)
+// Overview page (primary app home)
 import { UnifiedDashboard } from "@/components/dashboard/unified-dashboard"
 
 export default function OverviewPage() {

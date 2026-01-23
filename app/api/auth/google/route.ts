@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get the return URL from query params (where to redirect after OAuth)
-    const returnTo = request.nextUrl.searchParams.get("returnTo") || "/dashboard"
+    const returnTo = request.nextUrl.searchParams.get("returnTo") || "/overview"
 
     // Generate authorization URL with PKCE
     const { url: authUrl, state, codeVerifier } = await generateAuthUrl({

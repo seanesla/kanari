@@ -129,7 +129,7 @@ export function AIChatContent({
 
   const handleViewDashboard = useCallback(() => {
     onClose?.()
-    router.push("/dashboard")
+    router.push("/overview")
   }, [onClose, router])
 
   const runSynthesis = useCallback(

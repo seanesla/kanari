@@ -3,11 +3,12 @@
 import { useLayoutEffect, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
+import { isAppRoute } from "@/lib/app-routes"
 
 const TRANSITION_MS = 420
 
 function getRouteGroup(pathname: string) {
-  if (pathname.startsWith("/dashboard")) return "dashboard"
+  if (isAppRoute(pathname)) return "app"
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) return "onboarding"
   return "landing"
 }
@@ -34,9 +35,9 @@ export function RouteTransitionOverlay() {
     lastPathnameRef.current = pathname
     lastGroupRef.current = nextGroup
 
-    // Avoid the "page refresh" feel when navigating inside the dashboard.
+    // Avoid the "page refresh" feel when navigating inside the app.
     // Keep the existing overlay behavior for other route changes.
-    if (lastGroup === "dashboard" && nextGroup === "dashboard") return
+    if (lastGroup === "app" && nextGroup === "app") return
 
     setVisible(true)
     if (timeoutRef.current) {

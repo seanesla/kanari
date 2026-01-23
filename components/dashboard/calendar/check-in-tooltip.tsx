@@ -114,7 +114,7 @@ export function CheckInTooltip({
 
   const handleViewCheckIn = () => {
     onOpenChange(false)
-    router.push(`/dashboard/check-ins?highlight=${session.id}`)
+    router.push(`/check-ins?highlight=${session.id}`)
   }
 
   return (

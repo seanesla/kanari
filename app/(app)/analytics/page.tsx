@@ -9,7 +9,7 @@ import {
   PolarAngleAxis,
   ResponsiveContainer,
 } from "recharts"
-import { useDashboardAnimation } from "../layout"
+import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 import { cn } from "@/lib/utils"
 import { predictBurnoutRisk } from "@/lib/ml/forecasting"
 import { useDashboardStats, useTrendData, useRecordings, useCheckInSessions } from "@/hooks/use-storage"
