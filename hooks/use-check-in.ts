@@ -240,6 +240,26 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
     stateRef,
   })
 
+  const sessionHandlersWithRecovery = {
+    ...session.handlers,
+    onDisconnected: (reason: string) => {
+      // If we lose the Gemini socket mid-turn, we may never receive onTurnComplete.
+      // Without resetting streaming refs, the next connection can append into the
+      // same message bubble ("...mightHey...") and user utterances can chain.
+      // Pattern doc: docs/error-patterns/check-in-reconnect-turn-merge.md
+      messages.handleConnectionInterrupted(reason)
+      playbackControls.clearQueue()
+      suppressAssistantAudioRef.current = false
+      session.handlers.onDisconnected(reason)
+    },
+    onError: (error: Error) => {
+      messages.handleConnectionInterrupted(error.message)
+      playbackControls.clearQueue()
+      suppressAssistantAudioRef.current = false
+      session.handlers.onError(error)
+    },
+  }
+
   // Ensure manual interruption only suppresses audio for the current assistant turn.
   const messageHandlersWithAudioSuppression = {
     ...messages.handlers,
@@ -268,7 +288,7 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
   const [gemini, geminiControls] = useGeminiLive({
     ...messageHandlersWithAudioSuppression,
     ...widgets.handlers,
-    ...session.handlers,
+    ...sessionHandlersWithRecovery,
     onAffectiveDialogFallback: () => {
       toast.warning("Affective mode unavailable", {
         description:

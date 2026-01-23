@@ -18,6 +18,7 @@ import {
 import type { GeminiLiveClient, SessionContext } from "@/lib/gemini/live-client"
 import type {
   AccountabilityMode,
+  CheckInMessage,
   CheckInSession,
   CheckInState,
   Commitment,
@@ -216,6 +217,56 @@ function extendContextSummary(options: {
 
 function computeSessionDurationSeconds(sessionStartIso: string | null): number {
   return sessionStartIso ? (Date.now() - new Date(sessionStartIso).getTime()) / 1000 : 0
+}
+
+function normalizeWhitespace(text: string): string {
+  return text.replace(/\s+/g, " ").trim()
+}
+
+function formatMessagesForReconnect(messages: CheckInMessage[]): string {
+  const MAX_MESSAGES = 8
+  const MAX_CHARS_PER_MESSAGE = 280
+
+  const recent = messages
+    .filter((m) => m.role === "user" || m.role === "assistant")
+    .slice(-MAX_MESSAGES)
+
+  if (recent.length === 0) return "(no prior messages)"
+
+  return recent
+    .map((m) => {
+      const speaker = m.role === "assistant" ? "Kanari" : "User"
+      const content = normalizeWhitespace(m.content)
+      const clipped =
+        content.length > MAX_CHARS_PER_MESSAGE
+          ? `${content.slice(0, MAX_CHARS_PER_MESSAGE - 1)}…`
+          : content
+      return `${speaker}: ${clipped}`
+    })
+    .join("\n")
+}
+
+function buildReconnectResumeMessage(options: {
+  timeContext: NonNullable<SessionContext["timeContext"]>
+  messages: CheckInMessage[]
+}): string {
+  const { timeContext, messages } = options
+
+  return normalizeWhitespace(`
+[RESUME_CONVERSATION]
+We briefly lost connection and just reconnected.
+
+Current time (user local): ${timeContext.currentTime}
+
+Conversation so far (most recent last):
+${formatMessagesForReconnect(messages)}
+
+Instructions:
+- Continue the SAME conversation naturally.
+- Do NOT re-introduce yourself or restart the session.
+- If your last message was cut off, restate it cleanly and then continue.
+- Keep your next reply short (1-2 sentences) and end with ONE question.
+`)
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number, timeoutMessage: string): Promise<T> {
@@ -776,11 +827,36 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
       dispatch({ type: "SET_INIT_PHASE", phase: "connecting_gemini" })
       dispatch({ type: "SET_CONNECTING" })
 
-      const context = sessionContextRef.current ?? undefined
+      // Refresh the user's local time context. Reconnects can happen minutes later,
+      // and stale time-of-day can cause the model to greet incorrectly.
+      // Pattern doc: docs/error-patterns/utc-local-time-mismatch-in-prompts.md
+      const refreshedTime = buildFallbackTimeContext()
+
+      const previousContext = sessionContextRef.current
+      const mergedTimeContext = {
+        ...refreshedTime,
+        daysSinceLastCheckIn:
+          previousContext?.timeContext?.daysSinceLastCheckIn ?? refreshedTime.daysSinceLastCheckIn,
+      } satisfies NonNullable<SessionContext["timeContext"]>
+
+      const context: SessionContext | undefined = previousContext
+        ? { ...previousContext, timeContext: mergedTimeContext }
+        : { timeContext: mergedTimeContext }
+
+      sessionContextRef.current = context
       await withTimeout(
         gemini.connect(context),
         30_000,
         "Gemini reconnect timed out. Check your network and API key, then try again."
+      )
+
+      // The Live session is brand new after reconnect; rehydrate the assistant with
+      // a short recap so it doesn't restart the chat or merge turns.
+      gemini.sendText(
+        buildReconnectResumeMessage({
+          timeContext: mergedTimeContext,
+          messages: data.messages,
+        })
       )
       return true
     } catch (error) {
@@ -789,7 +865,7 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
     } finally {
       reconnectInProgressRef.current = false
     }
-  }, [dispatch, gemini])
+  }, [data.messages, dispatch, gemini])
 
   const cancelSession = useCallback(() => {
     startSessionAbortRef.current = true

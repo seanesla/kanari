@@ -705,5 +705,16 @@ AVOID these opener styles:
 
 After your greeting, wait for the user to respond before continuing the conversation.`
 
+  instruction += `
+
+CONNECTION RECOVERY (IMPORTANT)
+- If you receive the message "[RESUME_CONVERSATION]", it means the connection dropped mid-check-in and the app just reconnected.
+- The message will include a brief recap of the last few messages.
+- Do NOT re-introduce yourself and do NOT restart the session.
+- If your last message was cut off, restate that thought cleanly and continue.
+- Keep your next reply short (1-2 sentences) and end with ONE question.
+- Treat the CURRENT TIME CONTEXT above as authoritative; do not guess "morning"/"night".
+`
+
   return instruction
 }

@@ -12,6 +12,7 @@ type GeminiLiveCallbacks = {
   onConnected?: () => void
   onDisconnected?: (reason: string) => void
   onWidget?: (event: { widget: string; args: unknown }) => void
+  onUserTranscript?: (text: string, isFinal: boolean) => void
   onModelTranscript?: (text: string, finished: boolean) => void
   onAudioChunk?: (base64Audio: string) => void
   onSilenceChosen?: (reason: string) => void
@@ -259,6 +260,14 @@ describe("useCheckIn session lifecycle", () => {
     })
 
     expect(connectMock).toHaveBeenCalledTimes(2)
+
+    await waitFor(() => {
+      expect(
+        sendTextMock.mock.calls.some(([text]) =>
+          typeof text === "string" && text.includes("[RESUME_CONVERSATION]")
+        )
+      ).toBe(true)
+    })
     expect(result.current[0].state).not.toBe("complete")
     expect(onSessionEnd).not.toHaveBeenCalled()
   })
@@ -540,5 +549,45 @@ describe("useCheckIn session lifecycle", () => {
 
     expect(result.current[0]).toEqual(initialState)
     expect(disconnectMock).toHaveBeenCalled()
+  })
+
+  it("does not merge assistant transcripts across reconnects", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    // User participates so disconnect triggers reconnect.
+    act(() => {
+      geminiCallbacks?.onUserTranscript?.("Um I'm pretty tired.", false)
+    })
+
+    // Simulate an in-progress assistant response (streaming).
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("I can hear that in your voice. Is there anything that might", false)
+    })
+
+    expect(result.current[0].messages).toHaveLength(2)
+    expect(result.current[0].messages[1]?.role).toBe("assistant")
+    expect(result.current[0].messages[1]?.isStreaming).toBe(true)
+
+    // Connection drops mid-turn; hook attempts to reconnect.
+    act(() => {
+      geminiCallbacks?.onDisconnected?.("network lost")
+    })
+
+    await waitFor(() => {
+      expect(connectMock).toHaveBeenCalledTimes(2)
+    })
+
+    // After reconnect, a new assistant response should start a NEW bubble.
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("Hey Sean, it's Kanari.", false)
+    })
+
+    expect(result.current[0].messages).toHaveLength(3)
+    expect(result.current[0].messages[1]?.content).toContain("Is there anything")
+    expect(result.current[0].messages[2]?.content).toContain("Hey Sean")
   })
 })

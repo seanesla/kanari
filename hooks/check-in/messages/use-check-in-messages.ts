@@ -57,6 +57,11 @@ export interface UseCheckInMessagesResult {
   addUserTextMessage: (content: string) => void
   sendTextMessage: (text: string) => void
   handlers: CheckInMessagesGeminiHandlers
+  /**
+   * Called when the Gemini connection drops mid-turn.
+   * Resets streaming refs so the next connection doesn't append into the same bubble.
+   */
+  handleConnectionInterrupted: (reason?: string) => void
 }
 
 export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheckInMessagesResult {
@@ -550,6 +555,41 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     [addUserTextMessage, dispatch, sendText]
   )
 
+  const handleConnectionInterrupted = useCallback(
+    (_reason?: string) => {
+      // Treat disconnects like an abrupt "turn end" so new sessions don't
+      // merge transcripts into a previously streaming bubble.
+      suppressAssistantOutputRef.current = false
+
+      // Finalize any in-flight assistant message.
+      dispatch({ type: "FINALIZE_STREAMING_MESSAGE" })
+
+      const assistantMessageId = lastAssistantMessageIdRef.current
+      if (assistantMessageId) {
+        dispatch({ type: "SET_MESSAGE_STREAMING", messageId: assistantMessageId, isStreaming: false })
+      }
+
+      const userMessageId = lastUserMessageIdRef.current
+      if (userMessageId) {
+        dispatch({ type: "SET_MESSAGE_STREAMING", messageId: userMessageId, isStreaming: false })
+      }
+
+      currentTranscriptRef.current = ""
+      currentThinkingRef.current = ""
+      lastAssistantMessageIdRef.current = null
+
+      // Ensure the next user transcript doesn't keep appending into the last user bubble
+      // (especially if VAD speech-start events get lost around reconnects).
+      pendingUserUtteranceResetRef.current = true
+      userSpeechEndHandledRef.current = false
+      userSpeechStartRef.current = null
+
+      // Clear preview transcripts so the UI doesn't show stale partials.
+      dispatch({ type: "CLEAR_CURRENT_TRANSCRIPTS" })
+    },
+    [dispatch]
+  )
+
   const handlers: CheckInMessagesGeminiHandlers = {
     onUserSpeechStart,
     onUserSpeechEnd,
@@ -566,5 +606,6 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     addUserTextMessage,
     sendTextMessage,
     handlers,
+    handleConnectionInterrupted,
   }
 }
