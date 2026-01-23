@@ -18,6 +18,12 @@ import {
 import { buildMismatchContext, buildVoicePatternContext } from "@/lib/gemini/context-builder"
 import { mergeTranscriptUpdate } from "@/lib/gemini/transcript-merge"
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
+import {
+  blendAcousticAndSemanticBiomarkers,
+  inferSemanticBiomarkersFromText,
+  mergeSemanticBiomarkers,
+  type SemanticBiomarkers,
+} from "@/lib/ml/biomarker-fusion"
 import type { CheckInMessage } from "@/lib/types"
 import type { CheckInAction, CheckInData, CheckInMessagesCallbacks } from "../state"
 import { generateId } from "../ids"
@@ -97,6 +103,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
   // Accumulate session-level audio features across utterances
   const sessionFeatureAccumulatorRef = useRef<FeatureAccumulator | null>(null)
+  const sessionSemanticRef = useRef<SemanticBiomarkers | null>(null)
   const lastSessionIdRef = useRef<string | null>(null)
 
   // Dev-only: enable with localStorage.setItem("kanari.debugTranscriptMerge", "1")
@@ -120,6 +127,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     const sessionId = data.session?.id ?? null
     if (sessionId !== lastSessionIdRef.current) {
       sessionFeatureAccumulatorRef.current = null
+      sessionSemanticRef.current = null
       lastSessionIdRef.current = sessionId
 
       // Reset all per-session message/transcript refs.
@@ -189,16 +197,45 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       const averagedFeatures = getAverageFeatures(accumulator)
       const sessionMetrics = analyzeVoiceMetrics(averagedFeatures)
 
+      const semanticNow = inferSemanticBiomarkersFromText(data.currentUserTranscript)
+      const mergedSemantic = mergeSemanticBiomarkers(sessionSemanticRef.current, semanticNow)
+      sessionSemanticRef.current = mergedSemantic
+
+      const blended = blendAcousticAndSemanticBiomarkers({
+        acoustic: {
+          stressScore: sessionMetrics.stressScore,
+          fatigueScore: sessionMetrics.fatigueScore,
+          confidence: sessionMetrics.confidence,
+        },
+        semantic: {
+          stressScore: mergedSemantic.stressScore,
+          fatigueScore: mergedSemantic.fatigueScore,
+          stressConfidence: mergedSemantic.stressConfidence,
+          fatigueConfidence: mergedSemantic.fatigueConfidence,
+        },
+      })
+
       dispatch({
         type: "SET_SESSION_ACOUSTIC_METRICS",
         metrics: {
-          stressScore: sessionMetrics.stressScore,
-          fatigueScore: sessionMetrics.fatigueScore,
-          stressLevel: sessionMetrics.stressLevel,
-          fatigueLevel: sessionMetrics.fatigueLevel,
-          confidence: sessionMetrics.confidence,
+          stressScore: blended.stressScore,
+          fatigueScore: blended.fatigueScore,
+          stressLevel: blended.stressLevel,
+          fatigueLevel: blended.fatigueLevel,
+          confidence: blended.confidence,
           analyzedAt: sessionMetrics.analyzedAt,
           features: averagedFeatures,
+
+          acousticStressScore: sessionMetrics.stressScore,
+          acousticFatigueScore: sessionMetrics.fatigueScore,
+          acousticStressLevel: sessionMetrics.stressLevel,
+          acousticFatigueLevel: sessionMetrics.fatigueLevel,
+          acousticConfidence: sessionMetrics.confidence,
+
+          semanticStressScore: mergedSemantic.stressScore,
+          semanticFatigueScore: mergedSemantic.fatigueScore,
+          semanticConfidence: Math.max(mergedSemantic.stressConfidence, mergedSemantic.fatigueConfidence),
+          semanticSource: mergedSemantic.source,
         },
       })
 

@@ -194,6 +194,12 @@ type ModelSynthesisOutput = {
     category: "break" | "exercise" | "mindfulness" | "social" | "rest"
     linkedInsightIndexes: number[]
   }>
+  semanticBiomarkers?: {
+    stressScore: number
+    fatigueScore: number
+    confidence: number
+    notes: string
+  }
 }
 
 function normalizeModelOutput(sessionId: string, inputMeta: CheckInSynthesis["meta"]["input"], output: ModelSynthesisOutput): CheckInSynthesis {
@@ -235,10 +241,35 @@ function normalizeModelOutput(sessionId: string, inputMeta: CheckInSynthesis["me
     }
   })
 
+  const semanticBiomarkers = (() => {
+    if (!output.semanticBiomarkers) return undefined
+
+    const stressScore = Number(output.semanticBiomarkers.stressScore)
+    const fatigueScore = Number(output.semanticBiomarkers.fatigueScore)
+    const confidence = Number(output.semanticBiomarkers.confidence)
+    const notes = output.semanticBiomarkers.notes
+
+    if (!Number.isFinite(stressScore) || !Number.isFinite(fatigueScore) || !Number.isFinite(confidence)) {
+      return undefined
+    }
+
+    if (typeof notes !== "string" || notes.trim().length === 0) {
+      return undefined
+    }
+
+    return {
+      stressScore: Math.max(0, Math.min(100, Math.round(stressScore))),
+      fatigueScore: Math.max(0, Math.min(100, Math.round(fatigueScore))),
+      confidence: Math.max(0, Math.min(1, confidence)),
+      notes: truncateText(notes, 280),
+    }
+  })()
+
   return {
     narrative: truncateText(output.narrative, 900),
     insights,
     suggestions,
+    ...(semanticBiomarkers ? { semanticBiomarkers } : {}),
     meta: {
       model: "gemini-3-flash-preview",
       generatedAt: now,

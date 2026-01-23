@@ -112,6 +112,12 @@ describe("useCheckIn AI-first", () => {
       playbackOptions?.onPlaybackStart?.()
     })
 
+    // While the assistant is speaking, we run half-duplex to avoid echo
+    // (user audio should still be blocked until playback ends or the user interrupts).
+    act(() => {
+      playbackOptions?.onPlaybackEnd?.()
+    })
+
     act(() => {
       captureSendAudio?.("user-audio-2")
     })

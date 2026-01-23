@@ -6,20 +6,37 @@ import { AnimatePresence, motion } from "framer-motion"
 
 const TRANSITION_MS = 420
 
+function getRouteGroup(pathname: string) {
+  if (pathname.startsWith("/dashboard")) return "dashboard"
+  if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) return "onboarding"
+  return "landing"
+}
+
 export function RouteTransitionOverlay() {
   const pathname = usePathname()
   const lastPathnameRef = useRef<string | null>(null)
+  const lastGroupRef = useRef<string | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [visible, setVisible] = useState(false)
 
   useLayoutEffect(() => {
+    const nextGroup = getRouteGroup(pathname)
+
     if (lastPathnameRef.current === null) {
       lastPathnameRef.current = pathname
+      lastGroupRef.current = nextGroup
       return
     }
 
     if (lastPathnameRef.current === pathname) return
+
+    const lastGroup = lastGroupRef.current
     lastPathnameRef.current = pathname
+    lastGroupRef.current = nextGroup
+
+    // Avoid the "page refresh" feel when navigating inside the dashboard.
+    // Keep the existing overlay behavior for other route changes.
+    if (lastGroup === "dashboard" && nextGroup === "dashboard") return
 
     setVisible(true)
     if (timeoutRef.current) {

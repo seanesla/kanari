@@ -26,6 +26,7 @@ import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { useCoachAvatar } from "@/hooks/use-coach-avatar"
 import { synthesizeCheckInSession } from "@/lib/gemini/synthesis-client"
+import { blendAcousticAndSemanticBiomarkers } from "@/lib/ml/biomarker-fusion"
 import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
 import { SynthesisScreen } from "@/components/check-in/synthesis-screen"
 import { BiomarkerIndicator } from "./biomarker-indicator"
@@ -137,6 +138,16 @@ export function CheckInDialog({
 
   const runSynthesis = useCallback(
     async (session: CheckInSession) => {
+      const validMessageCount = session.messages.filter((m) => m.content.trim().length > 0).length
+      if (validMessageCount < 2) {
+        setSynthesis(null)
+        setIsSynthesizing(false)
+        setSynthesisError(
+          "Check-in ended too quickly to synthesize (needs at least 2 transcript messages). Try speaking a little longer next time."
+        )
+        return
+      }
+
       if (lastSynthesizedSessionIdRef.current === session.id && synthesis && !synthesisError) {
         return
       }
@@ -159,8 +170,55 @@ export function CheckInDialog({
         lastSynthesizedSessionIdRef.current = session.id
         setSynthesis(nextSynthesis)
 
-        // Persist synthesis to the saved session (dashboard continuity)
-        await updateCheckInSession(session.id, { synthesis: nextSynthesis })
+        const semantic = nextSynthesis.semanticBiomarkers
+        const currentMetrics = session.acousticMetrics
+        const refinedMetrics =
+          semantic && currentMetrics
+            ? (() => {
+                const acousticStressScore = currentMetrics.acousticStressScore ?? currentMetrics.stressScore
+                const acousticFatigueScore = currentMetrics.acousticFatigueScore ?? currentMetrics.fatigueScore
+                const acousticConfidence = currentMetrics.acousticConfidence ?? currentMetrics.confidence
+
+                const blended = blendAcousticAndSemanticBiomarkers({
+                  acoustic: {
+                    stressScore: acousticStressScore,
+                    fatigueScore: acousticFatigueScore,
+                    confidence: acousticConfidence,
+                  },
+                  semantic: {
+                    stressScore: semantic.stressScore,
+                    fatigueScore: semantic.fatigueScore,
+                    confidence: semantic.confidence,
+                  },
+                })
+
+                return {
+                  ...currentMetrics,
+                  stressScore: blended.stressScore,
+                  fatigueScore: blended.fatigueScore,
+                  stressLevel: blended.stressLevel,
+                  fatigueLevel: blended.fatigueLevel,
+                  confidence: blended.confidence,
+                  acousticStressScore,
+                  acousticFatigueScore,
+                  acousticStressLevel: currentMetrics.acousticStressLevel ?? currentMetrics.stressLevel,
+                  acousticFatigueLevel: currentMetrics.acousticFatigueLevel ?? currentMetrics.fatigueLevel,
+                  acousticConfidence,
+                  semanticStressScore: semantic.stressScore,
+                  semanticFatigueScore: semantic.fatigueScore,
+                  semanticConfidence: semantic.confidence,
+                  semanticSource: "gemini" as const,
+                }
+              })()
+            : null
+
+        if (refinedMetrics) {
+          setCompletedSession((current) => (current?.id === session.id ? { ...current, acousticMetrics: refinedMetrics } : current))
+          await updateCheckInSession(session.id, { synthesis: nextSynthesis, acousticMetrics: refinedMetrics })
+        } else {
+          // Persist synthesis to the saved session (dashboard continuity)
+          await updateCheckInSession(session.id, { synthesis: nextSynthesis })
+        }
 
         // Persist synthesis suggestions as pending suggestions (upsert by deterministic IDs)
         const createdAt = nextSynthesis.meta.generatedAt

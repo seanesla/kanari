@@ -187,6 +187,7 @@ describe("AIChatContent", () => {
     })
 
     const { AIChatContent } = await import("../check-in-ai-chat")
+    const { synthesizeCheckInSession } = await import("@/lib/gemini/synthesis-client")
     render(<AIChatContent />)
 
     expect(capturedOptions?.onSessionEnd).toEqual(expect.any(Function))
@@ -232,10 +233,14 @@ describe("AIChatContent", () => {
     }
 
     await act(async () => {
-      await capturedOptions.onSessionEnd(session)
+      await Promise.resolve(capturedOptions?.onSessionEnd?.(session))
     })
 
     expect(addCheckInSessionMock).toHaveBeenCalledTimes(1)
     expect(addCheckInSessionMock).toHaveBeenCalledWith(session)
+    expect(vi.mocked(synthesizeCheckInSession)).not.toHaveBeenCalled()
+    expect(
+      screen.getByText(/check-in ended too quickly to synthesize/i)
+    ).toBeInTheDocument()
   })
 })

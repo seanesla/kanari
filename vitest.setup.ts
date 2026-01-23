@@ -81,12 +81,12 @@ vi.mock("@/lib/gemini/live-prompts", () => ({
 // Mock ML inference
 vi.mock("@/lib/ml/inference", () => ({
   analyzeVoiceMetrics: vi.fn(() => ({
-    meanPitch: 200,
-    pitchVariation: 50,
-    energyMean: 0.5,
-    energyVariation: 0.1,
-    speechRate: 150,
-    pauseRatio: 0.2,
+    stressScore: 42,
+    fatigueScore: 55,
+    stressLevel: "moderate",
+    fatigueLevel: "tired",
+    confidence: 0.75,
+    analyzedAt: "1970-01-01T00:00:00.000Z",
   })),
 }))
 

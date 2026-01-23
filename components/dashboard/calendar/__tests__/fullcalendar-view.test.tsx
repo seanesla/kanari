@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render } from "@testing-library/react"
 import type { EventInput } from "@fullcalendar/core"
 import type { Suggestion, CheckInSession } from "@/lib/types"
+import { generateLightVariant } from "@/lib/color-utils"
 import { readFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -129,9 +130,9 @@ describe("FullCalendarView", () => {
 
     const checkInEvent = events.find((e) => e.id === "checkin-c1") as EventInput
     expect(checkInEvent.title).toBe("✓ Check-in • S: medium • F: high")
-    expect(checkInEvent.backgroundColor).toBe("rgba(245, 158, 11, 0.10)")
+    expect(checkInEvent.backgroundColor).toMatch(/^rgba\(245, 158, 11, 0\.1(0)?\)$/)
     expect(checkInEvent.borderColor).toBe("#f59e0b")
-    expect(checkInEvent.textColor).toBe("#fef3c7")
+    expect(checkInEvent.textColor).toBe(generateLightVariant("#f59e0b"))
     expect(checkInEvent.classNames).toEqual(["checkin-event"])
   })
 

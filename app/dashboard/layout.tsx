@@ -1,7 +1,6 @@
 "use client"
 
 import { createContext, useContext, useEffect, useRef, useState } from "react"
-import { usePathname } from "next/navigation"
 import { useSceneMode } from "@/lib/scene-context"
 import { useOnboardingGuard } from "@/hooks/use-onboarding"
 import { useDailyReminder } from "@/hooks/use-daily-reminder"
@@ -15,31 +14,28 @@ export function useDashboardAnimation() {
 function DashboardAnimationProvider({
   children,
   isReady,
-  pathname,
 }: {
   children: React.ReactNode
   isReady: boolean
-  pathname: string
 }) {
-  const lastPathnameRef = useRef<string | null>(null)
-  const shouldAnimateThisRender = isReady && lastPathnameRef.current !== pathname
+  const hasAnimatedRef = useRef(false)
+  const shouldAnimateThisRender = isReady && !hasAnimatedRef.current
 
-  // Update immediately so children see shouldAnimate=true on the first render of a new route.
+  // Mark immediately so children see shouldAnimate=true only on the first render.
   if (shouldAnimateThisRender) {
-    lastPathnameRef.current = pathname
+    hasAnimatedRef.current = true
   }
 
   const [shouldAnimate, setShouldAnimate] = useState(true)
 
   // Turn off the animation window after 150ms.
-  // Re-open the window when the pathname changes.
   useEffect(() => {
     if (!isReady) return
 
     setShouldAnimate(true)
     const timer = setTimeout(() => setShouldAnimate(false), 150)
     return () => clearTimeout(timer)
-  }, [isReady, pathname])
+  }, [isReady])
 
   return (
     <DashboardAnimationContext.Provider value={{ shouldAnimate: shouldAnimateThisRender || shouldAnimate }}>
@@ -51,7 +47,6 @@ function DashboardAnimationProvider({
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { setMode } = useSceneMode()
   const { isReady } = useOnboardingGuard()
-  const pathname = usePathname()
 
   useDailyReminder({ enabled: isReady })
 
@@ -70,7 +65,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <DashboardAnimationProvider isReady={isReady} pathname={pathname}>
+    <DashboardAnimationProvider isReady={isReady}>
       <div className="relative" data-dashboard>
         {children}
       </div>

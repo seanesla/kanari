@@ -30,6 +30,52 @@ import type {
   JournalEntry,
 } from "@/lib/types"
 
+function getUtcDayBounds(dateISO: string): { start: Date; end: Date } {
+  // Trend aggregation uses the UTC day extracted from ISO strings (YYYY-MM-DD).
+  const start = new Date(`${dateISO}T00:00:00.000Z`)
+  const end = new Date(`${dateISO}T23:59:59.999Z`)
+  return { start, end }
+}
+
+async function recomputeTrendDataForDate(dateISO: string): Promise<void> {
+  const { start, end } = getUtcDayBounds(dateISO)
+
+  const [sessions, recordings] = await Promise.all([
+    db.checkInSessions.where("startedAt").between(start, end, true, true).toArray(),
+    db.recordings.where("createdAt").between(start, end, true, true).toArray(),
+  ])
+
+  const points: Array<{ stressScore: number; fatigueScore: number }> = []
+
+  for (const session of sessions) {
+    const metrics = (session as { acousticMetrics?: { stressScore: number; fatigueScore: number } }).acousticMetrics
+    if (!metrics) continue
+    points.push({ stressScore: metrics.stressScore, fatigueScore: metrics.fatigueScore })
+  }
+
+  for (const recording of recordings) {
+    const metrics = (recording as { metrics?: { stressScore: number; fatigueScore: number } }).metrics
+    if (!metrics) continue
+    points.push({ stressScore: metrics.stressScore, fatigueScore: metrics.fatigueScore })
+  }
+
+  if (points.length === 0) {
+    await db.trendData.delete(dateISO)
+    return
+  }
+
+  const avgStress = points.reduce((sum, p) => sum + p.stressScore, 0) / points.length
+  const avgFatigue = points.reduce((sum, p) => sum + p.fatigueScore, 0) / points.length
+
+  await db.trendData.put({
+    id: dateISO,
+    date: new Date(dateISO),
+    stressScore: Math.round(avgStress),
+    fatigueScore: Math.round(avgFatigue),
+    recordingCount: points.length,
+  })
+}
+
 // ===========================================
 // Recording operations
 // ===========================================
@@ -491,6 +537,8 @@ export function useCheckInSessionActions() {
       const existing = await db.checkInSessions.get(id)
       if (!existing) throw new Error(`CheckInSession ${id} not found`)
 
+      const dateISO = (updates.startedAt ? updates.startedAt : existing.startedAt.toISOString()).split("T")[0]
+
       await db.checkInSessions.update(id, {
         ...updates,
         startedAt: updates.startedAt
@@ -500,6 +548,12 @@ export function useCheckInSessionActions() {
           ? new Date(updates.endedAt)
           : existing.endedAt,
       })
+
+      // If we update the session-level metrics post-hoc (e.g., Gemini semantic refinement),
+      // recompute that day's aggregated TrendData so charts/forecasting stay consistent.
+      if (updates.acousticMetrics) {
+        await recomputeTrendDataForDate(dateISO)
+      }
     },
     []
   )

@@ -44,11 +44,11 @@ export function buildSynthesizeCheckInRequestBody(
 
   const acousticMetrics = session.acousticMetrics
     ? {
-        stressScore: session.acousticMetrics.stressScore,
-        fatigueScore: session.acousticMetrics.fatigueScore,
-        stressLevel: session.acousticMetrics.stressLevel,
-        fatigueLevel: session.acousticMetrics.fatigueLevel,
-        confidence: session.acousticMetrics.confidence,
+        stressScore: session.acousticMetrics.acousticStressScore ?? session.acousticMetrics.stressScore,
+        fatigueScore: session.acousticMetrics.acousticFatigueScore ?? session.acousticMetrics.fatigueScore,
+        stressLevel: session.acousticMetrics.acousticStressLevel ?? session.acousticMetrics.stressLevel,
+        fatigueLevel: session.acousticMetrics.acousticFatigueLevel ?? session.acousticMetrics.fatigueLevel,
+        confidence: session.acousticMetrics.acousticConfidence ?? session.acousticMetrics.confidence,
       }
     : undefined
 
@@ -93,4 +93,3 @@ export async function synthesizeCheckInSession(
 
   return json.synthesis as CheckInSynthesis
 }
-

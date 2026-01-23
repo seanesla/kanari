@@ -25,6 +25,7 @@ import type {
   Suggestion,
 } from "@/lib/types"
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
+import { blendAcousticAndSemanticBiomarkers, inferSemanticBiomarkersFromText } from "@/lib/ml/biomarker-fusion"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 import type { UseCheckInAudioResult } from "./use-check-in-audio"
 
@@ -682,14 +683,45 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
             enableVAD: true,
           })
           const metrics = analyzeVoiceMetrics(processed.features)
+
+          const userTranscript = data.messages
+            .filter((m) => m.role === "user")
+            .map((m) => m.content)
+            .join("\n")
+          const semantic = inferSemanticBiomarkersFromText(userTranscript)
+          const blended = blendAcousticAndSemanticBiomarkers({
+            acoustic: {
+              stressScore: metrics.stressScore,
+              fatigueScore: metrics.fatigueScore,
+              confidence: metrics.confidence,
+            },
+            semantic: {
+              stressScore: semantic.stressScore,
+              fatigueScore: semantic.fatigueScore,
+              stressConfidence: semantic.stressConfidence,
+              fatigueConfidence: semantic.fatigueConfidence,
+            },
+          })
+
           acousticMetrics = {
-            stressScore: metrics.stressScore,
-            fatigueScore: metrics.fatigueScore,
-            stressLevel: metrics.stressLevel,
-            fatigueLevel: metrics.fatigueLevel,
-            confidence: metrics.confidence,
+            stressScore: blended.stressScore,
+            fatigueScore: blended.fatigueScore,
+            stressLevel: blended.stressLevel,
+            fatigueLevel: blended.fatigueLevel,
+            confidence: blended.confidence,
             analyzedAt: metrics.analyzedAt,
             features: processed.features,
+
+            acousticStressScore: metrics.stressScore,
+            acousticFatigueScore: metrics.fatigueScore,
+            acousticStressLevel: metrics.stressLevel,
+            acousticFatigueLevel: metrics.fatigueLevel,
+            acousticConfidence: metrics.confidence,
+
+            semanticStressScore: semantic.stressScore,
+            semanticFatigueScore: semantic.fatigueScore,
+            semanticConfidence: Math.max(semantic.stressConfidence, semantic.fatigueConfidence),
+            semanticSource: semantic.source,
           }
 
           dispatch({ type: "SET_SESSION_ACOUSTIC_METRICS", metrics: acousticMetrics })

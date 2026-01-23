@@ -867,6 +867,10 @@ YOUR TASK:
    - Be linked to one or more insights (by insight index)
    - Include clear rationale tied to the evidence
    - Be actionable and non-prescriptive (offer, don't prescribe)
+4) Estimate semantic stress + fatigue (0-100) from WHAT the user said (transcript + journal).
+   - This is separate from voice biomarkers (HOW they sounded).
+   - If evidence is weak or ambiguous, return ~50 with low confidence.
+   - Include a short, user-safe explanation in notes.
 
 IMPORTANT:
 - Do NOT invent quotes; only use provided text.
@@ -957,6 +961,17 @@ export const CHECK_IN_SYNTHESIS_SCHEMA = {
         },
         required: ["content", "rationale", "duration", "category", "linkedInsightIndexes"],
       },
+    },
+    semanticBiomarkers: {
+      type: "object",
+      description: "Semantic estimate from transcript/journal (not voice).",
+      properties: {
+        stressScore: { type: "number", minimum: 0, maximum: 100 },
+        fatigueScore: { type: "number", minimum: 0, maximum: 100 },
+        confidence: { type: "number", minimum: 0, maximum: 1 },
+        notes: { type: "string" },
+      },
+      required: ["stressScore", "fatigueScore", "confidence", "notes"],
     },
   },
   required: ["narrative", "insights", "suggestions"],

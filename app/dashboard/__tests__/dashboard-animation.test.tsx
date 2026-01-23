@@ -53,7 +53,7 @@ describe("Dashboard animation flag", () => {
     expect(screen.getByTestId("flag").textContent).toBe("false")
   })
 
-  it("resets to true when navigating between dashboard pages", () => {
+  it("stays disabled when navigating between dashboard pages", () => {
     const { rerender } = render(
       <DashboardLayout>
         <TestPage />
@@ -74,13 +74,6 @@ describe("Dashboard animation flag", () => {
       </DashboardLayout>
     )
 
-    // shouldAnimate should be re-enabled for the new route
-    expect(screen.getByTestId("flag").textContent).toBe("true")
-
-    // And then turn off again after the timeout
-    act(() => {
-      vi.advanceTimersByTime(200)
-    })
     expect(screen.getByTestId("flag").textContent).toBe("false")
   })
 })
