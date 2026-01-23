@@ -3,14 +3,17 @@
 import { useState, useEffect } from "react"
 import { HexColorPicker, HexColorInput } from "react-colorful"
 import { Paintbrush } from "@/lib/icons"
-import { useSceneMode } from "@/lib/scene-context"
 import { updateCSSVariables } from "@/lib/color-utils"
 import { Label } from "@/components/ui/label"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
 
-export function ColorPicker() {
-  const { accentColor, setAccentColor } = useSceneMode()
+interface ColorPickerProps {
+  accentColor: string
+  onAccentColorChange: (color: string) => void
+}
+
+export function ColorPicker({ accentColor, onAccentColorChange }: ColorPickerProps) {
   const [localColor, setLocalColor] = useState(accentColor)
 
   // Sync with context changes (initial load from IndexedDB)
@@ -22,13 +25,7 @@ export function ColorPicker() {
     setLocalColor(newColor)
     // Real-time preview
     updateCSSVariables(newColor)
-  }
-
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      // Persist to context/IndexedDB on close
-      setAccentColor(localColor)
-    }
+    onAccentColorChange(newColor)
   }
 
   return (
@@ -38,7 +35,7 @@ export function ColorPicker() {
         Customize the accent color used throughout the app and 3D scene
       </p>
 
-      <Popover onOpenChange={handleOpenChange}>
+      <Popover>
         <PopoverTrigger asChild>
           <Button variant="outline" className="w-full justify-start gap-2 bg-transparent">
             <div

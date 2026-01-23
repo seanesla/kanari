@@ -49,10 +49,19 @@ interface SceneContextValue {
   isLoading: boolean
   setIsLoading: (loading: boolean) => void
   accentColor: string
+  /** Update accent color in-memory only (no IndexedDB write). */
+  previewAccentColor: (color: string) => void
+  /** Update accent color and persist to IndexedDB. */
   setAccentColor: (color: string) => void
   selectedSansFont: string
+  /** Update dashboard font in-memory only (no IndexedDB write). */
+  previewSansFont: (font: string) => void
+  /** Update dashboard font and persist to IndexedDB. */
   setSansFont: (font: string) => void
   selectedSerifFont: string
+  /** Update dashboard font in-memory only (no IndexedDB write). */
+  previewSerifFont: (font: string) => void
+  /** Update dashboard font and persist to IndexedDB. */
   setSerifFont: (font: string) => void
   resetFontsToDefault: () => void
 }
@@ -109,6 +118,10 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const previewAccentColor = useCallback((color: string) => {
+    setAccentColorState(color)
+  }, [])
+
   const setAccentColor = useCallback((color: string) => {
     setAccentColorState(color)
     // Persist to IndexedDB
@@ -140,6 +153,11 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const previewSansFont = useCallback((font: string) => {
+    setSelectedSansFontState(font)
+    updateFontVariable("--font-sans", getFontCssFamily(font, "sans"))
+  }, [])
+
   const setSerifFont = useCallback((font: string) => {
     setSelectedSerifFontState(font)
     updateFontVariable("--font-serif", getFontCssFamily(font, "serif"))
@@ -156,10 +174,15 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const previewSerifFont = useCallback((font: string) => {
+    setSelectedSerifFontState(font)
+    updateFontVariable("--font-serif", getFontCssFamily(font, "serif"))
+  }, [])
+
   const resetFontsToDefault = useCallback(() => {
-    setSansFont(DEFAULT_SANS)
-    setSerifFont(DEFAULT_SERIF)
-  }, [setSansFont, setSerifFont])
+    previewSansFont(DEFAULT_SANS)
+    previewSerifFont(DEFAULT_SERIF)
+  }, [previewSansFont, previewSerifFont])
 
   const contextValue = useMemo(() => ({
     mode,
@@ -169,13 +192,16 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     isLoading,
     setIsLoading,
     accentColor,
+    previewAccentColor,
     setAccentColor,
     selectedSansFont,
+    previewSansFont,
     setSansFont,
     selectedSerifFont,
+    previewSerifFont,
     setSerifFont,
     resetFontsToDefault,
-  }), [mode, isLoading, accentColor, selectedSansFont, selectedSerifFont, setMode, resetToLanding, setAccentColor, setSansFont, setSerifFont, resetFontsToDefault])
+  }), [mode, isLoading, accentColor, selectedSansFont, selectedSerifFont, setMode, resetToLanding, previewAccentColor, setAccentColor, previewSansFont, setSansFont, previewSerifFont, setSerifFont, resetFontsToDefault])
 
   return (
     <SceneContext.Provider value={contextValue}>

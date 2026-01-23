@@ -1,18 +1,25 @@
 "use client"
 
-import { useSceneMode } from "@/lib/scene-context"
+import type { FontFamily, SerifFamily } from "@/lib/types"
 import { SANS_FONTS, SERIF_FONTS, DEFAULT_SANS, DEFAULT_SERIF, FONT_CSS_VARIABLES } from "@/lib/font-utils"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-export function FontPicker() {
-  const {
-    selectedSansFont,
-    setSansFont,
-    selectedSerifFont,
-    setSerifFont,
-    resetFontsToDefault,
-  } = useSceneMode()
+interface FontPickerProps {
+  selectedSansFont: FontFamily
+  onSansFontChange: (font: FontFamily) => void
+  selectedSerifFont: SerifFamily
+  onSerifFontChange: (font: SerifFamily) => void
+  onResetFontsToDefault: () => void
+}
+
+export function FontPicker({
+  selectedSansFont,
+  onSansFontChange,
+  selectedSerifFont,
+  onSerifFontChange,
+  onResetFontsToDefault,
+}: FontPickerProps) {
 
   return (
     <div className="space-y-6">
@@ -22,7 +29,7 @@ export function FontPicker() {
         <p className="text-sm text-muted-foreground mb-3 font-sans">
           Used for UI text and general content
         </p>
-        <Select value={selectedSansFont} onValueChange={setSansFont}>
+        <Select value={selectedSansFont} onValueChange={(value) => onSansFontChange(value as FontFamily)}>
           <SelectTrigger
             className="w-full"
             style={{ fontFamily: FONT_CSS_VARIABLES[selectedSansFont] }}
@@ -49,7 +56,7 @@ export function FontPicker() {
         <p className="text-sm text-muted-foreground mb-3 font-sans">
           Used for headings and display text
         </p>
-        <Select value={selectedSerifFont} onValueChange={setSerifFont}>
+        <Select value={selectedSerifFont} onValueChange={(value) => onSerifFontChange(value as SerifFamily)}>
           <SelectTrigger
             className="w-full"
             style={{ fontFamily: FONT_CSS_VARIABLES[selectedSerifFont] }}
@@ -71,15 +78,15 @@ export function FontPicker() {
       </div>
 
       {/* Reset to Defaults Button */}
-      <div className="mt-6 flex items-center justify-end">
-        <button
-          onClick={resetFontsToDefault}
-          className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-secondary/50 transition-colors"
-          aria-label="Reset all fonts to their default values"
-        >
-          Reset to Defaults
-        </button>
+        <div className="mt-6 flex items-center justify-end">
+          <button
+          onClick={onResetFontsToDefault}
+            className="px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-secondary/50 transition-colors"
+            aria-label="Reset all fonts to their default values"
+          >
+            Reset to Defaults
+          </button>
+        </div>
       </div>
-    </div>
   )
 }

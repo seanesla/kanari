@@ -19,7 +19,7 @@ interface HeroColorPickerProps {
 }
 
 export function HeroColorPicker({ children }: HeroColorPickerProps) {
-  const { accentColor, setAccentColor, isLoading } = useSceneMode()
+  const { accentColor, previewAccentColor, setAccentColor, isLoading } = useSceneMode()
   const [localColor, setLocalColor] = useState(accentColor)
   const [isHovered, setIsHovered] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
@@ -58,6 +58,8 @@ export function HeroColorPicker({ children }: HeroColorPickerProps) {
   const handleColorChange = (newColor: string) => {
     setLocalColor(newColor)
     updateCSSVariables(newColor)
+    // Update 3D scene + particles while dragging (no persistence until popover closes)
+    previewAccentColor(newColor)
   }
 
   const handleOpenChange = (open: boolean) => {

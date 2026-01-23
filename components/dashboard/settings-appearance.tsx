@@ -5,14 +5,28 @@ import { ColorPicker } from "./color-picker"
 import { FontPicker } from "./font-picker"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { DEFAULT_SANS, DEFAULT_SERIF } from "@/lib/font-utils"
+import type { FontFamily, SerifFamily } from "@/lib/types"
 
 interface SettingsAppearanceSectionProps {
-  disableStartupAnimation?: boolean
-  onDisableStartupAnimationChange?: (checked: boolean) => void
+  accentColor: string
+  onAccentColorChange: (color: string) => void
+  selectedSansFont: FontFamily
+  onSansFontChange: (font: FontFamily) => void
+  selectedSerifFont: SerifFamily
+  onSerifFontChange: (font: SerifFamily) => void
+  disableStartupAnimation: boolean
+  onDisableStartupAnimationChange: (checked: boolean) => void
 }
 
 export function SettingsAppearanceSection({
-  disableStartupAnimation = false,
+  accentColor,
+  onAccentColorChange,
+  selectedSansFont,
+  onSansFontChange,
+  selectedSerifFont,
+  onSerifFontChange,
+  disableStartupAnimation,
   onDisableStartupAnimationChange,
 }: SettingsAppearanceSectionProps) {
   return (
@@ -22,10 +36,19 @@ export function SettingsAppearanceSection({
         <h2 className="text-lg font-semibold font-serif">Appearance</h2>
       </div>
 
-      <ColorPicker />
+      <ColorPicker accentColor={accentColor} onAccentColorChange={onAccentColorChange} />
 
       <div className="mt-6 pt-6 border-t border-border">
-        <FontPicker />
+        <FontPicker
+          selectedSansFont={selectedSansFont}
+          onSansFontChange={onSansFontChange}
+          selectedSerifFont={selectedSerifFont}
+          onSerifFontChange={onSerifFontChange}
+          onResetFontsToDefault={() => {
+            onSansFontChange(DEFAULT_SANS as FontFamily)
+            onSerifFontChange(DEFAULT_SERIF as SerifFamily)
+          }}
+        />
       </div>
 
       <div className="mt-6 pt-6 border-t border-border">
@@ -49,4 +72,3 @@ export function SettingsAppearanceSection({
     </div>
   )
 }
-

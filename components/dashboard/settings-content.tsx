@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useCallback, useState } from "react"
+import { useEffect, useMemo, useCallback, useRef, useState } from "react"
 import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, CheckCircle2, Loader2 } from "@/lib/icons"
@@ -25,10 +25,13 @@ import { SettingsPrivacySection } from "./settings-privacy"
 import { SettingsTimeZoneSection } from "./settings-timezone"
 import { SettingsVoiceSection } from "./settings-voice-section"
 import { SettingsProfileSection } from "./settings-profile-section"
+import { LiquidGlassNavbar } from "@/components/liquid-glass-navbar"
 import { db } from "@/lib/storage/db"
 import { DEFAULT_USER_SETTINGS, createDefaultSettingsRecord } from "@/lib/settings/default-settings"
 import { setDisableStartupAnimationSync } from "@/lib/scene-context"
-import type { AccountabilityMode, GeminiVoice, UserSettings } from "@/lib/types"
+import { useSceneMode } from "@/lib/scene-context"
+import { useTimeZone } from "@/lib/timezone-context"
+import type { AccountabilityMode, FontFamily, GeminiVoice, SerifFamily, UserSettings } from "@/lib/types"
 
 // Pattern doc: docs/error-patterns/settings-schema-drift-and-partial-save.md
 type SettingsDraft = Pick<
@@ -36,11 +39,15 @@ type SettingsDraft = Pick<
   | "userName"
   | "enableNotifications"
   | "dailyReminderTime"
+  | "timeZone"
   | "autoScheduleRecovery"
   | "localStorageOnly"
   | "geminiApiKey"
   | "selectedGeminiVoice"
   | "accountabilityMode"
+  | "accentColor"
+  | "selectedSansFont"
+  | "selectedSerifFont"
   | "disableStartupAnimation"
 >
 
@@ -48,11 +55,15 @@ const DEFAULT_DRAFT: SettingsDraft = {
   userName: DEFAULT_USER_SETTINGS.userName,
   enableNotifications: DEFAULT_USER_SETTINGS.enableNotifications,
   dailyReminderTime: DEFAULT_USER_SETTINGS.dailyReminderTime,
+  timeZone: DEFAULT_USER_SETTINGS.timeZone,
   autoScheduleRecovery: DEFAULT_USER_SETTINGS.autoScheduleRecovery,
   localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
   geminiApiKey: DEFAULT_USER_SETTINGS.geminiApiKey,
   selectedGeminiVoice: DEFAULT_USER_SETTINGS.selectedGeminiVoice,
   accountabilityMode: DEFAULT_USER_SETTINGS.accountabilityMode,
+  accentColor: DEFAULT_USER_SETTINGS.accentColor,
+  selectedSansFont: DEFAULT_USER_SETTINGS.selectedSansFont,
+  selectedSerifFont: DEFAULT_USER_SETTINGS.selectedSerifFont,
   disableStartupAnimation: DEFAULT_USER_SETTINGS.disableStartupAnimation,
 }
 
@@ -60,6 +71,25 @@ export function SettingsContent() {
   const [draft, setDraft] = useState<SettingsDraft>(() => ({ ...DEFAULT_DRAFT }))
 
   const [baseline, setBaseline] = useState<SettingsDraft | null>(null)
+
+  const baselineRef = useRef<SettingsDraft | null>(null)
+  const { previewAccentColor, previewSansFont, previewSerifFont } = useSceneMode()
+  const { setTimeZone: setTimeZoneInContext } = useTimeZone()
+  useEffect(() => {
+    baselineRef.current = baseline
+  }, [baseline])
+
+  // If user leaves Settings with unsaved appearance changes, revert previews.
+  useEffect(() => {
+    return () => {
+      const saved = baselineRef.current
+      if (!saved) return
+
+      if (saved.accentColor) previewAccentColor(saved.accentColor)
+      if (saved.selectedSansFont) previewSansFont(saved.selectedSansFont)
+      if (saved.selectedSerifFont) previewSerifFont(saved.selectedSerifFont)
+    }
+  }, [previewAccentColor, previewSansFont, previewSerifFont])
 
   // Render the floating save bar into <body> so it's not affected by any
   // parent transforms (e.g. translate-y entry animations on the Settings page).
@@ -83,13 +113,22 @@ export function SettingsContent() {
           userName: savedSettings?.userName ?? DEFAULT_USER_SETTINGS.userName,
           enableNotifications: savedSettings?.enableNotifications ?? DEFAULT_USER_SETTINGS.enableNotifications,
           dailyReminderTime: savedSettings?.dailyReminderTime,
+          timeZone: savedSettings?.timeZone ?? DEFAULT_USER_SETTINGS.timeZone,
           autoScheduleRecovery: savedSettings?.autoScheduleRecovery ?? DEFAULT_USER_SETTINGS.autoScheduleRecovery,
           localStorageOnly: savedSettings?.localStorageOnly ?? DEFAULT_USER_SETTINGS.localStorageOnly,
           geminiApiKey: savedSettings?.geminiApiKey,
           selectedGeminiVoice: savedSettings?.selectedGeminiVoice as GeminiVoice | undefined,
           accountabilityMode: (savedSettings?.accountabilityMode as AccountabilityMode | undefined) ?? DEFAULT_USER_SETTINGS.accountabilityMode,
+          accentColor: savedSettings?.accentColor ?? DEFAULT_USER_SETTINGS.accentColor,
+          selectedSansFont: (savedSettings?.selectedSansFont as FontFamily | undefined) ?? DEFAULT_USER_SETTINGS.selectedSansFont,
+          selectedSerifFont: (savedSettings?.selectedSerifFont as SerifFamily | undefined) ?? DEFAULT_USER_SETTINGS.selectedSerifFont,
           disableStartupAnimation: savedSettings?.disableStartupAnimation ?? DEFAULT_USER_SETTINGS.disableStartupAnimation,
         }
+
+        // Apply the saved appearance immediately so the page matches the stored settings.
+        if (hydrated.accentColor) previewAccentColor(hydrated.accentColor)
+        if (hydrated.selectedSansFont) previewSansFont(hydrated.selectedSansFont)
+        if (hydrated.selectedSerifFont) previewSerifFont(hydrated.selectedSerifFont)
 
         // Keep localStorage in sync so SceneProvider can read it synchronously on load.
         setDisableStartupAnimationSync(hydrated.disableStartupAnimation ?? false)
@@ -125,11 +164,15 @@ export function SettingsContent() {
       baseline.userName !== normalizedDraft.userName ||
       baseline.enableNotifications !== normalizedDraft.enableNotifications ||
       baseline.dailyReminderTime !== normalizedDraft.dailyReminderTime ||
+      baseline.timeZone !== normalizedDraft.timeZone ||
       baseline.autoScheduleRecovery !== normalizedDraft.autoScheduleRecovery ||
       baseline.localStorageOnly !== normalizedDraft.localStorageOnly ||
       baseline.geminiApiKey !== normalizedDraft.geminiApiKey ||
       baseline.selectedGeminiVoice !== normalizedDraft.selectedGeminiVoice ||
       baseline.accountabilityMode !== normalizedDraft.accountabilityMode ||
+      baseline.accentColor !== normalizedDraft.accentColor ||
+      baseline.selectedSansFont !== normalizedDraft.selectedSansFont ||
+      baseline.selectedSerifFont !== normalizedDraft.selectedSerifFont ||
       baseline.disableStartupAnimation !== normalizedDraft.disableStartupAnimation
     )
   }, [baseline, normalizedDraft])
@@ -143,11 +186,15 @@ export function SettingsContent() {
         userName: normalizedDraft.userName,
         enableNotifications: normalizedDraft.enableNotifications,
         dailyReminderTime: normalizedDraft.dailyReminderTime,
+        timeZone: normalizedDraft.timeZone,
         autoScheduleRecovery: normalizedDraft.autoScheduleRecovery,
         localStorageOnly: normalizedDraft.localStorageOnly,
         geminiApiKey: normalizedDraft.geminiApiKey,
         selectedGeminiVoice: normalizedDraft.selectedGeminiVoice,
         accountabilityMode: normalizedDraft.accountabilityMode,
+        accentColor: normalizedDraft.accentColor,
+        selectedSansFont: normalizedDraft.selectedSansFont,
+        selectedSerifFont: normalizedDraft.selectedSerifFont,
         disableStartupAnimation: normalizedDraft.disableStartupAnimation,
       }
 
@@ -159,6 +206,11 @@ export function SettingsContent() {
       // Sync animation preference to localStorage for instant access on next page load
       setDisableStartupAnimationSync(normalizedDraft.disableStartupAnimation ?? false)
 
+      // Apply time zone immediately (provider does its own persistence too).
+      if (normalizedDraft.timeZone) {
+        setTimeZoneInContext(normalizedDraft.timeZone)
+      }
+
       setBaseline(normalizedDraft)
       setSaveMessage({ type: "success", text: "Settings saved successfully!" })
       // Clear success message after 3 seconds
@@ -169,16 +221,18 @@ export function SettingsContent() {
     } finally {
       setIsSaving(false)
     }
-  }, [normalizedDraft])
+  }, [normalizedDraft, setTimeZoneInContext])
 
   const handleResetToDefaults = useCallback(() => {
     setShowResetConfirm(false)
     setDraft({ ...DEFAULT_DRAFT })
     setSaveMessage(null)
 
-    // Reset localStorage too (applies on next load even before the user saves).
-    setDisableStartupAnimationSync(DEFAULT_DRAFT.disableStartupAnimation ?? false)
-  }, [])
+    // Preview defaults (still requires Save to persist).
+    if (DEFAULT_DRAFT.accentColor) previewAccentColor(DEFAULT_DRAFT.accentColor)
+    if (DEFAULT_DRAFT.selectedSansFont) previewSansFont(DEFAULT_DRAFT.selectedSansFont)
+    if (DEFAULT_DRAFT.selectedSerifFont) previewSerifFont(DEFAULT_DRAFT.selectedSerifFont)
+  }, [previewAccentColor, previewSansFont, previewSerifFont])
 
   return (
     <div className={`w-full space-y-8 ${isDirty ? "pb-24" : ""}`}>
@@ -220,7 +274,13 @@ export function SettingsContent() {
           }}
         />
 
-        <SettingsTimeZoneSection />
+        <SettingsTimeZoneSection
+          timeZone={draft.timeZone ?? DEFAULT_USER_SETTINGS.timeZone ?? "UTC"}
+          onTimeZoneChange={(timeZone) => {
+            setDraft((prev) => ({ ...prev, timeZone }))
+            setSaveMessage(null)
+          }}
+        />
 
         <SettingsPrivacySection
           localStorageOnly={draft.localStorageOnly}
@@ -231,13 +291,28 @@ export function SettingsContent() {
         />
 
         <SettingsAppearanceSection
-          disableStartupAnimation={draft.disableStartupAnimation}
+          accentColor={draft.accentColor ?? DEFAULT_USER_SETTINGS.accentColor ?? "#d4a574"}
+          onAccentColorChange={(color) => {
+            setDraft((prev) => ({ ...prev, accentColor: color }))
+            setSaveMessage(null)
+            previewAccentColor(color)
+          }}
+          selectedSansFont={(draft.selectedSansFont ?? DEFAULT_USER_SETTINGS.selectedSansFont ?? "Instrument Sans") as FontFamily}
+          onSansFontChange={(font) => {
+            setDraft((prev) => ({ ...prev, selectedSansFont: font }))
+            setSaveMessage(null)
+            previewSansFont(font)
+          }}
+          selectedSerifFont={(draft.selectedSerifFont ?? DEFAULT_USER_SETTINGS.selectedSerifFont ?? "Instrument Serif") as SerifFamily}
+          onSerifFontChange={(font) => {
+            setDraft((prev) => ({ ...prev, selectedSerifFont: font }))
+            setSaveMessage(null)
+            previewSerifFont(font)
+          }}
+          disableStartupAnimation={draft.disableStartupAnimation ?? false}
           onDisableStartupAnimationChange={(checked) => {
             setDraft((prev) => ({ ...prev, disableStartupAnimation: checked }))
             setSaveMessage(null)
-
-            // Apply instantly for the next page load, even if user forgets to click Save.
-            setDisableStartupAnimationSync(checked)
           }}
         />
 
@@ -329,12 +404,10 @@ export function SettingsContent() {
       {/* Floating Save Bar - appears when there are unsaved changes */}
       {portalRoot && isDirty
         ? createPortal(
-            <div
-              className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur px-4 py-3 shadow-lg"
-              role="status"
-              aria-live="polite"
+            <LiquidGlassNavbar
+              className="top-auto bottom-[calc(env(safe-area-inset-bottom)+1rem)] w-[calc(100%-2rem)] max-w-4xl"
             >
-              <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+              <div className="flex items-center justify-between gap-4 w-full" role="status" aria-live="polite">
                 <div className="flex items-center gap-2 text-sm">
                   <AlertCircle className="h-4 w-4 text-accent" />
                   <span className="font-medium">You have unsaved changes</span>
@@ -354,7 +427,7 @@ export function SettingsContent() {
                   )}
                 </Button>
               </div>
-            </div>,
+            </LiquidGlassNavbar>,
             portalRoot
           )
         : null}

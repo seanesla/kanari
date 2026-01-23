@@ -1,5 +1,7 @@
 import type { UserSettings } from "@/lib/types"
 import type { DBSettings } from "@/lib/storage/db"
+import { DEFAULT_ACCENT } from "@/lib/color-utils"
+import { DEFAULT_SANS, DEFAULT_SERIF } from "@/lib/font-utils"
 import { DEFAULT_TIME_ZONE } from "@/lib/timezone"
 
 export const DEFAULT_USER_SETTINGS: UserSettings = {
@@ -20,6 +22,11 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
 
   coachAvatarBase64: undefined,
   coachAvatarVoice: undefined,
+
+  // Appearance
+  accentColor: DEFAULT_ACCENT,
+  selectedSansFont: DEFAULT_SANS,
+  selectedSerifFont: DEFAULT_SERIF,
 
   disableStartupAnimation: false,
 

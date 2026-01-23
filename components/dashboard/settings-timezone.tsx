@@ -6,8 +6,13 @@ import { Label } from "@/components/ui/label"
 import { useTimeZone } from "@/lib/timezone-context"
 import { COMMON_TIME_ZONES, formatTimeZoneLabel } from "@/lib/timezone"
 
-export function SettingsTimeZoneSection() {
-  const { timeZone, setTimeZone, availableTimeZones, isLoading } = useTimeZone()
+interface SettingsTimeZoneSectionProps {
+  timeZone: string
+  onTimeZoneChange: (timeZone: string) => void
+}
+
+export function SettingsTimeZoneSection({ timeZone, onTimeZoneChange }: SettingsTimeZoneSectionProps) {
+  const { availableTimeZones, isLoading } = useTimeZone()
 
   const { common, all } = useMemo(() => {
     const commonSet = new Set(COMMON_TIME_ZONES)
@@ -52,7 +57,7 @@ export function SettingsTimeZoneSection() {
         <select
           id="time-zone"
           value={timeZone}
-          onChange={(e) => setTimeZone(e.target.value)}
+          onChange={(e) => onTimeZoneChange(e.target.value)}
           disabled={isLoading}
           className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm font-sans focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
           aria-label="Time zone"
@@ -84,4 +89,3 @@ export function SettingsTimeZoneSection() {
     </div>
   )
 }
-
