@@ -443,7 +443,7 @@ export function FullCalendarView({
 
   // Generate CSS variables for theming
   const themeStyles = useMemo(() => ({
-    "--fc-border-color": "oklch(0.30 0.01 var(--hue, 60))",
+    "--fc-border-color": "var(--border)",
     "--fc-button-bg-color": accentColor,
     "--fc-button-border-color": accentColor,
     "--fc-button-hover-bg-color": generateDarkVariant(accentColor),
@@ -452,7 +452,8 @@ export function FullCalendarView({
     "--fc-button-active-border-color": generateDarkVariant(accentColor),
     "--fc-today-bg-color": `${accentColor}15`,
     "--fc-page-bg-color": "transparent",
-    "--fc-neutral-bg-color": "oklch(0.14 0.01 var(--hue, 60))",
+    "--fc-neutral-bg-color": "var(--card)",
+    "--fc-neutral-text-color": "var(--foreground)",
     "--fc-list-event-hover-bg-color": `${accentColor}20`,
   } as React.CSSProperties), [accentColor])
 

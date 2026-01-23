@@ -3,12 +3,13 @@
 .fullcalendar-wrapper {
   --fc-small-font-size: 0.75rem;
   --fc-page-bg-color: transparent;
-  --fc-neutral-bg-color: oklch(0.14 0.01 60);
-  --fc-neutral-text-color: oklch(0.93 0.01 60);
-  --fc-border-color: oklch(0.30 0.01 60);
+  --fc-neutral-bg-color: var(--card);
+  --fc-neutral-text-color: var(--foreground);
+  --fc-border-color: var(--border);
   --fc-event-border-color: transparent;
   --fc-event-text-color: inherit;
   --fc-list-event-dot-width: 8px;
+  /* overridden by inline styles in fullcalendar-view.tsx */
   --fc-today-bg-color: oklch(0.78 0.16 70 / 0.1);
 }
 
@@ -73,7 +74,7 @@
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.025em;
-  color: oklch(0.78 0.08 60);
+  color: var(--muted-foreground);
 }
 
 .fullcalendar-wrapper .fc .fc-col-header-cell-cushion {
@@ -83,12 +84,13 @@
 /* Time grid */
 .fullcalendar-wrapper .fc .fc-timegrid-slot {
   height: 2.5rem;
-  border-bottom: 1px solid oklch(0.20 0.01 60);
+  border-bottom: 1px solid var(--border);
 }
 
 .fullcalendar-wrapper .fc .fc-timegrid-slot-label {
   font-size: 0.625rem;
-  color: oklch(0.65 0.05 60);
+  color: var(--muted-foreground);
+  opacity: 0.85;
   vertical-align: top;
   padding-top: 0.25rem;
 }
@@ -191,7 +193,7 @@
 .fullcalendar-wrapper .fc .fc-daygrid-day-number {
   font-size: 0.75rem;
   padding: 0.25rem 0.5rem;
-  color: oklch(0.78 0.08 60);
+  color: var(--muted-foreground);
 }
 
 .fullcalendar-wrapper .fc .fc-day-today .fc-daygrid-day-number {
