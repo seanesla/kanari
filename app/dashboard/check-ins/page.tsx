@@ -117,37 +117,51 @@ function CheckInsSidebar({
             "inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)",
         }}
       >
-        <CursorBorderGlow
-          className="rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-          size={300}
-          borderWidth={2}
-        />
+        {/* Clip only the glow (not the header controls) */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
+          <CursorBorderGlow
+            className="rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+            size={300}
+            borderWidth={2}
+          />
+        </div>
 
         {/* Header with New Check-in button, select mode, and sidebar toggle */}
-        <SidebarHeader className="px-4 py-4 border-b border-border/30">
-          <div className="flex items-center gap-2">
+        <SidebarHeader className="px-3 py-3 border-b border-border/30">
+          <div className="flex items-center gap-1.5 min-w-0">
             <Button
               onClick={onNewCheckIn}
-              className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90 gap-2"
+              size="sm"
+              className="flex-1 min-w-0 bg-accent text-accent-foreground hover:bg-accent/90"
               data-demo-id="demo-new-checkin-button"
             >
-              <Sparkles className="h-4 w-4" />
-              New Check-in
+              <Sparkles className="h-3.5 w-3.5" />
+              <span className="whitespace-nowrap">New Check-in</span>
             </Button>
-            {historyItems.length > 0 && (
-              <Button
-                variant={isSelectMode ? "secondary" : "ghost"}
-                size="icon"
-                onClick={onToggleSelectMode}
-                title={isSelectMode ? "Cancel selection" : "Select items"}
-              >
-                <CheckSquare className="h-4 w-4" />
-              </Button>
-            )}
-            <SidebarTrigger
-              className="size-9 shrink-0 rounded-xl hover:bg-white/5 mr-1"
-              title="Toggle sidebar"
-            />
+            <div
+              className="shrink-0 flex items-center gap-1 rounded-xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 p-0.5"
+              style={{
+                boxShadow:
+                  "inset 0 1px 0 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02)",
+              }}
+            >
+              {historyItems.length > 0 && (
+                <Button
+                  variant={isSelectMode ? "secondary" : "ghost"}
+                  size="icon-sm"
+                  onClick={onToggleSelectMode}
+                  title={isSelectMode ? "Cancel selection" : "Select items"}
+                  className="size-7 rounded-lg"
+                >
+                  <CheckSquare className="h-4 w-4" />
+                </Button>
+              )}
+              {historyItems.length > 0 ? <div className="mx-0.5 h-6 w-px bg-white/10" /> : null}
+              <SidebarTrigger
+                className="shrink-0 rounded-lg hover:bg-white/5"
+                title="Toggle sidebar"
+              />
+            </div>
           </div>
         </SidebarHeader>
 

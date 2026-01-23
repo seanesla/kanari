@@ -451,24 +451,33 @@ function SidebarEdgeTrigger({
       {/* Left-edge proximity glow */}
       <div
         aria-hidden="true"
-        className="absolute inset-y-0 left-0"
-        style={{ width: maxDistance + 160 }}
+        className="absolute inset-0"
       >
+        {/* Fade the glow into the page so there's no hard cutoff */}
         <div
           className="absolute inset-0"
           style={{
             background: gradient,
-            filter: 'blur(18px)',
-            opacity: 0.85,
+            filter: 'blur(26px)',
+            opacity: 0.72,
             mixBlendMode: 'screen',
+            WebkitMaskImage:
+              'linear-gradient(90deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 70%)',
+            maskImage:
+              'linear-gradient(90deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 30%, rgba(0,0,0,0) 70%)',
           }}
         />
         <div
           className="absolute inset-0"
           style={{
             background: gradient,
-            opacity: 0.35,
+            filter: 'blur(10px)',
+            opacity: 0.22,
             mixBlendMode: 'screen',
+            WebkitMaskImage:
+              'linear-gradient(90deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 22%, rgba(0,0,0,0) 62%)',
+            maskImage:
+              'linear-gradient(90deg, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 22%, rgba(0,0,0,0) 62%)',
           }}
         />
       </div>

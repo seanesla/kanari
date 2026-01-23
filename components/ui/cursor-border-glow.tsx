@@ -20,13 +20,13 @@ export function CursorBorderGlow({
 }: CursorBorderGlowProps) {
   // Thickness of the glow "ring" (in px). Larger values = more diffusion.
   // Keep it comfortably thick so it reads as a border bloom, not a dot.
-  const glowRing = Math.max(16, borderWidth * 10)
+  const glowRing = Math.max(18, borderWidth * 12)
   const traceRing = Math.max(2, borderWidth)
-  const blurPx = Math.max(26, Math.round(glowRing * 1.6))
-  const traceBlurPx = Math.max(10, Math.round(glowRing * 0.45))
+  const blurPx = Math.max(38, Math.round(glowRing * 2.1))
+  const traceBlurPx = Math.max(14, Math.round(glowRing * 0.8))
 
   // Intensity modulates the glow brightness based on distance from edge
-  const gradient = `radial-gradient(var(--glow-rx, ${size}px) var(--glow-ry, ${size}px) at var(--glow-x, 50%) var(--glow-y, 50%), color-mix(in srgb, var(--accent) calc(60% * var(--glow-intensity, 1)), transparent) 0%, color-mix(in srgb, var(--accent) calc(30% * var(--glow-intensity, 1)), transparent) 45%, transparent 100%)`
+  const gradient = `radial-gradient(var(--glow-rx, ${size}px) var(--glow-ry, ${size}px) at var(--glow-x, 50%) var(--glow-y, 50%), color-mix(in srgb, var(--accent) calc(46% * var(--glow-intensity, 1)), transparent) 0%, color-mix(in srgb, var(--accent) calc(22% * var(--glow-intensity, 1)), transparent) 32%, color-mix(in srgb, var(--accent) calc(10% * var(--glow-intensity, 1)), transparent) 62%, transparent 100%)`
   const ringMask = "linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)"
 
   return (
@@ -43,7 +43,7 @@ export function CursorBorderGlow({
         className="absolute inset-0 rounded-[inherit]"
         style={{
           filter: `blur(${blurPx}px)`,
-          opacity: 0.72,
+          opacity: 0.62,
           mixBlendMode: "screen",
         }}
       >
@@ -63,7 +63,7 @@ export function CursorBorderGlow({
         className="absolute inset-0 rounded-[inherit]"
         style={{
           filter: `blur(${traceBlurPx}px)`,
-          opacity: 0.28,
+          opacity: 0.18,
           mixBlendMode: "screen",
         }}
       >
