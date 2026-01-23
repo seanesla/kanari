@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { sessionManager } from "@/lib/gemini/session-manager"
 import { ApiError } from "@google/genai"
 import { getAPIKeyFromRequest, validateAPIKey } from "@/lib/gemini/client"
+import { maybeRateLimitKanariGeminiKey } from "@/lib/gemini/server-rate-limit"
 import {
   buildCheckInSystemInstruction,
   type SystemContextSummary,
@@ -62,6 +63,14 @@ export async function POST(
       return NextResponse.json(
         { error: "Request body too large", code: "CONFIG_ERROR" as const },
         { status: 413 }
+      )
+    }
+
+    const rateLimited = maybeRateLimitKanariGeminiKey(request, "live-session")
+    if (rateLimited) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please try again later.", code: "RATE_LIMIT" as const },
+        { status: 429 }
       )
     }
 

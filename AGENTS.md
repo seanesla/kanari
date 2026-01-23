@@ -6,7 +6,9 @@ This file provides guidance to AI coding assistants when working with code in th
 
 **Production:** https://kanari.space
 **Auto-deploys:** Push to `main` triggers Vercel deployment
-**No env vars required:** Users provide Gemini API key via Settings UI
+**Gemini API key:**
+- Default: users provide their own key via Settings UI
+- Optional (demo/hackathon): set `NEXT_PUBLIC_GEMINI_API_KEY` to ship a built-in key
 
 ## Hackathon Context
 
@@ -28,7 +30,7 @@ pnpm test:run     # Vitest single run
 Copy `.env.example` to `.env.local` with:
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` - For Calendar integration
 
-Note: Gemini API keys are entered by the user in the Settings UI (no server env fallback).
+Note: `NEXT_PUBLIC_GEMINI_API_KEY` is exposed to the browser. Prefer BYO key for production.
 
 ## Architecture
 

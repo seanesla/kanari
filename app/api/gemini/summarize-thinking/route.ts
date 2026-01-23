@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { validateAPIKey, getAPIKeyFromRequest } from "@/lib/gemini/client"
+import { maybeRateLimitKanariGeminiKey } from "@/lib/gemini/server-rate-limit"
 
 /**
  * POST /api/gemini/summarize-thinking
@@ -20,6 +21,9 @@ export async function POST(request: NextRequest) {
     if (contentLength && Number(contentLength) > 50_000) {
       return NextResponse.json({ error: "Request body too large" }, { status: 413 })
     }
+
+    const rateLimited = maybeRateLimitKanariGeminiKey(request, "summarize-thinking")
+    if (rateLimited) return rateLimited
 
     const body = await request.json()
     const { thinkingText } = body

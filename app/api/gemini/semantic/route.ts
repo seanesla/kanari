@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { validateAPIKey, getAPIKeyFromRequest, analyzeAudioSemantic } from "@/lib/gemini/client"
+import { maybeRateLimitKanariGeminiKey } from "@/lib/gemini/server-rate-limit"
 
 /**
  * POST /api/gemini/semantic
@@ -31,6 +32,9 @@ export async function POST(request: NextRequest) {
     if (contentLength && Number(contentLength) > 11_500_000) {
       return NextResponse.json({ error: "Request body too large" }, { status: 413 })
     }
+
+    const rateLimited = maybeRateLimitKanariGeminiKey(request, "semantic")
+    if (rateLimited) return rateLimited
 
     // Parse request body
     const body = await request.json()

@@ -489,6 +489,8 @@ export type MonoFamily =
   | "Inconsolata"
   | "Source Code Pro"
 
+export type GeminiApiKeySource = "kanari" | "user"
+
 export interface UserSettings {
   // User identity
   userName?: string // User's preferred name (for personalization)
@@ -528,6 +530,12 @@ export interface UserSettings {
 
   // API Configuration
   geminiApiKey?: string // User's Gemini API key (stored locally)
+  /**
+   * Which Gemini key to use.
+   * - "kanari": use the deployment-provided key (NEXT_PUBLIC_GEMINI_API_KEY)
+   * - "user": use the user's own key stored in IndexedDB
+   */
+  geminiApiKeySource?: GeminiApiKeySource
 
   // Onboarding
   hasCompletedOnboarding?: boolean // Whether user has completed the onboarding flow

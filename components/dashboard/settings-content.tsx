@@ -44,6 +44,7 @@ type SettingsDraft = Pick<
   | "autoScheduleRecovery"
   | "localStorageOnly"
   | "geminiApiKey"
+  | "geminiApiKeySource"
   | "selectedGeminiVoice"
   | "accountabilityMode"
   | "accentColor"
@@ -60,6 +61,7 @@ const DEFAULT_DRAFT: SettingsDraft = {
   autoScheduleRecovery: DEFAULT_USER_SETTINGS.autoScheduleRecovery,
   localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
   geminiApiKey: DEFAULT_USER_SETTINGS.geminiApiKey,
+  geminiApiKeySource: DEFAULT_USER_SETTINGS.geminiApiKeySource,
   selectedGeminiVoice: DEFAULT_USER_SETTINGS.selectedGeminiVoice,
   accountabilityMode: DEFAULT_USER_SETTINGS.accountabilityMode,
   accentColor: DEFAULT_USER_SETTINGS.accentColor,
@@ -118,6 +120,7 @@ export function SettingsContent() {
           autoScheduleRecovery: savedSettings?.autoScheduleRecovery ?? DEFAULT_USER_SETTINGS.autoScheduleRecovery,
           localStorageOnly: savedSettings?.localStorageOnly ?? DEFAULT_USER_SETTINGS.localStorageOnly,
           geminiApiKey: savedSettings?.geminiApiKey,
+          geminiApiKeySource: savedSettings?.geminiApiKeySource ?? DEFAULT_USER_SETTINGS.geminiApiKeySource,
           selectedGeminiVoice: savedSettings?.selectedGeminiVoice as GeminiVoice | undefined,
           accountabilityMode: (savedSettings?.accountabilityMode as AccountabilityMode | undefined) ?? DEFAULT_USER_SETTINGS.accountabilityMode,
           accentColor: savedSettings?.accentColor ?? DEFAULT_USER_SETTINGS.accentColor,
@@ -149,10 +152,12 @@ export function SettingsContent() {
   const normalizedDraft = useMemo((): SettingsDraft => {
     const trimmedKey = draft.geminiApiKey?.trim() ?? ""
     const trimmedName = draft.userName?.trim() ?? ""
+    const geminiApiKeySource = draft.geminiApiKeySource === "kanari" ? "kanari" : "user"
     return {
       ...draft,
       userName: trimmedName.length > 0 ? trimmedName : undefined,
       geminiApiKey: trimmedKey.length > 0 ? trimmedKey : undefined,
+      geminiApiKeySource,
       dailyReminderTime: draft.dailyReminderTime ? draft.dailyReminderTime : undefined,
       selectedGeminiVoice: draft.selectedGeminiVoice ?? undefined,
       accountabilityMode: draft.accountabilityMode ?? DEFAULT_USER_SETTINGS.accountabilityMode,
@@ -169,6 +174,7 @@ export function SettingsContent() {
       baseline.autoScheduleRecovery !== normalizedDraft.autoScheduleRecovery ||
       baseline.localStorageOnly !== normalizedDraft.localStorageOnly ||
       baseline.geminiApiKey !== normalizedDraft.geminiApiKey ||
+      baseline.geminiApiKeySource !== normalizedDraft.geminiApiKeySource ||
       baseline.selectedGeminiVoice !== normalizedDraft.selectedGeminiVoice ||
       baseline.accountabilityMode !== normalizedDraft.accountabilityMode ||
       baseline.accentColor !== normalizedDraft.accentColor ||
@@ -191,6 +197,7 @@ export function SettingsContent() {
         autoScheduleRecovery: normalizedDraft.autoScheduleRecovery,
         localStorageOnly: normalizedDraft.localStorageOnly,
         geminiApiKey: normalizedDraft.geminiApiKey,
+        geminiApiKeySource: normalizedDraft.geminiApiKeySource,
         selectedGeminiVoice: normalizedDraft.selectedGeminiVoice,
         accountabilityMode: normalizedDraft.accountabilityMode,
         accentColor: normalizedDraft.accentColor,
@@ -331,8 +338,13 @@ export function SettingsContent() {
 
         <SettingsApiSection
           geminiApiKey={draft.geminiApiKey ?? ""}
+          geminiApiKeySource={(draft.geminiApiKeySource ?? DEFAULT_USER_SETTINGS.geminiApiKeySource ?? "user")}
           onGeminiApiKeyChange={(value) => {
             setDraft((prev) => ({ ...prev, geminiApiKey: value }))
+            setSaveMessage(null)
+          }}
+          onGeminiApiKeySourceChange={(value) => {
+            setDraft((prev) => ({ ...prev, geminiApiKeySource: value }))
             setSaveMessage(null)
           }}
         />

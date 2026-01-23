@@ -4,6 +4,9 @@ import { DEFAULT_ACCENT } from "@/lib/color-utils"
 import { DEFAULT_SANS, DEFAULT_SERIF } from "@/lib/font-utils"
 import { DEFAULT_TIME_ZONE } from "@/lib/timezone"
 
+const DEFAULT_GEMINI_API_KEY_SOURCE: UserSettings["geminiApiKeySource"] =
+  process.env.NEXT_PUBLIC_GEMINI_API_KEY ? "kanari" : "user"
+
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   userName: undefined,
 
@@ -15,6 +18,9 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   preferredRecoveryTimes: [],
 
   localStorageOnly: true,
+
+  // Gemini API key handling
+  geminiApiKeySource: DEFAULT_GEMINI_API_KEY_SOURCE,
 
   accountabilityMode: "balanced",
 

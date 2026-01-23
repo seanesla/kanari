@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { validateAPIKey, getAPIKeyFromRequest, generateSuggestions, generateDiffAwareSuggestions } from "@/lib/gemini/client"
+import { maybeRateLimitKanariGeminiKey } from "@/lib/gemini/server-rate-limit"
 import {
   SYSTEM_PROMPT,
   DIFF_AWARE_SYSTEM_PROMPT,
@@ -133,6 +134,9 @@ export async function POST(request: NextRequest) {
     if (contentLength && Number(contentLength) > MAX_REQUEST_BODY_BYTES) {
       return NextResponse.json({ error: "Request body too large" }, { status: 413 })
     }
+
+    const rateLimited = maybeRateLimitKanariGeminiKey(request, "suggestions")
+    if (rateLimited) return rateLimited
 
     // Parse request body
     const body = await request.json()

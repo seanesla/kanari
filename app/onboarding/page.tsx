@@ -77,9 +77,9 @@ export default function OnboardingPage() {
   }, [updateSettings, goNext])
 
   // Handler for StepApiKey
-  const handleApiKeySubmit = useCallback(async (apiKey: string) => {
-    setPendingSettings((prev) => ({ ...prev, geminiApiKey: apiKey }))
-    await updateSettings({ geminiApiKey: apiKey })
+  const handleApiKeySubmit = useCallback(async (apiSettings: Partial<UserSettings>) => {
+    setPendingSettings((prev) => ({ ...prev, ...apiSettings }))
+    await updateSettings(apiSettings)
     goNext()
   }, [updateSettings, goNext])
 
@@ -136,6 +136,7 @@ export default function OnboardingPage() {
     <StepApiKey
       key="apiKey"
       initialApiKey={mergedSettings?.geminiApiKey || ""}
+      initialApiKeySource={mergedSettings?.geminiApiKeySource}
       onNext={handleApiKeySubmit}
       onBack={goBack}
       isActive={onboardingStep === 1}

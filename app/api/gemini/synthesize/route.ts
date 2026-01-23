@@ -19,6 +19,7 @@ import {
   getAPIKeyFromRequest,
   type GeminiRequest,
 } from "@/lib/gemini/client"
+import { maybeRateLimitKanariGeminiKey } from "@/lib/gemini/server-rate-limit"
 import { parseGeminiJson } from "@/lib/gemini/json"
 import { CHECK_IN_SYNTHESIS_PROMPT, CHECK_IN_SYNTHESIS_SCHEMA } from "@/lib/gemini/prompts"
 import type {
@@ -353,6 +354,9 @@ export async function POST(request: NextRequest) {
     if (contentLength && Number(contentLength) > 250_000) {
       return NextResponse.json({ error: "Request body too large" }, { status: 413 })
     }
+
+    const rateLimited = maybeRateLimitKanariGeminiKey(request, "synthesize")
+    if (rateLimited) return rateLimited
 
     const bodyJson = await request.json()
     const parsed = SynthesizeRequestSchema.safeParse(bodyJson)
