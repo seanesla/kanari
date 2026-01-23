@@ -119,7 +119,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         <Script id="startup-animation-pref" strategy="beforeInteractive">
           {`try { if (localStorage.getItem("kanari:disableStartupAnimation") === "true") { document.documentElement.dataset.disableStartupAnimation = "true" } } catch (e) {}`}

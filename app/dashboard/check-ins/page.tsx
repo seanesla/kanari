@@ -145,7 +145,7 @@ function CheckInsSidebar({
               </Button>
             )}
             <SidebarTrigger
-              className="size-9 rounded-xl hover:bg-white/5"
+              className="size-9 shrink-0 rounded-xl hover:bg-white/5 mr-1"
               title="Toggle sidebar"
             />
           </div>

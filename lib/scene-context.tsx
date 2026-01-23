@@ -72,12 +72,21 @@ export const SceneContext = createContext<SceneContextValue | null>(null)
 export function SceneProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<SceneMode>("landing")
   const scrollProgressRef = useRef(0)
-  // Initialize isLoading based on localStorage (synchronous read = no flash)
-  // If animation is disabled, start with isLoading=false so overlay never shows
-  const [isLoading, setIsLoading] = useState(() => !getDisableStartupAnimation())
+  // Keep SSR + client hydration consistent.
+  // Startup animation suppression is handled by an early inline script (app/layout.tsx)
+  // that sets a data attribute for CSS to hide the overlay before hydration.
+  const [isLoading, setIsLoading] = useState(true)
   const [accentColor, setAccentColorState] = useState(DEFAULT_ACCENT)
   const [selectedSansFont, setSelectedSansFontState] = useState(DEFAULT_SANS)
   const [selectedSerifFont, setSelectedSerifFontState] = useState(DEFAULT_SERIF)
+
+  // Apply localStorage preference after mount.
+  // This avoids hydration mismatches while still honoring the user's setting.
+  useEffect(() => {
+    if (getDisableStartupAnimation()) {
+      setIsLoading(false)
+    }
+  }, [])
 
   // Load saved settings (accent color and fonts) from IndexedDB on mount
   // Note: disableStartupAnimation is read from localStorage synchronously (see useState above)

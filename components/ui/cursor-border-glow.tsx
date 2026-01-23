@@ -22,7 +22,8 @@ export function CursorBorderGlow({
   // Keep it comfortably thick so it reads as a border bloom, not a dot.
   const glowRing = Math.max(16, borderWidth * 10)
   const traceRing = Math.max(2, borderWidth)
-  const blurPx = Math.max(22, Math.round(glowRing * 1.25))
+  const blurPx = Math.max(26, Math.round(glowRing * 1.6))
+  const traceBlurPx = Math.max(10, Math.round(glowRing * 0.45))
 
   // Intensity modulates the glow brightness based on distance from edge
   const gradient = `radial-gradient(var(--glow-rx, ${size}px) var(--glow-ry, ${size}px) at var(--glow-x, 50%) var(--glow-y, 50%), color-mix(in srgb, var(--accent) calc(60% * var(--glow-intensity, 1)), transparent) 0%, color-mix(in srgb, var(--accent) calc(30% * var(--glow-intensity, 1)), transparent) 45%, transparent 100%)`
@@ -42,7 +43,7 @@ export function CursorBorderGlow({
         className="absolute inset-0 rounded-[inherit]"
         style={{
           filter: `blur(${blurPx}px)`,
-          opacity: 0.75,
+          opacity: 0.72,
           mixBlendMode: "screen",
         }}
       >
@@ -61,7 +62,8 @@ export function CursorBorderGlow({
       <div
         className="absolute inset-0 rounded-[inherit]"
         style={{
-          opacity: 0.45,
+          filter: `blur(${traceBlurPx}px)`,
+          opacity: 0.28,
           mixBlendMode: "screen",
         }}
       >
