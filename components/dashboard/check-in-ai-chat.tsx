@@ -115,6 +115,10 @@ export function AIChatContent({
   const synthesisAbortRef = useRef<AbortController | null>(null)
   const lastSynthesizedSessionIdRef = useRef<string | null>(null)
 
+  // Tool focus mode (lets tools take over the main panel)
+  const [focusedWidgetId, setFocusedWidgetId] = useState<string | null>(null)
+  const [journalDrafts, setJournalDrafts] = useState<Record<string, string>>({})
+
   useEffect(() => {
     return () => {
       synthesisAbortRef.current?.abort()
@@ -389,6 +393,25 @@ export function AIChatContent({
   const showInitializing = ["initializing", "connecting"].includes(checkIn.state)
   const canInterruptAssistant = checkIn.state === "assistant_speaking"
 
+  const focusedWidget = focusedWidgetId
+    ? (checkIn.widgets.find((w) => w.id === focusedWidgetId) ?? null)
+    : null
+  const isToolFocused = Boolean(focusedWidget)
+
+  useEffect(() => {
+    if (!showConversation) {
+      setFocusedWidgetId(null)
+    }
+  }, [showConversation])
+
+  useEffect(() => {
+    if (!focusedWidgetId) return
+    const exists = checkIn.widgets.some((w) => w.id === focusedWidgetId)
+    if (!exists) {
+      setFocusedWidgetId(null)
+    }
+  }, [checkIn.widgets, focusedWidgetId])
+
   const statusDotClass = cn(
     "w-3 h-3 rounded-full transition-colors",
     checkIn.state === "user_speaking"
@@ -498,7 +521,34 @@ export function AIChatContent({
             </div>
 
             {/* Conversation */}
-            {checkIn.state === "idle" ? (
+            {showConversation && isToolFocused && focusedWidget?.type === "journal_prompt" ? (
+              <div className="flex-1 overflow-hidden p-4">
+                <JournalPrompt
+                  key={focusedWidget.id}
+                  widget={focusedWidget}
+                  variant="focus"
+                  className="h-full"
+                  initialContent={journalDrafts[focusedWidget.id] || ""}
+                  onDraftChange={(nextContent) =>
+                    setJournalDrafts((prev) => {
+                      const trimmed = nextContent.trim()
+                      if (!trimmed) {
+                        if (!(focusedWidget.id in prev)) return prev
+                        const { [focusedWidget.id]: _, ...rest } = prev
+                        return rest
+                      }
+                      return { ...prev, [focusedWidget.id]: nextContent }
+                    })
+                  }
+                  onBack={() => setFocusedWidgetId(null)}
+                  onDismiss={() => {
+                    controls.dismissWidget(focusedWidget.id)
+                    setFocusedWidgetId(null)
+                  }}
+                  onSave={(content) => controls.saveJournalEntry(focusedWidget.id, content)}
+                />
+              </div>
+            ) : checkIn.state === "idle" ? (
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
                 <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
                   <p className="text-sm">{isAutoStarting ? "Starting your check-in..." : "Tap Start when you're ready"}</p>
@@ -523,7 +573,7 @@ export function AIChatContent({
             )}
 
             {/* Widgets */}
-            {checkIn.widgets.length > 0 && (
+            {!isToolFocused && checkIn.widgets.length > 0 && (
               <div
                 className={cn(
                   "flex-shrink-0 border-t p-4 space-y-3 overflow-y-auto max-h-[260px]",
@@ -575,10 +625,10 @@ export function AIChatContent({
                         <JournalPrompt
                           key={widget.id}
                           widget={widget}
+                          initialContent={journalDrafts[widget.id] || ""}
+                          onOpenFocus={() => setFocusedWidgetId(widget.id)}
                           onDismiss={() => controls.dismissWidget(widget.id)}
-                          onSave={(content) =>
-                            controls.saveJournalEntry(widget.id, content)
-                          }
+                          onSave={(content) => controls.saveJournalEntry(widget.id, content)}
                         />
                       )
                     default:
@@ -595,18 +645,29 @@ export function AIChatContent({
                   {showConversation ? (
                     <>
                       <div className="pr-20">
-                        <ChatInput
-                          onSendText={(text) => {
-                            if (checkIn.state === "assistant_speaking") {
-                              controls.interruptAssistant()
-                            }
-                            controls.sendTextMessage(text)
-                          }}
-                          onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
-                          disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
-                          isMuted={checkIn.isMuted}
-                          onToggleMute={() => controls.toggleMute()}
-                        />
+                        {isToolFocused ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full h-14"
+                            onClick={() => setFocusedWidgetId(null)}
+                          >
+                            Back to chat
+                          </Button>
+                        ) : (
+                          <ChatInput
+                            onSendText={(text) => {
+                              if (checkIn.state === "assistant_speaking") {
+                                controls.interruptAssistant()
+                              }
+                              controls.sendTextMessage(text)
+                            }}
+                            onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
+                            disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
+                            isMuted={checkIn.isMuted}
+                            onToggleMute={() => controls.toggleMute()}
+                          />
+                        )}
                       </div>
 
                       <Button

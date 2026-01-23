@@ -93,6 +93,10 @@ export function CheckInDialog({
   const synthesisAbortRef = useRef<AbortController | null>(null)
   const lastSynthesizedSessionIdRef = useRef<string | null>(null)
 
+  // Tool focus mode
+  const [focusedWidgetId, setFocusedWidgetId] = useState<string | null>(null)
+  const [journalDrafts, setJournalDrafts] = useState<Record<string, string>>({})
+
   // Check if user has selected a voice when dialog opens
   useEffect(() => {
     if (!open) {
@@ -102,6 +106,8 @@ export function CheckInDialog({
       setSynthesis(null)
       setIsSynthesizing(false)
       setSynthesisError(null)
+      setFocusedWidgetId(null)
+      setJournalDrafts({})
       synthesisAbortRef.current?.abort()
       synthesisAbortRef.current = null
       lastSynthesizedSessionIdRef.current = null
@@ -312,6 +318,25 @@ export function CheckInDialog({
 
   const showInitializing = ["initializing", "connecting"].includes(checkIn.state)
 
+  const focusedWidget = focusedWidgetId
+    ? (checkIn.widgets.find((w) => w.id === focusedWidgetId) ?? null)
+    : null
+  const isToolFocused = Boolean(focusedWidget)
+
+  useEffect(() => {
+    if (!showConversation) {
+      setFocusedWidgetId(null)
+    }
+  }, [showConversation])
+
+  useEffect(() => {
+    if (!focusedWidgetId) return
+    const exists = checkIn.widgets.some((w) => w.id === focusedWidgetId)
+    if (!exists) {
+      setFocusedWidgetId(null)
+    }
+  }, [checkIn.widgets, focusedWidgetId])
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -463,76 +488,111 @@ export function CheckInDialog({
                   <BiomarkerIndicator metrics={checkIn.session?.acousticMetrics} />
                 </div>
 
-                {/* Messages */}
-                <ConversationView
-                  state={checkIn.state}
-                  messages={checkIn.messages}
-                  currentUserTranscript={checkIn.currentUserTranscript}
-                  currentAssistantThinking={checkIn.currentAssistantThinking}
-                  coachAvatar={coachAvatar}
-                />
-
-                {/* Gemini-triggered widgets */}
-                {checkIn.widgets.length > 0 && (
-                  <div className="flex-shrink-0 border-t bg-background/60 p-4 space-y-3 overflow-y-auto max-h-[260px]">
-                    <AnimatePresence initial={false}>
-                      {checkIn.widgets.map((widget) => {
-                        switch (widget.type) {
-                          case "schedule_activity":
-                            return (
-                              <ScheduleConfirmation
-                                key={widget.id}
-                                widget={widget}
-                                onDismiss={() => controls.dismissWidget(widget.id)}
-                                onUndo={(suggestionId) =>
-                                  controls.undoScheduledActivity(widget.id, suggestionId)
-                                }
-                              />
-                            )
-                          case "breathing_exercise":
-                            return (
-                              <BreathingExercise
-                                key={widget.id}
-                                widget={widget}
-                                onDismiss={() => controls.dismissWidget(widget.id)}
-                              />
-                            )
-                          case "stress_gauge":
-                            return (
-                              <StressGauge
-                                key={widget.id}
-                                widget={widget}
-                                onDismiss={() => controls.dismissWidget(widget.id)}
-                              />
-                            )
-                          case "quick_actions":
-                            return (
-                              <QuickActions
-                                key={widget.id}
-                                widget={widget}
-                                onDismiss={() => controls.dismissWidget(widget.id)}
-                                onSelect={(action, label) =>
-                                  controls.runQuickAction(widget.id, action, label)
-                                }
-                              />
-                            )
-                          case "journal_prompt":
-                            return (
-                              <JournalPrompt
-                                key={widget.id}
-                                widget={widget}
-                                onDismiss={() => controls.dismissWidget(widget.id)}
-                                onSave={(content) =>
-                                  controls.saveJournalEntry(widget.id, content)
-                                }
-                              />
-                            )
-                          default:
-                            return null
-                        }
-                      })}
-                    </AnimatePresence>
+                {isToolFocused && focusedWidget?.type === "journal_prompt" ? (
+                  <div className="flex-1 overflow-hidden p-4">
+                    <JournalPrompt
+                      key={focusedWidget.id}
+                      widget={focusedWidget}
+                      variant="focus"
+                      className="h-full"
+                      initialContent={journalDrafts[focusedWidget.id] || ""}
+                      onDraftChange={(nextContent) =>
+                        setJournalDrafts((prev) => {
+                          const trimmed = nextContent.trim()
+                          if (!trimmed) {
+                            if (!(focusedWidget.id in prev)) return prev
+                            const { [focusedWidget.id]: _, ...rest } = prev
+                            return rest
+                          }
+                          return { ...prev, [focusedWidget.id]: nextContent }
+                        })
+                      }
+                      onBack={() => setFocusedWidgetId(null)}
+                      onDismiss={() => {
+                        controls.dismissWidget(focusedWidget.id)
+                        setFocusedWidgetId(null)
+                      }}
+                      onSave={(content) =>
+                        controls.saveJournalEntry(focusedWidget.id, content)
+                      }
+                    />
                   </div>
+                ) : (
+                  <>
+                    {/* Messages */}
+                    <ConversationView
+                      state={checkIn.state}
+                      messages={checkIn.messages}
+                      currentUserTranscript={checkIn.currentUserTranscript}
+                      currentAssistantThinking={checkIn.currentAssistantThinking}
+                      coachAvatar={coachAvatar}
+                    />
+
+                    {/* Gemini-triggered widgets */}
+                    {checkIn.widgets.length > 0 && (
+                      <div className="flex-shrink-0 border-t bg-background/60 p-4 space-y-3 overflow-y-auto max-h-[260px]">
+                        <AnimatePresence initial={false}>
+                          {checkIn.widgets.map((widget) => {
+                            switch (widget.type) {
+                              case "schedule_activity":
+                                return (
+                                  <ScheduleConfirmation
+                                    key={widget.id}
+                                    widget={widget}
+                                    onDismiss={() => controls.dismissWidget(widget.id)}
+                                    onUndo={(suggestionId) =>
+                                      controls.undoScheduledActivity(widget.id, suggestionId)
+                                    }
+                                  />
+                                )
+                              case "breathing_exercise":
+                                return (
+                                  <BreathingExercise
+                                    key={widget.id}
+                                    widget={widget}
+                                    onDismiss={() => controls.dismissWidget(widget.id)}
+                                  />
+                                )
+                              case "stress_gauge":
+                                return (
+                                  <StressGauge
+                                    key={widget.id}
+                                    widget={widget}
+                                    onDismiss={() => controls.dismissWidget(widget.id)}
+                                  />
+                                )
+                              case "quick_actions":
+                                return (
+                                  <QuickActions
+                                    key={widget.id}
+                                    widget={widget}
+                                    onDismiss={() => controls.dismissWidget(widget.id)}
+                                    onSelect={(action, label) =>
+                                      controls.runQuickAction(widget.id, action, label)
+                                    }
+                                  />
+                                )
+                              case "journal_prompt":
+                                return (
+                                  <JournalPrompt
+                                    key={widget.id}
+                                    widget={widget}
+                                    initialContent={journalDrafts[widget.id] || ""}
+                                    onOpenFocus={() => setFocusedWidgetId(widget.id)}
+                                    onDismiss={() => controls.dismissWidget(widget.id)}
+                                    onSave={(content) =>
+                                      controls.saveJournalEntry(widget.id, content)
+                                    }
+                                  />
+                                )
+                              default:
+                                return null
+                            }
+                          })}
+                        </AnimatePresence>
+                      </div>
+                    )}
+                  </>
                 )}
               </motion.div>
             )}
@@ -591,13 +651,24 @@ export function CheckInDialog({
               <div className="relative mx-auto w-full max-w-2xl">
                 {/* Reserve space on the right so the floating hang up button doesn't overlap the bar */}
                 <div className="pr-20">
-                  <ChatInput
-                    onSendText={(text) => controls.sendTextMessage(text)}
-                    onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
-                    disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
-                    isMuted={checkIn.isMuted}
-                    onToggleMute={() => controls.toggleMute()}
-                  />
+                  {isToolFocused ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full h-14"
+                      onClick={() => setFocusedWidgetId(null)}
+                    >
+                      Back to chat
+                    </Button>
+                  ) : (
+                    <ChatInput
+                      onSendText={(text) => controls.sendTextMessage(text)}
+                      onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
+                      disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
+                      isMuted={checkIn.isMuted}
+                      onToggleMute={() => controls.toggleMute()}
+                    />
+                  )}
                 </div>
 
                 {/* Floating hang up button (outside the input bar) */}
