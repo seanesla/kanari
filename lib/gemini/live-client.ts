@@ -329,7 +329,9 @@ export class GeminiLiveClient {
 
     try {
       const apiKey = await getGeminiApiKey()
-      if (!apiKey) {
+      // Demo mode can seed a placeholder key ("DEMO_MODE") to avoid forcing judges through Settings.
+      // Treat it as "not configured" so we don't attempt a real Live connection with an invalid key.
+      if (!apiKey || apiKey === "DEMO_MODE") {
         throw new Error("Gemini API key not configured. Please add your Gemini API key in Settings.")
       }
 

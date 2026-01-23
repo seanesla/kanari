@@ -185,10 +185,16 @@ export function DemoProvider({ children }: DemoProviderProps) {
           await db.journalEntries.bulkPut(journals.map(fromJournalEntry))
 
           const existingSettings = await db.settings.get("default")
+          const existingKey = existingSettings?.geminiApiKey?.trim() ?? ""
+          const geminiApiKeyForDemo =
+            existingKey && existingKey !== DEMO_API_KEY ? existingSettings?.geminiApiKey : DEMO_API_KEY
           if (existingSettings) {
             await db.settings.update("default", {
               userName: DEMO_USER_NAME,
-              geminiApiKey: DEMO_API_KEY,
+              // IMPORTANT: Never overwrite a real user-provided key. Demo mode only needs a placeholder
+              // when no key is configured, and overwriting breaks real check-ins.
+              // See: docs/error-patterns/demo-mode-overwrites-real-user-data.md
+              geminiApiKey: geminiApiKeyForDemo,
               hasCompletedOnboarding: true,
               onboardingCompletedAt: new Date().toISOString(),
             })
@@ -270,18 +276,36 @@ export function DemoProvider({ children }: DemoProviderProps) {
 
         safeClearDemoBackup()
       } else {
-        // Best-effort fallback: restore the fields we explicitly changed.
-        await db.settings.update("default", {
-          userName: undefined,
-          hasCompletedOnboarding: false,
-          onboardingCompletedAt: undefined,
-          geminiApiKey: undefined,
-        })
+        // Best-effort fallback: only revert obvious demo placeholders.
+        // If localStorage is unavailable we may not have a backup to restore from, so avoid wiping
+        // real user settings (especially their API key).
+        const currentSettings = await db.settings.get("default")
+        const looksLikeDemo =
+          currentSettings?.userName === DEMO_USER_NAME || currentSettings?.geminiApiKey === DEMO_API_KEY
+
+        if (currentSettings && looksLikeDemo) {
+          await db.settings.update("default", {
+            ...(currentSettings.userName === DEMO_USER_NAME ? { userName: undefined } : {}),
+            ...(currentSettings.geminiApiKey === DEMO_API_KEY ? { geminiApiKey: undefined } : {}),
+            hasCompletedOnboarding: false,
+            onboardingCompletedAt: undefined,
+          })
+        }
       }
     } catch (error) {
       console.error("[DemoProvider] Failed to cleanup demo data:", error)
     }
   }, [])
+
+  // If a demo run was interrupted (refresh/crash) we can be left with:
+  // - demo data still seeded in IndexedDB
+  // - a backup still present in localStorage
+  // Auto-cleanup on mount so users don't get stuck with demo settings (e.g., DEMO_MODE key).
+  useEffect(() => {
+    const backup = safeReadDemoBackup()
+    if (!backup) return
+    cleanupDemoData()
+  }, [cleanupDemoData])
 
   // Get current step
   const getCurrentStep = useCallback((): DemoStep | null => {
