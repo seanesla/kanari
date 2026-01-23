@@ -23,6 +23,7 @@ export function LoadingOverlay({ visible, onAnimationComplete }: LoadingOverlayP
 
   return (
     <div
+      data-startup-overlay="true"
       className={`fixed inset-0 z-50 bg-[#0a0908] flex items-center justify-center transition-opacity duration-700 ${
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
       }`}

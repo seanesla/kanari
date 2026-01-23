@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next"
+import Script from "next/script"
 import {
   // Current fonts (defaults)
   Instrument_Sans,
@@ -119,6 +120,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
+      <head>
+        <Script id="startup-animation-pref" strategy="beforeInteractive">
+          {`try { if (localStorage.getItem("kanari:disableStartupAnimation") === "true") { document.documentElement.dataset.disableStartupAnimation = "true" } } catch (e) {}`}
+        </Script>
+      </head>
       <body
         className={`
           ${instrumentSans.variable} ${inter.variable} ${dmSans.variable} ${workSans.variable}

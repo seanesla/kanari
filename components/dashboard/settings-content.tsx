@@ -82,6 +82,10 @@ export function SettingsContent() {
           accountabilityMode: (savedSettings?.accountabilityMode as AccountabilityMode | undefined) ?? DEFAULT_USER_SETTINGS.accountabilityMode,
           disableStartupAnimation: savedSettings?.disableStartupAnimation ?? DEFAULT_USER_SETTINGS.disableStartupAnimation,
         }
+
+        // Keep localStorage in sync so SceneProvider can read it synchronously on load.
+        setDisableStartupAnimationSync(hydrated.disableStartupAnimation ?? false)
+
         setDraft(hydrated)
         setBaseline(hydrated)
       } catch (error) {
@@ -163,6 +167,9 @@ export function SettingsContent() {
     setShowResetConfirm(false)
     setDraft({ ...DEFAULT_DRAFT })
     setSaveMessage(null)
+
+    // Reset localStorage too (applies on next load even before the user saves).
+    setDisableStartupAnimationSync(DEFAULT_DRAFT.disableStartupAnimation ?? false)
   }, [])
 
   return (
@@ -220,6 +227,9 @@ export function SettingsContent() {
           onDisableStartupAnimationChange={(checked) => {
             setDraft((prev) => ({ ...prev, disableStartupAnimation: checked }))
             setSaveMessage(null)
+
+            // Apply instantly for the next page load, even if user forgets to click Save.
+            setDisableStartupAnimationSync(checked)
           }}
         />
 

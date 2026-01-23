@@ -252,3 +252,14 @@
 }
 
 /* Route transitions are handled in React (framer-motion overlay). */
+
+/*
+ * Startup animation (animated logo) can be disabled in Settings.
+ * We hide the overlay via an early inline script in app/layout.tsx so there's no flash
+ * from server-rendered HTML before React hydrates.
+ */
+html[data-disable-startup-animation="true"] [data-startup-overlay="true"] {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transition: none !important;
+}
