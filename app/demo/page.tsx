@@ -393,9 +393,11 @@ function DemoFeatureTour() {
                         {hasPlayableMedia ? (
                           <video
                             className="absolute inset-0 h-full w-full object-cover"
-                            controls
+                            autoPlay
+                            loop
+                            muted
                             playsInline
-                            preload="none"
+                            preload="metadata"
                             poster={slide.media.poster}
                           >
                             {slide.media.webm && <source src={slide.media.webm} type="video/webm" />}
