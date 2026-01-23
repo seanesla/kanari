@@ -226,4 +226,7 @@ export const VALIDATION = {
 
   /** Minimum pause count for valid analysis */
   MIN_PAUSE_COUNT: 2,
+
+  /** Minimum detected speech duration (seconds) before showing biomarkers */
+  MIN_SPEECH_SECONDS: 1,
 } as const

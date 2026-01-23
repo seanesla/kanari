@@ -8,16 +8,13 @@ beforeEach(() => {
 })
 
 describe("SimpleVAD", () => {
-  it("returns the entire audio when no speech is detected (silence)", () => {
+  it("returns no segments when no speech is detected (silence)", () => {
     const audio = new Float32Array(16000)
     const vad = new SimpleVAD(16000)
 
     const segments = vad.segment(audio)
 
-    expect(segments).toHaveLength(1)
-    expect(segments[0]?.audio).toBe(audio)
-    expect(segments[0]?.start).toBe(0)
-    expect(segments[0]?.end).toBeCloseTo(1, 6)
+    expect(segments).toHaveLength(0)
   })
 
   it("detects a speech segment when energy rises above the adaptive threshold", () => {
@@ -39,27 +36,11 @@ describe("SimpleVAD", () => {
 })
 
 describe("VoiceActivityDetector (Silero VAD wrapper)", () => {
-  it("falls back to a single segment when VAD cannot run in Node", async () => {
+  it("throws when VAD cannot run in Node", async () => {
     const audio = new Float32Array(16000).fill(0.2)
     const vad = new VoiceActivityDetector({ sampleRate: 16000 })
 
-    const segments = await vad.segment(audio)
-
-    expect(segments).toHaveLength(1)
-    expect(segments[0]?.audio).toBe(audio)
-    expect(segments[0]?.start).toBe(0)
-    expect(segments[0]?.end).toBeCloseTo(1, 6)
-  })
-
-  it("uses the configured sampleRate for fallback timing", async () => {
-    const audio = new Float32Array(8000).fill(0.2)
-    const vad = new VoiceActivityDetector({ sampleRate: 8000 })
-
-    const segments = await vad.segment(audio)
-
-    expect(segments).toHaveLength(1)
-    expect(segments[0]?.audio).toBe(audio)
-    expect(segments[0]?.end).toBeCloseTo(1, 6)
+    await expect(vad.segment(audio)).rejects.toThrow(/browser environment/i)
   })
 })
 
@@ -67,5 +48,19 @@ describe("segmentSpeech", () => {
   it("returns a segment list without throwing when VAD fails", async () => {
     const audio = new Float32Array(16000).fill(0.1)
     await expect(segmentSpeech(audio)).resolves.toHaveLength(1)
+  })
+
+  it("returns no segments for silence", async () => {
+    const audio = new Float32Array(16000)
+    await expect(segmentSpeech(audio)).resolves.toHaveLength(0)
+  })
+
+  it("uses sampleRate for timing on fallback", async () => {
+    const audio = new Float32Array(8000).fill(0.2)
+    const segments = await segmentSpeech(audio, { sampleRate: 8000 })
+
+    expect(segments).toHaveLength(1)
+    expect(segments[0]?.start).toBe(0)
+    expect(segments[0]?.end).toBeCloseTo(1, 6)
   })
 })

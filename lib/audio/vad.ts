@@ -90,28 +90,14 @@ export class VoiceActivityDetector {
    * Returns array of speech segments with timing information
    */
   async segment(audioData: Float32Array): Promise<SpeechSegment[]> {
-    try {
-      // Resample if necessary (use shared resampling function from pcm-converter)
-      const processedAudio =
-        this.options.sampleRate === 16000
-          ? audioData
-          : resampleAudio(audioData, this.options.sampleRate, 16000)
+    // Resample if necessary (use shared resampling function from pcm-converter)
+    const processedAudio =
+      this.options.sampleRate === 16000
+        ? audioData
+        : resampleAudio(audioData, this.options.sampleRate, 16000)
 
-      // Process with VAD
-      const segments = await this.processWithVAD(processedAudio)
-
-      return segments
-    } catch (error) {
-      logError("VAD", "Segmentation failed:", error)
-      // Fallback: return entire audio as single segment
-      return [
-        {
-          audio: audioData,
-          start: 0,
-          end: audioData.length / this.options.sampleRate,
-        },
-      ]
-    }
+    // Let errors propagate so segmentSpeech() can fall back to SimpleVAD.
+    return await this.processWithVAD(processedAudio)
   }
 
   /**
@@ -146,15 +132,6 @@ export class VoiceActivityDetector {
       })
     }
 
-    // If no segments detected, return entire audio as single segment
-    if (segments.length === 0) {
-      segments.push({
-        audio: audioData,
-        start: 0,
-        end: audioData.length / 16000,
-      })
-    }
-
     return segments
   }
 }
@@ -186,6 +163,9 @@ export class SimpleVAD {
       const energy = this.calculateEnergy(frame)
       frames.push({ energy, index: i })
     }
+
+    // Not enough data to evaluate speech.
+    if (frames.length === 0) return []
 
     // Calculate adaptive threshold
     const energies = frames.map((f) => f.energy)
@@ -222,15 +202,6 @@ export class SimpleVAD {
       segments.push({
         audio: audioData.slice(segmentStart),
         start: segmentStart / this.sampleRate,
-        end: audioData.length / this.sampleRate,
-      })
-    }
-
-    // If no segments found, return entire audio
-    if (segments.length === 0) {
-      segments.push({
-        audio: audioData,
-        start: 0,
         end: audioData.length / this.sampleRate,
       })
     }

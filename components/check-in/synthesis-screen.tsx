@@ -74,10 +74,16 @@ export function SynthesisScreen({
           </div>
 
           {/* Biomarkers (quick continuity cue) */}
-          {session?.acousticMetrics ? (
+          {session ? (
             <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4">
               <p className="text-xs font-medium text-muted-foreground mb-2">Voice biomarkers (this check-in)</p>
-              <BiomarkerIndicator metrics={session.acousticMetrics} compact />
+              {session.acousticMetrics ? (
+                <BiomarkerIndicator metrics={session.acousticMetrics} compact />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Not enough speech captured to analyze stress/fatigue. Try speaking for about 1-2 seconds next time.
+                </p>
+              )}
             </div>
           ) : null}
 

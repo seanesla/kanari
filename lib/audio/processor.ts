@@ -111,6 +111,11 @@ export class AudioProcessor {
             (sum, seg) => sum + (seg.end - seg.start),
             0
           )
+        } else {
+          // No speech detected.
+          // Pattern doc: docs/error-patterns/check-in-silence-produces-fake-biomarkers.md
+          processedAudio = new Float32Array(0)
+          speechDuration = 0
         }
       }
 
@@ -233,17 +238,29 @@ export function validateAudioData(audioData: Float32Array): boolean {
     return false
   }
 
-  // Check for all zeros (silent audio)
-  const hasSignal = Array.from(audioData).some((sample) => Math.abs(sample) > 0.001)
-  if (!hasSignal) {
-    return false
+  let hasSignal = false
+  let isClipped = false
+
+  for (let i = 0; i < audioData.length; i++) {
+    const sample = audioData[i] ?? 0
+    const abs = Math.abs(sample)
+
+    if (!hasSignal && abs > 0.001) {
+      hasSignal = true
+      if (isClipped) break
+    }
+
+    if (!isClipped && abs > 1.0) {
+      isClipped = true
+      if (hasSignal) break
+    }
   }
 
+  // Check for all zeros (silent audio)
+  if (!hasSignal) return false
+
   // Check for clipping (values outside -1 to 1)
-  const isClipped = Array.from(audioData).some((sample) => Math.abs(sample) > 1.0)
-  if (isClipped) {
-    console.warn("Audio data contains clipping (values > 1.0)")
-  }
+  if (isClipped) console.warn("Audio data contains clipping (values > 1.0)")
 
   return true
 }

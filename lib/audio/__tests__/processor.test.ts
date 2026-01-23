@@ -54,7 +54,7 @@ describe("processAudio", () => {
     vi.resetModules()
     vi.unmock("@/lib/audio/processor")
 
-    const extractMock = vi.fn(() => baseFeatures)
+    const extractMock = vi.fn((_audio: Float32Array) => baseFeatures)
     vi.doMock("../feature-extractor", () => ({
       FeatureExtractor: class {
         extract = extractMock
@@ -78,7 +78,7 @@ describe("processAudio", () => {
     vi.resetModules()
     vi.unmock("@/lib/audio/processor")
 
-    const extractMock = vi.fn(() => baseFeatures)
+    const extractMock = vi.fn((_audio: Float32Array) => baseFeatures)
     vi.doMock("../feature-extractor", () => ({
       FeatureExtractor: class {
         extract = extractMock
@@ -116,7 +116,7 @@ describe("processAudio", () => {
     vi.resetModules()
     vi.unmock("@/lib/audio/processor")
 
-    const extractMock = vi.fn(() => baseFeatures)
+    const extractMock = vi.fn((_audio: Float32Array) => baseFeatures)
     vi.doMock("../feature-extractor", () => ({
       FeatureExtractor: class {
         extract = extractMock
@@ -139,5 +139,37 @@ describe("processAudio", () => {
     expect(result.segments).toHaveLength(1)
     expect(result.segments?.[0]?.audio).toBe(audio)
     expect(result.metadata.speechDuration).toBeCloseTo(1, 6)
+  })
+
+  it("reports zero speechDuration when VAD finds no speech", async () => {
+    vi.resetModules()
+    vi.unmock("@/lib/audio/processor")
+
+    const extractMock = vi.fn((_audio: Float32Array) => baseFeatures)
+    vi.doMock("../feature-extractor", () => ({
+      FeatureExtractor: class {
+        extract = extractMock
+      },
+    }))
+
+    const segmentSpeechMock = vi.fn(async () => [])
+    vi.doMock("../vad", () => ({
+      segmentSpeech: segmentSpeechMock,
+    }))
+
+    const { processAudio } = await import("@/lib/audio/processor")
+
+    const audio = new Float32Array(16000).fill(0.0)
+    const result = await processAudio(audio, { enableVAD: true, sampleRate: 16000 })
+
+    expect(result.segments).toHaveLength(0)
+    expect(result.metadata.vadEnabled).toBe(true)
+    expect(result.metadata.speechDuration).toBe(0)
+
+    const extracted = extractMock.mock.calls[0]?.[0] as Float32Array | undefined
+    expect(extracted).toBeInstanceOf(Float32Array)
+    expect(extracted).toHaveLength(0)
+
+    expect(segmentSpeechMock).toHaveBeenCalled()
   })
 })

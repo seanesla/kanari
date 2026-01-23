@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch, MutableRefObject } from "react"
-import { processAudio } from "@/lib/audio/processor"
+import { processAudio, validateAudioData } from "@/lib/audio/processor"
 import { db, fromCommitment } from "@/lib/storage/db"
 import { computeContextFingerprint } from "@/lib/gemini/context-fingerprint"
 import { fetchCheckInContext, formatContextForAPI } from "@/lib/gemini/check-in-context"
@@ -27,6 +27,7 @@ import type {
 } from "@/lib/types"
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
 import { blendAcousticAndSemanticBiomarkers, inferSemanticBiomarkersFromText } from "@/lib/ml/biomarker-fusion"
+import { VALIDATION } from "@/lib/ml/thresholds"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 import type { UseCheckInAudioResult } from "./use-check-in-audio"
 
@@ -729,53 +730,65 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
       let acousticMetrics = data.session?.acousticMetrics
       if (!acousticMetrics && sessionAudio) {
         try {
-          const processed = await processAudio(sessionAudio, {
-            sampleRate: 16000,
-            enableVAD: true,
-          })
-          const metrics = analyzeVoiceMetrics(processed.features)
+          // Don't compute biomarkers from silence/mic noise.
+          // Pattern doc: docs/error-patterns/check-in-silence-produces-fake-biomarkers.md
+          if (!validateAudioData(sessionAudio)) {
+            logDebug("useCheckIn", "Skipped session-level biomarkers (no audio signal detected)")
+          } else {
+            const processed = await processAudio(sessionAudio, {
+              sampleRate: 16000,
+              enableVAD: true,
+            })
 
-          const userTranscript = data.messages
-            .filter((m) => m.role === "user")
-            .map((m) => m.content)
-            .join("\n")
-          const semantic = inferSemanticBiomarkersFromText(userTranscript)
-          const blended = blendAcousticAndSemanticBiomarkers({
-            acoustic: {
-              stressScore: metrics.stressScore,
-              fatigueScore: metrics.fatigueScore,
-              confidence: metrics.confidence,
-            },
-            semantic: {
-              stressScore: semantic.stressScore,
-              fatigueScore: semantic.fatigueScore,
-              stressConfidence: semantic.stressConfidence,
-              fatigueConfidence: semantic.fatigueConfidence,
-            },
-          })
+            const speechSeconds = Number(processed.metadata?.speechDuration ?? 0)
+            if (!Number.isFinite(speechSeconds) || speechSeconds < VALIDATION.MIN_SPEECH_SECONDS) {
+              logDebug("useCheckIn", `Skipped session-level biomarkers (speechDuration=${speechSeconds}s)`)
+            } else {
+              const metrics = analyzeVoiceMetrics(processed.features)
 
-          acousticMetrics = {
-            stressScore: blended.stressScore,
-            fatigueScore: blended.fatigueScore,
-            stressLevel: blended.stressLevel,
-            fatigueLevel: blended.fatigueLevel,
-            confidence: blended.confidence,
-            analyzedAt: metrics.analyzedAt,
-            features: processed.features,
+              const userTranscript = data.messages
+                .filter((m) => m.role === "user")
+                .map((m) => m.content)
+                .join("\n")
+              const semantic = inferSemanticBiomarkersFromText(userTranscript)
+              const blended = blendAcousticAndSemanticBiomarkers({
+                acoustic: {
+                  stressScore: metrics.stressScore,
+                  fatigueScore: metrics.fatigueScore,
+                  confidence: metrics.confidence,
+                },
+                semantic: {
+                  stressScore: semantic.stressScore,
+                  fatigueScore: semantic.fatigueScore,
+                  stressConfidence: semantic.stressConfidence,
+                  fatigueConfidence: semantic.fatigueConfidence,
+                },
+              })
 
-            acousticStressScore: metrics.stressScore,
-            acousticFatigueScore: metrics.fatigueScore,
-            acousticStressLevel: metrics.stressLevel,
-            acousticFatigueLevel: metrics.fatigueLevel,
-            acousticConfidence: metrics.confidence,
+              acousticMetrics = {
+                stressScore: blended.stressScore,
+                fatigueScore: blended.fatigueScore,
+                stressLevel: blended.stressLevel,
+                fatigueLevel: blended.fatigueLevel,
+                confidence: blended.confidence,
+                analyzedAt: metrics.analyzedAt,
+                features: processed.features,
 
-            semanticStressScore: semantic.stressScore,
-            semanticFatigueScore: semantic.fatigueScore,
-            semanticConfidence: Math.max(semantic.stressConfidence, semantic.fatigueConfidence),
-            semanticSource: semantic.source,
+                acousticStressScore: metrics.stressScore,
+                acousticFatigueScore: metrics.fatigueScore,
+                acousticStressLevel: metrics.stressLevel,
+                acousticFatigueLevel: metrics.fatigueLevel,
+                acousticConfidence: metrics.confidence,
+
+                semanticStressScore: semantic.stressScore,
+                semanticFatigueScore: semantic.fatigueScore,
+                semanticConfidence: Math.max(semantic.stressConfidence, semantic.fatigueConfidence),
+                semanticSource: semantic.source,
+              }
+
+              dispatch({ type: "SET_SESSION_ACOUSTIC_METRICS", metrics: acousticMetrics })
+            }
           }
-
-          dispatch({ type: "SET_SESSION_ACOUSTIC_METRICS", metrics: acousticMetrics })
         } catch (error) {
           console.warn("[useCheckIn] Failed to compute session-level metrics:", error)
         }
