@@ -293,6 +293,231 @@ function SidebarTrigger({
   )
 }
 
+const SIDEBAR_EDGE_LERP = 0.08
+const SIDEBAR_EDGE_STOP_THRESHOLD = 0.001
+
+function SidebarEdgeTrigger({
+  className,
+  maxDistance = 220,
+  revealDistance = 64,
+  ...props
+}: React.ComponentProps<'div'> & {
+  /** Distance (px) from the left edge where the glow starts. */
+  maxDistance?: number
+  /** Distance (px) from the left edge where the button begins to reveal. */
+  revealDistance?: number
+}) {
+  const { toggleSidebar, state, isMobile } = useSidebar()
+
+  const enabled = !isMobile && state === 'collapsed'
+
+  const rootRef = React.useRef<HTMLDivElement | null>(null)
+  const buttonWrapRef = React.useRef<HTMLDivElement | null>(null)
+  const enabledRef = React.useRef(false)
+  const rafId = React.useRef<number | null>(null)
+
+  const targetY = React.useRef(0)
+  const currentY = React.useRef(0)
+  const targetIntensity = React.useRef(0)
+  const currentIntensity = React.useRef(0)
+  const targetReveal = React.useRef(0)
+  const currentReveal = React.useRef(0)
+
+  const animate = React.useCallback(() => {
+    const el = rootRef.current
+    if (!el) {
+      rafId.current = null
+      return
+    }
+
+    currentY.current += (targetY.current - currentY.current) * SIDEBAR_EDGE_LERP
+    currentIntensity.current +=
+      (targetIntensity.current - currentIntensity.current) * SIDEBAR_EDGE_LERP
+    currentReveal.current +=
+      (targetReveal.current - currentReveal.current) * SIDEBAR_EDGE_LERP
+
+    el.style.setProperty('--edge-y', `${Math.round(currentY.current)}px`)
+    el.style.setProperty(
+      '--edge-intensity',
+      `${Math.max(0, Math.min(1, currentIntensity.current)).toFixed(3)}`,
+    )
+    el.style.setProperty(
+      '--edge-reveal',
+      `${Math.max(0, Math.min(1, currentReveal.current)).toFixed(3)}`,
+    )
+
+    const wrap = buttonWrapRef.current
+    if (wrap) {
+      wrap.style.pointerEvents =
+        enabledRef.current && currentReveal.current > 0.05 ? 'auto' : 'none'
+    }
+
+    const dy = Math.abs(targetY.current - currentY.current)
+    const di = Math.abs(targetIntensity.current - currentIntensity.current)
+    const dr = Math.abs(targetReveal.current - currentReveal.current)
+    const stillAnimating =
+      dy > 1 || di > SIDEBAR_EDGE_STOP_THRESHOLD || dr > SIDEBAR_EDGE_STOP_THRESHOLD
+
+    if (stillAnimating) {
+      rafId.current = requestAnimationFrame(animate)
+    } else {
+      rafId.current = null
+    }
+  }, [])
+
+  React.useEffect(() => {
+    if (isMobile) return
+
+    const enabled = state === 'collapsed'
+
+    const setHiddenTargets = () => {
+      targetIntensity.current = 0
+      targetReveal.current = 0
+      if (!rafId.current) rafId.current = requestAnimationFrame(animate)
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const el = rootRef.current
+      if (!el) return
+      if (!enabled) return setHiddenTargets()
+
+      const rect = el.getBoundingClientRect()
+      const withinX = event.clientX >= rect.left && event.clientX <= rect.right
+      const withinY = event.clientY >= rect.top && event.clientY <= rect.bottom
+      if (!withinX || !withinY) return setHiddenTargets()
+
+      const dist = event.clientX - rect.left
+      const clamped = Math.max(0, Math.min(1, 1 - dist / maxDistance))
+      // Start very weak, ramp up as you approach the edge.
+      targetIntensity.current = clamped * clamped
+
+      const revealClamped = Math.max(0, Math.min(1, 1 - dist / revealDistance))
+      targetReveal.current = revealClamped * revealClamped
+
+      const rawY = event.clientY - rect.top
+      const buttonMargin = 32
+      const y = Math.max(buttonMargin, Math.min(rect.height - buttonMargin, rawY))
+      targetY.current = y
+
+      if (!rafId.current) rafId.current = requestAnimationFrame(animate)
+    }
+
+    const handlePointerLeave = () => {
+      setHiddenTargets()
+    }
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true })
+    window.addEventListener('blur', handlePointerLeave)
+
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('blur', handlePointerLeave)
+    }
+  }, [animate, isMobile, maxDistance, revealDistance, state])
+
+  React.useEffect(() => {
+    return () => {
+      if (rafId.current) {
+        cancelAnimationFrame(rafId.current)
+        rafId.current = null
+      }
+    }
+  }, [])
+
+  if (isMobile) return null
+
+  enabledRef.current = enabled
+
+  const gradient =
+    'radial-gradient(120px 260px at 0px var(--edge-y, 50%), ' +
+    'color-mix(in srgb, var(--accent) calc(60% * var(--edge-intensity, 0)), transparent) 0%, ' +
+    'color-mix(in srgb, var(--accent) calc(22% * var(--edge-intensity, 0)), transparent) 48%, ' +
+    'transparent 100%)'
+
+  return (
+    <div
+      ref={rootRef}
+      data-sidebar="edge-trigger"
+      className={cn('pointer-events-none absolute inset-0 z-20', className)}
+      style={
+        {
+          '--edge-y': '50%',
+          '--edge-intensity': '0',
+          '--edge-reveal': '0',
+        } as React.CSSProperties
+      }
+      {...props}
+    >
+      {/* Left-edge proximity glow */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0"
+        style={{ width: maxDistance + 160 }}
+      >
+        <div
+          className="absolute inset-0"
+          style={{
+            background: gradient,
+            filter: 'blur(18px)',
+            opacity: 0.85,
+            mixBlendMode: 'screen',
+          }}
+        />
+        <div
+          className="absolute inset-0"
+          style={{
+            background: gradient,
+            opacity: 0.35,
+            mixBlendMode: 'screen',
+          }}
+        />
+      </div>
+
+      {/* Reveal button near cursor when close to the edge */}
+      <div
+        ref={buttonWrapRef}
+        className="absolute left-2 pointer-events-none"
+        style={{
+          top: 'var(--edge-y)',
+          transform: 'translateY(-50%)',
+          opacity: enabled ? 'var(--edge-reveal)' : 0,
+        }}
+      >
+        <button
+          type="button"
+          aria-label="Toggle Sidebar"
+          onClick={toggleSidebar}
+          className={cn(
+            'group relative size-14 rounded-2xl outline-none',
+            'focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]',
+          )}
+        >
+          <span className="sr-only">Toggle Sidebar</span>
+          <div
+            aria-hidden="true"
+            className="absolute inset-2 rounded-xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200"
+            style={{
+              boxShadow:
+                'inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)',
+            }}
+          />
+          <div
+            aria-hidden="true"
+            className="absolute inset-2 rounded-xl pointer-events-none"
+            style={{
+              background:
+                'linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 100%)',
+            }}
+          />
+          <div className="relative flex size-full items-center justify-center text-muted-foreground transition-colors group-hover:text-foreground">
+            <PanelLeftIcon />
+          </div>
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function SidebarRail({ className, ...props }: React.ComponentProps<'button'>) {
   const { toggleSidebar } = useSidebar()
 
@@ -740,6 +965,7 @@ export {
   SidebarProvider,
   SidebarRail,
   SidebarSeparator,
+  SidebarEdgeTrigger,
   SidebarTrigger,
   useSidebar,
 }

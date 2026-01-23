@@ -33,6 +33,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuSkeleton,
+  SidebarEdgeTrigger,
   SidebarInset,
   SidebarTrigger,
   useSidebar,
@@ -122,7 +123,7 @@ function CheckInsSidebar({
           borderWidth={2}
         />
 
-        {/* Header with New Check-in button and select mode toggle */}
+        {/* Header with New Check-in button, select mode, and sidebar toggle */}
         <SidebarHeader className="px-4 py-4 border-b border-border/30">
           <div className="flex items-center gap-2">
             <Button
@@ -143,6 +144,10 @@ function CheckInsSidebar({
                 <CheckSquare className="h-4 w-4" />
               </Button>
             )}
+            <SidebarTrigger
+              className="size-9 rounded-xl hover:bg-white/5"
+              title="Toggle sidebar"
+            />
           </div>
         </SidebarHeader>
 
@@ -502,24 +507,14 @@ function HistoryPageContent() {
         />
 
         <SidebarInset transparent className="flex flex-col bg-transparent pb-3">
-          {/* Header - mobile shows full header, desktop shows glassmorphic trigger */}
+          {/* Header - mobile shows full header */}
           <header className="md:hidden flex items-center gap-2 px-4 py-3 border-b border-accent/30">
             <SidebarTrigger className="-ml-1" />
             <h1 className="text-sm font-medium">Check-ins</h1>
           </header>
 
-          {/* Desktop: Glassmorphic trigger button aligned with sidebar top */}
-          <div className="hidden md:block absolute top-3 left-3 z-10">
-            <div
-              className="flex items-center justify-center rounded-xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200"
-              style={{
-                boxShadow:
-                  "inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)",
-              }}
-            >
-              <SidebarTrigger className="h-10 w-10 hover:bg-accent/10" />
-            </div>
-          </div>
+          {/* Desktop: Edge-hover glow trigger (appears only when collapsed) */}
+          <SidebarEdgeTrigger className="hidden md:block" />
 
           {/* Main content area */}
           <main className="flex-1 min-h-0 overflow-hidden">
