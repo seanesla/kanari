@@ -9,6 +9,7 @@ import { X, ArrowLeft, ArrowRight } from "@/lib/icons"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { getDemoVideoSources } from "@/lib/demo/demo-video-sources"
 
 type DemoSlide = {
   id: string
@@ -206,7 +207,16 @@ function DemoFeatureTour() {
   const pendingIndexRef = useRef<number | null>(null)
   const [showSlide, setShowSlide] = useState(true)
   const [isTransitioning, setIsTransitioning] = useState(false)
-  const [hasPlayableMedia, setHasPlayableMedia] = useState(false)
+  // We intentionally start in an "unknown" state so the first paint always
+  // renders the video frame (with poster) instead of briefly flashing the
+  // dev-only "drop file" hint.
+  //
+  // Also: keep status scoped to the active slide so we never momentarily reuse
+  // the previous slide's status during transitions.
+  const [mediaState, setMediaState] = useState<{
+    slideId: string
+    status: "unknown" | "available" | "missing"
+  }>(() => ({ slideId: SLIDES[0]?.id ?? "", status: "unknown" }))
   const [isClosing, setIsClosing] = useState(false)
 
   // Keep the landing scene/background while we show the demo.
@@ -215,6 +225,8 @@ function DemoFeatureTour() {
   }, [resetToLanding])
 
   const slide = SLIDES[index]!
+  const videoSources = useMemo(() => getDemoVideoSources(slide.media), [slide.media.mp4, slide.media.webm])
+  const mediaStatus = mediaState.slideId === slide.id ? mediaState.status : "unknown"
 
   // Use the latest requested index (if any) for button enable/disable.
   const effectiveIndex = pendingIndex ?? index
@@ -256,26 +268,28 @@ function DemoFeatureTour() {
     let cancelled = false
 
     const check = async () => {
-      setHasPlayableMedia(false)
-      const candidates = [slide.media.webm, slide.media.mp4].filter(Boolean) as string[]
+      setMediaState({ slideId: slide.id, status: "unknown" })
+      const candidates = videoSources.map((source) => source.src)
       for (const url of candidates) {
         try {
           const res = await fetch(url, { method: "HEAD" })
           if (res.ok) {
-            if (!cancelled) setHasPlayableMedia(true)
+            if (!cancelled) setMediaState({ slideId: slide.id, status: "available" })
             return
           }
         } catch {
           // ignore
         }
       }
+
+      if (!cancelled) setMediaState({ slideId: slide.id, status: "missing" })
     }
 
     void check()
     return () => {
       cancelled = true
     }
-  }, [slide.id, slide.media.mp4, slide.media.webm])
+  }, [slide.id, videoSources])
 
   // Keyboard navigation
   useEffect(() => {
@@ -390,21 +404,7 @@ function DemoFeatureTour() {
                           "shadow-[0_18px_60px_rgba(0,0,0,0.22)]"
                         )}
                       >
-                        {hasPlayableMedia ? (
-                          <video
-                            className="absolute inset-0 h-full w-full object-cover"
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                            preload="metadata"
-                            poster={slide.media.poster}
-                          >
-                            {slide.media.webm && <source src={slide.media.webm} type="video/webm" />}
-                            {slide.media.mp4 && <source src={slide.media.mp4} type="video/mp4" />}
-                            Your browser does not support the video tag.
-                          </video>
-                        ) : (
+                        {mediaStatus === "missing" ? (
                           <Image
                             src={slide.media.fallbackImage}
                             alt={`${slide.title} screenshot`}
@@ -413,11 +413,28 @@ function DemoFeatureTour() {
                             className="object-cover"
                             priority
                           />
+                        ) : (
+                          <video
+                            className="absolute inset-0 h-full w-full object-cover"
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            preload="metadata"
+                            poster={slide.media.poster}
+                            onCanPlay={() => setMediaState({ slideId: slide.id, status: "available" })}
+                            onError={() => setMediaState({ slideId: slide.id, status: "missing" })}
+                          >
+                            {videoSources.map((source) => (
+                              <source key={source.src} src={source.src} type={source.type} />
+                            ))}
+                            Your browser does not support the video tag.
+                          </video>
                         )}
 
                         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
 
-                        {!hasPlayableMedia ? (
+                        {mediaStatus === "missing" ? (
                           <div className="pointer-events-none absolute left-0 right-0 bottom-0 p-4 md:p-6">
                             <p className="text-xs text-white/80 font-mono truncate">{slide.media.replaceHint}</p>
                           </div>
