@@ -340,26 +340,6 @@ export function SettingsContent() {
         </div>
       </div>
 
-      {/* Save Message */}
-      {saveMessage && (
-        <div
-          className={`rounded-lg p-4 ${
-            saveMessage.type === "success"
-              ? "bg-green-500/10 border border-green-500/20 text-green-500"
-              : "bg-destructive/10 border border-destructive/20 text-destructive"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            {saveMessage.type === "success" ? (
-              <CheckCircle2 className="h-5 w-5" />
-            ) : (
-              <AlertCircle className="h-5 w-5" />
-            )}
-            <p className="font-medium">{saveMessage.text}</p>
-          </div>
-        </div>
-      )}
-
       {/* Reset to Defaults */}
       <div className="rounded-lg border border-border/50 px-4 py-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -401,31 +381,50 @@ export function SettingsContent() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Floating Save Bar - appears when there are unsaved changes */}
-      {portalRoot && isDirty
+      {/* Floating Save / Status Bar */}
+      {portalRoot && (isDirty || saveMessage)
         ? createPortal(
             <LiquidGlassNavbar
               className="top-auto bottom-[calc(env(safe-area-inset-bottom)+1rem)] w-[calc(100%-2rem)] max-w-4xl"
             >
               <div className="flex items-center justify-between gap-4 w-full" role="status" aria-live="polite">
                 <div className="flex items-center gap-2 text-sm">
-                  <AlertCircle className="h-4 w-4 text-accent" />
-                  <span className="font-medium">You have unsaved changes</span>
-                </div>
-                <Button
-                  onClick={handleSaveSettings}
-                  disabled={isSaving}
-                  className="bg-accent text-accent-foreground hover:bg-accent/90"
-                >
-                  {isSaving ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
+                  {saveMessage ? (
+                    saveMessage.type === "success" ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                        <span className="font-medium text-green-500">{saveMessage.text}</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle className="h-4 w-4 text-destructive" />
+                        <span className="font-medium text-destructive">{saveMessage.text}</span>
+                      </>
+                    )
                   ) : (
-                    "Save Changes"
+                    <>
+                      <AlertCircle className="h-4 w-4 text-accent" />
+                      <span className="font-medium">You have unsaved changes</span>
+                    </>
                   )}
-                </Button>
+                </div>
+
+                {isDirty ? (
+                  <Button
+                    onClick={handleSaveSettings}
+                    disabled={isSaving}
+                    className="bg-accent text-accent-foreground hover:bg-accent/90"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                ) : null}
               </div>
             </LiquidGlassNavbar>,
             portalRoot
