@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useCallback, useState } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { AlertCircle, CheckCircle2, Loader2 } from "@/lib/icons"
 import {
@@ -59,6 +60,13 @@ export function SettingsContent() {
   const [draft, setDraft] = useState<SettingsDraft>(() => ({ ...DEFAULT_DRAFT }))
 
   const [baseline, setBaseline] = useState<SettingsDraft | null>(null)
+
+  // Render the floating save bar into <body> so it's not affected by any
+  // parent transforms (e.g. translate-y entry animations on the Settings page).
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
+  useEffect(() => {
+    setPortalRoot(document.body)
+  }, [])
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
@@ -319,34 +327,37 @@ export function SettingsContent() {
       </AlertDialog>
 
       {/* Floating Save Bar - appears when there are unsaved changes */}
-      {isDirty && (
-        <div
-          className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur px-4 py-3 shadow-lg"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm">
-              <AlertCircle className="h-4 w-4 text-accent" />
-              <span className="font-medium">You have unsaved changes</span>
-            </div>
-            <Button
-              onClick={handleSaveSettings}
-              disabled={isSaving}
-              className="bg-accent text-accent-foreground hover:bg-accent/90"
+      {portalRoot && isDirty
+        ? createPortal(
+            <div
+              className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur px-4 py-3 shadow-lg"
+              role="status"
+              aria-live="polite"
             >
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save Changes"
-              )}
-            </Button>
-          </div>
-        </div>
-      )}
+              <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-sm">
+                  <AlertCircle className="h-4 w-4 text-accent" />
+                  <span className="font-medium">You have unsaved changes</span>
+                </div>
+                <Button
+                  onClick={handleSaveSettings}
+                  disabled={isSaving}
+                  className="bg-accent text-accent-foreground hover:bg-accent/90"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </div>
+            </div>,
+            portalRoot
+          )
+        : null}
     </div>
   )
 }
