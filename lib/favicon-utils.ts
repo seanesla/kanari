@@ -75,23 +75,37 @@ function svgToDataUrl(svg: string): string {
 }
 
 function setFaviconHref(href: string) {
-  // Remove any existing dynamic favicon.
-  const oldDynamic = document.querySelector<HTMLLinkElement>(DYNAMIC_FAVICON_SELECTOR)
-  if (oldDynamic) oldDynamic.remove()
+  const head = document.head
+  if (!head) return
 
-  // Also remove any static icon links (e.g., from Next.js metadata) so the
-  // dynamic one takes precedence. Browsers use the first <link rel="icon">.
-  const staticIcons = document.querySelectorAll<HTMLLinkElement>(
+  // IMPORTANT: Don't remove Next/React-managed <head> tags (e.g. metadata icons).
+  // Removing them can cause React to crash on navigation with:
+  // `TypeError: null is not an object (evaluating '(t=t.stateNode).parentNode.removeChild')`
+  // See: docs/error-patterns/next-head-tag-dom-removal-crash.md
+
+  const dynamicLinkSelector = DYNAMIC_FAVICON_SELECTOR
+  let link = head.querySelector<HTMLLinkElement>(dynamicLinkSelector)
+  if (!link) {
+    link = document.createElement("link")
+    link.rel = "icon"
+    link.type = "image/svg+xml"
+    link.setAttribute("sizes", "any")
+    link.setAttribute("data-dynamic-favicon", "true")
+  }
+
+  link.href = href
+
+  // Insert the dynamic favicon before any existing static icons, so browsers that
+  // select the first <link rel="icon"> pick ours without needing to delete theirs.
+  const firstStaticIcon = head.querySelector<HTMLLinkElement>(
     'link[rel="icon"]:not([data-dynamic-favicon="true"])'
   )
-  staticIcons.forEach((el) => el.remove())
 
-  const link = document.createElement("link")
-  link.rel = "icon"
-  link.type = "image/svg+xml"
-  link.setAttribute("data-dynamic-favicon", "true")
-  link.href = href
-  document.head.appendChild(link)
+  if (firstStaticIcon) {
+    head.insertBefore(link, firstStaticIcon)
+  } else {
+    head.appendChild(link)
+  }
 }
 
 /**
