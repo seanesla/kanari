@@ -43,14 +43,17 @@ Note: `NEXT_PUBLIC_GEMINI_API_KEY` is exposed to the browser. Prefer BYO key for
 4. **Scheduling**: User schedules recovery suggestions via Google Calendar
 
 ### Key Directories
+- `app/(app)/` - Dashboard routes: overview, check-ins, analytics, achievements, settings (URLs: `/overview`, `/check-ins`, etc.)
 - `app/api/gemini/live/` - Gemini Live streaming routes (WebSocket proxy)
 - `app/api/gemini/synthesize/` - Post-check-in synthesis API (insights, journal entries)
+- `app/demo/` - Interactive feature tour with video demos
 - `components/check-in/` - Check-in dialog, voice picker, synthesis screen, conversation UI
 - `components/dashboard/` - Dashboard UI (metrics, charts, kanban, history, insights panel, journal entries panel)
 - `hooks/` - `use-check-in`, `use-gemini-live`, `use-audio-playback`, `use-recording`, `use-storage`, `use-voice-preview`
 - `lib/audio/` - Web Audio, VAD, Meyda features, PCM conversion
 - `lib/gemini/` - API client, prompts, `live-client.ts` (WebSocket), `synthesis-client.ts`, `voices.ts`, mismatch detection
-- `lib/ml/` - Forecasting, inference, `thresholds.ts` (constants)
+- `lib/ml/` - Forecasting, inference, `thresholds.ts`, `personalized-biomarkers.ts` (calibration), `biomarker-fusion.ts` (semantic+acoustic blending)
+- `lib/server/` - Rate limiting utilities for shared API key
 - `lib/settings/` - Default settings configuration
 
 ### State Management
@@ -102,7 +105,7 @@ Example:
 const startDateTime = instant.toZonedDateTimeISO(timeZone)
 ```
 
-## OpenCode Subagents
+## Claude Code Subagents
 
 **Explore Subagent**: Read-only codebase analysis. Use whenever you are searching files, mapping structure, and finding patterns without modifying code.
 

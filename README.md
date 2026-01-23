@@ -22,11 +22,13 @@ Your voice patterns shift days before you consciously feel burnout. kanari detec
 ### Core
 - **AI Voice Check-ins**: Conversational check-ins powered by Gemini Live - speak naturally, get real-time responses
 - **Acoustic Biomarker Analysis**: Detects stress and fatigue from speech rate, pitch variations, pause patterns, and spectral features
+- **Semantic Fusion**: Combines acoustic signals with conversation content for more accurate scoring
 - **Burnout Forecasting**: Predicts risk 3-7 days ahead based on voice pattern trends
 - **Check-in Synthesis**: AI-generated summaries with insights and journal entries after each session
 
 ### Personalization
 - **30+ AI Voices**: Choose from distinct Gemini voices with audio preview
+- **Biomarker Calibration**: Personalize stress and fatigue baselines to your unique voice patterns
 - **Interactive Widgets**: Breathing exercises, stress gauges, quick actions triggered during check-ins
 - **Recovery Suggestions**: Context-aware recommendations based on your conversation and biomarkers
 
@@ -35,9 +37,12 @@ Your voice patterns shift days before you consciously feel burnout. kanari detec
 - **Week View**: Visual scheduler showing your recovery activities
 - **Achievement System**: Track streaks and milestones
 
+### Demo
+- **Guided Feature Tour**: Interactive walkthrough at `/demo` showcasing all features with video demos
+
 ### Privacy
 - **Client-side Processing**: Acoustic analysis runs entirely in your browser
-- **Your API Key**: Users provide their own Gemini API key (free tier available)
+- **Flexible API Keys**: Use the built-in demo key or bring your own Gemini API key (free tier available)
 - **No Account Required**: Data stored locally in IndexedDB
 
 ---
@@ -76,7 +81,7 @@ pnpm dev
 Open `http://localhost:3000` in Chrome, Safari, or Firefox.
 
 The onboarding flow will guide you to:
-1. Get a free Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey)
+1. Choose an API key option: use the built-in demo key OR get your own free key from [Google AI Studio](https://aistudio.google.com/apikey)
 2. Configure your preferences (check-in duration, voice activity detection)
 3. Choose your accent color
 
