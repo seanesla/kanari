@@ -8,13 +8,6 @@ This file provides guidance to AI coding assistants when working with code in th
 **Auto-deploys:** Push to `main` triggers Vercel deployment
 **No env vars required:** Users provide Gemini API key via Settings UI
 
-## Naming: Dashboard vs Overview
-
-- **Dashboard** = the route group (`app/dashboard/`) containing all app pages
-- **Overview** = the main page at `/dashboard` (NOT called "Dashboard")
-
-Do NOT rename `OverviewPage` to `DashboardPage` or change "Overview" labels to "Dashboard".
-
 ## Hackathon Context
 
 **Google DeepMind Gemini 3 Hackathon** (Dec 17, 2025 - Feb 9, 2026)
@@ -106,6 +99,13 @@ Example:
 // https://github.com/schedule-x/schedule-x/blob/main/website/app/docs/calendar/events/page.mdx
 const startDateTime = instant.toZonedDateTimeISO(timeZone)
 ```
+
+## OpenCode Subagents
+
+**Explore Subagent**: Read-only codebase analysis. Use whenever you are searching files, mapping structure, and finding patterns without modifying code.
+
+**General Subagent**: Multi-step task execution. Use for complex investigations, parallel work, and changes.
+
 
 # Error fixing workflow
 
