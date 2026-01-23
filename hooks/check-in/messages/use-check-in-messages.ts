@@ -18,13 +18,22 @@ import {
 import { buildMismatchContext, buildVoicePatternContext } from "@/lib/gemini/context-builder"
 import { mergeTranscriptUpdate } from "@/lib/gemini/transcript-merge"
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
+import { db } from "@/lib/storage/db"
 import {
   blendAcousticAndSemanticBiomarkers,
   inferSemanticBiomarkersFromText,
   mergeSemanticBiomarkers,
   type SemanticBiomarkers,
 } from "@/lib/ml/biomarker-fusion"
-import type { CheckInMessage } from "@/lib/types"
+import {
+  applyBiomarkerCalibration,
+  computeCombinedConfidence,
+  computePersonalizedAcousticScores,
+  computeVoiceDataQuality,
+  scoreToFatigueLevel,
+  scoreToStressLevel,
+} from "@/lib/ml/personalized-biomarkers"
+import type { AudioFeatures, BiomarkerCalibration, CheckInMessage } from "@/lib/types"
 import type { CheckInAction, CheckInData, CheckInMessagesCallbacks } from "../state"
 import { generateId } from "../ids"
 
@@ -111,6 +120,10 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
   const sessionSemanticRef = useRef<SemanticBiomarkers | null>(null)
   const lastSessionIdRef = useRef<string | null>(null)
 
+  // Load per-user biomarker tuning once per session.
+  const baselineFeaturesRef = useRef<AudioFeatures | null>(null)
+  const calibrationRef = useRef<BiomarkerCalibration | null>(null)
+
   // Dev-only: enable with localStorage.setItem("kanari.debugTranscriptMerge", "1")
   const debugTranscriptMergeRef = useRef(false)
   useEffect(() => {
@@ -134,6 +147,21 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       sessionFeatureAccumulatorRef.current = null
       sessionSemanticRef.current = null
       lastSessionIdRef.current = sessionId
+
+       baselineFeaturesRef.current = null
+       calibrationRef.current = null
+
+       // Fire-and-forget: read settings once per session.
+       void (async () => {
+         try {
+           const settings = await db.settings.get("default")
+           baselineFeaturesRef.current = settings?.voiceBaseline?.features ?? null
+           calibrationRef.current = settings?.voiceBiomarkerCalibration ?? null
+         } catch {
+           baselineFeaturesRef.current = null
+           calibrationRef.current = null
+         }
+       })()
 
       // Reset all per-session message/transcript refs.
       lastUserMessageIdRef.current = null
@@ -202,15 +230,47 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       const averagedFeatures = getAverageFeatures(accumulator)
       const sessionMetrics = analyzeVoiceMetrics(averagedFeatures)
 
+       const speechSeconds = accumulator.totalWeight / 16000
+       const quality = computeVoiceDataQuality({
+         speechSeconds,
+         totalSeconds: speechSeconds,
+         rms: averagedFeatures.rms,
+       })
+
+       const personalized = computePersonalizedAcousticScores({
+         features: averagedFeatures,
+         baseline: baselineFeaturesRef.current,
+         fallbackScores: {
+           stressScore: sessionMetrics.stressScore,
+           fatigueScore: sessionMetrics.fatigueScore,
+         },
+       })
+
+       const acousticStressScore = applyBiomarkerCalibration({
+         rawScore: personalized.stressScore,
+         dimension: "stress",
+         calibration: calibrationRef.current,
+       })
+       const acousticFatigueScore = applyBiomarkerCalibration({
+         rawScore: personalized.fatigueScore,
+         dimension: "fatigue",
+         calibration: calibrationRef.current,
+       })
+
+       const acousticConfidence = computeCombinedConfidence({
+         baseConfidence: sessionMetrics.confidence,
+         quality,
+       })
+
       const semanticNow = inferSemanticBiomarkersFromText(data.currentUserTranscript)
       const mergedSemantic = mergeSemanticBiomarkers(sessionSemanticRef.current, semanticNow)
       sessionSemanticRef.current = mergedSemantic
 
       const blended = blendAcousticAndSemanticBiomarkers({
         acoustic: {
-          stressScore: sessionMetrics.stressScore,
-          fatigueScore: sessionMetrics.fatigueScore,
-          confidence: sessionMetrics.confidence,
+          stressScore: acousticStressScore,
+          fatigueScore: acousticFatigueScore,
+          confidence: acousticConfidence,
         },
         semantic: {
           stressScore: mergedSemantic.stressScore,
@@ -231,16 +291,19 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
           analyzedAt: sessionMetrics.analyzedAt,
           features: averagedFeatures,
 
-          acousticStressScore: sessionMetrics.stressScore,
-          acousticFatigueScore: sessionMetrics.fatigueScore,
-          acousticStressLevel: sessionMetrics.stressLevel,
-          acousticFatigueLevel: sessionMetrics.fatigueLevel,
-          acousticConfidence: sessionMetrics.confidence,
+          acousticStressScore,
+          acousticFatigueScore,
+          acousticStressLevel: scoreToStressLevel(acousticStressScore),
+          acousticFatigueLevel: scoreToFatigueLevel(acousticFatigueScore),
+          acousticConfidence,
 
           semanticStressScore: mergedSemantic.stressScore,
           semanticFatigueScore: mergedSemantic.fatigueScore,
           semanticConfidence: Math.max(mergedSemantic.stressConfidence, mergedSemantic.fatigueConfidence),
           semanticSource: mergedSemantic.source,
+
+          explanations: personalized.explanations,
+          quality,
         },
       })
 

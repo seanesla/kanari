@@ -5,7 +5,16 @@ import { toast } from "sonner"
 import { useRecording } from "@/hooks/use-recording"
 import { useRecordingActions, useTrendDataActions } from "@/hooks/use-storage"
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
-import type { AudioFeatures, Recording } from "@/lib/types"
+import {
+  applyBiomarkerCalibration,
+  computeCombinedConfidence,
+  computePersonalizedAcousticScores,
+  computeVoiceDataQuality,
+  scoreToFatigueLevel,
+  scoreToStressLevel,
+} from "@/lib/ml/personalized-biomarkers"
+import { db } from "@/lib/storage/db"
+import type { AudioFeatures, BiomarkerCalibration, Recording } from "@/lib/types"
 
 export interface VoiceRecordingSavedEvent {
   recording: Recording
@@ -60,13 +69,72 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
   const saveRecording = useCallback(async (
     audioData: Float32Array,
     processingDuration: number,
-    extractedFeatures: AudioFeatures
+    extractedFeatures: AudioFeatures,
+    speechSeconds: number
   ) => {
     setIsSaving(true)
     setSaveError(null)
     try {
-      // Compute metrics using ML inference
-      const metrics = analyzeVoiceMetrics(extractedFeatures)
+      const baseMetrics = analyzeVoiceMetrics(extractedFeatures)
+
+      let baselineFeatures: AudioFeatures | null = null
+      let calibration: BiomarkerCalibration | null = null
+      try {
+        const settings = await db.settings.get("default")
+        baselineFeatures = settings?.voiceBaseline?.features ?? null
+        calibration = settings?.voiceBiomarkerCalibration ?? null
+      } catch {
+        // ignore
+      }
+
+      let maxAbs = 0
+      for (let i = 0; i < audioData.length; i++) {
+        const abs = Math.abs(audioData[i] ?? 0)
+        if (abs > maxAbs) maxAbs = abs
+      }
+
+      const quality = computeVoiceDataQuality({
+        speechSeconds,
+        totalSeconds: processingDuration,
+        rms: extractedFeatures.rms,
+        maxAbs,
+      })
+
+      const personalized = computePersonalizedAcousticScores({
+        features: extractedFeatures,
+        baseline: baselineFeatures,
+        fallbackScores: {
+          stressScore: baseMetrics.stressScore,
+          fatigueScore: baseMetrics.fatigueScore,
+        },
+      })
+
+      const stressScore = applyBiomarkerCalibration({
+        rawScore: personalized.stressScore,
+        dimension: "stress",
+        calibration,
+      })
+      const fatigueScore = applyBiomarkerCalibration({
+        rawScore: personalized.fatigueScore,
+        dimension: "fatigue",
+        calibration,
+      })
+
+      const confidence = computeCombinedConfidence({
+        baseConfidence: baseMetrics.confidence,
+        quality,
+      })
+
+      const metrics = {
+        stressScore,
+        fatigueScore,
+        stressLevel: scoreToStressLevel(stressScore),
+        fatigueLevel: scoreToFatigueLevel(fatigueScore),
+        confidence,
+        analyzedAt: baseMetrics.analyzedAt,
+        explanations: personalized.explanations,
+        quality,
+      }
 
       // Create recording object
       const recording: Recording = {
@@ -149,9 +217,10 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
   useEffect(() => {
     if (isComplete && audioData && features && !isSaved && !isSaving && !saveAttemptedRef.current) {
       saveAttemptedRef.current = true
-      saveRecording(audioData, duration, features)
+      const speechSeconds = recordingData.processingResult?.metadata?.speechDuration ?? duration
+      saveRecording(audioData, duration, features, speechSeconds)
     }
-  }, [isComplete, audioData, features, duration, isSaved, isSaving, saveRecording])
+  }, [isComplete, audioData, features, duration, isSaved, isSaving, saveRecording, recordingData.processingResult])
 
   // Reset save attempted flag when starting a new recording
   useEffect(() => {
@@ -188,9 +257,10 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
     if (audioData && features) {
       saveAttemptedRef.current = false
       setSaveError(null)
-      saveRecording(audioData, duration, features)
+      const speechSeconds = processingResult?.metadata?.speechDuration ?? duration
+      saveRecording(audioData, duration, features, speechSeconds)
     }
-  }, [audioData, features, duration, saveRecording])
+  }, [audioData, features, duration, processingResult, saveRecording])
 
   const handleTimeUpdate = useCallback((currentTime: number) => {
     if (duration > 0) {

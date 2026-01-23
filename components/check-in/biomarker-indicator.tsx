@@ -30,11 +30,13 @@ function MetricBar({
   value,
   level,
   colorClass,
+  showNumbers,
 }: {
   label: string
   value: number
   level?: string
   colorClass: string
+  showNumbers: boolean
 }) {
   const score = clampScore(value)
 
@@ -42,7 +44,7 @@ function MetricBar({
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{label}</span>
-        <span className="tabular-nums">{score}</span>
+        <span className="tabular-nums">{showNumbers ? score : ""}</span>
       </div>
       <div className="h-2 w-full rounded-full bg-muted/40 overflow-hidden">
         <div className={cn("h-full rounded-full transition-all", colorClass)} style={{ width: `${score}%` }} />
@@ -65,7 +67,13 @@ export function BiomarkerIndicator({ metrics, className, compact = false }: Biom
 
   const stressScore = clampScore(metrics.stressScore)
   const fatigueScore = clampScore(metrics.fatigueScore)
-  const confidencePct = Math.round((metrics.confidence ?? 0) * 100)
+  const displayConfidence = metrics.acousticConfidence ?? metrics.confidence ?? 0
+  const confidencePct = Math.round(displayConfidence * 100)
+  const showNumbers = displayConfidence >= 0.65
+
+  const qualityReasons = (metrics.quality?.reasons ?? []).slice(0, 2)
+  const stressDrivers = (metrics.explanations?.stress ?? []).slice(0, compact ? 2 : 3)
+  const fatigueDrivers = (metrics.explanations?.fatigue ?? []).slice(0, compact ? 2 : 3)
 
   return (
     <div
@@ -81,15 +89,40 @@ export function BiomarkerIndicator({ metrics, className, compact = false }: Biom
           value={stressScore}
           level={metrics.stressLevel}
           colorClass={getStressColor(stressScore)}
+          showNumbers={showNumbers}
         />
         <MetricBar
           label="Fatigue"
           value={fatigueScore}
           level={metrics.fatigueLevel}
           colorClass={getFatigueColor(fatigueScore)}
+          showNumbers={showNumbers}
         />
       </div>
+
       <div className="mt-2 text-[11px] text-muted-foreground">Confidence {confidencePct}%</div>
+
+      {!showNumbers && qualityReasons.length > 0 ? (
+        <div className="mt-1 text-[11px] text-muted-foreground">
+          Low confidence: {qualityReasons.join(" • ")}
+        </div>
+      ) : null}
+
+      {stressDrivers.length > 0 || fatigueDrivers.length > 0 ? (
+        <div className="mt-2 text-[11px] text-muted-foreground">
+          {metrics.explanations?.mode === "baseline" ? "Compared to your baseline:" : "What Kanari noticed:"}
+          {stressDrivers.length > 0 ? (
+            <div className="mt-1">
+              <span className="text-foreground/70">Stress:</span> {stressDrivers.join(" • ")}
+            </div>
+          ) : null}
+          {fatigueDrivers.length > 0 ? (
+            <div className="mt-1">
+              <span className="text-foreground/70">Fatigue:</span> {fatigueDrivers.join(" • ")}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

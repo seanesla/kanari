@@ -37,6 +37,26 @@ if (typeof window !== "undefined" && !("Notification" in window)) {
   })
 }
 
+// Radix UI (Slider/Dialog/etc) expects ResizeObserver in jsdom.
+if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
+  class MockResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
+
+  Object.defineProperty(window, "ResizeObserver", {
+    value: MockResizeObserver,
+    configurable: true,
+    writable: true,
+  })
+  Object.defineProperty(globalThis, "ResizeObserver", {
+    value: MockResizeObserver,
+    configurable: true,
+    writable: true,
+  })
+}
+
 // Mock Web Audio API modules
 vi.mock("@ricky0123/vad-web", () => ({
   MicVAD: vi.fn(),

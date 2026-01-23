@@ -25,6 +25,7 @@ import { SettingsPrivacySection } from "./settings-privacy"
 import { SettingsTimeZoneSection } from "./settings-timezone"
 import { SettingsVoiceSection } from "./settings-voice-section"
 import { SettingsProfileSection } from "./settings-profile-section"
+import { SettingsBiomarkersSection } from "./settings-biomarkers-section"
 import { LiquidGlassNavbar } from "@/components/liquid-glass-navbar"
 import { db } from "@/lib/storage/db"
 import { DEFAULT_USER_SETTINGS, createDefaultSettingsRecord } from "@/lib/settings/default-settings"
@@ -252,6 +253,8 @@ export function SettingsContent() {
             setSaveMessage(null)
           }}
         />
+
+        <SettingsBiomarkersSection />
 
         <SettingsAccountabilitySection
           accountabilityMode={draft.accountabilityMode}

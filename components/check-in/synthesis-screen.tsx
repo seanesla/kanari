@@ -1,12 +1,16 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useEffect, useState } from "react"
 import Image from "next/image"
 import { RefreshCw, ArrowRight } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Slider } from "@/components/ui/slider"
+import { db } from "@/lib/storage/db"
+import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import { updateCalibrationFromSelfReportSubmission } from "@/lib/ml/personalized-biomarkers"
 import type { CheckInSession, CheckInSynthesis } from "@/lib/types"
 import { BiomarkerIndicator } from "@/components/check-in/biomarker-indicator"
 import { formatDate } from "@/lib/date-utils"
@@ -34,6 +38,28 @@ export function SynthesisScreen({
   className,
 }: SynthesisScreenProps) {
   const { timeZone } = useTimeZone()
+
+  const [selfStress, setSelfStress] = useState<number>(50)
+  const [selfFatigue, setSelfFatigue] = useState<number>(50)
+  const [selfSavedAt, setSelfSavedAt] = useState<string | null>(null)
+  const [selfSaveError, setSelfSaveError] = useState<string | null>(null)
+  const [isSavingSelfReport, setIsSavingSelfReport] = useState(false)
+
+  useEffect(() => {
+    if (!session) return
+    const saved = session.selfReport
+    if (saved) {
+      setSelfStress(saved.stressScore)
+      setSelfFatigue(saved.fatigueScore)
+      setSelfSavedAt(saved.reportedAt)
+      setSelfSaveError(null)
+      return
+    }
+
+    // Keep defaults, but clear any previous success/error when switching sessions.
+    setSelfSavedAt(null)
+    setSelfSaveError(null)
+  }, [session?.id])
   const insightTitleById = useMemo(() => {
     const map = new Map<string, string>()
     for (const insight of synthesis?.insights ?? []) {
@@ -41,6 +67,61 @@ export function SynthesisScreen({
     }
     return map
   }, [synthesis])
+
+  const canSaveSelfReport = Boolean(session?.id) && !isSavingSelfReport
+
+  const handleSaveSelfReport = useMemo(() => {
+    return async () => {
+      if (!session?.id) return
+
+      setIsSavingSelfReport(true)
+      setSelfSaveError(null)
+      try {
+        const now = new Date().toISOString()
+        const payload = {
+          stressScore: Math.round(selfStress),
+          fatigueScore: Math.round(selfFatigue),
+          reportedAt: now,
+        }
+
+        const updated = await db.checkInSessions.update(session.id, { selfReport: payload })
+        if (updated === 0) {
+          throw new Error("This check-in wasn't saved, so the rating can't be stored.")
+        }
+
+        // Update per-user calibration so future scores become more accurate.
+        const metrics = session.acousticMetrics
+        if (metrics) {
+          const acousticStressScore = metrics.acousticStressScore ?? metrics.stressScore
+          const acousticFatigueScore = metrics.acousticFatigueScore ?? metrics.fatigueScore
+          const settings = await db.settings.get("default")
+
+          const nextCalibration = updateCalibrationFromSelfReportSubmission({
+            acousticStressScore,
+            acousticFatigueScore,
+            selfReportStressScore: payload.stressScore,
+            selfReportFatigueScore: payload.fatigueScore,
+            calibration: settings?.voiceBiomarkerCalibration ?? null,
+            now,
+          })
+
+          const updatedSettings = await db.settings.update("default", {
+            voiceBiomarkerCalibration: nextCalibration,
+          })
+          if (updatedSettings === 0) {
+            await db.settings.put(createDefaultSettingsRecord({ voiceBiomarkerCalibration: nextCalibration }))
+          }
+        }
+
+        setSelfSavedAt(now)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to save rating"
+        setSelfSaveError(message)
+      } finally {
+        setIsSavingSelfReport(false)
+      }
+    }
+  }, [session?.id, session?.acousticMetrics, selfStress, selfFatigue, isSavingSelfReport])
 
   return (
     <div className={cn("flex-1 flex flex-col overflow-hidden", className)}>
@@ -84,6 +165,67 @@ export function SynthesisScreen({
                   Not enough speech captured to analyze stress/fatigue. Try speaking for about 1-2 seconds next time.
                 </p>
               )}
+            </div>
+          ) : null}
+
+          {/* Self report (improves personalization) */}
+          {session ? (
+            <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Quick self-check (improves accuracy)</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    This helps Kanari tune your personal baseline over time.
+                  </p>
+                </div>
+                {selfSavedAt ? (
+                  <span className="text-[11px] text-muted-foreground">Saved</span>
+                ) : null}
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>How stressed do you feel?</span>
+                    <span className="tabular-nums">{Math.round(selfStress)}</span>
+                  </div>
+                  <Slider
+                    value={[selfStress]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={(v) => setSelfStress(v[0] ?? 0)}
+                    aria-label="Self reported stress"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>How tired do you feel?</span>
+                    <span className="tabular-nums">{Math.round(selfFatigue)}</span>
+                  </div>
+                  <Slider
+                    value={[selfFatigue]}
+                    min={0}
+                    max={100}
+                    step={1}
+                    onValueChange={(v) => setSelfFatigue(v[0] ?? 0)}
+                    aria-label="Self reported fatigue"
+                  />
+                </div>
+
+                {selfSaveError ? <p className="text-xs text-destructive">{selfSaveError}</p> : null}
+
+                <div className="flex justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => void handleSaveSelfReport()}
+                    disabled={!canSaveSelfReport}
+                  >
+                    {isSavingSelfReport ? "Saving..." : selfSavedAt ? "Update" : "Save"}
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : null}
 

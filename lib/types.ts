@@ -53,6 +53,62 @@ export interface VoiceMetrics {
   fatigueLevel: FatigueLevel
   confidence: number // 0-1
   analyzedAt: string
+
+  /** Optional: why the score changed (for explainable UI) */
+  explanations?: BiomarkerExplanations
+
+  /** Optional: data quality signals (speech amount, noise, etc.) */
+  quality?: VoiceDataQuality
+}
+
+export type BiomarkerExplanationMode = "baseline" | "threshold"
+
+export interface BiomarkerExplanations {
+  mode: BiomarkerExplanationMode
+  stress: string[]
+  fatigue: string[]
+}
+
+export interface VoiceDataQuality {
+  /** Detected speech duration (seconds) */
+  speechSeconds: number
+  /** Total recorded duration (seconds) */
+  totalSeconds: number
+  /** speechSeconds / totalSeconds */
+  speechRatio: number
+  /** Combined 0-1 quality score */
+  quality: number
+  /** Human-readable reasons when quality is low */
+  reasons: string[]
+}
+
+export interface VoiceBaseline {
+  /** Baseline audio features captured during calibration */
+  features: AudioFeatures
+  recordedAt: string
+  /** Which calibration prompt was used */
+  promptId: string
+  /** Optional: detected speech duration during calibration */
+  speechSeconds?: number
+}
+
+export interface BiomarkerCalibration {
+  /** Bias applied after scoring (-25..25) */
+  stressBias: number
+  fatigueBias: number
+  /** Scale applied around 50 (0.75..1.25) */
+  stressScale: number
+  fatigueScale: number
+  sampleCount: number
+  updatedAt: string
+}
+
+export interface CheckInSelfReport {
+  /** 0-100 (higher = more stressed) */
+  stressScore: number
+  /** 0-100 (higher = more fatigued) */
+  fatigueScore: number
+  reportedAt: string
 }
 
 export interface TrendData {
@@ -476,6 +532,12 @@ export interface UserSettings {
   // Onboarding
   hasCompletedOnboarding?: boolean // Whether user has completed the onboarding flow
   onboardingCompletedAt?: string // ISO timestamp when onboarding was completed
+
+  /** Optional: per-user voice baseline used to personalize biomarkers */
+  voiceBaseline?: VoiceBaseline
+
+  /** Optional: learned mapping tweaks based on user self-report */
+  voiceBiomarkerCalibration?: BiomarkerCalibration
 }
 
 // ============================================
@@ -687,7 +749,16 @@ export interface CheckInSession {
     semanticFatigueScore?: number
     semanticConfidence?: number
     semanticSource?: "keywords" | "gemini"
+
+    /** Optional: why the score changed (for explainable UI) */
+    explanations?: BiomarkerExplanations
+
+    /** Optional: data quality signals (speech amount, noise, etc.) */
+    quality?: VoiceDataQuality
   }
+
+  /** Optional: user self-report collected after the check-in */
+  selfReport?: CheckInSelfReport
   // Audio data for session playback (user's voice only)
   audioData?: number[] // Float32Array serialized for IndexedDB storage
   sampleRate?: number // For playback (default 16000)

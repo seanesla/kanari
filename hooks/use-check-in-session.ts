@@ -18,6 +18,8 @@ import {
 import type { GeminiLiveClient, SessionContext } from "@/lib/gemini/live-client"
 import type {
   AccountabilityMode,
+  AudioFeatures,
+  BiomarkerCalibration,
   CheckInMessage,
   CheckInSession,
   CheckInState,
@@ -28,6 +30,14 @@ import type {
 import { analyzeVoiceMetrics } from "@/lib/ml/inference"
 import { blendAcousticAndSemanticBiomarkers, inferSemanticBiomarkersFromText } from "@/lib/ml/biomarker-fusion"
 import { VALIDATION } from "@/lib/ml/thresholds"
+import {
+  applyBiomarkerCalibration,
+  computeCombinedConfidence,
+  computePersonalizedAcousticScores,
+  computeVoiceDataQuality,
+  scoreToFatigueLevel,
+  scoreToStressLevel,
+} from "@/lib/ml/personalized-biomarkers"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 import type { UseCheckInAudioResult } from "./use-check-in-audio"
 
@@ -744,18 +754,68 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
             if (!Number.isFinite(speechSeconds) || speechSeconds < VALIDATION.MIN_SPEECH_SECONDS) {
               logDebug("useCheckIn", `Skipped session-level biomarkers (speechDuration=${speechSeconds}s)`)
             } else {
-              const metrics = analyzeVoiceMetrics(processed.features)
+              const baseMetrics = analyzeVoiceMetrics(processed.features)
+
+              let baselineFeatures: AudioFeatures | null = null
+              let calibration: BiomarkerCalibration | null = null
+              try {
+                const settings = await db.settings.get("default")
+                baselineFeatures = (settings?.voiceBaseline?.features as AudioFeatures | undefined) ?? null
+                calibration = (settings?.voiceBiomarkerCalibration as BiomarkerCalibration | undefined) ?? null
+              } catch {
+                // ignore
+              }
+
+              let maxAbs = 0
+              for (let i = 0; i < sessionAudio.length; i++) {
+                const abs = Math.abs(sessionAudio[i] ?? 0)
+                if (abs > maxAbs) maxAbs = abs
+              }
+
+              const totalSeconds = sessionAudio.length / 16000
+              const quality = computeVoiceDataQuality({
+                speechSeconds,
+                totalSeconds,
+                rms: processed.features.rms,
+                maxAbs,
+              })
+
+              const personalized = computePersonalizedAcousticScores({
+                features: processed.features,
+                baseline: baselineFeatures,
+                fallbackScores: {
+                  stressScore: baseMetrics.stressScore,
+                  fatigueScore: baseMetrics.fatigueScore,
+                },
+              })
+
+              const acousticStressScore = applyBiomarkerCalibration({
+                rawScore: personalized.stressScore,
+                dimension: "stress",
+                calibration,
+              })
+              const acousticFatigueScore = applyBiomarkerCalibration({
+                rawScore: personalized.fatigueScore,
+                dimension: "fatigue",
+                calibration,
+              })
+
+              const acousticConfidence = computeCombinedConfidence({
+                baseConfidence: baseMetrics.confidence,
+                quality,
+              })
 
               const userTranscript = data.messages
                 .filter((m) => m.role === "user")
                 .map((m) => m.content)
                 .join("\n")
               const semantic = inferSemanticBiomarkersFromText(userTranscript)
+
               const blended = blendAcousticAndSemanticBiomarkers({
                 acoustic: {
-                  stressScore: metrics.stressScore,
-                  fatigueScore: metrics.fatigueScore,
-                  confidence: metrics.confidence,
+                  stressScore: acousticStressScore,
+                  fatigueScore: acousticFatigueScore,
+                  confidence: acousticConfidence,
                 },
                 semantic: {
                   stressScore: semantic.stressScore,
@@ -771,19 +831,22 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
                 stressLevel: blended.stressLevel,
                 fatigueLevel: blended.fatigueLevel,
                 confidence: blended.confidence,
-                analyzedAt: metrics.analyzedAt,
+                analyzedAt: baseMetrics.analyzedAt,
                 features: processed.features,
 
-                acousticStressScore: metrics.stressScore,
-                acousticFatigueScore: metrics.fatigueScore,
-                acousticStressLevel: metrics.stressLevel,
-                acousticFatigueLevel: metrics.fatigueLevel,
-                acousticConfidence: metrics.confidence,
+                acousticStressScore,
+                acousticFatigueScore,
+                acousticStressLevel: scoreToStressLevel(acousticStressScore),
+                acousticFatigueLevel: scoreToFatigueLevel(acousticFatigueScore),
+                acousticConfidence,
 
                 semanticStressScore: semantic.stressScore,
                 semanticFatigueScore: semantic.fatigueScore,
                 semanticConfidence: Math.max(semantic.stressConfidence, semantic.fatigueConfidence),
                 semanticSource: semantic.source,
+
+                explanations: personalized.explanations,
+                quality,
               }
 
               dispatch({ type: "SET_SESSION_ACOUSTIC_METRICS", metrics: acousticMetrics })
