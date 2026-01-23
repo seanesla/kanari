@@ -52,7 +52,8 @@ interface BreathingExerciseProps {
 export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps) {
   const pattern = useMemo(() => getPattern(widget.args.type), [widget.args.type])
 
-  const [isRunning, setIsRunning] = useState(true)
+  const [hasStarted, setHasStarted] = useState(false)
+  const [isRunning, setIsRunning] = useState(false)
   const [remainingSeconds, setRemainingSeconds] = useState(widget.args.duration)
   const [phaseIndex, setPhaseIndex] = useState(0)
   const [phaseRemaining, setPhaseRemaining] = useState(pattern[0]?.seconds ?? 0)
@@ -60,7 +61,8 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
 
   // Reset internal state when widget changes (HMR / new tool call)
   useEffect(() => {
-    setIsRunning(true)
+    setHasStarted(false)
+    setIsRunning(false)
     setRemainingSeconds(widget.args.duration)
     setPhaseIndex(0)
     setPhaseRemaining(pattern[0]?.seconds ?? 0)
@@ -101,7 +103,52 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
       description={widget.args.type === "478" ? "4-7-8 breathing" : widget.args.type}
       onDismiss={onDismiss}
     >
-      <div className="flex items-center justify-between gap-3">
+      {!hasStarted ? (
+        <>
+          <p className="text-sm text-muted-foreground">
+            Kanari suggested a short breathing exercise. Want to start it now?
+          </p>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+              <p className="font-medium text-foreground">Duration</p>
+              <p className="mt-0.5">{formatTime(widget.args.duration)}</p>
+            </div>
+            <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+              <p className="font-medium text-foreground">Pattern</p>
+              <p className="mt-0.5">
+                {widget.args.type === "box"
+                  ? "4-4-4-4"
+                  : widget.args.type === "478"
+                    ? "4-7-8"
+                    : "4-6"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={onDismiss}>
+              Not now
+            </Button>
+            <Button
+              size="sm"
+              className="bg-accent text-accent-foreground hover:bg-accent/90"
+              onClick={() => {
+                setHasStarted(true)
+                setIsRunning(true)
+                setRemainingSeconds(widget.args.duration)
+                setPhaseIndex(0)
+                setPhaseRemaining(pattern[0]?.seconds ?? 0)
+                setPhaseKey((k) => k + 1)
+              }}
+            >
+              Start
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+        <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-medium">
             {isComplete ? "Done" : phase?.label ?? "Breath"}
@@ -143,11 +190,31 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
       <div className="mt-5 flex items-center justify-center">
         <motion.div
           key={phaseKey}
-          className="h-28 w-28 rounded-full border border-accent/30 bg-accent/10"
+          className="relative h-36 w-36"
           initial={{ scale: phase?.fromScale ?? 1 }}
           animate={{ scale: phase?.toScale ?? 1 }}
-          transition={{ duration: phase?.seconds ?? 1, ease: "easeInOut" }}
-        />
+          transition={{ duration: phase?.seconds ?? 1, ease: [0.22, 1, 0.36, 1] }}
+        >
+          <div className="absolute inset-0 rounded-full bg-accent/20 blur-2xl" />
+
+          <div
+            className={
+              "absolute inset-3 rounded-full border border-accent/25 bg-gradient-to-br from-accent/25 via-background/10 to-accent/5 backdrop-blur-xl " +
+              "shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_18px_45px_rgba(0,0,0,0.25)]"
+            }
+          />
+
+          <motion.div
+            aria-hidden="true"
+            className="absolute inset-3 rounded-full"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+          >
+            <div className="absolute -inset-10 rounded-full bg-gradient-to-r from-transparent via-accent/12 to-transparent blur-2xl" />
+          </motion.div>
+
+          <div className="absolute inset-6 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.16),transparent_60%)]" />
+        </motion.div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-muted-foreground">
@@ -160,7 +227,8 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
           <p className="mt-0.5">{widget.args.type}</p>
         </div>
       </div>
+        </>
+      )}
     </WidgetContainer>
   )
 }
-

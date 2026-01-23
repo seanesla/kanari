@@ -288,6 +288,8 @@ export function AIChatContent({
     void startOrResume()
   }, [autoStart, canStart, checkIn.state, startOrResume])
 
+  const isAutoStarting = autoStart && checkIn.state === "idle" && canStart
+
   // Handle closing the chat - preserve session for later resumption
   // User can come back and continue where they left off
   const handleClose = useCallback(() => {
@@ -346,12 +348,23 @@ export function AIChatContent({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <p className="text-sm text-muted-foreground text-center">
-              Start a voice check-in when you're ready.
-            </p>
-            <Button onClick={startOrResume} disabled={!canStart}>
-              {canStart ? "Start" : "Preparing..."}
-            </Button>
+            {isAutoStarting ? (
+              <div className="flex flex-col items-center gap-3">
+                <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+                <p className="text-sm text-muted-foreground text-center">
+                  Starting your check-in...
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground text-center">
+                  Start a voice check-in when you're ready.
+                </p>
+                <Button onClick={startOrResume} disabled={!canStart}>
+                  {canStart ? "Start" : "Preparing..."}
+                </Button>
+              </>
+            )}
           </motion.div>
         )}
 
