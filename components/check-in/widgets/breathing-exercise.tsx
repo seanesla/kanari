@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Slider } from "@/components/ui/slider"
 import type { BreathingExerciseType, BreathingExerciseWidgetState } from "@/lib/types"
 import { WidgetContainer } from "./widget-container"
+import { cn } from "@/lib/utils"
 
 const MIN_DURATION_SECONDS = 30
 const MAX_DURATION_SECONDS = 10 * 60
@@ -60,31 +61,60 @@ function formatTime(seconds: number): string {
 interface BreathingExerciseProps {
   widget: BreathingExerciseWidgetState
   onDismiss?: () => void
+  onBack?: () => void
+  onOpenFocus?: (durationSeconds: number) => void
+  initialDurationSeconds?: number
+  autoStart?: boolean
+  variant?: "inline" | "focus"
+  className?: string
 }
 
-export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps) {
+export function BreathingExercise({
+  widget,
+  onDismiss,
+  onBack,
+  onOpenFocus,
+  initialDurationSeconds,
+  autoStart = false,
+  variant = "inline",
+  className,
+}: BreathingExerciseProps) {
   const pattern = useMemo(() => getPattern(widget.args.type), [widget.args.type])
   const suggestedDurationSeconds = widget.args.duration
-  const initialDurationSeconds = clampAndSnapDuration(widget.args.duration)
+  const initialDuration = clampAndSnapDuration(initialDurationSeconds ?? widget.args.duration)
 
   const [hasStarted, setHasStarted] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
-  const [durationSeconds, setDurationSeconds] = useState(initialDurationSeconds)
-  const [remainingSeconds, setRemainingSeconds] = useState(initialDurationSeconds)
+  const [durationSeconds, setDurationSeconds] = useState(initialDuration)
+  const [remainingSeconds, setRemainingSeconds] = useState(initialDuration)
   const [phaseIndex, setPhaseIndex] = useState(0)
   const [phaseRemaining, setPhaseRemaining] = useState(pattern[0]?.seconds ?? 0)
   const [phaseKey, setPhaseKey] = useState(0)
+
+  const isFocus = variant === "focus"
 
   // Reset internal state when widget changes (HMR / new tool call)
   useEffect(() => {
     setHasStarted(false)
     setIsRunning(false)
-    setDurationSeconds(initialDurationSeconds)
-    setRemainingSeconds(initialDurationSeconds)
+    setDurationSeconds(initialDuration)
+    setRemainingSeconds(initialDuration)
     setPhaseIndex(0)
     setPhaseRemaining(pattern[0]?.seconds ?? 0)
     setPhaseKey((k) => k + 1)
-  }, [initialDurationSeconds, pattern])
+  }, [initialDuration, pattern])
+
+  useEffect(() => {
+    if (!autoStart) return
+    if (hasStarted) return
+
+    setHasStarted(true)
+    setIsRunning(true)
+    setRemainingSeconds(durationSeconds)
+    setPhaseIndex(0)
+    setPhaseRemaining(pattern[0]?.seconds ?? 0)
+    setPhaseKey((k) => k + 1)
+  }, [autoStart, durationSeconds, hasStarted, pattern])
 
   useEffect(() => {
     if (!isRunning) return
@@ -128,7 +158,10 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
     <WidgetContainer
       title="Breathing exercise"
       description={widget.args.type === "478" ? "4-7-8 breathing" : widget.args.type}
+      onBack={isFocus ? onBack : undefined}
       onDismiss={onDismiss}
+      variant={isFocus ? "focus" : "inline"}
+      className={className}
     >
       {!hasStarted ? (
         <>
@@ -187,6 +220,10 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
               size="sm"
               className="bg-accent text-accent-foreground hover:bg-accent/90"
               onClick={() => {
+                if (onOpenFocus) {
+                  onOpenFocus(durationSeconds)
+                  return
+                }
                 setHasStarted(true)
                 setIsRunning(true)
                 setRemainingSeconds(durationSeconds)
@@ -200,7 +237,7 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
           </div>
         </>
       ) : (
-        <div className="space-y-5">
+        <div className={cn("space-y-5", isFocus && "h-full min-h-0 flex flex-col")}>
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-medium">{phaseText}</p>
@@ -240,10 +277,13 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
             </div>
           </div>
 
-          <div className="flex items-center justify-center">
+          <div className={cn("flex items-center justify-center", isFocus && "flex-1 min-h-0")}>
             <motion.div
               key={phaseKey}
-              className="relative h-40 w-40"
+              className={cn(
+                "relative",
+                isFocus ? "h-56 w-56 md:h-64 md:w-64" : "h-40 w-40"
+              )}
               initial={{ scale: phase?.fromScale ?? 1 }}
               animate={{ scale: phase?.toScale ?? 1 }}
               transition={{ duration: phase?.seconds ?? 1, ease: "easeInOut" }}
@@ -303,7 +343,10 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
                   key={phaseKey}
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="text-base font-semibold tracking-wide"
+                  className={cn(
+                    isFocus ? "text-lg" : "text-base",
+                    "font-semibold tracking-wide"
+                  )}
                 >
                   {phaseText}
                 </motion.p>
@@ -316,7 +359,7 @@ export function BreathingExercise({ widget, onDismiss }: BreathingExerciseProps)
             </motion.div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div className={cn("grid grid-cols-2 gap-2 text-xs text-muted-foreground", isFocus && "mt-auto")}>
             <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2">
               <p className="font-medium text-foreground">Remaining</p>
               <p className="mt-0.5">{formatTime(remainingSeconds)}</p>

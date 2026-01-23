@@ -96,6 +96,7 @@ export function CheckInDialog({
   // Tool focus mode
   const [focusedWidgetId, setFocusedWidgetId] = useState<string | null>(null)
   const [journalDrafts, setJournalDrafts] = useState<Record<string, string>>({})
+  const [breathingDrafts, setBreathingDrafts] = useState<Record<string, number>>({})
 
   // Check if user has selected a voice when dialog opens
   useEffect(() => {
@@ -108,6 +109,7 @@ export function CheckInDialog({
       setSynthesisError(null)
       setFocusedWidgetId(null)
       setJournalDrafts({})
+      setBreathingDrafts({})
       synthesisAbortRef.current?.abort()
       synthesisAbortRef.current = null
       lastSynthesizedSessionIdRef.current = null
@@ -488,34 +490,50 @@ export function CheckInDialog({
                   <BiomarkerIndicator metrics={checkIn.session?.acousticMetrics} />
                 </div>
 
-                {isToolFocused && focusedWidget?.type === "journal_prompt" ? (
+                {focusedWidget ? (
                   <div className="flex-1 overflow-hidden p-4">
-                    <JournalPrompt
-                      key={focusedWidget.id}
-                      widget={focusedWidget}
-                      variant="focus"
-                      className="h-full"
-                      initialContent={journalDrafts[focusedWidget.id] || ""}
-                      onDraftChange={(nextContent) =>
-                        setJournalDrafts((prev) => {
-                          const trimmed = nextContent.trim()
-                          if (!trimmed) {
-                            if (!(focusedWidget.id in prev)) return prev
-                            const { [focusedWidget.id]: _, ...rest } = prev
-                            return rest
-                          }
-                          return { ...prev, [focusedWidget.id]: nextContent }
-                        })
-                      }
-                      onBack={() => setFocusedWidgetId(null)}
-                      onDismiss={() => {
-                        controls.dismissWidget(focusedWidget.id)
-                        setFocusedWidgetId(null)
-                      }}
-                      onSave={(content) =>
-                        controls.saveJournalEntry(focusedWidget.id, content)
-                      }
-                    />
+                    {focusedWidget.type === "journal_prompt" ? (
+                      <JournalPrompt
+                        key={focusedWidget.id}
+                        widget={focusedWidget}
+                        variant="focus"
+                        className="h-full"
+                        initialContent={journalDrafts[focusedWidget.id] || ""}
+                        onDraftChange={(nextContent) =>
+                          setJournalDrafts((prev) => {
+                            const trimmed = nextContent.trim()
+                            if (!trimmed) {
+                              if (!(focusedWidget.id in prev)) return prev
+                              const { [focusedWidget.id]: _, ...rest } = prev
+                              return rest
+                            }
+                            return { ...prev, [focusedWidget.id]: nextContent }
+                          })
+                        }
+                        onBack={() => setFocusedWidgetId(null)}
+                        onDismiss={() => {
+                          controls.dismissWidget(focusedWidget.id)
+                          setFocusedWidgetId(null)
+                        }}
+                        onSave={(content) =>
+                          controls.saveJournalEntry(focusedWidget.id, content)
+                        }
+                      />
+                    ) : focusedWidget.type === "breathing_exercise" ? (
+                      <BreathingExercise
+                        key={focusedWidget.id}
+                        widget={focusedWidget}
+                        variant="focus"
+                        className="h-full"
+                        initialDurationSeconds={breathingDrafts[focusedWidget.id]}
+                        autoStart
+                        onBack={() => setFocusedWidgetId(null)}
+                        onDismiss={() => {
+                          controls.dismissWidget(focusedWidget.id)
+                          setFocusedWidgetId(null)
+                        }}
+                      />
+                    ) : null}
                   </div>
                 ) : (
                   <>
@@ -550,6 +568,11 @@ export function CheckInDialog({
                                   <BreathingExercise
                                     key={widget.id}
                                     widget={widget}
+                                    initialDurationSeconds={breathingDrafts[widget.id]}
+                                    onOpenFocus={(durationSeconds) => {
+                                      setBreathingDrafts((prev) => ({ ...prev, [widget.id]: durationSeconds }))
+                                      setFocusedWidgetId(widget.id)
+                                    }}
                                     onDismiss={() => controls.dismissWidget(widget.id)}
                                   />
                                 )
