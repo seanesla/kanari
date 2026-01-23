@@ -27,7 +27,7 @@
  * - Has mute functionality to pause microphone input
  */
 
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
 import { logDebug, logError, logWarn } from "@/lib/logger"
 import { motion, AnimatePresence } from "framer-motion"
@@ -87,6 +87,9 @@ interface CheckInAIChatProps {
   requestDiscard?: boolean
   /** Called after session has been cancelled due to discard request */
   onDiscardComplete?: () => void
+
+  /** When true, auto-starts the session on mount (user-gesture path only). */
+  autoStart?: boolean
 }
 
 export function AIChatContent({
@@ -96,6 +99,7 @@ export function AIChatContent({
   chrome = "default",
   requestDiscard,
   onDiscardComplete,
+  autoStart = false,
 }: CheckInAIChatProps) {
   const isGlassChrome = chrome === "glass"
   // Hook to save completed sessions to IndexedDB
@@ -269,6 +273,20 @@ export function AIChatContent({
 
     await controls.startSession({ userGesture: true })
   }, [controls])
+
+  const autoStartRanRef = useRef(false)
+  useLayoutEffect(() => {
+    // Auto-start is only safe when this mount was triggered by a real click/tap.
+    // (We use it to remove the redundant "Start" click after the user already
+    // clicked "New Check-in".)
+    if (!autoStart) return
+    if (autoStartRanRef.current) return
+    if (!canStart) return
+    if (checkIn.state !== "idle") return
+
+    autoStartRanRef.current = true
+    void startOrResume()
+  }, [autoStart, canStart, checkIn.state, startOrResume])
 
   // Handle closing the chat - preserve session for later resumption
   // User can come back and continue where they left off

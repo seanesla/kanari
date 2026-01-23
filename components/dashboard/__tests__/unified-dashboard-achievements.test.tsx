@@ -184,6 +184,6 @@ describe("UnifiedDashboard achievements preview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Daily Check-in" }))
 
     expect(completeAchievement).not.toHaveBeenCalled()
-    expect(push).toHaveBeenCalledWith("/dashboard/history?newCheckIn=true")
+    expect(push).toHaveBeenCalledWith("/dashboard/check-ins?newCheckIn=true")
   })
 })

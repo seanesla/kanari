@@ -73,8 +73,13 @@ const CATEGORY_COLORS: Record<SuggestionCategory, { bg: string; border: string; 
   break: { bg: "rgba(245, 158, 11, 0.10)", border: "#f59e0b", text: "#fef3c7" }, // Will be overridden by accent
 }
 
-// Check-in marker colors
-const CHECKIN_COLORS = { bg: "rgba(245, 158, 11, 0.10)", border: "#f59e0b", text: "#fef3c7" }
+function buildAccentEventColors(accentColor: string): { bg: string; border: string; text: string } {
+  return {
+    bg: hexToRgba(accentColor, 0.10),
+    border: accentColor,
+    text: generateLightVariant(accentColor),
+  }
+}
 
 // Completed event colors (gray)
 const COMPLETED_COLORS = { bg: "rgba(107, 114, 128, 0.10)", border: "#6b7280", text: "#9ca3af" }
@@ -251,7 +256,7 @@ function suggestionToEvent(
 }
 
 // Helper to map check-ins to FullCalendar event format
-function checkInToEvent(session: CheckInSession, timeZone: string): EventInput | null {
+function checkInToEvent(session: CheckInSession, timeZone: string, accentColor: string): EventInput | null {
   if (!session.startedAt) return null
 
   const instant = Temporal.Instant.from(session.startedAt)
@@ -265,14 +270,16 @@ function checkInToEvent(session: CheckInSession, timeZone: string): EventInput |
     : null
   const title = metrics ? `✓ Check-in • ${metrics}` : "✓ Check-in"
 
+  const colors = buildAccentEventColors(accentColor)
+
   return {
     id: `checkin-${session.id}`,
     title,
     start: startDateTime.toString({ timeZoneName: "never" }),
     end: endDateTime.toString({ timeZoneName: "never" }),
-    backgroundColor: CHECKIN_COLORS.bg,
-    borderColor: CHECKIN_COLORS.border,
-    textColor: CHECKIN_COLORS.text,
+    backgroundColor: colors.bg,
+    borderColor: colors.border,
+    textColor: colors.text,
     extendedProps: {
       session,
       isCheckIn: true,
@@ -316,7 +323,7 @@ export function FullCalendarView({
       .filter((event): event is EventInput => event !== null)
 
     const checkInEvents = checkInSessions
-      .map((session) => checkInToEvent(session, timeZone))
+      .map((session) => checkInToEvent(session, timeZone, accentColor))
       .filter((event): event is EventInput => event !== null)
 
     return dedupeEventsById([...scheduledEvents, ...completedEvents, ...checkInEvents])

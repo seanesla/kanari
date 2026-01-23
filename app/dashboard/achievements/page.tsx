@@ -250,7 +250,7 @@ export default function AchievementsPage() {
                 </div>
                 <div className="mt-3">
                   <Button asChild variant="outline" size="sm" className="w-full">
-                    <Link href="/dashboard/history?newCheckIn=true">New check-in</Link>
+                    <Link href="/dashboard/check-ins?newCheckIn=true">New check-in</Link>
                   </Button>
                 </div>
               </div>

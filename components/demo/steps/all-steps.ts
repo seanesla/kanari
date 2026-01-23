@@ -62,7 +62,7 @@ export const ALL_DEMO_STEPS: DemoStep[] = [
   {
     id: "checkin-sidebar",
     phase: "checkin",
-    route: "/dashboard/history",
+    route: "/dashboard/check-ins",
     target: "demo-checkin-sidebar",
     title: "Check-in History",
     content: "Browse previous check-ins. Each shows your wellness scores and full AI conversation.",

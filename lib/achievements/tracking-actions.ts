@@ -14,7 +14,7 @@ export interface DailyAchievementAction {
 export function getDailyAchievementAction(key: DailyAchievementTrackingKey): DailyAchievementAction {
   switch (key) {
     case "do_check_in":
-      return { href: "/dashboard/history?newCheckIn=true", label: "Start check-in" }
+      return { href: "/dashboard/check-ins?newCheckIn=true", label: "Start check-in" }
     case "complete_suggestions":
       return { href: "/dashboard?focus=suggestions", label: "Open suggestions" }
     case "schedule_suggestion":
@@ -37,4 +37,3 @@ export function getDailyAchievementProgress(input: {
       return { current: counts.suggestionsScheduledToday, target: tracking.target, label: "Suggestions scheduled today" }
   }
 }
-

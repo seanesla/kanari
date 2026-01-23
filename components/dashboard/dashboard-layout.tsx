@@ -27,7 +27,7 @@ export function DashboardLayout({
         No suggestions yet. Start a check-in to get personalized recovery recommendations.
       </p>
       <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-        <Link href="/dashboard/history?newCheckIn=true">
+        <Link href="/dashboard/check-ins?newCheckIn=true">
           Check in now
           <ArrowRight className="ml-2 h-4 w-4" />
         </Link>

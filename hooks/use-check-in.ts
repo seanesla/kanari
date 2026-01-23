@@ -154,6 +154,13 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
   const sendAudio = useCallback((base64Audio: string) => {
     // Block user audio until the assistant starts the conversation.
     if (!assistantHasStartedRef.current) return
+
+    // Avoid feedback loops when the assistant audio is playing through speakers.
+    // In some environments, echo cancellation isn't strong enough and Gemini will
+    // transcribe its own voice. We run the session in a half-duplex mode:
+    // - while the assistant is speaking: don't stream mic audio
+    // - once the assistant stops: resume streaming mic audio
+    if (stateRef.current === "assistant_speaking") return
     getGeminiControls().sendAudio(base64Audio)
   }, [getGeminiControls])
 

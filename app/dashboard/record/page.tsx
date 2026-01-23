@@ -12,5 +12,5 @@ import { redirect } from "next/navigation"
  * which opens the check-in flow automatically
  */
 export default function RecordPage() {
-  redirect("/dashboard/history?newCheckIn=true")
+  redirect("/dashboard/check-ins?newCheckIn=true")
 }

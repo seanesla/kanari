@@ -93,6 +93,6 @@ describe("AchievementsPage", () => {
 
     // The UI should route users to the relevant feature (check-in) to complete it.
     const cta = screen.getByRole("link", { name: /start check-in/i })
-    expect(cta).toHaveAttribute("href", "/dashboard/history?newCheckIn=true")
+    expect(cta).toHaveAttribute("href", "/dashboard/check-ins?newCheckIn=true")
   })
 })

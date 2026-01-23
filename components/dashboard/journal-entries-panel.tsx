@@ -55,7 +55,7 @@ export function JournalEntriesPanel({ limit = 5, className }: JournalEntriesPane
 
                 {entry.checkInSessionId ? (
                   <Button asChild variant="ghost" size="sm" className="mt-2 w-full justify-between">
-                    <Link href={`/dashboard/history?highlight=${entry.checkInSessionId}`}>
+                    <Link href={`/dashboard/check-ins?highlight=${entry.checkInSessionId}`}>
                       View related check-in
                       <ArrowRight className="h-4 w-4" />
                     </Link>

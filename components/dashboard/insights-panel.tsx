@@ -74,7 +74,7 @@ export function InsightsPanel({ session, className }: InsightsPanelProps) {
         </div>
 
         <Button asChild variant="outline" size="sm" className="w-full gap-2">
-          <Link href={`/dashboard/history?highlight=${session.id}`}>
+          <Link href={`/dashboard/check-ins?highlight=${session.id}`}>
             View full check-in
             <ArrowRight className="h-4 w-4 ml-auto" />
           </Link>

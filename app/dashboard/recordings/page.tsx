@@ -1,7 +1,7 @@
 /**
  * Recordings Page Redirect
  *
- * This page has been moved to /dashboard/history
+ * This page has been moved to /dashboard/check-ins
  * This file now redirects to the unified check-in history page.
  *
  * This redirect is kept for backwards compatibility with any
@@ -11,8 +11,8 @@
 import { redirect } from "next/navigation"
 
 /**
- * Default export - redirects to the new history page
+ * Default export - redirects to the new check-ins page
  */
 export default function RecordingsPage() {
-  redirect("/dashboard/history")
+  redirect("/dashboard/check-ins")
 }

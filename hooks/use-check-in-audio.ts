@@ -99,6 +99,7 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
+          autoGainControl: true,
         },
       })
 

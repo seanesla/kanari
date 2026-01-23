@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
 import { AnimatePresence, motion } from "framer-motion"
 
-const TRANSITION_MS = 650
+const TRANSITION_MS = 420
 
 export function RouteTransitionOverlay() {
   const pathname = usePathname()
@@ -46,18 +46,24 @@ export function RouteTransitionOverlay() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.12, ease: "easeOut" }}
+          transition={{ duration: 0.14, ease: "easeOut" }}
         >
           <div className="absolute inset-0 bg-background/70 backdrop-blur-md" />
 
+          {/* Soft glass bloom (no sweeping/strobe) */}
           <motion.div
-            className="absolute -inset-[25%] bg-gradient-to-r from-transparent via-accent/20 to-transparent blur-3xl"
-            initial={{ x: "-55%", rotate: -12 }}
-            animate={{ x: "55%", rotate: -12 }}
+            className="pointer-events-none absolute inset-0"
+            initial={{ opacity: 0, scale: 0.985 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.015 }}
             transition={{ duration: TRANSITION_MS / 1000, ease: [0.22, 1, 0.36, 1] }}
-          />
+          >
+            <div className="absolute -top-32 left-1/2 h-[520px] w-[780px] -translate-x-1/2 rounded-full bg-accent/12 blur-3xl" />
+            <div className="absolute top-[35vh] -left-32 h-[420px] w-[520px] rounded-full bg-foreground/5 blur-3xl" />
+            <div className="absolute bottom-[-180px] right-[-140px] h-[520px] w-[680px] rounded-full bg-accent/10 blur-3xl" />
+          </motion.div>
 
-          <div className="absolute inset-0 bg-gradient-to-b from-background/40 via-transparent to-background/40" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/35 via-transparent to-background/35" />
         </motion.div>
       ) : null}
     </AnimatePresence>

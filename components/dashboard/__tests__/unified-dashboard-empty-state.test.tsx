@@ -141,10 +141,9 @@ describe("UnifiedDashboard empty state", () => {
     const { container } = render(<UnifiedDashboard />)
 
     expect(screen.getByText(/No suggestions yet/i)).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /check in now/i })).toHaveAttribute("href", "/dashboard/history?newCheckIn=true")
+    expect(screen.getByRole("link", { name: /check in now/i })).toHaveAttribute("href", "/dashboard/check-ins?newCheckIn=true")
 
     expect(container.querySelector(".h-\\[260px\\]")).toBeNull()
     expect(container.querySelector(".h-\\[70vh\\]")).toBeNull()
   })
 })
-

@@ -21,7 +21,7 @@ const landingLinks = [
 // "Overview" not "Dashboard" for /dashboard route (see AGENTS.md)
 const dashboardLinks = [
   { id: "overview", href: "/dashboard", label: "Overview", exact: true },
-  { id: "history", href: "/dashboard/history", label: "Check-ins", exact: false },
+  { id: "check-ins", href: "/dashboard/check-ins", label: "Check-ins", exact: false },
   { id: "analytics", href: "/dashboard/analytics", label: "Analytics", exact: false },
   { id: "achievements", href: "/dashboard/achievements", label: "Achievements", exact: true },
   { id: "settings", href: "/dashboard/settings", label: "Settings", exact: true },
