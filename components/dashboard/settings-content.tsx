@@ -243,8 +243,8 @@ export function SettingsContent() {
   }, [previewAccentColor, previewSansFont, previewSerifFont])
 
   return (
-    <div className={`w-full space-y-8 ${isDirty ? "pb-24" : ""}`}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 auto-rows-max">
+    <div className={`w-full space-y-6 ${isDirty ? "pb-24" : ""}`}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 auto-rows-max">
         <SettingsProfileSection
           userName={draft.userName ?? ""}
           onUserNameChange={(name) => {
@@ -336,18 +336,20 @@ export function SettingsContent() {
           }}
         />
 
-        <SettingsApiSection
-          geminiApiKey={draft.geminiApiKey ?? ""}
-          geminiApiKeySource={(draft.geminiApiKeySource ?? DEFAULT_USER_SETTINGS.geminiApiKeySource ?? "user")}
-          onGeminiApiKeyChange={(value) => {
-            setDraft((prev) => ({ ...prev, geminiApiKey: value }))
-            setSaveMessage(null)
-          }}
-          onGeminiApiKeySourceChange={(value) => {
-            setDraft((prev) => ({ ...prev, geminiApiKeySource: value }))
-            setSaveMessage(null)
-          }}
-        />
+        <div className="md:col-span-2">
+          <SettingsApiSection
+            geminiApiKey={draft.geminiApiKey ?? ""}
+            geminiApiKeySource={(draft.geminiApiKeySource ?? DEFAULT_USER_SETTINGS.geminiApiKeySource ?? "user")}
+            onGeminiApiKeyChange={(value) => {
+              setDraft((prev) => ({ ...prev, geminiApiKey: value }))
+              setSaveMessage(null)
+            }}
+            onGeminiApiKeySourceChange={(value) => {
+              setDraft((prev) => ({ ...prev, geminiApiKeySource: value }))
+              setSaveMessage(null)
+            }}
+          />
+        </div>
 
         {/* Gemini Memory */}
         <div className="md:col-span-2">

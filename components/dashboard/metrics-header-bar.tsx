@@ -5,6 +5,7 @@ import { TrendingUp, TrendingDown, Minus, AlertTriangle, Flame } from "@/lib/ico
 import { cn } from "@/lib/utils"
 import { useDashboardStats, useTrendData } from "@/hooks/use-storage"
 import { predictBurnoutRisk } from "@/lib/ml/forecasting"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 // Unified check-in button replaces separate entry points
 import { CheckInButton } from "@/components/dashboard/check-in-button"
 import type { BurnoutPrediction } from "@/lib/types"
@@ -64,51 +65,93 @@ export function MetricsHeaderBar() {
         <div className="h-8 w-px bg-border/70 hidden md:block" />
 
         {/* Wellness Score */}
-        <div className="flex items-center gap-2">
-          <div className={cn("text-2xl md:text-3xl font-serif tabular-nums", wellnessColor)}>
-            {wellnessScore !== null ? wellnessScore : "--"}
-          </div>
-          <div className="text-xs text-muted-foreground leading-tight">
-            <div>Wellness</div>
-            <div>Score</div>
-          </div>
-        </div>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-2 cursor-help">
+              <div className={cn("text-2xl md:text-3xl font-serif tabular-nums", wellnessColor)}>
+                {wellnessScore !== null ? wellnessScore : "--"}
+              </div>
+              <div className="text-xs text-muted-foreground leading-tight">
+                <div>Wellness</div>
+                <div>Score</div>
+              </div>
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={8} className="max-w-[260px]">
+            <div className="space-y-1">
+              <p className="font-medium">Wellness Score</p>
+              <p className="opacity-90">100 - (avg stress + avg fatigue) / 2</p>
+              {dashboardStats.totalRecordings > 0 ? (
+                <p className="opacity-80">
+                  Avg stress: {dashboardStats.averageStress}% • Avg fatigue: {dashboardStats.averageFatigue}%
+                </p>
+              ) : (
+                <p className="opacity-80">Complete a check-in to calculate this.</p>
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
 
         {/* Divider */}
         <div className="h-8 w-px bg-border/70 hidden md:block" />
 
         {/* Burnout Risk */}
-        {burnoutPrediction ? (
-          <div className="flex items-center gap-2">
-            {(() => {
-              const config = riskConfig[burnoutPrediction.riskLevel]
-              const Icon = config.icon
-              return (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-2 cursor-help">
+              {burnoutPrediction ? (
+                (() => {
+                  const config = riskConfig[burnoutPrediction.riskLevel]
+                  const Icon = config.icon
+                  return (
+                    <>
+                      <div className={cn("p-1.5 rounded-md", config.bg)}>
+                        <Icon className={cn("h-4 w-4", config.color)} />
+                      </div>
+                      <div>
+                        <div className={cn("text-sm font-medium capitalize", config.color)}>
+                          {burnoutPrediction.riskLevel}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Burnout risk</div>
+                      </div>
+                    </>
+                  )
+                })()
+              ) : (
                 <>
-                  <div className={cn("p-1.5 rounded-md", config.bg)}>
-                    <Icon className={cn("h-4 w-4", config.color)} />
+                  <div className="p-1.5 rounded-md bg-muted/20">
+                    <Minus className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div>
-                    <div className={cn("text-sm font-medium capitalize", config.color)}>
-                      {burnoutPrediction.riskLevel}
-                    </div>
+                    <div className="text-sm font-medium text-muted-foreground">N/A</div>
                     <div className="text-xs text-muted-foreground">Burnout risk</div>
                   </div>
                 </>
-              )
-            })()}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-muted/20">
-              <Minus className="h-4 w-4 text-muted-foreground" />
+              )}
             </div>
-            <div>
-              <div className="text-sm font-medium text-muted-foreground">N/A</div>
-              <div className="text-xs text-muted-foreground">Burnout risk</div>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={8} className="max-w-[320px]">
+            <div className="space-y-1">
+              <p className="font-medium">Burnout Risk</p>
+              <p className="opacity-90">
+                Forecast for the next 3-7 days from your recent daily stress/fatigue trend.
+              </p>
+              {burnoutPrediction ? (
+                <>
+                  <p className="opacity-80">
+                    Score: {burnoutPrediction.riskScore}/100 • Window: {burnoutPrediction.predictedDays}d • Confidence:{" "}
+                    {Math.round(burnoutPrediction.confidence * 100)}%
+                  </p>
+                  {burnoutPrediction.factors.length > 0 ? (
+                    <p className="opacity-80">Signals: {burnoutPrediction.factors.slice(0, 2).join(" • ")}</p>
+                  ) : null}
+                </>
+              ) : (
+                <p className="opacity-80">Need at least 2 days of check-ins to forecast.</p>
+              )}
             </div>
-          </div>
-        )}
+          </TooltipContent>
+        </Tooltip>
 
         {/* Divider */}
         <div className="h-8 w-px bg-border/70 hidden md:block" />

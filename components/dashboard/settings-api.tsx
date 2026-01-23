@@ -63,13 +63,13 @@ export function SettingsApiSection({
   }, [geminiApiKey, geminiApiKeySource])
 
   return (
-    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
-      <div className="flex items-center gap-2 mb-6">
+    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-5 transition-colors hover:bg-card/40">
+      <div className="flex items-center gap-2 mb-4">
         <Image src="/gemini-logo.svg" alt="Gemini" width={20} height={20} />
         <h2 className="text-lg font-semibold font-serif">Gemini API</h2>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <div>
           <Label className="text-base font-sans">Gemini Key</Label>
 

@@ -196,7 +196,7 @@ export default function AnalyticsPage() {
 
   return (
     <div data-demo-id="demo-analytics-page" className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-20 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
+      <main className="px-4 md:px-6 lg:px-8 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-20 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
         {/* Header */}
         <div
           className={cn(
@@ -211,20 +211,10 @@ export default function AnalyticsPage() {
           />
         </div>
 
-        {/* Engagement Tracker */}
-        <div
-          className={cn(
-            "mb-16 transition-all duration-1000 delay-200",
-            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
-          )}
-        >
-          <EngagementTracker />
-        </div>
-
         {/* Insights */}
         <div
           className={cn(
-            "mb-8 transition-all duration-1000 delay-250",
+            "mb-6 transition-all duration-1000 delay-200",
             visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
           )}
         >
@@ -234,7 +224,7 @@ export default function AnalyticsPage() {
         {/* AI Insights Section */}
         <div
           className={cn(
-            "mb-16 transition-all duration-1000 delay-275",
+            "mb-12 transition-all duration-1000 delay-250",
             visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
           )}
         >
@@ -246,13 +236,13 @@ export default function AnalyticsPage() {
           <div
             data-demo-id="demo-burnout-prediction"
             className={cn(
-              "relative mb-16 transition-all duration-1000 delay-300",
+              "relative mb-12 transition-all duration-1000 delay-300",
               visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
             )}
           >
             <div
               className={cn(
-                "rounded-lg border p-4 md:p-8 lg:p-12 backdrop-blur-xl",
+                "rounded-lg border p-4 md:p-6 lg:p-8 backdrop-blur-xl",
                 riskLevelConfig[burnoutPrediction.riskLevel].bg,
                 riskLevelConfig[burnoutPrediction.riskLevel].border
               )}
@@ -260,18 +250,18 @@ export default function AnalyticsPage() {
               <div className="flex items-start gap-6">
                 <div
                   className={cn(
-                    "h-14 w-14 rounded-lg flex items-center justify-center",
+                    "h-12 w-12 rounded-lg flex items-center justify-center",
                     riskLevelConfig[burnoutPrediction.riskLevel].bg
                   )}
                 >
                   {(() => {
                     const Icon = riskLevelConfig[burnoutPrediction.riskLevel].icon
-                    return <Icon className={cn("h-7 w-7", riskLevelConfig[burnoutPrediction.riskLevel].color)} />
+                    return <Icon className={cn("h-6 w-6", riskLevelConfig[burnoutPrediction.riskLevel].color)} />
                   })()}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-2xl font-serif">Burnout Risk Forecast</h3>
+                    <h3 className="text-xl md:text-2xl font-serif">Burnout Risk Forecast</h3>
                     <span
                       className={cn(
                         "px-3 py-1 rounded-full text-xs font-medium uppercase tracking-wider",
@@ -289,18 +279,18 @@ export default function AnalyticsPage() {
                     {burnoutPrediction.riskLevel === "critical" && "Urgent attention needed. Please schedule recovery time immediately."}
                   </p>
 
-                  <div className="grid md:grid-cols-3 gap-6 mb-6">
+                  <div className="grid md:grid-cols-3 gap-4 mb-6">
                     <div>
                       <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Risk Score</p>
-                      <p className="text-3xl font-serif tabular-nums">{burnoutPrediction.riskScore}/100</p>
+                      <p className="text-2xl md:text-3xl font-serif tabular-nums">{burnoutPrediction.riskScore}/100</p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Forecast Window</p>
-                      <p className="text-3xl font-serif tabular-nums">{burnoutPrediction.predictedDays} days</p>
+                      <p className="text-2xl md:text-3xl font-serif tabular-nums">{burnoutPrediction.predictedDays} days</p>
                     </div>
                     <div>
                       <p className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Trend</p>
-                      <p className="text-3xl font-serif capitalize">{burnoutPrediction.trend}</p>
+                      <p className="text-2xl md:text-3xl font-serif capitalize">{burnoutPrediction.trend}</p>
                     </div>
                   </div>
 
@@ -335,20 +325,20 @@ export default function AnalyticsPage() {
           <div className="relative">
             <div
               className={cn(
-                "mb-8 transition-all duration-1000 delay-300",
+                "mb-6 transition-all duration-1000 delay-300",
                 chartsVisible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
               )}
             >
               <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Trends</p>
-              <h2 className="text-3xl md:text-4xl font-serif">Wellness Metrics</h2>
+              <h2 className="text-2xl md:text-3xl font-serif">Wellness Metrics</h2>
             </div>
 
             {/* Charts Grid */}
-            <div data-demo-id="demo-trend-charts" className="grid md:grid-cols-2 gap-8 items-start">
+            <div data-demo-id="demo-trend-charts" className="grid md:grid-cols-2 gap-6 items-start">
               {/* Chart 1: 7-Day Trend */}
               <div
                 className={cn(
-                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
+                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-6 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
                   chartsVisible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
                 )}
                 style={{ transitionDelay: chartsVisible ? "400ms" : "0ms" }}
@@ -357,7 +347,7 @@ export default function AnalyticsPage() {
                 <h3 className="text-lg font-semibold mb-2">Stress & Fatigue (7 days)</h3>
                 <StressFatigueChart
                   data={stats.totalRecordings > 0 ? trendData : []}
-                  height={350}
+                  height={300}
                   showLegend={true}
                   showTrendIndicator={true}
                   expanded={stressChartExpanded}
@@ -369,15 +359,15 @@ export default function AnalyticsPage() {
               {/* Chart 2: Wellness Score Gauge */}
               <div
                 className={cn(
-                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-8 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
+                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-6 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
                   chartsVisible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
                 )}
                 style={{ transitionDelay: chartsVisible ? "500ms" : "0ms" }}
                 onClick={() => stats.totalRecordings > 0 && setWellnessExpanded(!wellnessExpanded)}
               >
-                <h3 className="text-lg font-semibold mb-4">Wellness Score</h3>
+                <h3 className="text-lg font-semibold mb-3">Wellness Score</h3>
                 {stats.totalRecordings === 0 ? (
-                  <div className="h-[350px] flex items-center justify-center">
+                  <div className="h-[300px] flex items-center justify-center">
                     <div className="text-center">
                       <TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground/30" />
                       <p className="text-muted-foreground">No data yet</p>
@@ -385,7 +375,7 @@ export default function AnalyticsPage() {
                     </div>
                   </div>
                 ) : (
-                  <div className="h-[350px]">
+                  <div className="h-[300px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <RadialBarChart
                         data={wellnessData}
@@ -401,7 +391,7 @@ export default function AnalyticsPage() {
                           y="50%"
                           textAnchor="middle"
                           dominantBaseline="central"
-                          fontSize={32}
+                          fontSize={30}
                           fontFamily="serif"
                           fontWeight="600"
                           fill={wellnessColor}
@@ -470,6 +460,16 @@ export default function AnalyticsPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Engagement Tracker */}
+        <div
+          className={cn(
+            "mt-12 transition-all duration-1000 delay-350",
+            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
+          )}
+        >
+          <EngagementTracker />
         </div>
       </main>
     </div>
