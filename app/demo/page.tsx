@@ -415,9 +415,11 @@ function DemoFeatureTour() {
 
                         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
 
-                        <div className="pointer-events-none absolute left-0 right-0 bottom-0 p-4 md:p-6">
-                          <p className="text-xs text-white/80 font-mono truncate">{slide.media.replaceHint}</p>
-                        </div>
+                        {!hasPlayableMedia ? (
+                          <div className="pointer-events-none absolute left-0 right-0 bottom-0 p-4 md:p-6">
+                            <p className="text-xs text-white/80 font-mono truncate">{slide.media.replaceHint}</p>
+                          </div>
+                        ) : null}
                       </AspectRatio>
                     </div>
 
