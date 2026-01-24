@@ -699,14 +699,20 @@ export function ShootingStars({ accentColor }: { accentColor: string }) {
     const tailLength = s.maxTrailLength * tailGrow
     const spacing = tailLength / Math.max(1, s.trailPoints - 1)
 
-    const head = new THREE.Vector3().copy(s.start).addScaledVector(s.dir, s.travelDistance * p)
+    const travel = s.travelDistance * p
+    const headX = s.start.x + s.dir.x * travel
+    const headY = s.start.y + s.dir.y * travel
+    const headZ = s.start.z + s.dir.z * travel
+
+    const stepX = s.dir.x * spacing
+    const stepY = s.dir.y * spacing
+    const stepZ = s.dir.z * spacing
 
     for (let i = 0; i < s.trailPoints; i++) {
-      const pos = new THREE.Vector3().copy(head).addScaledVector(s.dir, -i * spacing)
       const idx = i * 3
-      data.positions[idx] = pos.x
-      data.positions[idx + 1] = pos.y
-      data.positions[idx + 2] = pos.z
+      data.positions[idx] = headX - stepX * i
+      data.positions[idx + 1] = headY - stepY * i
+      data.positions[idx + 2] = headZ - stepZ * i
     }
 
     positionAttrRef.current.needsUpdate = true

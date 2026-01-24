@@ -125,6 +125,13 @@ vi.mock("@/components/dashboard/metrics-header-bar", async () => {
   }
 })
 
+vi.mock("@/components/dashboard/overview-analytics-section", async () => {
+  const React = await import("react")
+  return {
+    OverviewAnalyticsSection: () => React.createElement("div", null, "Analytics"),
+  }
+})
+
 vi.mock("@/components/dashboard/insights-panel", async () => {
   const React = await import("react")
   return {

@@ -21,11 +21,13 @@ import { useAchievements } from "@/hooks/use-achievements"
 import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
-import { CollapsibleSection } from "./collapsible-section"
 import { MetricsHeaderBar } from "./metrics-header-bar"
 import { Deck } from "@/components/dashboard/deck"
 import { JournalEntriesPanel } from "./journal-entries-panel"
+import { OverviewAnalyticsSection } from "@/components/dashboard/overview-analytics-section"
+import { InsightsPanel } from "@/components/dashboard/insights-panel"
 import { KanbanBoard } from "./suggestions/kanban-board"
 import { FullCalendarView } from "./calendar"
 import { SuggestionDetailDialog, ScheduleTimeDialog } from "./suggestions"
@@ -40,6 +42,8 @@ export function UnifiedDashboard() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
+
+  const [activeView, setActiveView] = useState<"today" | "trends">("today")
   const [kanbanExpanded, setKanbanExpanded] = useState(true)
   const [calendarOpen, setCalendarOpen] = useState(false)
 
@@ -113,26 +117,32 @@ export function UnifiedDashboard() {
     }
   }, [shouldAnimate])
 
-  // Deep-link helpers for achievements CTAs (focus suggestions, optionally open schedule flow).
+  // Optional query params for demo mode / internal links.
+  // - view=today|trends
+  // - action=schedule (auto-opens schedule dialog for first pending suggestion)
   useEffect(() => {
-    const focus = searchParams.get("focus")
-    if (focus !== "suggestions") return
+    const view = searchParams.get("view")
+    const action = searchParams.get("action")
 
-    setKanbanExpanded(true)
+    if (view === "trends") {
+      setActiveView("trends")
+    }
 
-    // Scroll the kanban area into view once the layout has rendered.
-    requestAnimationFrame(() => {
-      document.getElementById("kanban-section")?.scrollIntoView({ behavior: "smooth", block: "start" })
-    })
+    if (view === "today") {
+      setActiveView("today")
+    }
 
-    if (searchParams.get("action") === "schedule") {
+    if (action === "schedule") {
+      setActiveView("today")
       const pending = suggestions.find((s) => s.status === "pending")
       if (pending) {
         handlers.handleScheduleFromDialog(pending)
       }
     }
 
-    window.history.replaceState({}, "", "/overview")
+    if (view || action) {
+      window.history.replaceState({}, "", "/overview")
+    }
   }, [handlers, searchParams, suggestions])
 
   const dailyProgressPct = dayCompletion.totalCount > 0
@@ -162,6 +172,10 @@ export function UnifiedDashboard() {
     if (storedTrendData.length < 2) return null
     return predictBurnoutRisk(storedTrendData)
   }, [storedTrendData])
+
+  const latestSynthesisSession = useMemo(() => {
+    return checkInSessions.find((session) => !!session.synthesis) ?? null
+  }, [checkInSessions])
 
   // Voice patterns for detail dialog
   const voicePatterns = useMemo(() => {
@@ -267,6 +281,10 @@ export function UnifiedDashboard() {
         completedSuggestions={completedSuggestions}
         checkInSessions={checkInSessions}
         recoveryBlocks={recoveryBlocks}
+        onEventClick={handlers.handleSuggestionClick}
+        onTimeSlotClick={handlers.handleTimeSlotClick}
+        onExternalDrop={handlers.handleExternalDrop}
+        pendingDragActive={pendingDragActive}
         className="h-full"
       />
 
@@ -301,6 +319,74 @@ export function UnifiedDashboard() {
     return droppedSuggestion
   }, [droppedSuggestion, scheduleDialogSuggestion])
 
+  const achievementsCard = (
+    <Deck className="p-6">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-sm font-medium">Today's achievements</h3>
+          {!dayCompletion.isComplete && (dailyRemainingCount > 0 || suggestionsRemainingCount > 0) ? (
+            <p className="text-xs text-muted-foreground mt-1">
+              Level {achievementProgress.level} - {achievementProgress.levelTitle} -{" "}
+              {dailyRemainingCount > 0 ? `${dailyRemainingCount} left` : "Daily done"}
+              {suggestionsRemainingCount > 0 ? ` - ${suggestionsRemainingCount} suggestion left` : ""}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-1">
+              Level {achievementProgress.level} - {achievementProgress.levelTitle} - {achievementProgress.totalPoints} pts
+            </p>
+          )}
+        </div>
+        <div className="text-right text-xs text-muted-foreground">
+          <div className="tabular-nums">
+            <span className="font-medium text-foreground">
+              {dayCompletion.completedCount}/{dayCompletion.totalCount}
+            </span>{" "}
+            today
+          </div>
+          {dayCompletion.isComplete && <div className="text-accent">Complete</div>}
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-3">
+        <Progress value={dailyProgressPct} />
+
+        <div className="grid gap-2 sm:grid-cols-2">
+          {achievementsToday.length === 0 ? (
+            <div className="text-xs text-muted-foreground">
+              {achievementsLoading ? "Generating today's achievements..." : "No achievements yet."}
+            </div>
+          ) : (
+            achievementsToday.slice(0, 2).map((achievement) => (
+              <DailyAchievementCard
+                key={achievement.id}
+                achievement={achievement}
+                variant="compact"
+                showNewIndicator
+                onClick={() => handleAchievementClick(achievement)}
+              />
+            ))
+          )}
+        </div>
+
+        <div className="flex items-center justify-end text-xs text-muted-foreground">
+          <Link href="/achievements" className="underline underline-offset-4 hover:text-foreground">
+            View all
+          </Link>
+        </div>
+      </div>
+    </Deck>
+  )
+
+  const journalCard = (
+    <Deck className="p-6">
+      <div className="mb-4">
+        <h3 className="text-sm font-medium">Journal entries</h3>
+        <p className="text-xs text-muted-foreground mt-1">Recent reflections captured during check-ins.</p>
+      </div>
+      <JournalEntriesPanel embedded />
+    </Deck>
+  )
+
   return (
     <div data-demo-id="demo-dashboard-main" className="min-h-screen bg-transparent relative overflow-hidden">
       <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-24 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
@@ -315,162 +401,141 @@ export function UnifiedDashboard() {
           <MetricsHeaderBar />
         </div>
 
-        {/* Daily achievements (compact) */}
-        {/* Entry animation: keep in sync with the dashboard-level visible flag.
-            See docs/error-patterns/dashboard-missing-entry-animation.md */}
-        <div
-          data-testid="dashboard-daily-achievements"
-          className={cn(
-            "mb-4 transition-all duration-1000 delay-150",
-            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
-          )}
-        >
-          <CollapsibleSection title="Today's Achievements" defaultOpen={!isMobile}>
-            <div className="space-y-3">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    Level {achievementProgress.level} • {achievementProgress.levelTitle}
-                  </p>
-                  {!dayCompletion.isComplete && (dailyRemainingCount > 0 || suggestionsRemainingCount > 0) ? (
-                    <p className="text-xs text-muted-foreground">
-                      {dailyRemainingCount > 0 ? `${dailyRemainingCount} left` : "Daily done"}
-                      {suggestionsRemainingCount > 0 ? ` • ${suggestionsRemainingCount} suggestion left` : ""}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">{achievementProgress.totalPoints} pts</p>
-                  )}
-                </div>
-                <div className="text-right text-xs text-muted-foreground">
-                  <div className="tabular-nums">
-                    <span className="font-medium text-foreground">
-                      {dayCompletion.completedCount}/{dayCompletion.totalCount}
-                    </span>{" "}
-                    today
-                  </div>
-                  {dayCompletion.isComplete && <div className="text-accent">Complete</div>}
-                </div>
-              </div>
+        <Tabs value={activeView} onValueChange={(value) => setActiveView(value as "today" | "trends")}>
+          <div
+            className={cn(
+              "mb-6 transition-all duration-1000 delay-150",
+              visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
+            )}
+          >
+            <TabsList className="w-full">
+              <TabsTrigger value="today">Today</TabsTrigger>
+              <TabsTrigger value="trends">Trends</TabsTrigger>
+            </TabsList>
+          </div>
 
-              <Progress value={dailyProgressPct} />
-
-              <div className="grid gap-2 sm:grid-cols-2">
-                {achievementsToday.length === 0 ? (
-                  <div className="text-xs text-muted-foreground">
-                    {achievementsLoading ? "Generating today’s achievements…" : "No achievements yet."}
-                  </div>
-                ) : (
-                  achievementsToday.slice(0, 2).map((achievement) => (
-                    <DailyAchievementCard
-                      key={achievement.id}
-                      achievement={achievement}
-                      variant="compact"
-                      showNewIndicator
-                      onClick={() => handleAchievementClick(achievement)}
-                    />
-                  ))
-                )}
-              </div>
-
-              <div className="flex items-center justify-end text-xs text-muted-foreground">
-                <Link href="/achievements" className="underline underline-offset-4 hover:text-foreground">
-                  View all
-                </Link>
-              </div>
-            </div>
-          </CollapsibleSection>
-        </div>
-
-        {/* Main Content */}
-        <div
-          className={cn(
-            "transition-all duration-1000 delay-200",
-            visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
-          )}
-        >
-          {isMobile ? (
-            /* Mobile Layout: Stacked with collapsible panels at bottom */
-            <div className="space-y-4">
-              {/* Kanban */}
-              <Deck data-demo-id="demo-suggestions-kanban" className="p-4 h-[240px] overflow-hidden">
-                {kanbanContent}
-              </Deck>
-
-              {/* Calendar */}
-              <Deck
-                data-demo-id="demo-calendar"
-                className="overflow-hidden aspect-square w-full max-w-[420px] mx-auto"
-              >
-                {calendarContent}
-              </Deck>
-
-
-              {/* Collapsible Journal */}
-              <CollapsibleSection title="Journal Entries" defaultOpen={false}>
-                <JournalEntriesPanel embedded />
-              </CollapsibleSection>
-
-              {/* Empty state */}
-              {showEmptyState && (
-                <div className="mt-8 text-center">
-                  <p className="text-muted-foreground mb-4">
-                    No suggestions yet. Start a check-in to get personalized recovery recommendations.
-                  </p>
-                  <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-                    <Link href="/check-ins?newCheckIn=true">
-                      Check in now
-                    </Link>
-                  </Button>
-                </div>
+          <TabsContent value="today">
+            <div
+              className={cn(
+                "transition-all duration-1000 delay-200",
+                visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
               )}
-            </div>
-          ) : (
-            /* Desktop Layout: 2-column grid (calmer + more scannable) */
-            <div className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] items-start">
-                <div className="space-y-4 min-w-0">
-                  {/* Kanban */}
-                  <Deck
-                    data-demo-id="demo-suggestions-kanban"
-                    className={cn(
-                      "p-4 overflow-hidden transition-[height] duration-300",
-                      kanbanExpanded ? "h-[420px]" : "h-[260px]"
-                    )}
-                  >
+            >
+              {isMobile ? (
+                <div className="space-y-4">
+                  <InsightsPanel session={latestSynthesisSession} />
+
+                  <Deck data-demo-id="demo-suggestions-kanban" className="p-4 h-[240px] overflow-hidden">
                     {kanbanContent}
                   </Deck>
 
-                  {/* Collapsible Journal */}
-                  <CollapsibleSection title="Journal Entries" defaultOpen={false}>
-                    <JournalEntriesPanel embedded />
-                  </CollapsibleSection>
+                  {showEmptyState && (
+                    <div className="text-center">
+                      <p className="text-muted-foreground mb-4">
+                        No suggestions yet. Start a check-in to get personalized recovery recommendations.
+                      </p>
+                      <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+                        <Link href="/check-ins?newCheckIn=true">Check in now</Link>
+                      </Button>
+                    </div>
+                  )}
+
+                  <Deck
+                    data-demo-id="demo-calendar"
+                    className="overflow-hidden aspect-square w-full max-w-[420px] mx-auto"
+                  >
+                    {calendarContent}
+                  </Deck>
+
+                  {/* Entry animation: keep in sync with the dashboard-level visible flag.
+                      See docs/error-patterns/dashboard-missing-entry-animation.md */}
+                  <div
+                    data-testid="dashboard-daily-achievements"
+                    className={cn(
+                      "transition-all duration-1000 delay-250",
+                      visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
+                    )}
+                  >
+                    {achievementsCard}
+                  </div>
+
+                  {journalCard}
                 </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] items-start">
+                    <div className="space-y-4 min-w-0">
+                      <Deck
+                        data-demo-id="demo-suggestions-kanban"
+                        className={cn(
+                          "p-4 overflow-hidden transition-[height] duration-300",
+                          kanbanExpanded ? "h-[420px]" : "h-[260px]"
+                        )}
+                      >
+                        {kanbanContent}
+                      </Deck>
 
-                {/* Calendar (square preview, expands on click) */}
-                <Deck
-                  data-demo-id="demo-calendar"
-                  className="overflow-hidden aspect-square w-full max-w-[420px] mx-auto lg:max-w-none lg:mx-0"
-                >
-                  {calendarContent}
-                </Deck>
-              </div>
+                      {journalCard}
+                    </div>
 
-              {/* Empty state */}
-              {showEmptyState && (
-                <div className="mt-8 text-center">
-                  <p className="text-muted-foreground mb-4">
-                    No suggestions yet. Start a check-in to get personalized recovery recommendations.
-                  </p>
-                  <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
-                    <Link href="/check-ins?newCheckIn=true">
-                      Check in now
-                    </Link>
-                  </Button>
+                    <div className="space-y-4 min-w-0">
+                      <InsightsPanel session={latestSynthesisSession} />
+
+                      <Deck
+                        data-demo-id="demo-calendar"
+                        className="overflow-hidden aspect-square w-full max-w-[420px] mx-auto lg:max-w-none lg:mx-0"
+                      >
+                        {calendarContent}
+                      </Deck>
+
+                      {/* Entry animation: keep in sync with the dashboard-level visible flag.
+                          See docs/error-patterns/dashboard-missing-entry-animation.md */}
+                      <div
+                        data-testid="dashboard-daily-achievements"
+                        className={cn(
+                          "transition-all duration-1000 delay-250",
+                          visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
+                        )}
+                      >
+                        {achievementsCard}
+                      </div>
+                    </div>
+                  </div>
+
+                  {showEmptyState && (
+                    <div className="mt-8 text-center">
+                      <p className="text-muted-foreground mb-4">
+                        No suggestions yet. Start a check-in to get personalized recovery recommendations.
+                      </p>
+                      <Button asChild className="bg-accent text-accent-foreground hover:bg-accent/90">
+                        <Link href="/check-ins?newCheckIn=true">Check in now</Link>
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
+          </TabsContent>
+
+          <TabsContent value="trends">
+            {activeView === "trends" ? (
+              <div
+                id="analytics-section"
+                className={cn(
+                  "transition-all duration-1000 delay-200",
+                  visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
+                )}
+              >
+                <OverviewAnalyticsSection
+                  burnoutPrediction={burnoutPrediction}
+                  storedTrendData={storedTrendData}
+                  recordings={allRecordings}
+                  sessions={checkInSessions}
+                />
+              </div>
+            ) : null}
+          </TabsContent>
+        </Tabs>
 
         {/* Suggestion Detail Dialog */}
         <SuggestionDetailDialog

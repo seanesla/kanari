@@ -1,12 +1,20 @@
 "use client"
 
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { Sparkles, Stars, shaderMaterial } from "@react-three/drei"
 import * as THREE from "three"
 import { useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import { generateLightVariant } from "@/lib/color-utils"
+import {
+  FloatingGeometryField,
+  GalaxySprites,
+  NebulaBackdrop,
+  NebulaVolume,
+  ShootingStars,
+  StarClusters,
+} from "@/components/background/space-effects"
 
 // Source: Context7 - pmndrs/drei docs - "shaderMaterial"
 const AuroraCurtainMaterial = shaderMaterial(
@@ -156,119 +164,6 @@ function Aurora({ accentColor }: { accentColor: string }) {
   )
 }
 
-function mulberry32(seed: number) {
-  return function rng() {
-    let t = (seed += 0x6d2b79f5)
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
-function createNebulaTexture(seed: number): THREE.Texture | null {
-  if (typeof document === "undefined") return null
-
-  const size = 256
-  const canvas = document.createElement("canvas")
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext("2d")
-  if (!ctx) return null
-
-  const rand = mulberry32(seed)
-
-  ctx.clearRect(0, 0, size, size)
-  ctx.globalCompositeOperation = "source-over"
-
-  // Soft, irregular cloud puffs (blurred) – avoids obvious circular glows.
-  ctx.filter = "blur(14px)"
-  for (let i = 0; i < 42; i += 1) {
-    const x = size * (0.22 + rand() * 0.56)
-    const y = size * (0.22 + rand() * 0.56)
-    const r = size * (0.08 + rand() * 0.22)
-    const a = 0.06 + rand() * 0.11
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r)
-    g.addColorStop(0, `rgba(255,255,255,${a})`)
-    g.addColorStop(1, "rgba(255,255,255,0)")
-    ctx.fillStyle = g
-    ctx.beginPath()
-    ctx.arc(x, y, r, 0, Math.PI * 2)
-    ctx.fill()
-  }
-  ctx.filter = "none"
-
-  // Fade the texture edges so it reads like a mist patch, not a disc.
-  ctx.globalCompositeOperation = "destination-in"
-  const edgeFade = ctx.createRadialGradient(size * 0.5, size * 0.5, 0, size * 0.5, size * 0.5, size * 0.52)
-  edgeFade.addColorStop(0, "rgba(255,255,255,1)")
-  edgeFade.addColorStop(0.7, "rgba(255,255,255,0.85)")
-  edgeFade.addColorStop(1, "rgba(255,255,255,0)")
-  ctx.fillStyle = edgeFade
-  ctx.fillRect(0, 0, size, size)
-  ctx.globalCompositeOperation = "source-over"
-
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.wrapS = THREE.ClampToEdgeWrapping
-  texture.wrapT = THREE.ClampToEdgeWrapping
-  texture.minFilter = THREE.LinearFilter
-  texture.magFilter = THREE.LinearFilter
-  texture.generateMipmaps = false
-  return texture
-}
-
-function Nebula({ color }: { color: string }) {
-  const groupRef = useRef<THREE.Group>(null)
-  const reducedMotion = useReducedMotion()
-
-  const textures = useMemo(() => {
-    return [createNebulaTexture(1), createNebulaTexture(2)].filter(
-      (t): t is THREE.Texture => Boolean(t)
-    )
-  }, [])
-
-  useFrame((state) => {
-    if (reducedMotion) return
-    if (!groupRef.current) return
-    const t = state.clock.elapsedTime
-    groupRef.current.rotation.y = t * 0.004
-    groupRef.current.rotation.x = Math.sin(t * 0.03) * 0.02
-  })
-
-  // A few textured mist patches to create depth without obvious "giant circles".
-  return (
-    <group ref={groupRef}>
-      {textures[0] ? (
-        <mesh position={[7.5, 2.5, -22]} rotation={[0.2, -0.5, 0.15]} scale={[22, 12, 1]}>
-          <planeGeometry args={[1, 1]} />
-          <meshBasicMaterial
-            map={textures[0]}
-            color={color}
-            transparent
-            opacity={0.038}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
-      ) : null}
-      {textures[1] ? (
-        <mesh position={[-8, -3.5, -26]} rotation={[-0.1, 0.8, -0.08]} scale={[24, 14, 1]}>
-          <planeGeometry args={[1, 1]} />
-          <meshBasicMaterial
-            map={textures[1]}
-            color={color}
-            transparent
-            opacity={0.03}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            toneMapped={false}
-          />
-        </mesh>
-      ) : null}
-    </group>
-  )
-}
-
 function SpaceField({ accentColor }: { accentColor: string }) {
   const reducedMotion = useReducedMotion()
   const rigRef = useRef<THREE.Group>(null)
@@ -291,17 +186,23 @@ function SpaceField({ accentColor }: { accentColor: string }) {
 
       <Aurora accentColor={accentColor} />
 
+      <NebulaVolume accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
+
+      <GalaxySprites accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
+
       <Stars
         radius={120}
         depth={60}
-        count={reducedMotion ? 600 : 1400}
+        count={reducedMotion ? 600 : 1350}
         factor={4}
         saturation={0.2}
         fade
       />
 
+      <StarClusters accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
+
       <Sparkles
-        count={reducedMotion ? 30 : 110}
+        count={reducedMotion ? 30 : 90}
         // Keep the drift subtle; avoid occasional fast streaks.
         speed={reducedMotion ? 0 : 0.08}
         opacity={0.55}
@@ -311,7 +212,9 @@ function SpaceField({ accentColor }: { accentColor: string }) {
         noise={[0.55, 0.85, 0.55]}
       />
 
-      <Nebula color={sparkleColor} />
+      <NebulaBackdrop accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
+      <ShootingStars accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
+      <FloatingGeometryField accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
     </group>
   )
 }
@@ -324,13 +227,31 @@ export function AppSpaceBackground() {
   const { accentColor } = useSceneMode()
   const reducedMotion = useReducedMotion()
 
+  const [isPageVisible, setIsPageVisible] = useState(() => {
+    if (typeof document === "undefined") return true
+    return document.visibilityState !== "hidden"
+  })
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+
+    const onVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState !== "hidden")
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+    }
+  }, [])
+
   return (
     <div className="pointer-events-none fixed inset-0 -z-10">
       <Canvas
         dpr={[1, 1.5]}
         camera={{ position: [0, 0, 1], fov: 65 }}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-        frameloop={reducedMotion ? "demand" : "always"}
+        frameloop={reducedMotion || !isPageVisible ? "demand" : "always"}
       >
         <SpaceField accentColor={accentColor} />
       </Canvas>

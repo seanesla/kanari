@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { Temporal } from "temporal-polyfill"
 import { useLiveQuery } from "dexie-react-hooks"
 import { getDateKey } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
@@ -505,12 +506,40 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
   useEffect(() => {
     setTodayISO(getDateKey(new Date().toISOString(), timeZone))
 
-    const interval = setInterval(() => {
-      const next = getDateKey(new Date().toISOString(), timeZone)
-      setTodayISO((prev) => (prev === next ? prev : next))
-    }, 60_000)
+    if (typeof window === "undefined") return
 
-    return () => clearInterval(interval)
+    let cancelled = false
+    let timeoutId: number | null = null
+
+    const scheduleNextMidnight = () => {
+      if (cancelled) return
+
+      let delayMs = 60_000
+
+      try {
+        const now = Temporal.Now.zonedDateTimeISO(timeZone)
+        const nextMidnight = now.toPlainDate().add({ days: 1 }).toZonedDateTime({
+          timeZone,
+          plainTime: Temporal.PlainTime.from("00:00"),
+        })
+        delayMs = Math.max(0, nextMidnight.epochMilliseconds - now.epochMilliseconds) + 500
+      } catch {
+        delayMs = 60_000
+      }
+
+      timeoutId = window.setTimeout(() => {
+        const next = getDateKey(new Date().toISOString(), timeZone)
+        setTodayISO((prev) => (prev === next ? prev : next))
+        scheduleNextMidnight()
+      }, delayMs)
+    }
+
+    scheduleNextMidnight()
+
+    return () => {
+      cancelled = true
+      if (timeoutId !== null) window.clearTimeout(timeoutId)
+    }
   }, [timeZone])
 
   const ensureToday = useCallback(async () => {

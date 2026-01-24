@@ -13,7 +13,7 @@ const OAUTH_CODE_VERIFIER_COOKIE = "kanari_oauth_code_verifier"
 const OAUTH_RETURN_TO_COOKIE = "kanari_oauth_return_to"
 
 // Allowed redirect paths (security: prevent open redirect attacks)
-const ALLOWED_REDIRECT_PREFIXES = ["/overview", "/check-ins", "/analytics", "/achievements", "/settings"]
+const ALLOWED_REDIRECT_PREFIXES = ["/overview", "/check-ins", "/achievements", "/settings"]
 const DEFAULT_REDIRECT = "/overview"
 
 function getSafeRedirectPath(returnTo: string | undefined): string {

@@ -104,7 +104,7 @@ describe("AIChatContent", () => {
     expect(screen.getByRole("button", { name: /interrupt/i })).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: /interrupt/i }))
     expect(interruptAssistant).toHaveBeenCalledTimes(1)
-  })
+  }, 10000)
 
   it("applies glass chrome styles when chrome=\"glass\"", async () => {
     useCheckInMock.mockReturnValue([

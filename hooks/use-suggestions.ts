@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState, useCallback } from "react"
+import { Temporal } from "temporal-polyfill"
 import { logError } from "@/lib/logger"
 import type {
   Suggestion,
@@ -156,9 +157,41 @@ export function useSuggestions(): UseSuggestionsResult {
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    const id = window.setInterval(() => setDayTick((t) => t + 1), 60_000)
-    return () => window.clearInterval(id)
-  }, [])
+    if (!timeZone) return
+
+    let cancelled = false
+    let timeoutId: number | null = null
+
+    const scheduleNextTick = () => {
+      if (cancelled) return
+
+      let delayMs = 60_000
+
+      try {
+        const now = Temporal.Now.zonedDateTimeISO(timeZone)
+        const nextMidnight = now.toPlainDate().add({ days: 1 }).toZonedDateTime({
+          timeZone,
+          plainTime: Temporal.PlainTime.from("00:00"),
+        })
+        delayMs = Math.max(0, nextMidnight.epochMilliseconds - now.epochMilliseconds) + 500
+      } catch {
+        // If timezone math fails, fall back to a cheap periodic tick.
+        delayMs = 60_000
+      }
+
+      timeoutId = window.setTimeout(() => {
+        setDayTick((t) => t + 1)
+        scheduleNextTick()
+      }, delayMs)
+    }
+
+    scheduleNextTick()
+
+    return () => {
+      cancelled = true
+      if (timeoutId !== null) window.clearTimeout(timeoutId)
+    }
+  }, [timeZone])
 
   const clearUpdateError = useCallback(() => setUpdateError(null), [])
   const clearDiffSummary = useCallback(() => setLastDiffSummary(null), [])

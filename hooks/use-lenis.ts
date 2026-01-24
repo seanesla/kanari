@@ -17,7 +17,7 @@ export function useLenis() {
         lenisRef.current.destroy()
         lenisRef.current = null
       }
-      if (rafIdRef.current) {
+      if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current)
         rafIdRef.current = null
       }
@@ -35,19 +35,47 @@ export function useLenis() {
     })
     lenisRef.current = lenis
 
-    function raf(time: number) {
-      lenis.raf(time)
+    let cancelled = false
+
+    const stopLoop = () => {
+      if (rafIdRef.current === null) return
+      cancelAnimationFrame(rafIdRef.current)
+      rafIdRef.current = null
+    }
+
+    const startLoop = () => {
+      if (rafIdRef.current !== null) return
+      const raf = (time: number) => {
+        if (cancelled) return
+        lenis.raf(time)
+        rafIdRef.current = requestAnimationFrame(raf)
+      }
       rafIdRef.current = requestAnimationFrame(raf)
     }
-    rafIdRef.current = requestAnimationFrame(raf)
+
+    const onVisibilityChange = () => {
+      if (typeof document === "undefined") return
+      if (document.visibilityState === "hidden") {
+        stopLoop()
+        return
+      }
+      startLoop()
+    }
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", onVisibilityChange)
+    }
+    onVisibilityChange()
 
     return () => {
+      cancelled = true
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", onVisibilityChange)
+      }
+
+      stopLoop()
       lenis.destroy()
       lenisRef.current = null
-      if (rafIdRef.current) {
-        cancelAnimationFrame(rafIdRef.current)
-        rafIdRef.current = null
-      }
     }
   }, [mode])
 }

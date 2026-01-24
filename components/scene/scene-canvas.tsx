@@ -2,8 +2,18 @@
 
 import type { MutableRefObject } from "react"
 import { Environment } from "@react-three/drei"
+import { useReducedMotion } from "framer-motion"
 import type { SceneMode } from "@/lib/types"
 import { useSceneMode } from "@/lib/scene-context"
+import {
+  DistantStars,
+  FloatingGeometryField,
+  GalaxySprites,
+  NebulaBackdrop,
+  NebulaVolume,
+  ShootingStars,
+  StarClusters,
+} from "@/components/background/space-effects"
 import { SECTION_POSITIONS, SECTION_THRESHOLDS } from "./constants"
 import { KanariCore } from "./kanari-core"
 import { SectionAccent } from "./section-accent"
@@ -17,6 +27,7 @@ interface SceneProps {
 
 export function Scene({ scrollProgressRef, mode }: SceneProps) {
   const { accentColor } = useSceneMode()
+  const reducedMotion = useReducedMotion()
 
   return (
     <>
@@ -29,6 +40,15 @@ export function Scene({ scrollProgressRef, mode }: SceneProps) {
       <Environment preset="night" />
 
       <ScrollCamera scrollProgressRef={scrollProgressRef} mode={mode} />
+
+      {/* Deep space backplate (kept subtle to not compete with KanariCore). */}
+      <DistantStars accentColor={accentColor} variant="landing" animate={!reducedMotion} />
+      <GalaxySprites accentColor={accentColor} variant="landing" animate={!reducedMotion} />
+      <StarClusters accentColor={accentColor} variant="landing" animate={!reducedMotion} />
+      <NebulaVolume accentColor={accentColor} variant="landing" animate={!reducedMotion} />
+      <NebulaBackdrop accentColor={accentColor} variant="landing" animate={!reducedMotion} />
+      <ShootingStars accentColor={accentColor} variant="landing" animate={!reducedMotion} />
+      <FloatingGeometryField accentColor={accentColor} variant="landing" animate={!reducedMotion} />
 
       {/* THE focal point - always visible, transforms with scroll */}
       <KanariCore scrollProgressRef={scrollProgressRef} mode={mode} />

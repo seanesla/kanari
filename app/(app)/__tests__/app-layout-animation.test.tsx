@@ -68,7 +68,7 @@ describe("Dashboard animation flag", () => {
     expect(screen.getByTestId("flag").textContent).toBe("false")
 
     // Simulate navigation to a different dashboard route
-    currentPath = "/analytics"
+    currentPath = "/check-ins"
     rerender(
       <AppLayout>
         <TestPage />

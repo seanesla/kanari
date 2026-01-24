@@ -16,9 +16,9 @@ export function getDailyAchievementAction(key: DailyAchievementTrackingKey): Dai
     case "do_check_in":
       return { href: "/check-ins?newCheckIn=true", label: "Start check-in" }
     case "complete_suggestions":
-      return { href: "/overview?focus=suggestions", label: "Open suggestions" }
+      return { href: "/overview", label: "Open suggestions" }
     case "schedule_suggestion":
-      return { href: "/overview?focus=suggestions&action=schedule", label: "Schedule a suggestion" }
+      return { href: "/overview?action=schedule", label: "Schedule a suggestion" }
   }
 }
 

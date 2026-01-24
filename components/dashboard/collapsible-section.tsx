@@ -14,17 +14,30 @@ interface CollapsibleSectionProps {
   title: string
   children: React.ReactNode
   defaultOpen?: boolean
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function CollapsibleSection({
   title,
   children,
   defaultOpen = false,
+  open,
+  onOpenChange,
 }: CollapsibleSectionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen)
+  const isControlled = open !== undefined
+  const isOpen = isControlled ? open : uncontrolledOpen
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!isControlled) {
+      setUncontrolledOpen(nextOpen)
+    }
+    onOpenChange?.(nextOpen)
+  }
 
   return (
-    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+    <Collapsible open={isOpen} onOpenChange={handleOpenChange}>
       <Deck
         tone={isOpen ? "raised" : "quiet"}
         className={cn(

@@ -79,14 +79,21 @@ export function RecordingWaveform({
   const color = colorProp || accentColor // Use accent color from context if not provided
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const barsRef = useRef<number[]>([])
+  const barStartIndexRef = useRef(0)
   const animationFrameRef = useRef<number>(0)
   const waveformDataRef = useRef<number[]>([])
+  const audioLevelRef = useRef(audioLevel)
+
+  useEffect(() => {
+    audioLevelRef.current = audioLevel
+  }, [audioLevel])
 
   // Initialize bars for real-time mode
   useEffect(() => {
     if (mode === "realtime") {
       // Create initial bars array (60 bars for smooth animation)
       barsRef.current = Array(60).fill(0)
+      barStartIndexRef.current = 0
     }
   }, [mode])
 
@@ -103,15 +110,28 @@ export function RecordingWaveform({
       ctx.fillStyle = backgroundColor
       ctx.fillRect(0, 0, width, height)
 
-      // Shift bars left and add new bar
-      barsRef.current.shift()
-      barsRef.current.push(audioLevel)
+      const bars = barsRef.current
+      if (bars.length > 0) {
+        // Ring-buffer update (drops oldest, appends newest) without O(n) shift()
+        const writeIndex = barStartIndexRef.current
+        bars[writeIndex] = audioLevelRef.current
+        barStartIndexRef.current = (writeIndex + 1) % bars.length
+      }
 
       // Draw bars
-      const barWidth = width / barsRef.current.length
+      const barsLength = barsRef.current.length
+      if (barsLength === 0) {
+        animationFrameRef.current = requestAnimationFrame(draw)
+        return
+      }
+
+      const barWidth = width / barsLength
       const barSpacing = 2
 
-      barsRef.current.forEach((level, index) => {
+      const startIndex = barStartIndexRef.current
+
+      for (let index = 0; index < barsLength; index += 1) {
+        const level = bars[(startIndex + index) % barsLength] ?? 0
         const barHeight = level * height * 0.8 // Max 80% of canvas height
         const x = index * barWidth
         const y = (height - barHeight) / 2
@@ -123,7 +143,7 @@ export function RecordingWaveform({
 
         ctx.fillStyle = gradient
         ctx.fillRect(x, y, barWidth - barSpacing, barHeight)
-      })
+      }
 
       animationFrameRef.current = requestAnimationFrame(draw)
     }
@@ -135,7 +155,7 @@ export function RecordingWaveform({
         cancelAnimationFrame(animationFrameRef.current)
       }
     }
-  }, [mode, audioLevel, width, height, color, backgroundColor])
+  }, [mode, width, height, color, backgroundColor])
 
   // Draw static waveform
   useEffect(() => {
@@ -150,20 +170,23 @@ export function RecordingWaveform({
     ctx.fillRect(0, 0, width, height)
 
     // Downsample audio data to fit canvas width
-    const samplesPerPixel = Math.floor(audioData.length / width)
+    const samplesPerPixel = Math.max(1, Math.floor(audioData.length / width))
     const waveformData: number[] = []
 
     for (let i = 0; i < width; i++) {
       const start = i * samplesPerPixel
-      const end = start + samplesPerPixel
-      const slice = audioData.slice(start, end)
+      const end = Math.min(audioData.length, start + samplesPerPixel)
 
       // Calculate RMS for this slice
       let sum = 0
-      for (let j = 0; j < slice.length; j++) {
-        sum += slice[j] * slice[j]
+      let count = 0
+      for (let j = start; j < end; j++) {
+        const sample = audioData[j] ?? 0
+        sum += sample * sample
+        count += 1
       }
-      const rms = Math.sqrt(sum / slice.length)
+
+      const rms = count > 0 ? Math.sqrt(sum / count) : 0
       waveformData.push(rms)
     }
 

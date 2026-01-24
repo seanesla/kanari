@@ -84,7 +84,7 @@ export const ALL_DEMO_STEPS: DemoStep[] = [
   {
     id: "analytics-burnout",
     phase: "analytics",
-    route: "/analytics",
+    route: "/overview?view=trends",
     target: "demo-burnout-prediction",
     title: "Burnout Forecast",
     content: "AI predicts your burnout risk for the coming week based on voice patterns and trends.",
