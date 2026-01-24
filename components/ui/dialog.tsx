@@ -60,9 +60,12 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          // Avoid transform-based "zoom" animations here: they can fight with centering transforms
-          // and look like the dialog is flying in from a corner on some pages.
-          'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg',
+          // Use opacity-only transitions for the content. Tailwind "animate-in" keyframes write to
+          // `transform`, which fights the centering translate and can look like the dialog flies in
+          // from a corner on some pages.
+          'bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg',
+          'transition-opacity duration-200',
+          'data-[state=open]:opacity-100 data-[state=closed]:opacity-0',
           className,
         )}
         {...props}
