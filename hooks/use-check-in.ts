@@ -194,8 +194,27 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
     [getGeminiControls]
   )
 
+  const handleUserBargeIn = useCallback(() => {
+    const state = stateRef.current
+    if (state !== "assistant_speaking" && state !== "ai_greeting") return
+
+    // Stop assistant audio immediately and allow mic audio through.
+    suppressAssistantAudioRef.current = true
+    playbackControls.clearQueue()
+
+    // Critical: update the ref synchronously so sendAudio() stops half-duplex blocking
+    // on the very next captured mic chunk.
+    stateRef.current = "user_speaking"
+    dispatch({ type: "SET_USER_SPEAKING" })
+  }, [dispatch, playbackControls])
+
   // Sub-hooks
-  const audio = useCheckInAudio({ dispatch, sendAudio })
+  const audio = useCheckInAudio({
+    dispatch,
+    sendAudio,
+    getCheckInState: () => stateRef.current,
+    onUserBargeIn: handleUserBargeIn,
+  })
 
   const queueAssistantAudio = useCallback(
     (base64Audio: string) => {
@@ -336,6 +355,8 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
       playbackControls.clearQueue()
       const state = stateRef.current
       if (state === "assistant_speaking" || state === "ai_greeting" || state === "processing") {
+        // Sync ref immediately so mic audio is unblocked without waiting for a render.
+        stateRef.current = "listening"
         dispatch({ type: "SET_LISTENING" })
       }
     },

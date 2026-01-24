@@ -9,6 +9,7 @@ import { z } from "zod"
 import type {
   BreathingExerciseToolArgs,
   CommitmentToolArgs,
+  GetJournalEntriesToolArgs,
   JournalPromptToolArgs,
   QuickActionsToolArgs,
   ScheduleActivityToolArgs,
@@ -280,4 +281,9 @@ export const CommitmentArgsSchema: z.ZodType<CommitmentToolArgs> = z.object({
   content: z.string().min(1).max(300),
   category: z.enum(["action", "habit", "mindset", "boundary"]),
   timeframe: z.string().min(1).max(80).optional(),
+})
+
+export const GetJournalEntriesArgsSchema: z.ZodType<GetJournalEntriesToolArgs> = z.object({
+  limit: z.number().int().min(1).max(25).optional(),
+  offset: z.number().int().min(0).max(10_000).optional(),
 })

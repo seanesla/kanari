@@ -201,6 +201,30 @@ export const SHOW_JOURNAL_PROMPT_TOOL = {
   }]
 }
 
+/**
+ * Tool declaration for reading journal entries as context.
+ * Note: Access is gated by the user's Settings (shareJournalWithAi).
+ */
+export const GET_JOURNAL_ENTRIES_TOOL = {
+  functionDeclarations: [{
+    name: "get_journal_entries",
+    description: "Fetch the user's saved journal entries (most recent first) so you can reference or summarize them. IMPORTANT: Only use this if the user is asking about their journal or wants you to reference it. If the tool response says journal sharing is disabled, ask the user to enable 'Share Journal With AI' in Settings.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        limit: {
+          type: Type.INTEGER,
+          description: "Max number of entries to return (most recent first). Default: 10. Max: 25."
+        },
+        offset: {
+          type: Type.INTEGER,
+          description: "How many of the most-recent entries to skip (pagination). Default: 0."
+        }
+      },
+    }
+  }]
+}
+
 export const GEMINI_TOOLS = [
   MUTE_RESPONSE_TOOL,
   SCHEDULE_ACTIVITY_TOOL,
@@ -209,6 +233,7 @@ export const GEMINI_TOOLS = [
   SHOW_STRESS_GAUGE_TOOL,
   SHOW_QUICK_ACTIONS_TOOL,
   SHOW_JOURNAL_PROMPT_TOOL,
+  GET_JOURNAL_ENTRIES_TOOL,
 ]
 
 // Allowed values for validation - prevents prompt injection
@@ -338,6 +363,11 @@ AVAILABLE TOOLS:
 5) show_journal_prompt({ prompt, placeholder, category })
    - Use when the user wants to journal or reflection would help
    - Keep prompts supportive, concrete, and short
+
+ 6) get_journal_entries({ limit, offset })
+    - Use when the user asks what is in their journal or wants you to reference past entries
+    - Use offset to request older entries if needed (pagination)
+    - If the tool response says sharing is disabled, ask the user to enable "Share Journal With AI" in Settings
 
 ═══════════════════════════════════════════════════════════════════════════════
 CONVERSATIONAL MODE (Only use when NO silence triggers are present)

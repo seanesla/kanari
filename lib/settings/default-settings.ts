@@ -19,6 +19,8 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
 
   localStorageOnly: true,
 
+  shareJournalWithAi: false,
+
   // Gemini API key handling
   geminiApiKeySource: DEFAULT_GEMINI_API_KEY_SOURCE,
 

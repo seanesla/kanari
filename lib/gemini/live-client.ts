@@ -21,6 +21,7 @@
 import {
   BreathingExerciseArgsSchema,
   CommitmentArgsSchema,
+  GetJournalEntriesArgsSchema,
   JournalPromptArgsSchema,
   QuickActionsArgsSchema,
   ScheduleActivityArgsSchema,
@@ -833,6 +834,99 @@ export class GeminiLiveClient {
             response: { acknowledged: true, shown: true }
           }])
         }
+        continue
+      }
+
+      if (fc.name === "get_journal_entries") {
+        const parsed = GetJournalEntriesArgsSchema.safeParse(fc.args ?? {})
+        if (!parsed.success) {
+          logWarn("LiveClient", "Invalid get_journal_entries args:", parsed.error.issues)
+          if (fc.id) {
+            this.sendToolResponse([{
+              id: fc.id,
+              name: fc.name,
+              response: { acknowledged: false, error: "invalid_args" }
+            }])
+          }
+          continue
+        }
+
+        // Tool calls are async (IndexedDB read), so respond in the background.
+        if (fc.id) {
+          const limit = Math.max(1, Math.min(25, parsed.data.limit ?? 10))
+          const offset = Math.max(0, Math.min(10_000, parsed.data.offset ?? 0))
+          void (async () => {
+            try {
+              if (typeof indexedDB === "undefined") {
+                this.sendToolResponse([{
+                  id: fc.id!,
+                  name: fc.name,
+                  response: { acknowledged: false, error: "indexeddb_unavailable" }
+                }])
+                return
+              }
+
+              const { db, toJournalEntry } = await import("@/lib/storage/db")
+              const settings = await db.settings.get("default")
+              const allowed = settings?.shareJournalWithAi ?? false
+
+              if (!allowed) {
+                this.sendToolResponse([{
+                  id: fc.id!,
+                  name: fc.name,
+                  response: { acknowledged: false, error: "sharing_disabled" }
+                }])
+                return
+              }
+
+              const truncateText = (text: string, maxChars: number) => {
+                const cleaned = (text ?? "").trim()
+                if (cleaned.length <= maxChars) return cleaned
+                if (maxChars <= 3) return cleaned.slice(0, maxChars)
+                return `${cleaned.slice(0, maxChars - 3)}...`
+              }
+
+              const total = await db.journalEntries.count()
+              const rows = await db.journalEntries
+                .orderBy("createdAt")
+                .reverse()
+                .offset(offset)
+                .limit(limit)
+                .toArray()
+              const entries = rows.map(toJournalEntry).map((e) => ({
+                ...e,
+                prompt: truncateText(e.prompt, 180),
+                content: truncateText(e.content, 800),
+              }))
+
+              const nextOffset = offset + entries.length
+              const hasMore = nextOffset < total
+
+              this.sendToolResponse([{
+                id: fc.id!,
+                name: fc.name,
+                response: {
+                  acknowledged: true,
+                  entries,
+                  totalEntries: total,
+                  returned: entries.length,
+                  offset,
+                  nextOffset,
+                  hasMore,
+                  truncated: hasMore,
+                }
+              }])
+            } catch (error) {
+              const message = error instanceof Error ? error.message : "Failed to read journal"
+              this.sendToolResponse([{
+                id: fc.id!,
+                name: fc.name,
+                response: { acknowledged: false, error: "read_failed", message }
+              }])
+            }
+          })()
+        }
+
         continue
       }
 

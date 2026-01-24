@@ -4,11 +4,18 @@ import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch } from "react"
 import { int16ToBase64 } from "@/lib/audio/pcm-converter"
 import { logDebug } from "@/lib/logger"
+import type { CheckInState } from "@/lib/types"
 import type { CheckInAction } from "./use-check-in-messages"
 
 export interface UseCheckInAudioOptions {
   dispatch: Dispatch<CheckInAction>
   sendAudio: (base64Audio: string) => void
+  /**
+   * Used for barge-in: when the assistant is speaking, detect if the user starts talking.
+   * If so, call `onUserBargeIn` to stop assistant playback and allow mic audio through.
+   */
+  getCheckInState?: () => CheckInState
+  onUserBargeIn?: () => void
 }
 
 export interface UseCheckInAudioResult {
@@ -23,7 +30,7 @@ export interface UseCheckInAudioResult {
 }
 
 export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudioResult {
-  const { dispatch, sendAudio } = options
+  const { dispatch, sendAudio, getCheckInState, onUserBargeIn } = options
 
   // Audio capture refs
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -46,6 +53,21 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
   // Throttle ref for audio level dispatches (60ms interval)
   const lastAudioLevelDispatchRef = useRef<number>(0)
   const AUDIO_LEVEL_THROTTLE_MS = 60
+
+  // ============================================
+  // Local barge-in detection (simple energy VAD)
+  // ============================================
+
+  // When the assistant is speaking, we still capture mic audio but we normally
+  // don't forward it to Gemini (half-duplex). To support "barge-in" (user starts
+  // talking to interrupt), we detect loud mic input locally and trigger an interrupt.
+  //
+  // This is intentionally simple: if we see N consecutive chunks above a threshold,
+  // treat it as the user starting to speak.
+  const bargeInTriggeredRef = useRef(false)
+  const bargeInConsecutiveRef = useRef(0)
+  const BARGE_IN_LEVEL_THRESHOLD = 0.08 // 0-1 (matches UI scaling)
+  const BARGE_IN_CONSECUTIVE_CHUNKS = 2 // ~256ms at 2048 samples / 16kHz
 
   // Max audio chunks to prevent memory leak (roughly 10 seconds at 100ms chunks)
   const MAX_AUDIO_CHUNKS = 1000
@@ -185,15 +207,43 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
           const pcmBuffer = event.data.pcm as ArrayBuffer
           const int16Data = new Int16Array(pcmBuffer)
 
+          // Convert to Float32 for local analysis + storage, and compute RMS in the same pass.
+          let sumSquares = 0
+          const float32Data = new Float32Array(int16Data.length)
+          for (let i = 0; i < int16Data.length; i++) {
+            const v = int16Data[i] / (int16Data[i] < 0 ? 0x8000 : 0x7fff)
+            float32Data[i] = v
+            sumSquares += v * v
+          }
+          const rms = Math.sqrt(sumSquares / Math.max(1, float32Data.length))
+          const inputLevel = Math.min(rms * 5, 1)
+
+          // Barge-in: if the assistant is speaking and the user starts talking,
+          // trigger an interrupt BEFORE we forward this chunk.
+          const state = getCheckInState?.()
+          const assistantSpeaking = state === "assistant_speaking" || state === "ai_greeting"
+          if (!assistantSpeaking) {
+            bargeInTriggeredRef.current = false
+            bargeInConsecutiveRef.current = 0
+          } else if (onUserBargeIn && getCheckInState) {
+            if (!bargeInTriggeredRef.current) {
+              if (inputLevel >= BARGE_IN_LEVEL_THRESHOLD) {
+                bargeInConsecutiveRef.current += 1
+              } else {
+                bargeInConsecutiveRef.current = 0
+              }
+
+              if (bargeInConsecutiveRef.current >= BARGE_IN_CONSECUTIVE_CHUNKS) {
+                bargeInTriggeredRef.current = true
+                bargeInConsecutiveRef.current = 0
+                onUserBargeIn()
+              }
+            }
+          }
+
           // Convert to base64 and send to Gemini
           const base64Audio = int16ToBase64(int16Data)
           sendAudio(base64Audio)
-
-          // Also store for mismatch detection and session-level analysis
-          const float32Data = new Float32Array(int16Data.length)
-          for (let i = 0; i < int16Data.length; i++) {
-            float32Data[i] = int16Data[i] / (int16Data[i] < 0 ? 0x8000 : 0x7fff)
-          }
           // Prevent memory leak by dropping oldest chunks if at limit
           if (audioChunksRef.current.length >= MAX_AUDIO_CHUNKS) {
             audioChunksRef.current.shift()
@@ -205,12 +255,7 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
           // Calculate input level for visualization (throttled to reduce re-renders)
           const now = Date.now()
           if (now - lastAudioLevelDispatchRef.current >= AUDIO_LEVEL_THROTTLE_MS) {
-            let sum = 0
-            for (let i = 0; i < float32Data.length; i++) {
-              sum += float32Data[i] * float32Data[i]
-            }
-            const rms = Math.sqrt(sum / float32Data.length)
-            dispatch({ type: "SET_INPUT_LEVEL", level: Math.min(rms * 5, 1) })
+            dispatch({ type: "SET_INPUT_LEVEL", level: inputLevel })
             lastAudioLevelDispatchRef.current = now
           }
         }

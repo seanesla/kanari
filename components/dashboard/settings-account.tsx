@@ -24,6 +24,8 @@ interface SettingsAccountSectionProps {
   isSaving: boolean
   localStorageOnly: boolean
   onLocalStorageOnlyChange: (checked: boolean) => void
+  shareJournalWithAi: boolean
+  onShareJournalWithAiChange: (checked: boolean) => void
   embedded?: boolean
 }
 
@@ -31,6 +33,8 @@ export function SettingsAccountSection({
   isSaving,
   localStorageOnly,
   onLocalStorageOnlyChange,
+  shareJournalWithAi,
+  onShareJournalWithAiChange,
   embedded = false,
 }: SettingsAccountSectionProps) {
   const router = useRouter()
@@ -94,6 +98,25 @@ export function SettingsAccountSection({
                 checked={localStorageOnly}
                 onCheckedChange={onLocalStorageOnlyChange}
                 aria-label="Local Storage Only"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <Label htmlFor="share-journal" className="text-base font-sans">
+                  Share Journal With AI
+                </Label>
+                <p className="text-sm text-muted-foreground font-sans">
+                  Allow Kanari to send your journal entries to Gemini during check-ins so it can reference them.
+                </p>
+              </div>
+              <Switch
+                id="share-journal"
+                checked={shareJournalWithAi}
+                onCheckedChange={onShareJournalWithAiChange}
+                aria-label="Share Journal With AI"
               />
             </div>
           </div>

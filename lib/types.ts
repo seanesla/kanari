@@ -509,6 +509,13 @@ export interface UserSettings {
 
   // Privacy
   localStorageOnly: boolean
+  /**
+   * If enabled, Kanari can share your journal entries with Gemini during check-ins
+   * so the AI can reference them.
+   *
+   * Off by default.
+   */
+  shareJournalWithAi: boolean
 
   // Coach preferences
   coachVoice?: CoachVoice
@@ -838,6 +845,17 @@ export interface JournalPromptToolArgs {
   prompt: string
   placeholder?: string
   category?: string
+}
+
+/**
+ * Tool args for letting Gemini request journal entries as context.
+ * This is not a widget; it returns data via tool response.
+ */
+export interface GetJournalEntriesToolArgs {
+  /** Max entries to return (most recent first). */
+  limit?: number
+  /** Number of most-recent entries to skip (for pagination). */
+  offset?: number
 }
 
 export type WidgetType =

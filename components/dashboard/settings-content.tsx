@@ -41,6 +41,7 @@ type SettingsDraft = Pick<
   | "timeZone"
   | "autoScheduleRecovery"
   | "localStorageOnly"
+  | "shareJournalWithAi"
   | "geminiApiKey"
   | "geminiApiKeySource"
   | "selectedGeminiVoice"
@@ -58,6 +59,7 @@ const DEFAULT_DRAFT: SettingsDraft = {
   timeZone: DEFAULT_USER_SETTINGS.timeZone,
   autoScheduleRecovery: DEFAULT_USER_SETTINGS.autoScheduleRecovery,
   localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
+  shareJournalWithAi: DEFAULT_USER_SETTINGS.shareJournalWithAi,
   geminiApiKey: DEFAULT_USER_SETTINGS.geminiApiKey,
   geminiApiKeySource: DEFAULT_USER_SETTINGS.geminiApiKeySource,
   selectedGeminiVoice: DEFAULT_USER_SETTINGS.selectedGeminiVoice,
@@ -117,6 +119,7 @@ export function SettingsContent() {
           timeZone: savedSettings?.timeZone ?? DEFAULT_USER_SETTINGS.timeZone,
           autoScheduleRecovery: savedSettings?.autoScheduleRecovery ?? DEFAULT_USER_SETTINGS.autoScheduleRecovery,
           localStorageOnly: savedSettings?.localStorageOnly ?? DEFAULT_USER_SETTINGS.localStorageOnly,
+          shareJournalWithAi: savedSettings?.shareJournalWithAi ?? DEFAULT_USER_SETTINGS.shareJournalWithAi,
           geminiApiKey: savedSettings?.geminiApiKey,
           geminiApiKeySource: savedSettings?.geminiApiKeySource ?? DEFAULT_USER_SETTINGS.geminiApiKeySource,
           selectedGeminiVoice: savedSettings?.selectedGeminiVoice as GeminiVoice | undefined,
@@ -171,6 +174,7 @@ export function SettingsContent() {
       baseline.timeZone !== normalizedDraft.timeZone ||
       baseline.autoScheduleRecovery !== normalizedDraft.autoScheduleRecovery ||
       baseline.localStorageOnly !== normalizedDraft.localStorageOnly ||
+      baseline.shareJournalWithAi !== normalizedDraft.shareJournalWithAi ||
       baseline.geminiApiKey !== normalizedDraft.geminiApiKey ||
       baseline.geminiApiKeySource !== normalizedDraft.geminiApiKeySource ||
       baseline.selectedGeminiVoice !== normalizedDraft.selectedGeminiVoice ||
@@ -201,6 +205,7 @@ export function SettingsContent() {
         timeZone: normalizedDraft.timeZone,
         autoScheduleRecovery: normalizedDraft.autoScheduleRecovery,
         localStorageOnly: normalizedDraft.localStorageOnly,
+        shareJournalWithAi: normalizedDraft.shareJournalWithAi,
         geminiApiKey: normalizedDraft.geminiApiKey,
         geminiApiKeySource: normalizedDraft.geminiApiKeySource,
         selectedGeminiVoice: normalizedDraft.selectedGeminiVoice,
@@ -344,6 +349,11 @@ export function SettingsContent() {
             localStorageOnly={draft.localStorageOnly}
             onLocalStorageOnlyChange={(checked) => {
               setDraft((prev) => ({ ...prev, localStorageOnly: checked }))
+              setSaveMessage(null)
+            }}
+            shareJournalWithAi={draft.shareJournalWithAi}
+            onShareJournalWithAiChange={(checked: boolean) => {
+              setDraft((prev) => ({ ...prev, shareJournalWithAi: checked }))
               setSaveMessage(null)
             }}
           />
