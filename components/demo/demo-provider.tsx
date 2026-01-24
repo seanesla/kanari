@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react"
 import { useRouter } from "next/navigation"
+import type { EntityTable, IDType } from "dexie"
 import {
   db,
   fromCheckInSession,
@@ -176,6 +177,21 @@ export function DemoProvider({ children }: DemoProviderProps) {
           db.settings,
         ],
         async () => {
+          // Demo can be started multiple times (or after a refresh) without a clean stop.
+          // Remove any existing demo rows first so we don't accumulate duplicates.
+          const deleteDemoRows = async <T extends { id: string }>(table: EntityTable<T, "id">) => {
+            const keys = await table.where("id").startsWith("demo_").primaryKeys()
+            if (keys.length > 0) {
+              await table.bulkDelete(keys as IDType<T, "id">[])
+            }
+          }
+
+          await deleteDemoRows(db.checkInSessions)
+          await deleteDemoRows(db.suggestions)
+          await deleteDemoRows(db.achievements)
+          await deleteDemoRows(db.milestoneBadges)
+          await deleteDemoRows(db.journalEntries)
+
           await db.checkInSessions.bulkPut(sessions.map(fromCheckInSession))
           await db.trendData.bulkPut(trends.map(fromTrendData))
           await db.suggestions.bulkPut(suggestions.map(fromSuggestion))

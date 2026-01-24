@@ -326,10 +326,88 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
     () => db.milestoneBadges.orderBy("earnedAt").reverse().toArray(),
     []
   )
-  const milestoneBadges: MilestoneBadge[] = useMemo(
-    () => (dbMilestones ?? []).map(toMilestoneBadge),
-    [dbMilestones]
-  )
+  const milestoneBadges: MilestoneBadge[] = useMemo(() => {
+    const badges = (dbMilestones ?? []).map(toMilestoneBadge)
+
+    // Defensive: older builds (and demo-mode reseeding) could insert duplicates of the same milestone.
+    // De-dupe by `type` at the view-model layer so the UI never shows repeated cards.
+    const byType = new Map<MilestoneBadgeType, MilestoneBadge>()
+    for (const badge of badges) {
+      const existing = byType.get(badge.type)
+      if (!existing) {
+        byType.set(badge.type, badge)
+        continue
+      }
+
+      const existingEarned = new Date(existing.earnedAt).getTime()
+      const incomingEarned = new Date(badge.earnedAt).getTime()
+      const keepExisting = existingEarned <= incomingEarned
+
+      const keep = keepExisting ? existing : badge
+      const drop = keepExisting ? badge : existing
+
+      const allSeen = keep.seen && drop.seen
+      const merged: MilestoneBadge = {
+        ...keep,
+        earnedAt: new Date(Math.min(existingEarned, incomingEarned)).toISOString(),
+        streakDays: Math.max(keep.streakDays, drop.streakDays),
+        seen: allSeen,
+        seenAt: allSeen
+          ? [keep.seenAt, drop.seenAt].filter(Boolean).sort().slice(-1)[0]
+          : undefined,
+      }
+
+      byType.set(merged.type, merged)
+    }
+
+    return Array.from(byType.values()).sort(
+      (a, b) => new Date(b.earnedAt).getTime() - new Date(a.earnedAt).getTime()
+    )
+  }, [dbMilestones])
+
+  // Best-effort: prune duplicate milestone rows so toasts/seen-state stay consistent.
+  useEffect(() => {
+    if (!dbMilestones) return
+    if (dbMilestones.length <= 1) return
+
+    void (async () => {
+      await db.transaction("rw", db.milestoneBadges, async () => {
+        const all = await db.milestoneBadges.toArray()
+        const byType = new Map<MilestoneBadgeType, typeof all>()
+        for (const badge of all) {
+          const list = byType.get(badge.type) ?? []
+          list.push(badge)
+          byType.set(badge.type, list)
+        }
+
+        for (const [, list] of byType) {
+          if (list.length <= 1) continue
+
+          const sortedByEarned = list.slice().sort((a, b) => a.earnedAt.getTime() - b.earnedAt.getTime())
+          const keep = sortedByEarned[0]
+          const drop = sortedByEarned.slice(1)
+
+          const minEarnedAt = sortedByEarned[0]?.earnedAt ?? keep.earnedAt
+          const maxStreakDays = Math.max(...sortedByEarned.map((b) => b.streakDays))
+          const allSeen = sortedByEarned.every((b) => b.seen)
+          const latestSeenAt = sortedByEarned
+            .map((b) => b.seenAt)
+            .filter((d): d is Date => Boolean(d))
+            .sort((a, b) => a.getTime() - b.getTime())
+            .slice(-1)[0]
+
+          await db.milestoneBadges.update(keep.id, {
+            earnedAt: minEarnedAt,
+            streakDays: maxStreakDays,
+            seen: allSeen,
+            seenAt: allSeen ? latestSeenAt : undefined,
+          })
+
+          await db.milestoneBadges.bulkDelete(drop.map((b) => b.id))
+        }
+      })
+    })()
+  }, [dbMilestones])
 
   const dbProgress = useLiveQuery(() => db.userProgress.get("default"), [])
   const progress: UserProgress = dbProgress ?? DEFAULT_PROGRESS
@@ -718,57 +796,6 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
         }
       }
 
-      // If completing this achievement finishes the day AND the user did 2+ suggestions, advance streak + milestones.
-      if (!hasInput || !recordings || !sessions || !suggestions) return
-      const nowAchievements = await db.achievements
-        .where("dateISO")
-        .equals(todayISO)
-        .filter((a) => !a.expired)
-        .toArray()
-
-      const allComplete = nowAchievements.length > 0 && nowAchievements.every((a) => a.completed)
-      const { suggestionsCompletedToday } = calculateTodayCounts({
-        recordings,
-        sessions,
-        suggestions,
-        timeZone,
-        todayISO,
-      })
-
-      const qualifies = allComplete && suggestionsCompletedToday >= 2
-      if (!qualifies) return
-      if (nextProgress.lastCompletedDateISO === todayISO) return
-
-      const yesterdayISO = shiftDateISO(todayISO, -1)
-      const isConsecutive = nextProgress.lastCompletedDateISO === yesterdayISO
-      const nextStreak = isConsecutive ? nextProgress.currentDailyCompletionStreak + 1 : 1
-
-      const updatedStreakProgress: UserProgress = {
-        ...nextProgress,
-        currentDailyCompletionStreak: nextStreak,
-        longestDailyCompletionStreak: Math.max(nextProgress.longestDailyCompletionStreak, nextStreak),
-        lastCompletedDateISO: todayISO,
-      }
-
-      await db.userProgress.put(updatedStreakProgress)
-
-      const milestone = milestoneDefinitionForStreak(nextStreak)
-      if (!milestone) return
-
-      const alreadyEarned = await db.milestoneBadges.where("type").equals(milestone.type).count()
-      if (alreadyEarned > 0) return
-
-      const badge: MilestoneBadge = {
-        id: crypto.randomUUID(),
-        type: milestone.type,
-        title: milestone.title,
-        description: milestone.description,
-        earnedAt: nowISO,
-        streakDays: nextStreak,
-        seen: false,
-      }
-
-      await db.milestoneBadges.add(fromMilestoneBadge(badge))
     })
 
     if (shouldRequestAILevelTitle && pendingLevelTitleRequest) {
@@ -782,7 +809,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
         // ignore
       }
     }
-  }, [hasInput, recordings, sessions, suggestions, timeZone, todayISO])
+  }, [])
 
   const markAchievementSeen = useCallback(async (achievementId: string) => {
     await db.achievements.update(achievementId, { seen: true, seenAt: new Date() })
@@ -848,7 +875,8 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
         if (alreadyEarned > 0) return
 
         const badge: MilestoneBadge = {
-          id: crypto.randomUUID(),
+          // Use a stable ID so concurrent completions can't create duplicates.
+          id: milestone.type,
           type: milestone.type,
           title: milestone.title,
           description: milestone.description,
@@ -857,7 +885,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
           seen: false,
         }
 
-        await db.milestoneBadges.add(fromMilestoneBadge(badge))
+        await db.milestoneBadges.put(fromMilestoneBadge(badge))
       })
     })()
   }, [dayCompletion.isComplete, hasInput, todayISO])
