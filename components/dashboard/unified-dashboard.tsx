@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
+import { motion } from "framer-motion"
 import { RefreshCw, ChevronsUpDown, ArrowUpRight, Sparkles, TrendingUp, X } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
@@ -411,43 +412,66 @@ export function UnifiedDashboard() {
             <TabsList
               className={cn(
                 "w-full max-w-[460px] mx-auto",
-                "h-11 p-1 rounded-2xl",
-                "border border-border/60",
-                "bg-[rgba(255,255,255,0.02)] backdrop-blur-xl backdrop-saturate-150",
-                "shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_12px_30px_rgba(0,0,0,0.28)]"
+                "relative h-11 p-1 rounded-2xl",
+                "border border-border/80",
+                "bg-card/35 backdrop-blur-2xl backdrop-saturate-150",
+                "ring-1 ring-white/8",
+                "shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_50px_rgba(0,0,0,0.35)]"
               )}
             >
               <TabsTrigger
                 value="today"
                 className={cn(
-                  "h-9 rounded-xl px-4",
+                  "relative h-9 rounded-xl px-4 overflow-hidden",
                   "text-sm font-semibold tracking-tight",
                   "text-muted-foreground/90 hover:text-foreground",
                   "hover:bg-muted/20",
-                  "data-[state=active]:bg-accent data-[state=active]:text-accent-foreground",
-                  "data-[state=active]:shadow-[0_10px_30px_oklch(from_var(--accent)_l_c_h/0.22)]",
-                  "data-[state=active]:hover:bg-accent",
+                  "data-[state=active]:text-accent-foreground",
                   "transition-all duration-200"
                 )}
               >
-                <Sparkles className="h-4 w-4" />
-                Today
+                {activeView === "today" ? (
+                  <motion.div
+                    layoutId="overview-tabs-indicator"
+                    transition={{ type: "spring", stiffness: 520, damping: 42 }}
+                    className={cn(
+                      "absolute inset-0 rounded-xl",
+                      "bg-accent",
+                      "shadow-[0_12px_36px_oklch(from_var(--accent)_l_c_h/0.28)]"
+                    )}
+                  />
+                ) : null}
+                <span className="relative z-10 inline-flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4" />
+                  Today
+                </span>
               </TabsTrigger>
               <TabsTrigger
                 value="trends"
                 className={cn(
-                  "h-9 rounded-xl px-4",
+                  "relative h-9 rounded-xl px-4 overflow-hidden",
                   "text-sm font-semibold tracking-tight",
                   "text-muted-foreground/90 hover:text-foreground",
                   "hover:bg-muted/20",
-                  "data-[state=active]:bg-accent data-[state=active]:text-accent-foreground",
-                  "data-[state=active]:shadow-[0_10px_30px_oklch(from_var(--accent)_l_c_h/0.22)]",
-                  "data-[state=active]:hover:bg-accent",
+                  "data-[state=active]:text-accent-foreground",
                   "transition-all duration-200"
                 )}
               >
-                <TrendingUp className="h-4 w-4" />
-                Trends
+                {activeView === "trends" ? (
+                  <motion.div
+                    layoutId="overview-tabs-indicator"
+                    transition={{ type: "spring", stiffness: 520, damping: 42 }}
+                    className={cn(
+                      "absolute inset-0 rounded-xl",
+                      "bg-accent",
+                      "shadow-[0_12px_36px_oklch(from_var(--accent)_l_c_h/0.28)]"
+                    )}
+                  />
+                ) : null}
+                <span className="relative z-10 inline-flex items-center gap-1.5">
+                  <TrendingUp className="h-4 w-4" />
+                  Trends
+                </span>
               </TabsTrigger>
             </TabsList>
           </div>
