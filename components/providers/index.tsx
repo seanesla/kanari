@@ -10,6 +10,7 @@ import { TimeZoneProvider } from "@/lib/timezone-context"
 import { applySafariViewTransitionFix } from "@/lib/utils"
 import SceneBackground from "@/components/scene"
 import { PersistentNavbar } from "@/components/persistent-navbar"
+import { RequireUserName } from "@/components/require-user-name"
 import { ColorSync } from "@/components/color-sync"
 import { IconProvider } from "./icon-provider"
 import { DataPreloader } from "./data-preloader"
@@ -32,6 +33,7 @@ export function Providers({ children }: { children: ReactNode }) {
                 <SceneBackground />
                 <PersistentNavbar />
                 <RouteTransitionOverlay />
+                <RequireUserName />
                 {children}
                 <DemoOverlay />
               </NavbarProvider>

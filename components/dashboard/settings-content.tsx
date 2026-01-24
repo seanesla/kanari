@@ -186,6 +186,13 @@ export function SettingsContent() {
 
   // Save settings to IndexedDB
   const handleSaveSettings = useCallback(async () => {
+    if (!normalizedDraft.userName) {
+      setSaveMessage({ type: "error", text: "Please enter your name to save settings." })
+      // Best-effort focus so the fix is obvious.
+      document.getElementById("user-name")?.focus()
+      return
+    }
+
     setIsSaving(true)
     setSaveMessage(null)
     try {
@@ -233,7 +240,8 @@ export function SettingsContent() {
 
   const handleResetToDefaults = useCallback(() => {
     setShowResetConfirm(false)
-    setDraft({ ...DEFAULT_DRAFT })
+    // Name is mandatory; keep the currently-saved name when resetting.
+    setDraft({ ...DEFAULT_DRAFT, userName: baselineRef.current?.userName })
     setSaveMessage(null)
 
     // Preview defaults (still requires Save to persist).
@@ -417,6 +425,11 @@ export function SettingsContent() {
                           <span className="font-medium text-destructive">{saveMessage.text}</span>
                         </>
                       )
+                    ) : isDirty && !normalizedDraft.userName ? (
+                      <>
+                        <AlertCircle className="h-4 w-4 text-destructive" />
+                        <span className="font-medium text-destructive">Your name is required.</span>
+                      </>
                     ) : (
                       <>
                         <AlertCircle className="h-4 w-4 text-accent" />
@@ -428,7 +441,7 @@ export function SettingsContent() {
                   {isDirty ? (
                     <Button
                       onClick={handleSaveSettings}
-                      disabled={isSaving}
+                      disabled={isSaving || !normalizedDraft.userName}
                       className="bg-accent text-accent-foreground hover:bg-accent/90"
                     >
                       {isSaving ? (

@@ -42,6 +42,11 @@ export function StepIntro({ initialSettings, onNext }: StepIntroProps) {
   const [selectedColor, setSelectedColor] = useState(initialSettings?.accentColor || accentColor)
   const [showCustomPicker, setShowCustomPicker] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [nameTouched, setNameTouched] = useState(false)
+
+  const trimmedName = userName.trim()
+  const isNameValid = trimmedName.length > 0
+  const showNameError = nameTouched && !isNameValid
 
   const handleColorSelect = (hex: string) => {
     setSelectedColor(hex)
@@ -55,15 +60,21 @@ export function StepIntro({ initialSettings, onNext }: StepIntroProps) {
   }
 
   const handleNext = async () => {
+    setNameTouched(true)
+    if (!isNameValid) return
+
     setIsSubmitting(true)
-    // Persist accent color to context (which saves to IndexedDB)
-    setAccentColor(selectedColor)
-    // Pass settings to parent to save
-    await onNext({
-      userName: userName.trim() || undefined,
-      accentColor: selectedColor,
-    })
-    setIsSubmitting(false)
+    try {
+      // Persist accent color to context (which saves to IndexedDB)
+      setAccentColor(selectedColor)
+      // Pass settings to parent to save
+      await onNext({
+        userName: trimmedName,
+        accentColor: selectedColor,
+      })
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const isPresetSelected = presetColors.some(
@@ -107,8 +118,12 @@ export function StepIntro({ initialSettings, onNext }: StepIntroProps) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <Label htmlFor="userName" className="text-sm text-muted-foreground">
-          Your name (optional)
+        <Label
+          htmlFor="userName"
+          className="flex items-center justify-between text-sm text-muted-foreground"
+        >
+          <span>Your name</span>
+          <span className="text-xs text-muted-foreground/70">Required</span>
         </Label>
         <Input
           id="userName"
@@ -116,9 +131,25 @@ export function StepIntro({ initialSettings, onNext }: StepIntroProps) {
           placeholder="Enter your name..."
           value={userName}
           onChange={(e) => setUserName(e.target.value)}
-          className="h-12 text-lg"
+          onBlur={() => setNameTouched(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              void handleNext()
+            }
+          }}
+          aria-invalid={showNameError}
+          aria-describedby={showNameError ? "userName-error" : undefined}
+          className={cn(
+            "h-12 text-lg",
+            showNameError && "border-destructive focus-visible:ring-destructive/40"
+          )}
           maxLength={50}
         />
+        {showNameError && (
+          <p id="userName-error" className="text-sm text-destructive">
+            Please enter your name to continue.
+          </p>
+        )}
       </motion.div>
 
       {/* Color section header */}
@@ -239,7 +270,12 @@ export function StepIntro({ initialSettings, onNext }: StepIntroProps) {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8 }}
       >
-        <Button onClick={handleNext} size="lg" className="px-8" disabled={isSubmitting}>
+        <Button
+          onClick={handleNext}
+          size="lg"
+          className="px-8"
+          disabled={isSubmitting}
+        >
           {isSubmitting ? "Saving..." : "Continue"}
         </Button>
       </motion.div>
