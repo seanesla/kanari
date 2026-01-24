@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { CollapsibleSection } from "./collapsible-section"
 import { MetricsHeaderBar } from "./metrics-header-bar"
+import { Deck } from "@/components/dashboard/deck"
 import { JournalEntriesPanel } from "./journal-entries-panel"
 import { KanbanBoard } from "./suggestions/kanban-board"
 import { FullCalendarView } from "./calendar"
@@ -365,19 +366,19 @@ export function UnifiedDashboard() {
             /* Mobile Layout: Stacked with collapsible panels at bottom */
             <div className="space-y-4">
               {/* Kanban */}
-              <div data-demo-id="demo-suggestions-kanban" className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 h-[240px] overflow-hidden">
+              <Deck data-demo-id="demo-suggestions-kanban" className="p-4 h-[240px] overflow-hidden">
                 {kanbanContent}
-              </div>
+              </Deck>
 
               {/* Calendar */}
-              <div data-demo-id="demo-calendar" className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden h-[60vh]">
+              <Deck data-demo-id="demo-calendar" className="overflow-hidden h-[60vh]">
                 {calendarContent}
-              </div>
+              </Deck>
 
 
               {/* Collapsible Journal */}
               <CollapsibleSection title="Journal Entries" defaultOpen={true}>
-                <JournalEntriesPanel className="border-0 bg-transparent" />
+                <JournalEntriesPanel embedded />
               </CollapsibleSection>
 
               {/* Empty state */}
@@ -398,25 +399,25 @@ export function UnifiedDashboard() {
             /* Desktop Layout: Stacked sections (natural page scroll) */
             <div className="space-y-4">
               {/* Kanban */}
-              <div
+              <Deck
                 data-demo-id="demo-suggestions-kanban"
                 className={cn(
-                  "rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 overflow-hidden transition-all duration-300",
+                  "p-4 overflow-hidden transition-[height] duration-300",
                   kanbanExpanded ? "h-[400px]" : "h-[240px]"
                 )}
               >
                 {kanbanContent}
-              </div>
+              </Deck>
 
               {/* Calendar */}
-              <div data-demo-id="demo-calendar" className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden h-[70vh] min-h-[520px]">
+              <Deck data-demo-id="demo-calendar" className="overflow-hidden h-[70vh] min-h-[520px]">
                 {calendarContent}
-              </div>
+              </Deck>
 
 
               {/* Collapsible Journal */}
               <CollapsibleSection title="Journal Entries" defaultOpen={true}>
-                <JournalEntriesPanel className="border-0 bg-transparent" />
+                <JournalEntriesPanel embedded />
               </CollapsibleSection>
 
               {/* Empty state */}

@@ -8,6 +8,7 @@ import { predictBurnoutRisk } from "@/lib/ml/forecasting"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 // Unified check-in button replaces separate entry points
 import { CheckInButton } from "@/components/dashboard/check-in-button"
+import { Deck } from "@/components/dashboard/deck"
 import type { BurnoutPrediction } from "@/lib/types"
 
 export function MetricsHeaderBar() {
@@ -44,18 +45,9 @@ export function MetricsHeaderBar() {
   }, [wellnessScore])
 
   return (
-    <div className="relative overflow-hidden flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl px-4 py-3 md:px-6 md:py-4">
-      {/* Wave glow effect */}
-      <div
-        className="pointer-events-none absolute inset-0 animate-gradient-sweep"
-        style={{
-          backgroundImage: `linear-gradient(90deg, transparent 0%, oklch(from var(--accent) l calc(c * 1.2) h / 0.04) 20%, oklch(from var(--accent) l calc(c * 1.2) h / 0.08) 50%, oklch(from var(--accent) l calc(c * 1.2) h / 0.04) 80%, transparent 100%)`,
-          backgroundSize: "200% 100%",
-        }}
-      />
-
+    <Deck className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 md:px-6 md:py-4">
       {/* Title + Metrics */}
-      <div className="relative flex flex-wrap items-center gap-4 md:gap-6">
+      <div className="flex flex-wrap items-center gap-4 md:gap-6">
         {/* Page Title */}
         <h1 className="text-xl md:text-2xl font-serif">
           Your <span className="text-accent">overview</span>
@@ -171,7 +163,7 @@ export function MetricsHeaderBar() {
       </div>
 
       {/* Actions */}
-      <div className="relative flex items-center gap-2">
+      <div className="flex items-center gap-2">
         {/*
           Unified Check-in Button
           Single entry point for AI chat check-ins with live biomarker capture.
@@ -179,6 +171,6 @@ export function MetricsHeaderBar() {
         */}
         <CheckInButton />
       </div>
-    </div>
+    </Deck>
   )
 }

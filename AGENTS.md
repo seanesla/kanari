@@ -105,7 +105,7 @@ Example:
 const startDateTime = instant.toZonedDateTimeISO(timeZone)
 ```
 
-## Claude Code Subagents
+## OpenCode Subagents
 
 **Explore Subagent**: Read-only codebase analysis. Use whenever you are searching files, mapping structure, and finding patterns without modifying code.
 

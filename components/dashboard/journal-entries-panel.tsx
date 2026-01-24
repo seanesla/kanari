@@ -13,14 +13,58 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 interface JournalEntriesPanelProps {
   limit?: number
   className?: string
+  embedded?: boolean
 }
 
-export function JournalEntriesPanel({ limit = 5, className }: JournalEntriesPanelProps) {
+export function JournalEntriesPanel({ limit = 5, className, embedded = false }: JournalEntriesPanelProps) {
   const { timeZone } = useTimeZone()
   const entries = useJournalEntries(limit)
 
+  const entriesContent = (
+    <div className={cn("space-y-3", embedded ? "" : "px-6")}
+    >
+      {entries.length === 0 ? (
+        <p className="text-sm text-muted-foreground">
+          No entries yet. Start a check-in and try a journal prompt.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {entries.map((entry) => (
+            <div key={entry.id} className="rounded-lg border border-border/50 bg-background/40 p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">{formatDate(entry.createdAt, timeZone)}</p>
+                  <p className="text-sm font-medium mt-1 line-clamp-2">{entry.prompt}</p>
+                </div>
+                <Badge variant="secondary" className="shrink-0">
+                  {entry.category}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap line-clamp-4">
+                {entry.content}
+              </p>
+
+              {entry.checkInSessionId ? (
+                <Button asChild variant="ghost" size="sm" className="mt-2 w-full justify-between">
+                  <Link href={`/check-ins?highlight=${entry.checkInSessionId}`}>
+                    View related check-in
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+
+  if (embedded) {
+    return <div className={cn(className)}>{entriesContent}</div>
+  }
+
   return (
-    <Card className={cn("border-border/70 bg-card/30 backdrop-blur-xl", className)}>
+    <Card className={cn("border-border/60 bg-card/70", className)}>
       <CardHeader>
         <CardTitle className="text-sm flex items-center gap-2">
           <NotebookPen className="h-4 w-4 text-accent" />
@@ -31,41 +75,7 @@ export function JournalEntriesPanel({ limit = 5, className }: JournalEntriesPane
         </CardDescription>
       </CardHeader>
 
-      <CardContent className="space-y-3">
-        {entries.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No entries yet. Start a check-in and try a journal prompt.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {entries.map((entry) => (
-              <div key={entry.id} className="rounded-lg border border-border/50 bg-background/30 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">{formatDate(entry.createdAt, timeZone)}</p>
-                    <p className="text-sm font-medium mt-1 line-clamp-2">{entry.prompt}</p>
-                  </div>
-                  <Badge variant="secondary" className="shrink-0">
-                    {entry.category}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2 whitespace-pre-wrap line-clamp-4">
-                  {entry.content}
-                </p>
-
-                {entry.checkInSessionId ? (
-                  <Button asChild variant="ghost" size="sm" className="mt-2 w-full justify-between">
-                    <Link href={`/check-ins?highlight=${entry.checkInSessionId}`}>
-                      View related check-in
-                      <ArrowRight className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
+      <CardContent className="space-y-3 px-0">{entriesContent}</CardContent>
     </Card>
   )
 }

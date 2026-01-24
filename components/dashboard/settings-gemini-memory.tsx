@@ -7,6 +7,7 @@ import { useSuggestionMemory } from "@/hooks/use-suggestion-memory"
 import { cn } from "@/lib/utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import type { CategoryPreference, GeminiMemoryContext, SuggestionCategory } from "@/lib/types"
+import { Deck } from "@/components/dashboard/deck"
 
 const categoryLabels: Record<SuggestionCategory, string> = {
   break: "Break",
@@ -197,7 +198,7 @@ export function GeminiMemorySection() {
     )
 
   return (
-    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
+    <Deck className="p-6 transition-colors hover:bg-card/80">
       <div className="flex items-center gap-2 mb-6">
         <Image src="/gemini-logo.svg" alt="Gemini" width={20} height={20} />
         <h2 className="text-lg font-semibold font-serif">Gemini Memory</h2>
@@ -442,6 +443,6 @@ export function GeminiMemorySection() {
           </div>
         </div>
       </div>
-    </div>
+    </Deck>
   )
 }

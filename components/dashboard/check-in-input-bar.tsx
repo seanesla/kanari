@@ -10,6 +10,7 @@
 import { Mic } from "@/lib/icons"
 import { useCursorGlow } from "@/hooks/use-cursor-glow"
 import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
+import { Deck } from "@/components/dashboard/deck"
 
 interface CheckInInputBarProps {
   onStartNewCheckIn: () => void
@@ -19,15 +20,12 @@ export function CheckInInputBar({ onStartNewCheckIn }: CheckInInputBarProps) {
   const glow = useCursorGlow({ clampToBorder: true })
 
   return (
-    <div
-      className="relative mx-auto w-full max-w-2xl p-4 rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 group"
+    <Deck
+      tone="raised"
+      className="mx-auto w-full max-w-2xl p-4 rounded-2xl group"
       onMouseMove={glow.onMouseMove}
       onMouseLeave={glow.onMouseLeave}
-      style={{
-        ...glow.style,
-        boxShadow:
-          "inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)",
-      }}
+      style={glow.style}
     >
       <CursorBorderGlow
         className="rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
@@ -36,11 +34,11 @@ export function CheckInInputBar({ onStartNewCheckIn }: CheckInInputBarProps) {
       />
       <button
         onClick={onStartNewCheckIn}
-        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-white/10 bg-[rgba(255,255,255,0.02)] text-left text-muted-foreground hover:border-white/20 hover:bg-[rgba(255,255,255,0.04)] transition-all"
+        className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-border/60 bg-muted/20 text-left text-muted-foreground hover:border-border/80 hover:bg-muted/30 transition-colors"
       >
         <Mic className="h-5 w-5 text-accent" />
         <span className="text-sm">Start a check-in...</span>
       </button>
-    </div>
+    </Deck>
   )
 }

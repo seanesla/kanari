@@ -44,7 +44,7 @@ export const SERIF_FONTS: FontOption[] = [
 
 // Defaults
 export const DEFAULT_SANS = "Instrument Sans"
-export const DEFAULT_SERIF = "Instrument Serif"
+export const DEFAULT_SERIF = "Merriweather"
 
 // CSS variable mapping for font previews
 export const FONT_CSS_VARIABLES: Record<string, string> = {
@@ -103,7 +103,7 @@ export function updateFontVariable(variable: string, fontFamily: string): void {
 export function getFontCssFamily(fontName: string, fontType: "sans" | "serif" = "sans"): string {
   const fontList = fontType === "sans" ? SANS_FONTS : SERIF_FONTS
   const font = fontList.find((f) => f.name === fontName)
-  return font?.cssFamily || (fontType === "sans" ? '"Instrument Sans", system-ui' : '"Instrument Serif", Georgia')
+  return font?.cssFamily || (fontType === "sans" ? '"Instrument Sans", system-ui' : '"Merriweather", Georgia')
 }
 
 /**

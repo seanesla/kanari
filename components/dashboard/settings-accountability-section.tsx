@@ -4,6 +4,7 @@ import { Heart, Shield, Target } from "@/lib/icons"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import type { AccountabilityMode } from "@/lib/types"
+import { Deck } from "@/components/dashboard/deck"
 
 interface SettingsAccountabilitySectionProps {
   accountabilityMode: AccountabilityMode | undefined
@@ -15,7 +16,7 @@ export function SettingsAccountabilitySection({
   onAccountabilityModeChange,
 }: SettingsAccountabilitySectionProps) {
   return (
-    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
+    <Deck className="p-6 transition-colors hover:bg-card/80">
       <div className="flex items-center gap-2 mb-4">
         <Target className="h-5 w-5 text-accent" />
         <h2 className="text-lg font-semibold font-serif">Check-in Style</h2>
@@ -69,7 +70,6 @@ export function SettingsAccountabilitySection({
           </Label>
         </div>
       </RadioGroup>
-    </div>
+    </Deck>
   )
 }
-

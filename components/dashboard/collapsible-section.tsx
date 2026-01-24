@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { ChevronDown } from "@/lib/icons"
 import { cn } from "@/lib/utils"
+import { Deck } from "@/components/dashboard/deck"
 import {
   Collapsible,
   CollapsibleContent,
@@ -24,10 +25,11 @@ export function CollapsibleSection({
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <div
+      <Deck
+        tone={isOpen ? "raised" : "quiet"}
         className={cn(
-          "rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl overflow-hidden transition-all duration-300",
-          isOpen && "border-accent/30 shadow-sm shadow-accent/5"
+          "overflow-hidden transition-colors",
+          isOpen && "border-accent/35 ring-accent/15"
         )}
       >
         <CollapsibleTrigger className="flex w-full items-center justify-between px-4 py-3 hover:bg-muted/10 transition-colors">
@@ -42,7 +44,7 @@ export function CollapsibleSection({
         <CollapsibleContent>
           <div className="px-4 pb-4">{children}</div>
         </CollapsibleContent>
-      </div>
+      </Deck>
     </Collapsible>
   )
 }

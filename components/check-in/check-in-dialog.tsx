@@ -445,14 +445,14 @@ export function CheckInDialog({
                       className={cn(
                         "w-3 h-3 rounded-full transition-colors",
                         checkIn.state === "user_speaking"
-                          ? "bg-green-500"
+                          ? "bg-green-500 ring-2 ring-green-500/25"
                           : checkIn.state === "assistant_speaking"
-                            ? "bg-blue-500"
+                             ? "bg-blue-500 ring-2 ring-blue-500/25"
                             : checkIn.state === "ai_greeting"
-                              ? "bg-blue-500 animate-pulse"
-                            : checkIn.state === "listening"
-                              ? "bg-accent animate-pulse"
-                              : "bg-muted"
+                               ? "bg-blue-500 ring-2 ring-blue-500/20"
+                             : checkIn.state === "listening"
+                               ? "bg-accent ring-2 ring-accent/25"
+                               : "bg-muted"
                       )}
                     />
                     <span className="text-sm text-muted-foreground">

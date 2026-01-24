@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { verifyGeminiApiKey } from "@/lib/gemini/client"
 import type { GeminiApiKeySource } from "@/lib/types"
+import { Deck } from "@/components/dashboard/deck"
 
 interface SettingsApiSectionProps {
   geminiApiKey: string
@@ -63,7 +64,7 @@ export function SettingsApiSection({
   }, [geminiApiKey, geminiApiKeySource])
 
   return (
-    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-5 transition-colors hover:bg-card/40">
+    <Deck className="p-5 transition-colors hover:bg-card/80">
       <div className="flex items-center gap-2 mb-4">
         <Image src="/gemini-logo.svg" alt="Gemini" width={20} height={20} />
         <h2 className="text-lg font-semibold font-serif">Gemini API</h2>
@@ -192,6 +193,6 @@ export function SettingsApiSection({
           </p>
         </div>
       </div>
-    </div>
+    </Deck>
   )
 }

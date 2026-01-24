@@ -1,7 +1,7 @@
 "use client"
 
 import { resampleAudio } from "./pcm-converter"
-import { logWarn, logError } from "@/lib/logger"
+import { logWarn } from "@/lib/logger"
 
 // Dynamic import to avoid SSR issues with onnxruntime-web
 // The vad-web package imports onnxruntime-web/wasm which requires browser APIs

@@ -26,7 +26,7 @@ import { SettingsTimeZoneSection } from "./settings-timezone"
 import { SettingsVoiceSection } from "./settings-voice-section"
 import { SettingsProfileSection } from "./settings-profile-section"
 import { SettingsBiomarkersSection } from "./settings-biomarkers-section"
-import { LiquidGlassNavbar } from "@/components/liquid-glass-navbar"
+import { Deck } from "@/components/dashboard/deck"
 import { db } from "@/lib/storage/db"
 import { DEFAULT_USER_SETTINGS, createDefaultSettingsRecord } from "@/lib/settings/default-settings"
 import { setDisableStartupAnimationSync } from "@/lib/scene-context"
@@ -313,7 +313,7 @@ export function SettingsContent() {
             setSaveMessage(null)
             previewSansFont(font)
           }}
-          selectedSerifFont={(draft.selectedSerifFont ?? DEFAULT_USER_SETTINGS.selectedSerifFont ?? "Instrument Serif") as SerifFamily}
+          selectedSerifFont={(draft.selectedSerifFont ?? DEFAULT_USER_SETTINGS.selectedSerifFont ?? "Merriweather") as SerifFamily}
           onSerifFontChange={(font) => {
             setDraft((prev) => ({ ...prev, selectedSerifFont: font }))
             setSaveMessage(null)
@@ -401,49 +401,49 @@ export function SettingsContent() {
       {/* Floating Save / Status Bar */}
       {portalRoot && (isDirty || saveMessage)
         ? createPortal(
-            <LiquidGlassNavbar
-              className="top-auto bottom-[calc(env(safe-area-inset-bottom)+1rem)] w-[calc(100%-2rem)] max-w-4xl"
-            >
-              <div className="flex items-center justify-between gap-4 w-full" role="status" aria-live="polite">
-                <div className="flex items-center gap-2 text-sm">
-                  {saveMessage ? (
-                    saveMessage.type === "success" ? (
-                      <>
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <span className="font-medium text-green-500">{saveMessage.text}</span>
-                      </>
+            <div className="pointer-events-none fixed left-1/2 top-auto bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-50 w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2">
+              <Deck className="pointer-events-auto px-4 py-3">
+                <div className="flex items-center justify-between gap-4 w-full" role="status" aria-live="polite">
+                  <div className="flex items-center gap-2 text-sm">
+                    {saveMessage ? (
+                      saveMessage.type === "success" ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          <span className="font-medium text-green-500">{saveMessage.text}</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="h-4 w-4 text-destructive" />
+                          <span className="font-medium text-destructive">{saveMessage.text}</span>
+                        </>
+                      )
                     ) : (
                       <>
-                        <AlertCircle className="h-4 w-4 text-destructive" />
-                        <span className="font-medium text-destructive">{saveMessage.text}</span>
+                        <AlertCircle className="h-4 w-4 text-accent" />
+                        <span className="font-medium">You have unsaved changes</span>
                       </>
-                    )
-                  ) : (
-                    <>
-                      <AlertCircle className="h-4 w-4 text-accent" />
-                      <span className="font-medium">You have unsaved changes</span>
-                    </>
-                  )}
-                </div>
-
-                {isDirty ? (
-                  <Button
-                    onClick={handleSaveSettings}
-                    disabled={isSaving}
-                    className="bg-accent text-accent-foreground hover:bg-accent/90"
-                  >
-                    {isSaving ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
-                      </>
-                    ) : (
-                      "Save Changes"
                     )}
-                  </Button>
-                ) : null}
-              </div>
-            </LiquidGlassNavbar>,
+                  </div>
+
+                  {isDirty ? (
+                    <Button
+                      onClick={handleSaveSettings}
+                      disabled={isSaving}
+                      className="bg-accent text-accent-foreground hover:bg-accent/90"
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        "Save Changes"
+                      )}
+                    </Button>
+                  ) : null}
+                </div>
+              </Deck>
+            </div>,
             portalRoot
           )
         : null}

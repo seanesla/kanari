@@ -9,6 +9,7 @@ import { useAllSuggestions } from "@/hooks/use-storage"
 import { useAchievements } from "@/hooks/use-achievements"
 import { DailyAchievementCard, CelebrationToastQueue } from "@/components/achievements"
 import { PageHeader } from "@/components/dashboard/page-header"
+import { Deck } from "@/components/dashboard/deck"
 import { Progress } from "@/components/ui/progress"
 import { Button } from "@/components/ui/button"
 import { getDateLabel } from "@/lib/date-utils"
@@ -74,10 +75,6 @@ export default function AchievementsPage() {
 
   return (
     <div data-demo-id="demo-achievements-page" className="min-h-screen bg-transparent relative overflow-hidden">
-      {/* Subtle gradient orb for visual depth */}
-      <div className="pointer-events-none absolute top-40 right-10 h-48 w-48 rounded-full bg-accent/3 blur-3xl" />
-      <div className="pointer-events-none absolute -top-10 left-10 h-56 w-56 rounded-full bg-accent/5 blur-3xl" />
-
       <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-20 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
         {/* Header */}
         <div
@@ -100,9 +97,9 @@ export default function AchievementsPage() {
             visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
           )}
         >
-          <div className="grid gap-4 lg:grid-cols-3">
-            {/* Today */}
-            <div data-demo-id="demo-daily-challenges" className="lg:col-span-2 rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+            <div className="grid gap-4 lg:grid-cols-3">
+              {/* Today */}
+              <Deck data-demo-id="demo-daily-challenges" className="lg:col-span-2 p-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold">Today&apos;s Focus</h2>
@@ -169,7 +166,7 @@ export default function AchievementsPage() {
                         <DailyAchievementCard achievement={achievement} variant="full" showNewIndicator />
 
                         {achievement.type === "challenge" && !achievement.completed && !achievement.expired && tracking && action && trackingProgress && (
-                          <div className="rounded-xl border border-border/60 bg-background/25 backdrop-blur px-3 py-3">
+                          <div className="rounded-xl border border-border/60 bg-background/35 px-3 py-3">
                             <div className="flex items-center justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -202,11 +199,11 @@ export default function AchievementsPage() {
                   })
                 )}
               </div>
-            </div>
+            </Deck>
 
             {/* Progress + Streak */}
             <div className="space-y-4">
-              <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+              <Deck className="p-6">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="text-sm font-medium text-muted-foreground">Level</h3>
@@ -229,9 +226,9 @@ export default function AchievementsPage() {
                     <span>{progressToNextLevel} pts to level {progress.level + 1}</span>
                   </div>
                 </div>
-              </div>
+              </Deck>
 
-              <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+              <Deck className="p-6">
                 <h3 className="text-sm font-medium text-muted-foreground">Streak</h3>
                 <div className="mt-2 flex items-baseline justify-between gap-3">
                   <p className="text-2xl font-semibold tabular-nums">
@@ -253,12 +250,12 @@ export default function AchievementsPage() {
                      <Link href="/check-ins?newCheckIn=true">New check-in</Link>
                   </Button>
                 </div>
-              </div>
+              </Deck>
             </div>
           </div>
 
           {/* Milestones */}
-          <div className="mt-6 rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+          <Deck className="mt-6 p-6">
             <h2 className="text-lg font-semibold">Milestones</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Earn milestone badges at 7, 30, 60, and 90 days of completed daily sets.
@@ -298,10 +295,10 @@ export default function AchievementsPage() {
                 ))}
               </div>
             )}
-          </div>
+          </Deck>
 
           {/* History */}
-          <div className="mt-6 rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6">
+          <Deck className="mt-6 p-6">
             <h2 className="text-lg font-semibold">History</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Your full daily achievements log.
@@ -342,7 +339,7 @@ export default function AchievementsPage() {
                 })}
               </div>
             )}
-          </div>
+          </Deck>
 
           {/* Celebrations */}
           <CelebrationToastQueue

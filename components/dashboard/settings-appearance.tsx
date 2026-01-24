@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { DEFAULT_SANS, DEFAULT_SERIF } from "@/lib/font-utils"
 import type { FontFamily, SerifFamily } from "@/lib/types"
+import { Deck } from "@/components/dashboard/deck"
 
 interface SettingsAppearanceSectionProps {
   accentColor: string
@@ -30,7 +31,7 @@ export function SettingsAppearanceSection({
   onDisableStartupAnimationChange,
 }: SettingsAppearanceSectionProps) {
   return (
-    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
+    <Deck className="p-6 transition-colors hover:bg-card/80">
       <div className="flex items-center gap-2 mb-6">
         <Paintbrush className="h-5 w-5 text-accent" />
         <h2 className="text-lg font-semibold font-serif">Appearance</h2>
@@ -69,6 +70,6 @@ export function SettingsAppearanceSection({
           />
         </div>
       </div>
-    </div>
+    </Deck>
   )
 }

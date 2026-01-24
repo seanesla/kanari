@@ -416,15 +416,15 @@ export function AIChatContent({
   const statusDotClass = cn(
     "w-3 h-3 rounded-full transition-colors",
     checkIn.state === "user_speaking"
-      ? "bg-green-500"
+      ? "bg-green-500 ring-2 ring-green-500/25"
       : checkIn.state === "assistant_speaking"
-        ? "bg-blue-500"
+        ? "bg-blue-500 ring-2 ring-blue-500/25"
         : checkIn.state === "ai_greeting"
-          ? "bg-blue-500 animate-pulse"
+          ? "bg-blue-500 ring-2 ring-blue-500/20"
           : checkIn.state === "listening"
-            ? "bg-accent animate-pulse"
+            ? "bg-accent ring-2 ring-accent/25"
             : showInitializing || isAutoStarting
-              ? "bg-accent animate-pulse"
+              ? "bg-accent/70 ring-2 ring-accent/15"
               : "bg-muted"
   )
 
@@ -483,7 +483,7 @@ export function AIChatContent({
         ) : (
           <>
             {/* Status */}
-            <div className={cn("flex-shrink-0 flex justify-center border-b py-3", isGlassChrome && "border-white/10")}>
+            <div className={cn("flex-shrink-0 flex justify-center border-b py-3", isGlassChrome && "border-border/40")}>
               <div className="flex items-center gap-2">
                 <div className={statusDotClass} />
                 <span className="text-sm text-muted-foreground">{statusText}</span>
@@ -511,13 +511,13 @@ export function AIChatContent({
               className={cn(
                 "px-6 py-3 border-b",
                 isGlassChrome
-                  ? "border-white/10 bg-transparent"
+                  ? "border-border/40 bg-transparent"
                   : "border-border/50 bg-background/40"
               )}
             >
               <BiomarkerIndicator
                 metrics={checkIn.session?.acousticMetrics}
-                className={isGlassChrome ? "border-white/10 bg-transparent" : undefined}
+                className={isGlassChrome ? "border-border/40 bg-transparent" : undefined}
               />
             </div>
 
@@ -594,7 +594,7 @@ export function AIChatContent({
               <div
                 className={cn(
                   "flex-shrink-0 border-t p-4 space-y-3 overflow-y-auto max-h-[260px]",
-                  isGlassChrome ? "border-white/10 bg-transparent" : "bg-background/60"
+                  isGlassChrome ? "border-border/40 bg-transparent" : "bg-background/60"
                 )}
               >
                 {checkIn.widgets.map((widget) => {
@@ -661,7 +661,7 @@ export function AIChatContent({
             )}
 
             {/* Footer */}
-            <div className={cn("flex-shrink-0 border-t", isGlassChrome && "border-white/10")}>
+            <div className={cn("flex-shrink-0 border-t", isGlassChrome && "border-border/40")}>
               <div className="px-4 py-3">
                 <div className="relative mx-auto w-full max-w-2xl">
                   {showConversation ? (

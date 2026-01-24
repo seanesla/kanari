@@ -3,6 +3,7 @@
 import { Volume2 } from "@/lib/icons"
 import { VoiceList } from "@/components/voice-list"
 import type { GeminiVoice } from "@/lib/types"
+import { Deck } from "@/components/dashboard/deck"
 
 interface SettingsVoiceSectionProps {
   selectedVoice: GeminiVoice | undefined
@@ -14,7 +15,7 @@ export function SettingsVoiceSection({
   onVoiceChange,
 }: SettingsVoiceSectionProps) {
   return (
-    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
+    <Deck className="p-6 transition-colors hover:bg-card/80">
       <div className="flex items-center gap-2 mb-4">
         <Volume2 className="h-5 w-5 text-accent" />
         <h2 className="text-lg font-semibold font-serif">AI Voice</h2>
@@ -30,6 +31,6 @@ export function SettingsVoiceSection({
         onVoiceSelect={onVoiceChange}
         height="300px"
       />
-    </div>
+    </Deck>
   )
 }

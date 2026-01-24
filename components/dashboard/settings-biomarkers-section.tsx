@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { Gauge, Mic, Sparkles, Trash2 } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
+import { Deck } from "@/components/dashboard/deck"
 import {
   Dialog,
   DialogContent,
@@ -95,7 +96,7 @@ export function SettingsBiomarkersSection() {
   }, [])
 
   return (
-    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40 md:col-span-2">
+    <Deck className="md:col-span-2 p-6 transition-colors hover:bg-card/80">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
@@ -155,7 +156,7 @@ export function SettingsBiomarkersSection() {
           setStatus("Saved baseline. Future scores will be personalized.")
         }}
       />
-    </div>
+    </Deck>
   )
 }
 
@@ -247,7 +248,7 @@ function VoiceBaselineDialog(props: {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border/70 bg-card/95 backdrop-blur-xl max-w-xl">
+      <DialogContent className="border-border/70 bg-card/95 max-w-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mic className="h-5 w-5 text-accent" />

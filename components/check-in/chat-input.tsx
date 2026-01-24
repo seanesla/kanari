@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
+import { Deck } from "@/components/dashboard/deck"
 import { ToolCommandMenu } from "./tool-command-menu"
 import { ToolPickerButton } from "./tool-picker-button"
 import { ToolArgumentForm } from "./tool-argument-form"
@@ -138,15 +139,12 @@ export function ChatInput({ onSendText, onTriggerTool, disabled, isMuted, onTogg
   const searchValue = value.startsWith("/") ? value.slice(1) : ""
 
   return (
-    <div
-      className="relative w-full p-4 rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 group"
+    <Deck
+      tone="raised"
+      className="w-full p-4 rounded-2xl group"
       onMouseMove={glow.onMouseMove}
       onMouseLeave={glow.onMouseLeave}
-      style={{
-        ...glow.style,
-        boxShadow:
-          "inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)",
-      }}
+      style={glow.style}
     >
       <CursorBorderGlow
         className="rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-200"
@@ -154,7 +152,7 @@ export function ChatInput({ onSendText, onTriggerTool, disabled, isMuted, onTogg
         borderWidth={2}
       />
       <Popover open={showCommandMenu} onOpenChange={setShowCommandMenu}>
-        <div className="flex items-center gap-2 w-full px-4 py-3 rounded-xl border border-white/10 bg-[rgba(255,255,255,0.02)] text-left hover:border-white/20 hover:bg-[rgba(255,255,255,0.04)] transition-all">
+        <div className="flex items-center gap-2 w-full px-4 py-3 rounded-xl border border-border/60 bg-muted/20 text-left hover:border-border/80 hover:bg-muted/30 transition-colors">
           {/* Tool picker button */}
           <ToolPickerButton onSelect={handleToolSelect} disabled={disabled} />
 
@@ -180,7 +178,7 @@ export function ChatInput({ onSendText, onTriggerTool, disabled, isMuted, onTogg
                 "h-9 w-9 shrink-0 rounded-full transition-all duration-200 hover:scale-110 active:scale-100",
                 isMuted
                   ? "bg-red-500 hover:bg-red-600 text-white ring-2 ring-red-500/30"
-                  : "hover:bg-white/5"
+                  : "hover:bg-muted/30"
               )}
               onClick={onToggleMute}
               aria-pressed={!!isMuted}
@@ -199,7 +197,7 @@ export function ChatInput({ onSendText, onTriggerTool, disabled, isMuted, onTogg
           <Button
             variant="ghost"
             size="icon"
-            className="h-9 w-9 shrink-0 hover:bg-white/5"
+            className="h-9 w-9 shrink-0 hover:bg-muted/30"
             onClick={handleSend}
             disabled={disabled || !value.trim() || value.startsWith("/")}
           >
@@ -218,6 +216,6 @@ export function ChatInput({ onSendText, onTriggerTool, disabled, isMuted, onTogg
           <ToolCommandMenu searchValue={searchValue} onSelect={handleToolSelect} />
         </PopoverContent>
       </Popover>
-    </div>
+    </Deck>
   )
 }

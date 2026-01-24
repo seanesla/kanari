@@ -6,8 +6,8 @@ import { RefreshCw, ArrowRight } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Slider } from "@/components/ui/slider"
+import { Deck } from "@/components/dashboard/deck"
 import { db } from "@/lib/storage/db"
 import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
 import { updateCalibrationFromSelfReportSubmission } from "@/lib/ml/personalized-biomarkers"
@@ -156,7 +156,7 @@ export function SynthesisScreen({
 
           {/* Biomarkers (quick continuity cue) */}
           {session ? (
-            <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4">
+            <Deck className="p-4">
               <p className="text-xs font-medium text-muted-foreground mb-2">Voice biomarkers (this check-in)</p>
               {session.acousticMetrics ? (
                 <BiomarkerIndicator metrics={session.acousticMetrics} compact />
@@ -165,12 +165,12 @@ export function SynthesisScreen({
                   Not enough speech captured to analyze stress/fatigue. Try speaking for about 1-2 seconds next time.
                 </p>
               )}
-            </div>
+            </Deck>
           ) : null}
 
           {/* Self report (improves personalization) */}
           {session ? (
-            <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4">
+            <Deck className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Quick self-check (improves accuracy)</p>
@@ -226,64 +226,60 @@ export function SynthesisScreen({
                   </Button>
                 </div>
               </div>
-            </div>
+            </Deck>
           ) : null}
 
           {/* Loading */}
           {isLoading && (
-            <Card className="border-border/70 bg-card/30 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground" />
-                  Synthesizing your check-in…
-                </CardTitle>
-                <CardDescription>
-                  Kanari is asking Gemini 3 to connect your conversation, journal, and voice patterns into a clear “why”.
-                </CardDescription>
-              </CardHeader>
-            </Card>
+            <Deck className="p-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-full bg-muted/40 p-2">
+                  <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Synthesizing your check-in...</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Kanari is asking Gemini 3 to connect your conversation, journal, and voice patterns into a clear "why".
+                  </p>
+                </div>
+              </div>
+            </Deck>
           )}
 
           {/* Error */}
           {!isLoading && error && (
-            <Card className="border-border/70 bg-card/30 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="text-sm">Synthesis unavailable</CardTitle>
-                <CardDescription className="break-words">{error}</CardDescription>
-              </CardHeader>
-              <CardContent className="flex gap-2">
+            <Deck className="p-4">
+              <div>
+                <p className="text-sm font-semibold">Synthesis unavailable</p>
+                <p className="text-sm text-muted-foreground mt-1 break-words">{error}</p>
+              </div>
+              <div className="mt-4 flex gap-2">
                 {onRetry ? (
                   <Button variant="outline" onClick={onRetry}>
                     Retry
                   </Button>
                 ) : null}
                 {onDone ? <Button onClick={onDone}>Done</Button> : null}
-              </CardContent>
-            </Card>
+              </div>
+            </Deck>
           )}
 
           {/* Synthesis content */}
           {!isLoading && !error && synthesis && (
             <>
-              <Card className="border-border/70 bg-card/30 backdrop-blur-xl">
-                <CardHeader>
-                  <CardTitle className="text-sm">Narrative</CardTitle>
-                  <CardDescription>{synthesis.narrative}</CardDescription>
-                </CardHeader>
-              </Card>
+              <Deck className="p-4">
+                <p className="text-sm font-semibold">Narrative</p>
+                <p className="text-sm text-muted-foreground mt-2">{synthesis.narrative}</p>
+              </Deck>
 
               <div className="space-y-3">
                 <p className="text-sm font-medium">Key insights (with evidence)</p>
                 {synthesis.insights.map((insight) => (
-                  <Card
-                    key={insight.id}
-                    className="border-border/70 bg-card/30 backdrop-blur-xl"
-                  >
-                    <CardHeader>
-                      <CardTitle className="text-sm">{insight.title}</CardTitle>
-                      <CardDescription>{insight.description}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
+                  <Deck key={insight.id} className="p-4">
+                    <p className="text-sm font-semibold">{insight.title}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{insight.description}</p>
+
+                    <div className="mt-4 space-y-3">
                       {insight.evidence.quotes.length > 0 && (
                         <div className="space-y-2">
                           <p className="text-xs font-medium text-muted-foreground">Quotes</p>
@@ -325,24 +321,19 @@ export function SynthesisScreen({
                           )}
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </Deck>
                 ))}
               </div>
 
               <div className="space-y-3">
                 <p className="text-sm font-medium">Targeted suggestions (with “why”)</p>
                 {synthesis.suggestions.map((suggestion) => (
-                  <Card
-                    key={suggestion.id}
-                    className="border-border/70 bg-card/30 backdrop-blur-xl"
-                  >
-                    <CardHeader>
-                      <CardTitle className="text-sm leading-snug">{suggestion.content}</CardTitle>
-                      <CardDescription>{suggestion.rationale}</CardDescription>
-                    </CardHeader>
+                  <Deck key={suggestion.id} className="p-4">
+                    <p className="text-sm font-semibold leading-snug">{suggestion.content}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{suggestion.rationale}</p>
                     {suggestion.linkedInsightIds.length > 0 && (
-                      <CardContent>
+                      <div className="mt-4">
                         <p className="text-xs font-medium text-muted-foreground mb-2">Linked insights</p>
                         <div className="flex flex-wrap gap-2">
                           {suggestion.linkedInsightIds.map((id) => (
@@ -351,9 +342,9 @@ export function SynthesisScreen({
                             </Badge>
                           ))}
                         </div>
-                      </CardContent>
+                      </div>
                     )}
-                  </Card>
+                  </Deck>
                 ))}
               </div>
             </>
@@ -362,7 +353,7 @@ export function SynthesisScreen({
       </div>
 
       {/* Footer actions */}
-      <div className="flex-shrink-0 border-t border-border/70 bg-background/60 backdrop-blur px-6 py-4">
+      <div className="flex-shrink-0 border-t border-border/70 bg-background/60 px-6 py-4">
         <div className="mx-auto w-full max-w-2xl flex items-center justify-between gap-2">
           {onDone ? (
             <Button variant="outline" onClick={onDone}>

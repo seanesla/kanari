@@ -5,6 +5,7 @@ import { Globe2 } from "@/lib/icons"
 import { Label } from "@/components/ui/label"
 import { useTimeZone } from "@/lib/timezone-context"
 import { COMMON_TIME_ZONES, formatTimeZoneLabel } from "@/lib/timezone"
+import { Deck } from "@/components/dashboard/deck"
 
 interface SettingsTimeZoneSectionProps {
   timeZone: string
@@ -38,7 +39,7 @@ export function SettingsTimeZoneSection({ timeZone, onTimeZoneChange }: Settings
   }, [timeZone])
 
   return (
-    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
+    <Deck className="p-6 transition-colors hover:bg-card/80">
       <div className="flex items-center gap-2 mb-6">
         <Globe2 className="h-5 w-5 text-accent" />
         <h2 className="text-lg font-semibold font-serif">Time Zone</h2>
@@ -86,6 +87,6 @@ export function SettingsTimeZoneSection({ timeZone, onTimeZoneChange }: Settings
           </p>
         )}
       </div>
-    </div>
+    </Deck>
   )
 }

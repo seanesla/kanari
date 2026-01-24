@@ -84,7 +84,7 @@ export function MessageBubble({
           <p className={cn("whitespace-pre-wrap", isAssistantStreaming && "opacity-90")}>
             {message.content}
             {isAssistantStreaming && (
-              <span className="inline-block animate-pulse opacity-60">▍</span>
+              <span className="inline-block opacity-60">▍</span>
             )}
           </p>
         </div>
@@ -178,25 +178,9 @@ export function TypingIndicator({
       {/* Avatar */}
       <CoachAvatar base64={coachAvatar} size="sm" />
 
-      {/* Typing dots */}
+      {/* Typing indicator (non-looping) */}
       <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
-        <div className="flex gap-1">
-          {[0, 1, 2].map((i) => (
-            <motion.span
-              key={i}
-              className="w-2 h-2 bg-muted-foreground/50 rounded-full"
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.5, 1, 0.5],
-              }}
-              transition={{
-                duration: 0.6,
-                repeat: Infinity,
-                delay: i * 0.15,
-              }}
-            />
-          ))}
-        </div>
+        <span className="text-sm text-muted-foreground">Thinking...</span>
       </div>
     </motion.div>
   )

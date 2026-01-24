@@ -322,19 +322,17 @@ export function BreathingExercise({
 
               <div
                 className={
-                  "absolute inset-3 rounded-full border border-accent/25 bg-gradient-to-br from-accent/25 via-background/10 to-accent/5 backdrop-blur-xl " +
+                  "absolute inset-3 rounded-full border border-accent/25 bg-gradient-to-br from-accent/25 via-background/10 to-accent/5 " +
                   "shadow-[inset_0_1px_0_rgba(255,255,255,0.10),0_18px_45px_rgba(0,0,0,0.25)]"
                 }
               />
 
-              <motion.div
+              <div
                 aria-hidden="true"
                 className="absolute inset-3 rounded-full"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 36, repeat: Infinity, ease: "linear" }}
               >
                 <div className="absolute -inset-10 rounded-full bg-gradient-to-r from-transparent via-accent/12 to-transparent blur-2xl" />
-              </motion.div>
+              </div>
 
               <div className="absolute inset-6 rounded-full bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.16),transparent_60%)]" />
 

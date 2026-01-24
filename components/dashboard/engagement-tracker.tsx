@@ -4,6 +4,7 @@ import { useMemo } from "react"
 import { Flame, Target, MessageCircle } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useDashboardStats } from "@/hooks/use-storage"
+import { Deck } from "@/components/dashboard/deck"
 
 interface EngagementTrackerProps {
   className?: string
@@ -38,12 +39,7 @@ export function EngagementTracker({ className }: EngagementTrackerProps) {
   }, [stats.currentStreak])
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-6",
-        className
-      )}
-    >
+    <Deck className={cn("p-4 md:p-6", className)}>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Weekly Goal */}
         <div className="flex flex-col gap-3">
@@ -100,8 +96,8 @@ export function EngagementTracker({ className }: EngagementTrackerProps) {
         {/* Total Check-ins */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-md bg-purple-500/10">
-              <MessageCircle className="h-4 w-4 text-purple-500" />
+            <div className="p-1.5 rounded-md bg-sky-500/10">
+              <MessageCircle className="h-4 w-4 text-sky-400" />
             </div>
             <span className="text-xs uppercase tracking-widest text-muted-foreground">
               Check-ins
@@ -118,6 +114,6 @@ export function EngagementTracker({ className }: EngagementTrackerProps) {
           </p>
         </div>
       </div>
-    </div>
+    </Deck>
   )
 }

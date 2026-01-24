@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label"
 import { Loader2, RefreshCw, Trash2, User } from "@/lib/icons"
 import { useClearAllData } from "@/hooks/use-storage"
 import { db } from "@/lib/storage/db"
+import { Deck } from "@/components/dashboard/deck"
 
 interface SettingsAccountSectionProps {
   isSaving: boolean
@@ -68,7 +69,7 @@ export function SettingsAccountSection({ isSaving }: SettingsAccountSectionProps
 
   return (
     <>
-      <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
+      <Deck className="p-6 transition-colors hover:bg-card/80">
         <div className="flex items-center gap-2 mb-6">
           <User className="h-5 w-5 text-accent" />
           <h2 className="text-lg font-semibold font-serif">Account</h2>
@@ -124,7 +125,7 @@ export function SettingsAccountSection({ isSaving }: SettingsAccountSectionProps
             </Button>
           </div>
         </div>
-      </div>
+      </Deck>
 
       {/* Reset All Data Confirmation Dialog */}
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>

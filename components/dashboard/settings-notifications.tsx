@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { useNotifications } from "@/hooks/use-notifications"
+import { Deck } from "@/components/dashboard/deck"
 
 interface SettingsNotificationsSectionProps {
   enableNotifications: boolean
@@ -133,7 +134,7 @@ export function SettingsNotificationsSection({
   }
 
   return (
-    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
+    <Deck className="p-6 transition-colors hover:bg-card/80">
       <h2 className="mb-6 text-lg font-semibold font-serif">Notifications</h2>
 
       <div className="space-y-6">
@@ -194,6 +195,6 @@ export function SettingsNotificationsSection({
           )}
         </div>
       </div>
-    </div>
+    </Deck>
   )
 }

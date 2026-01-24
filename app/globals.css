@@ -134,7 +134,7 @@
 /* Landing page uses global --font-* variables, dashboard uses --dashboard-font-* */
 [data-dashboard] {
   --font-sans: var(--dashboard-font-sans, "Instrument Sans", system-ui);
-  --font-serif: var(--dashboard-font-serif, "Instrument Serif", Georgia);
+  --font-serif: var(--dashboard-font-serif, "Merriweather", Georgia);
   --font-mono: var(--font-sans);
 }
 

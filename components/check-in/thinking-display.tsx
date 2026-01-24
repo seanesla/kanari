@@ -113,13 +113,7 @@ export function ThinkingDisplay({ thinkingText, className }: ThinkingDisplayProp
             {isExpanded ? "Hide" : "Show"} thinking
           </span>
           {isSummarizing && (
-            <motion.span
-              className="text-muted-foreground/50"
-              animate={{ opacity: [0.3, 0.7, 0.3] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            >
-              summarizing...
-            </motion.span>
+            <span className="text-muted-foreground/50">summarizing...</span>
           )}
         </button>
 
@@ -174,25 +168,9 @@ function ThinkingDots({ className }: { className?: string }) {
         <Sparkles className="w-4 h-4 text-primary" />
       </div>
 
-      {/* Typing dots */}
+      {/* Fallback (non-looping) */}
       <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
-        <div className="flex gap-1">
-          {[0, 1, 2].map((i) => (
-            <motion.span
-              key={i}
-              className="w-2 h-2 bg-muted-foreground/50 rounded-full"
-              animate={{
-                scale: [1, 1.2, 1],
-                opacity: [0.5, 1, 0.5],
-              }}
-              transition={{
-                duration: 0.6,
-                repeat: Infinity,
-                delay: i * 0.15,
-              }}
-            />
-          ))}
-        </div>
+        <span className="text-sm text-muted-foreground">Thinking...</span>
       </div>
     </motion.div>
   )

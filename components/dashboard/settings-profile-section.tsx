@@ -3,6 +3,7 @@
 import { User } from "@/lib/icons"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Deck } from "@/components/dashboard/deck"
 
 interface SettingsProfileSectionProps {
   userName: string
@@ -11,7 +12,7 @@ interface SettingsProfileSectionProps {
 
 export function SettingsProfileSection({ userName, onUserNameChange }: SettingsProfileSectionProps) {
   return (
-    <div className="rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-6 transition-colors hover:bg-card/40">
+    <Deck className="p-6 transition-colors hover:bg-card/80">
       <div className="flex items-center gap-2 mb-4">
         <User className="h-5 w-5 text-accent" />
         <h2 className="text-lg font-semibold font-serif">Profile</h2>
@@ -33,6 +34,6 @@ export function SettingsProfileSection({ userName, onUserNameChange }: SettingsP
           autoComplete="nickname"
         />
       </div>
-    </div>
+    </Deck>
   )
 }

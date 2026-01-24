@@ -18,6 +18,7 @@ import { AudioPlayer } from "@/components/dashboard/audio-player"
 import { formatDate, formatDurationWithUnits } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import { useCoachAvatar } from "@/hooks/use-coach-avatar"
+import { Deck } from "@/components/dashboard/deck"
 import type { CheckInSession } from "@/lib/types"
 
 interface AIChatDetailViewProps {
@@ -102,10 +103,8 @@ export function AIChatDetailView({
       </div>
 
       {/* Session info bar */}
-      <div
-        className="px-6 py-3 border-b border-accent/30 bg-foreground/5 backdrop-blur-xl space-y-2"
-        style={{ boxShadow: '0 0 10px color-mix(in srgb, var(--accent) 10%, transparent)' }}
-      >
+      <div className="px-6 py-3 border-b border-border/60">
+        <Deck tone="quiet" className="p-3 space-y-2">
         {/* Date */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Calendar className="h-4 w-4" />
@@ -126,16 +125,14 @@ export function AIChatDetailView({
             &ldquo;{session.summary.positiveNotes[0]}&rdquo;
           </p>
         )}
+        </Deck>
       </div>
 
       {/* Messages scroll area */}
       <ScrollArea className="flex-1 min-h-0">
         <div className="px-6 py-6 space-y-6">
           {session.acousticMetrics && (
-            <div
-              className="rounded-lg border border-accent/30 bg-foreground/5 backdrop-blur-xl p-4"
-              style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--accent) 15%, transparent)' }}
-            >
+            <Deck tone="default" className="p-4">
               <h3 className="text-sm font-medium mb-3">Voice Analysis</h3>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
@@ -153,14 +150,11 @@ export function AIChatDetailView({
                   </div>
                 </div>
               </div>
-            </div>
+            </Deck>
           )}
 
           {audioDataArray && (
-            <div
-              className="rounded-lg border border-accent/30 bg-foreground/5 backdrop-blur-xl p-4"
-              style={{ boxShadow: '0 0 15px color-mix(in srgb, var(--accent) 15%, transparent)' }}
-            >
+            <Deck tone="default" className="p-4">
               <div className="flex justify-center mb-4">
                 <RecordingWaveform
                   mode="static"
@@ -181,7 +175,7 @@ export function AIChatDetailView({
                   seekPosition={seekPosition}
                 />
               </div>
-            </div>
+            </Deck>
           )}
 
           {session.messages.length === 0 ? (

@@ -44,6 +44,7 @@ import { CheckInListItem } from "@/components/dashboard/check-in-list-item"
 import { AIChatDetailView } from "@/components/dashboard/ai-chat-detail-view"
 import { CheckInInputBar } from "@/components/dashboard/check-in-input-bar"
 import { AIChatContent } from "@/components/dashboard/check-in-ai-chat"
+import { Deck } from "@/components/dashboard/deck"
 import { getDateKey, getDateLabel } from "@/lib/date-utils"
 import { SelectionActionBar } from "@/components/dashboard/selection-action-bar"
 import { BatchDeleteConfirmDialog } from "@/components/dashboard/batch-delete-confirm-dialog"
@@ -107,15 +108,12 @@ function CheckInsSidebar({
       className="border-r border-transparent p-3"
       data-demo-id="demo-checkin-sidebar"
     >
-      <div
-        className="relative h-full w-full rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 flex flex-col group"
+      <Deck
+        tone="raised"
+        className="h-full w-full rounded-2xl flex flex-col group"
         onMouseMove={glow.onMouseMove}
         onMouseLeave={glow.onMouseLeave}
-        style={{
-          ...glow.style,
-          boxShadow:
-            "inset 0 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02), 0 8px 32px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.1)",
-        }}
+        style={glow.style}
       >
         {/* Clip only the glow (not the header controls) */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
@@ -139,11 +137,7 @@ function CheckInsSidebar({
               <span className="whitespace-nowrap">New Check-in</span>
             </Button>
             <div
-              className="shrink-0 flex items-center gap-1 rounded-xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 p-0.5"
-              style={{
-                boxShadow:
-                  "inset 0 1px 0 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 0 rgba(0, 0, 0, 0.02)",
-              }}
+              className="shrink-0 flex items-center gap-1 rounded-xl border border-border/60 bg-muted/20 p-0.5"
             >
               {historyItems.length > 0 && (
                 <Button
@@ -238,7 +232,7 @@ function CheckInsSidebar({
             </button>
           </div>
         </SidebarFooter>
-      </div>
+      </Deck>
     </Sidebar>
   )
 }
@@ -259,15 +253,9 @@ function NewCheckInContent({
 }) {
   return (
     <div className="flex flex-col h-full p-3 md:p-4">
-      <div
-        className={cn(
-          "flex flex-col h-full",
-          "rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.02)] backdrop-blur-2xl backdrop-saturate-200 overflow-hidden",
-          "shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(0,0,0,0.02),0_8px_32px_rgba(0,0,0,0.25),0_2px_8px_rgba(0,0,0,0.1)]"
-        )}
-      >
+      <Deck tone="raised" className={cn("flex flex-col h-full rounded-2xl overflow-hidden")}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border/60">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-accent/10">
               <Sparkles className="h-5 w-5 text-accent" />
@@ -284,11 +272,10 @@ function NewCheckInContent({
             onClose={onClose}
             onSessionChange={onSessionChange}
             onSessionComplete={onSessionComplete}
-            chrome="glass"
             autoStart={autoStart}
           />
         </div>
-      </div>
+      </Deck>
     </div>
   )
 }

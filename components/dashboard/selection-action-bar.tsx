@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion"
 import { Trash2, CheckSquare, X } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
-import { GlassPanel } from "@/components/ui/glass-panel"
+import { Deck } from "@/components/dashboard/deck"
 
 interface SelectionActionBarProps {
   selectedCount: number
@@ -36,7 +36,7 @@ export function SelectionActionBar({
           transition={{ duration: 0.2 }}
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50"
         >
-          <GlassPanel glow blur="xl" className="px-4 py-3 flex items-center gap-4">
+          <Deck tone="raised" className="px-4 py-3 flex items-center gap-4">
             {/* Selected count */}
             <span className="text-sm font-medium text-foreground">
               {selectedCount} selected
@@ -75,7 +75,7 @@ export function SelectionActionBar({
               <Trash2 className="h-4 w-4" />
               Delete
             </Button>
-          </GlassPanel>
+          </Deck>
         </motion.div>
       )}
     </AnimatePresence>

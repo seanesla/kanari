@@ -20,6 +20,7 @@ import { AnalyticsInsightsSection } from "@/components/dashboard/analytics-insig
 import { useSceneMode } from "@/lib/scene-context"
 import { useTimeZone } from "@/lib/timezone-context"
 import { PageHeader } from "@/components/dashboard/page-header"
+import { Deck } from "@/components/dashboard/deck"
 import type { BurnoutPrediction } from "@/lib/types"
 
 export default function AnalyticsPage() {
@@ -240,14 +241,21 @@ export default function AnalyticsPage() {
               visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
             )}
           >
-            <div
+            <Deck
               className={cn(
-                "rounded-lg border p-4 md:p-6 lg:p-8 backdrop-blur-xl",
-                riskLevelConfig[burnoutPrediction.riskLevel].bg,
+                "overflow-hidden p-4 md:p-6 lg:p-8",
                 riskLevelConfig[burnoutPrediction.riskLevel].border
               )}
             >
-              <div className="flex items-start gap-6">
+              <div
+                aria-hidden="true"
+                className={cn(
+                  "pointer-events-none absolute inset-0",
+                  riskLevelConfig[burnoutPrediction.riskLevel].bg
+                )}
+              />
+
+              <div className="relative flex items-start gap-6">
                 <div
                   className={cn(
                     "h-12 w-12 rounded-lg flex items-center justify-center",
@@ -313,15 +321,12 @@ export default function AnalyticsPage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </Deck>
           </div>
         )}
 
         {/* Charts Section */}
         <div ref={chartsRef} className="relative">
-          <div className="pointer-events-none absolute top-0 right-0 h-64 w-64 rounded-full bg-success/3 blur-3xl" />
-          <div className="pointer-events-none absolute bottom-0 left-1/2 -translate-x-1/2 h-48 w-48 rounded-full bg-accent/3 blur-3xl" />
-
           <div className="relative">
             <div
               className={cn(
@@ -336,9 +341,9 @@ export default function AnalyticsPage() {
             {/* Charts Grid */}
             <div data-demo-id="demo-trend-charts" className="grid md:grid-cols-2 gap-6 items-start">
               {/* Chart 1: 7-Day Trend */}
-              <div
+              <Deck
                 className={cn(
-                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-6 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
+                  "group p-4 md:p-6 transition-colors duration-300 hover:border-accent/50 cursor-pointer",
                   chartsVisible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
                 )}
                 style={{ transitionDelay: chartsVisible ? "400ms" : "0ms" }}
@@ -354,12 +359,12 @@ export default function AnalyticsPage() {
                   onExpandChange={setStressChartExpanded}
                   aggregatedFeatures={aggregatedFeatures}
                 />
-              </div>
+              </Deck>
 
               {/* Chart 2: Wellness Score Gauge */}
-              <div
+              <Deck
                 className={cn(
-                  "group relative rounded-lg border border-border/70 bg-card/30 backdrop-blur-xl p-4 md:p-6 transition-all duration-500 hover:border-accent/50 hover:bg-card/40 cursor-pointer",
+                  "group p-4 md:p-6 transition-colors duration-300 hover:border-accent/50 cursor-pointer",
                   chartsVisible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
                 )}
                 style={{ transitionDelay: chartsVisible ? "500ms" : "0ms" }}
@@ -457,7 +462,7 @@ export default function AnalyticsPage() {
                     </AnimatePresence>
                   </>
                 )}
-              </div>
+              </Deck>
             </div>
           </div>
         </div>

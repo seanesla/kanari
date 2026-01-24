@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/component
 import { Badge } from "@/components/ui/badge"
 import { useAnalyticsInsights } from "@/hooks/use-analytics-insights"
 import type { AnalyticsTimeRange, AggregatedObservation } from "@/lib/types"
+import { Deck } from "@/components/dashboard/deck"
 
 const TIME_RANGE_LABELS: Record<AnalyticsTimeRange, string> = {
   "7_days": "7 days",
@@ -27,7 +28,7 @@ export function AnalyticsInsightsSection() {
     (insights?.observations.positive.length ?? 0)
 
   return (
-    <div className="rounded-xl border border-border/50 bg-card/30 backdrop-blur-xl p-6">
+    <Deck className="p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
@@ -194,7 +195,7 @@ export function AnalyticsInsightsSection() {
           </Collapsible>
         </>
       )}
-    </div>
+    </Deck>
   )
 }
 
