@@ -316,7 +316,7 @@ export function SettingsContent() {
           }}
         />
 
-        <Deck className="md:col-span-2 p-6 transition-colors hover:bg-card/80">
+        <Deck className="p-6 transition-colors hover:bg-card/80">
           <div className="flex items-center gap-2 mb-6">
             <Globe2 className="h-5 w-5 text-accent" />
             <h2 className="text-lg font-semibold font-serif">Time Zone</h2>
@@ -333,9 +333,9 @@ export function SettingsContent() {
 
           <div className="my-6 h-px bg-border/60" />
 
-          <div className="flex items-center gap-2 mb-4">
-            <User className="h-4 w-4 text-accent" />
-            <h3 className="text-sm font-semibold font-serif">Account</h3>
+          <div className="flex items-center gap-2 mb-6">
+            <User className="h-5 w-5 text-accent" />
+            <h2 className="text-lg font-semibold font-serif">Account</h2>
           </div>
 
           <SettingsAccountSection
