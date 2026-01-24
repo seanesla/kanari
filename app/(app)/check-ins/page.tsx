@@ -127,7 +127,17 @@ function CheckInsSidebar({
         </SidebarHeader>
 
         {/* Check-in list */}
-        <SidebarContent className="px-2">
+        <SidebarContent
+          className={cn(
+            "px-2",
+            // Scrollbar polish: hide the always-visible “scroll line” until hover, keep it thin.
+            "[scrollbar-width:thin] [scrollbar-color:transparent_transparent]",
+            "[&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2",
+            "[&::-webkit-scrollbar-track]:bg-transparent",
+            "[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-transparent",
+            "hover:[&::-webkit-scrollbar-thumb]:bg-border/50"
+          )}
+        >
           {isLoading ? (
             <div className="py-4">
               {Array.from({ length: 8 }).map((_, idx) => (
