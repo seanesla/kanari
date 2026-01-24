@@ -11,6 +11,13 @@
   --fc-list-event-dot-width: 8px;
   /* overridden by inline styles in fullcalendar-view.tsx */
   --fc-today-bg-color: oklch(0.78 0.16 70 / 0.1);
+
+  /* Controls the time grid "entry boxes" height */
+  --kanari-timegrid-slot-height: 5rem;
+}
+
+.fullcalendar-wrapper[data-variant="mini"] {
+  --kanari-timegrid-slot-height: 2.25rem;
 }
 
 /* Main calendar background */
@@ -83,7 +90,8 @@
 
 /* Time grid */
 .fullcalendar-wrapper .fc .fc-timegrid-slot {
-  height: 2.5rem;
+  /* Controls the empty time-slot cell size */
+  height: var(--kanari-timegrid-slot-height, 3.25rem) !important;
   border-bottom: 1px solid var(--border);
 }
 
@@ -92,7 +100,7 @@
   color: var(--muted-foreground);
   opacity: 0.85;
   vertical-align: top;
-  padding-top: 0.25rem;
+  padding-top: 0.45rem;
 }
 
 /* Events */
@@ -265,6 +273,10 @@
 
 /* Mobile responsive styles */
 @media (max-width: 640px) {
+  .fullcalendar-wrapper {
+    --kanari-timegrid-slot-height: 2.25rem;
+  }
+
   .fullcalendar-wrapper .fc .fc-toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -291,9 +303,7 @@
     padding: 0.25rem 0;
   }
 
-  .fullcalendar-wrapper .fc .fc-timegrid-slot {
-    height: 2rem;
-  }
+  /* Slot height controlled by --kanari-timegrid-slot-height */
 
   .fullcalendar-wrapper .fc .fc-timegrid-slot-label {
     font-size: 0.5rem;

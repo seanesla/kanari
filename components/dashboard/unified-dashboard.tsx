@@ -496,11 +496,13 @@ export function UnifiedDashboard() {
               "p-0 overflow-hidden",
               "grid grid-rows-[auto_1fr] gap-0",
               "rounded-2xl border-border/70 bg-card/95 backdrop-blur-xl",
-              "!w-[min(96vw,80rem)] !max-w-none sm:!max-w-none",
-              "!h-[min(80vh,44rem)]"
+              // Aim for a near-square dialog on desktop, while still using most of the viewport.
+              // Width is capped relative to height to avoid a "letterbox" feel.
+              "!h-[min(96vh,64rem)]",
+              "!w-[min(96vw,calc(min(96vh,64rem)*1.06))] !max-w-none sm:!max-w-none"
             )}
           >
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+            <div className="flex items-center justify-between px-4 py-2 border-b border-border/60">
               <div className="min-w-0">
                 <DialogTitle className="text-sm font-medium">Calendar</DialogTitle>
                 <DialogDescription className="sr-only">

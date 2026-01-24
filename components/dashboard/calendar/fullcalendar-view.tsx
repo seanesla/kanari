@@ -472,6 +472,7 @@ export function FullCalendarView({
         isInteractive && pendingDragActive && !isDragOver && "ring-1 ring-accent/30 ring-offset-1 ring-offset-background rounded-lg"
       )}
       style={themeStyles}
+      data-variant={variant}
       onDragOver={isInteractive ? handleDragOver : undefined}
       onDragLeave={isInteractive ? handleDragLeave : undefined}
       onDrop={isInteractive ? handleDrop : undefined}
