@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { motion } from "framer-motion"
-import { RefreshCw, ChevronsUpDown, ArrowUpRight, Sparkles, TrendingUp, X } from "@/lib/icons"
+import { RefreshCw, ChevronsUpDown, Sparkles, TrendingUp, X } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 import {
@@ -275,7 +275,7 @@ export function UnifiedDashboard() {
 
   // Calendar content (shared between mobile and desktop)
   const calendarContent = (
-    <div className="relative h-full">
+    <div className="h-full">
       <FullCalendarView
         variant="mini"
         scheduledSuggestions={scheduledSuggestions}
@@ -283,34 +283,11 @@ export function UnifiedDashboard() {
         checkInSessions={checkInSessions}
         recoveryBlocks={recoveryBlocks}
         onEventClick={handlers.handleSuggestionClick}
-        onTimeSlotClick={handlers.handleTimeSlotClick}
+        onTimeSlotClick={() => setCalendarOpen(true)}
         onExternalDrop={handlers.handleExternalDrop}
         pendingDragActive={pendingDragActive}
         className="h-full"
       />
-
-      <button
-        type="button"
-        onClick={() => setCalendarOpen(true)}
-        className={cn(
-          "absolute inset-0 rounded-xl",
-          "cursor-zoom-in",
-          "focus:outline-none focus:ring-2 focus:ring-accent/50"
-        )}
-        aria-label="Expand calendar"
-      >
-        <span className="sr-only">Expand calendar</span>
-        <span
-          aria-hidden="true"
-          className={cn(
-            "absolute top-3 right-3 inline-flex items-center justify-center",
-            "h-9 w-9 rounded-lg border border-border/60 bg-background/40 backdrop-blur-sm",
-            "text-muted-foreground hover:text-foreground transition-colors"
-          )}
-        >
-          <ArrowUpRight className="h-4 w-4" />
-        </span>
-      </button>
     </div>
   )
 
@@ -489,6 +466,18 @@ export function UnifiedDashboard() {
                 <div className="space-y-4">
                   <InsightsPanel session={latestSynthesisSession} />
 
+                  {/* Entry animation: keep in sync with the dashboard-level visible flag.
+                      See docs/error-patterns/dashboard-missing-entry-animation.md */}
+                  <div
+                    data-testid="dashboard-daily-achievements"
+                    className={cn(
+                      "transition-all duration-1000 delay-250",
+                      visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
+                    )}
+                  >
+                    {achievementsCard}
+                  </div>
+
                   <Deck data-demo-id="demo-suggestions-kanban" className="p-4 h-[240px] overflow-hidden">
                     {kanbanContent}
                   </Deck>
@@ -511,18 +500,6 @@ export function UnifiedDashboard() {
                     {calendarContent}
                   </Deck>
 
-                  {/* Entry animation: keep in sync with the dashboard-level visible flag.
-                      See docs/error-patterns/dashboard-missing-entry-animation.md */}
-                  <div
-                    data-testid="dashboard-daily-achievements"
-                    className={cn(
-                      "transition-all duration-1000 delay-250",
-                      visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
-                    )}
-                  >
-                    {achievementsCard}
-                  </div>
-
                   {journalCard}
                 </div>
               ) : (
@@ -539,6 +516,18 @@ export function UnifiedDashboard() {
                         {kanbanContent}
                       </Deck>
 
+                      {/* Entry animation: keep in sync with the dashboard-level visible flag.
+                          See docs/error-patterns/dashboard-missing-entry-animation.md */}
+                      <div
+                        data-testid="dashboard-daily-achievements"
+                        className={cn(
+                          "transition-all duration-1000 delay-250",
+                          visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
+                        )}
+                      >
+                        {achievementsCard}
+                      </div>
+
                       {journalCard}
                     </div>
 
@@ -551,18 +540,6 @@ export function UnifiedDashboard() {
                       >
                         {calendarContent}
                       </Deck>
-
-                      {/* Entry animation: keep in sync with the dashboard-level visible flag.
-                          See docs/error-patterns/dashboard-missing-entry-animation.md */}
-                      <div
-                        data-testid="dashboard-daily-achievements"
-                        className={cn(
-                          "transition-all duration-1000 delay-250",
-                          visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
-                        )}
-                      >
-                        {achievementsCard}
-                      </div>
                     </div>
                   </div>
 
