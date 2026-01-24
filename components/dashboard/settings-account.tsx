@@ -24,12 +24,14 @@ interface SettingsAccountSectionProps {
   isSaving: boolean
   localStorageOnly: boolean
   onLocalStorageOnlyChange: (checked: boolean) => void
+  embedded?: boolean
 }
 
 export function SettingsAccountSection({
   isSaving,
   localStorageOnly,
   onLocalStorageOnlyChange,
+  embedded = false,
 }: SettingsAccountSectionProps) {
   const router = useRouter()
   const clearAllData = useClearAllData()
@@ -74,15 +76,8 @@ export function SettingsAccountSection({
     }
   }, [clearAllData, router])
 
-  return (
-    <>
-      <Deck className="p-6 transition-colors hover:bg-card/80">
-        <div className="flex items-center gap-2 mb-6">
-          <User className="h-5 w-5 text-accent" />
-          <h2 className="text-lg font-semibold font-serif">Account</h2>
-        </div>
-
-        <div className="space-y-6">
+  const content = (
+    <div className="space-y-6">
           {/* Privacy */}
           <div>
             <div className="flex items-center justify-between gap-4">
@@ -152,7 +147,21 @@ export function SettingsAccountSection({
             </Button>
           </div>
         </div>
-      </Deck>
+  )
+
+  return (
+    <>
+      {embedded ? (
+        content
+      ) : (
+        <Deck className="p-6 transition-colors hover:bg-card/80">
+          <div className="flex items-center gap-2 mb-6">
+            <User className="h-5 w-5 text-accent" />
+            <h2 className="text-lg font-semibold font-serif">Account</h2>
+          </div>
+          {content}
+        </Deck>
+      )}
 
       {/* Reset All Data Confirmation Dialog */}
       <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>

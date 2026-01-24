@@ -29,6 +29,7 @@ import { DEFAULT_USER_SETTINGS, createDefaultSettingsRecord } from "@/lib/settin
 import { setDisableStartupAnimationSync } from "@/lib/scene-context"
 import { useSceneMode } from "@/lib/scene-context"
 import { useTimeZone } from "@/lib/timezone-context"
+import { Globe2, User } from "@/lib/icons"
 import type { AccountabilityMode, FontFamily, GeminiVoice, SerifFamily, UserSettings } from "@/lib/types"
 
 // Pattern doc: docs/error-patterns/settings-schema-drift-and-partial-save.md
@@ -289,14 +290,6 @@ export function SettingsContent() {
           }}
         />
 
-        <SettingsTimeZoneSection
-          timeZone={draft.timeZone ?? DEFAULT_USER_SETTINGS.timeZone ?? "UTC"}
-          onTimeZoneChange={(timeZone) => {
-            setDraft((prev) => ({ ...prev, timeZone }))
-            setSaveMessage(null)
-          }}
-        />
-
         <SettingsAppearanceSection
           accentColor={draft.accentColor ?? DEFAULT_USER_SETTINGS.accentColor ?? "#d4a574"}
           onAccentColorChange={(color) => {
@@ -323,14 +316,38 @@ export function SettingsContent() {
           }}
         />
 
-        <SettingsAccountSection
-          isSaving={isSaving}
-          localStorageOnly={draft.localStorageOnly}
-          onLocalStorageOnlyChange={(checked) => {
-            setDraft((prev) => ({ ...prev, localStorageOnly: checked }))
-            setSaveMessage(null)
-          }}
-        />
+        <Deck className="md:col-span-2 p-6 transition-colors hover:bg-card/80">
+          <div className="flex items-center gap-2 mb-6">
+            <Globe2 className="h-5 w-5 text-accent" />
+            <h2 className="text-lg font-semibold font-serif">Time Zone</h2>
+          </div>
+
+          <SettingsTimeZoneSection
+            embedded
+            timeZone={draft.timeZone ?? DEFAULT_USER_SETTINGS.timeZone ?? "UTC"}
+            onTimeZoneChange={(timeZone) => {
+              setDraft((prev) => ({ ...prev, timeZone }))
+              setSaveMessage(null)
+            }}
+          />
+
+          <div className="my-6 h-px bg-border/60" />
+
+          <div className="flex items-center gap-2 mb-4">
+            <User className="h-4 w-4 text-accent" />
+            <h3 className="text-sm font-semibold font-serif">Account</h3>
+          </div>
+
+          <SettingsAccountSection
+            embedded
+            isSaving={isSaving}
+            localStorageOnly={draft.localStorageOnly}
+            onLocalStorageOnlyChange={(checked) => {
+              setDraft((prev) => ({ ...prev, localStorageOnly: checked }))
+              setSaveMessage(null)
+            }}
+          />
+        </Deck>
 
         <div className="md:col-span-2">
           <SettingsApiSection

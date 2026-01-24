@@ -10,9 +10,10 @@ import { Deck } from "@/components/dashboard/deck"
 interface SettingsTimeZoneSectionProps {
   timeZone: string
   onTimeZoneChange: (timeZone: string) => void
+  embedded?: boolean
 }
 
-export function SettingsTimeZoneSection({ timeZone, onTimeZoneChange }: SettingsTimeZoneSectionProps) {
+export function SettingsTimeZoneSection({ timeZone, onTimeZoneChange, embedded = false }: SettingsTimeZoneSectionProps) {
   const { availableTimeZones, isLoading } = useTimeZone()
 
   const { common, all } = useMemo(() => {
@@ -38,55 +39,60 @@ export function SettingsTimeZoneSection({ timeZone, onTimeZoneChange }: Settings
     }
   }, [timeZone])
 
+  const content = (
+    <div className="space-y-4">
+      <div>
+        <Label htmlFor="time-zone" className="text-base font-sans">
+          Display & scheduling timezone
+        </Label>
+        <p className="text-sm text-muted-foreground font-sans mt-1">
+          Used across Kanari for calendars, reminders, and timestamps.
+        </p>
+      </div>
+
+      <select
+        id="time-zone"
+        value={timeZone}
+        onChange={(e) => onTimeZoneChange(e.target.value)}
+        disabled={isLoading}
+        className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm font-sans focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
+        aria-label="Time zone"
+      >
+        <optgroup label="Common">
+          {common.map((tz) => (
+            <option key={tz} value={tz}>
+              {formatTimeZoneLabel(tz)}
+            </option>
+          ))}
+        </optgroup>
+        {all.length > 0 && (
+          <optgroup label="All time zones">
+            {all.map((tz) => (
+              <option key={tz} value={tz}>
+                {tz}
+              </option>
+            ))}
+          </optgroup>
+        )}
+      </select>
+
+      {nowPreview && (
+        <p className="text-xs text-muted-foreground font-sans">
+          Current time in {timeZone}: {nowPreview}
+        </p>
+      )}
+    </div>
+  )
+
+  if (embedded) return content
+
   return (
     <Deck className="p-6 transition-colors hover:bg-card/80">
       <div className="flex items-center gap-2 mb-6">
         <Globe2 className="h-5 w-5 text-accent" />
         <h2 className="text-lg font-semibold font-serif">Time Zone</h2>
       </div>
-
-      <div className="space-y-4">
-        <div>
-          <Label htmlFor="time-zone" className="text-base font-sans">
-            Display & scheduling timezone
-          </Label>
-          <p className="text-sm text-muted-foreground font-sans mt-1">
-            Used across Kanari for calendars, reminders, and timestamps.
-          </p>
-        </div>
-
-        <select
-          id="time-zone"
-          value={timeZone}
-          onChange={(e) => onTimeZoneChange(e.target.value)}
-          disabled={isLoading}
-          className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm font-sans focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-60"
-          aria-label="Time zone"
-        >
-          <optgroup label="Common">
-            {common.map((tz) => (
-              <option key={tz} value={tz}>
-                {formatTimeZoneLabel(tz)}
-              </option>
-            ))}
-          </optgroup>
-          {all.length > 0 && (
-            <optgroup label="All time zones">
-              {all.map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </select>
-
-        {nowPreview && (
-          <p className="text-xs text-muted-foreground font-sans">
-            Current time in {timeZone}: {nowPreview}
-          </p>
-        )}
-      </div>
+      {content}
     </Deck>
   )
 }
