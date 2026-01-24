@@ -8,7 +8,6 @@
  * - Sidebar with chronological check-in list (grouped by date)
  * - Main content area shows selected item details inline
  * - New check-in mode (AI chat)
- * - Filter toggle (All / AI Chats)
  * - Mobile: sidebar becomes a Sheet
  */
 
@@ -17,7 +16,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Clock, Plus, MessageSquare, Sparkles, CheckSquare } from "@/lib/icons"
+import { Clock, Plus, Sparkles } from "@/lib/icons"
 import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -27,7 +26,6 @@ import {
   Sidebar,
   SidebarHeader,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupLabel,
   SidebarMenu,
@@ -46,15 +44,10 @@ import { CheckInInputBar } from "@/components/dashboard/check-in-input-bar"
 import { AIChatContent } from "@/components/dashboard/check-in-ai-chat"
 import { Deck } from "@/components/dashboard/deck"
 import { getDateKey, getDateLabel } from "@/lib/date-utils"
-import { SelectionActionBar } from "@/components/dashboard/selection-action-bar"
-import { BatchDeleteConfirmDialog } from "@/components/dashboard/batch-delete-confirm-dialog"
 import { useCursorGlow } from "@/hooks/use-cursor-glow"
 import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
 import { useTimeZone } from "@/lib/timezone-context"
 import type { HistoryItem, CheckInSession } from "@/lib/types"
-
-/** Filter options for the check-ins list */
-type FilterType = "all" | "ai_chat"
 
 /**
  * Main sidebar content component
@@ -64,28 +57,16 @@ function CheckInsSidebar({
   groupedByDate,
   selectedItemId,
   onSelectItem,
-  filter,
-  onFilterChange,
   onNewCheckIn,
   historyItems,
   isLoading,
-  isSelectMode,
-  selectedIds,
-  onToggleSelect,
-  onToggleSelectMode,
 }: {
   groupedByDate: { dateKey: string; dateLabel: string; items: HistoryItem[] }[]
   selectedItemId: string | null
   onSelectItem: (item: HistoryItem) => void
-  filter: FilterType
-  onFilterChange: (filter: FilterType) => void
   onNewCheckIn: () => void
   historyItems: HistoryItem[]
   isLoading: boolean
-  isSelectMode: boolean
-  selectedIds: Set<string>
-  onToggleSelect: (id: string, checked: boolean) => void
-  onToggleSelectMode: () => void
 }) {
   const { setOpenMobile, isMobile } = useSidebar()
   const glow = useCursorGlow({ clampToBorder: true, distanceIntensity: true })
@@ -124,7 +105,7 @@ function CheckInsSidebar({
           />
         </div>
 
-        {/* Header with New Check-in button, select mode, and sidebar toggle */}
+        {/* Header with New Check-in button and sidebar toggle */}
         <SidebarHeader className="px-3 py-3 border-b border-border/30">
           <div className="flex items-center gap-1.5 min-w-0">
             <Button
@@ -136,21 +117,7 @@ function CheckInsSidebar({
               <Sparkles className="h-3.5 w-3.5" />
               <span className="whitespace-nowrap">New Check-in</span>
             </Button>
-            <div
-              className="shrink-0 flex items-center gap-1 rounded-xl border border-border/60 bg-muted/20 p-0.5"
-            >
-              {historyItems.length > 0 && (
-                <Button
-                  variant={isSelectMode ? "secondary" : "ghost"}
-                  size="icon-sm"
-                  onClick={onToggleSelectMode}
-                  title={isSelectMode ? "Cancel selection" : "Select items"}
-                  className="size-7 rounded-lg"
-                >
-                  <CheckSquare className="h-4 w-4" />
-                </Button>
-              )}
-              {historyItems.length > 0 ? <div className="mx-0.5 h-6 w-px bg-white/10" /> : null}
+            <div className="shrink-0 flex items-center rounded-xl border border-border/60 bg-muted/20 p-0.5">
               <SidebarTrigger
                 className="shrink-0 rounded-lg hover:bg-white/5"
                 title="Toggle sidebar"
@@ -192,9 +159,6 @@ function CheckInsSidebar({
                         item={item}
                         isSelected={selectedItemId === item.id}
                         onSelect={() => handleSelectItem(item)}
-                        showCheckbox={isSelectMode}
-                        isChecked={selectedIds.has(item.id)}
-                        onCheckChange={(checked) => onToggleSelect(item.id, checked)}
                       />
                     </SidebarMenuItem>
                   ))}
@@ -203,35 +167,6 @@ function CheckInsSidebar({
             ))
           )}
         </SidebarContent>
-
-        {/* Footer with filter toggle */}
-        <SidebarFooter className="px-4 py-3 border-t border-border/30">
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => onFilterChange("all")}
-              className={cn(
-                "flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors",
-                filter === "all"
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              All
-            </button>
-            <button
-              onClick={() => onFilterChange("ai_chat")}
-              className={cn(
-                "flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center justify-center gap-1",
-                filter === "ai_chat"
-                  ? "bg-accent text-accent-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <MessageSquare className="h-3 w-3" />
-              Chat
-            </button>
-          </div>
-        </SidebarFooter>
       </Deck>
     </Sidebar>
   )
@@ -299,29 +234,15 @@ function HistoryPageContent() {
   // Highlight state for newly created items
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null)
 
-  // Filter state
-  const [filter, setFilter] = useState<FilterType>("all")
-
-  // Multi-select state
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
-  const [isSelectMode, setIsSelectMode] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-
   // Fetch unified history timeline
   const { items: historyItems, isLoading: isHistoryLoading } = useHistory()
 
-  // Filter items based on selected filter
-  const filteredItems = useMemo(() => {
-    if (filter === "all") return historyItems
-    return historyItems.filter((item) => item.type === filter)
-  }, [historyItems, filter])
-
-  // Group filtered items by date for sidebar sections
+  // Group items by date for sidebar sections
   const groupedByDate = useMemo(() => {
     const groups: { dateKey: string; dateLabel: string; items: HistoryItem[] }[] = []
     let currentDateKey: string | null = null
 
-    for (const item of filteredItems) {
+    for (const item of historyItems) {
       const itemDate = item.timestamp
       const dateKey = getDateKey(itemDate, timeZone)
 
@@ -338,7 +259,7 @@ function HistoryPageContent() {
     }
 
     return groups
-  }, [filteredItems, timeZone])
+  }, [historyItems, timeZone])
 
   // Get delete actions
   const { deleteCheckInSession, deleteIncompleteSessions } = useCheckInSessionActions()
@@ -390,47 +311,18 @@ function HistoryPageContent() {
     }
   }, [highlightedItemId])
 
-  // Clear selection when filtered item is hidden
-  // This ensures the detail view cannot display items outside the filtered set
+  // Ensure the detail view can't display items that no longer exist
   useEffect(() => {
-    if (selectedItemId && !filteredItems.some((item) => item.id === selectedItemId)) {
+    if (selectedItemId && !historyItems.some((item) => item.id === selectedItemId)) {
       setSelectedItemId(null)
     }
-  }, [filteredItems, selectedItemId])
+  }, [historyItems, selectedItemId])
 
   // Handle selecting an item
   const handleSelectItem = useCallback((item: HistoryItem) => {
     setSelectedItemId(item.id)
     setIsCreatingNew(false)
   }, [])
-
-  // Multi-select handlers
-  const handleToggleSelect = useCallback((id: string, checked: boolean) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (checked) {
-        next.add(id)
-      } else {
-        next.delete(id)
-      }
-      return next
-    })
-  }, [])
-
-  const handleSelectAll = useCallback(() => {
-    setSelectedIds(new Set(filteredItems.map((item) => item.id)))
-  }, [filteredItems])
-
-  const handleClearSelection = useCallback(() => {
-    setSelectedIds(new Set())
-  }, [])
-
-  const handleToggleSelectMode = useCallback(() => {
-    setIsSelectMode((prev) => !prev)
-    if (isSelectMode) {
-      setSelectedIds(new Set())
-    }
-  }, [isSelectMode])
 
   const handleDeleteSession = useCallback(
     (sessionId: string) => {
@@ -441,22 +333,6 @@ function HistoryPageContent() {
     },
     [deleteCheckInSession, selectedItemId]
   )
-
-  // Handle batch delete
-  const handleBatchDelete = useCallback(async () => {
-    for (const id of selectedIds) {
-      const item = historyItems.find((h) => h.id === id)
-      if (item) {
-        await deleteCheckInSession(item.session.id)
-      }
-    }
-    setSelectedIds(new Set())
-    setShowDeleteConfirm(false)
-    setIsSelectMode(false)
-    if (selectedItemId && selectedIds.has(selectedItemId)) {
-      setSelectedItemId(null)
-    }
-  }, [selectedIds, historyItems, deleteCheckInSession, selectedItemId])
 
   const handleSessionComplete = useCallback((session: CheckInSession) => {
     setHighlightedItemId(session.id)
@@ -496,15 +372,9 @@ function HistoryPageContent() {
           groupedByDate={groupedByDate}
           selectedItemId={selectedItemId}
           onSelectItem={handleSelectItem}
-          filter={filter}
-          onFilterChange={setFilter}
           onNewCheckIn={handleStartNewCheckIn}
           historyItems={historyItems}
           isLoading={isHistoryLoading}
-          isSelectMode={isSelectMode}
-          selectedIds={selectedIds}
-          onToggleSelect={handleToggleSelect}
-          onToggleSelectMode={handleToggleSelectMode}
         />
 
         <SidebarInset transparent className="flex flex-col bg-transparent pb-3">
@@ -596,23 +466,6 @@ function HistoryPageContent() {
           {!isCreatingNew && <CheckInInputBar onStartNewCheckIn={handleStartNewCheckIn} />}
         </SidebarInset>
       </SidebarProvider>
-
-      {/* Selection action bar (floating at bottom) */}
-      <SelectionActionBar
-        selectedCount={selectedIds.size}
-        totalCount={filteredItems.length}
-        onSelectAll={handleSelectAll}
-        onClearSelection={handleClearSelection}
-        onDeleteSelected={() => setShowDeleteConfirm(true)}
-      />
-
-      {/* Delete confirmation dialog */}
-      <BatchDeleteConfirmDialog
-        open={showDeleteConfirm}
-        onOpenChange={setShowDeleteConfirm}
-        selectedCount={selectedIds.size}
-        onConfirm={handleBatchDelete}
-      />
     </div>
   )
 }
