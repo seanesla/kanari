@@ -1,6 +1,7 @@
 "use client"
 
 import { cn } from "@/lib/utils"
+import { motion, useReducedMotion } from "framer-motion"
 import { Deck } from "@/components/dashboard/deck"
 
 interface PageHeaderProps {
@@ -18,6 +19,28 @@ export function PageHeader({
   actions,
   className,
 }: PageHeaderProps) {
+  const reduceMotion = useReducedMotion()
+  const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
+
+  const titleInitial = reduceMotion
+    ? { opacity: 0 }
+    : { opacity: 0, y: "120%", filter: "blur(10px)" }
+
+  const titleAnimate = reduceMotion
+    ? { opacity: 1 }
+    : { opacity: 1, y: 0, filter: "blur(0px)" }
+
+  const titleTransition = reduceMotion ? { duration: 0 } : { duration: 0.9, ease: EASE }
+
+  const subtitleInitial = reduceMotion ? { opacity: 0 } : { opacity: 0, y: 14, filter: "blur(8px)" }
+  const subtitleAnimate = reduceMotion
+    ? { opacity: 1 }
+    : { opacity: 1, y: 0, filter: "blur(0px)" }
+
+  const subtitleTransition = reduceMotion
+    ? { duration: 0 }
+    : { duration: 0.75, ease: EASE, delay: 0.08 }
+
   return (
     <Deck
       className={cn(
@@ -27,20 +50,45 @@ export function PageHeader({
     >
       <div className="flex flex-col gap-1">
         <h1 className="text-xl md:text-2xl font-serif tracking-tight">
-          {titleAccent ? (
-            <>
-              {title} <span className="text-accent">{titleAccent}</span>
-            </>
-          ) : (
-            title
-          )}
+          <span className="block overflow-hidden">
+            <motion.span
+              className="block"
+              initial={titleInitial}
+              animate={titleAnimate}
+              transition={titleTransition}
+            >
+              {titleAccent ? (
+                <>
+                  {title} <span className="text-accent">{titleAccent}</span>
+                </>
+              ) : (
+                title
+              )}
+            </motion.span>
+          </span>
         </h1>
         {subtitle && (
-          <p className="text-sm text-muted-foreground max-w-xl">{subtitle}</p>
+          <motion.p
+            className="text-sm text-muted-foreground max-w-xl"
+            initial={subtitleInitial}
+            animate={subtitleAnimate}
+            transition={subtitleTransition}
+          >
+            {subtitle}
+          </motion.p>
         )}
       </div>
 
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && (
+        <motion.div
+          className="flex items-center gap-2"
+          initial={subtitleInitial}
+          animate={subtitleAnimate}
+          transition={subtitleTransition}
+        >
+          {actions}
+        </motion.div>
+      )}
     </Deck>
   )
 }

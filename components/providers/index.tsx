@@ -4,6 +4,7 @@ import "temporal-polyfill/global"
 
 import { useEffect } from "react"
 import type { ReactNode } from "react"
+import { MotionConfig } from "framer-motion"
 import { SceneProvider } from "@/lib/scene-context"
 import { NavbarProvider } from "@/lib/navbar-context"
 import { TimeZoneProvider } from "@/lib/timezone-context"
@@ -24,23 +25,25 @@ export function Providers({ children }: { children: ReactNode }) {
 
   return (
     <IconProvider>
-      <DataPreloader>
-        <SceneProvider>
-          <TimeZoneProvider>
-            <ColorSync />
-            <DemoProvider>
-              <NavbarProvider>
-                <SceneBackground />
-                <PersistentNavbar />
-                <RouteTransitionOverlay />
-                <RequireUserName />
-                {children}
-                <DemoOverlay />
-              </NavbarProvider>
-            </DemoProvider>
-          </TimeZoneProvider>
-        </SceneProvider>
-      </DataPreloader>
+      <MotionConfig reducedMotion="user">
+        <DataPreloader>
+          <SceneProvider>
+            <TimeZoneProvider>
+              <ColorSync />
+              <DemoProvider>
+                <NavbarProvider>
+                  <SceneBackground />
+                  <PersistentNavbar />
+                  <RouteTransitionOverlay />
+                  <RequireUserName />
+                  {children}
+                  <DemoOverlay />
+                </NavbarProvider>
+              </DemoProvider>
+            </TimeZoneProvider>
+          </SceneProvider>
+        </DataPreloader>
+      </MotionConfig>
     </IconProvider>
   )
 }

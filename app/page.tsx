@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { motion, useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import { useLenis } from "@/hooks/use-lenis"
 import { useSectionObserver } from "@/hooks/use-section-observer"
@@ -15,6 +16,9 @@ import { DemoTriggerButton } from "@/components/demo"
 export default function LandingPage() {
   const [heroVisible, setHeroVisible] = useState(false)
   const { resetToLanding, isLoading } = useSceneMode()
+  const reduceMotion = useReducedMotion()
+
+  const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
   // Smooth scroll with inertia
   useLenis()
@@ -36,58 +40,157 @@ export default function LandingPage() {
     }
   }, [isLoading])
 
+  const heroContainer = {
+    hidden: {},
+    show: {
+      transition: {
+        staggerChildren: reduceMotion ? 0 : 0.14,
+        delayChildren: reduceMotion ? 0 : 0.1,
+      },
+    },
+  }
+
+  const heroBrand = {
+    hidden: reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.985, filter: "blur(14px)" },
+    show: reduceMotion
+      ? { opacity: 1 }
+      : {
+          opacity: 1,
+          y: 0,
+          scale: 1,
+          filter: "blur(0px)",
+          transition: { duration: 1.0, ease: EASE },
+        },
+  }
+
+  const heroLine = {
+    hidden: reduceMotion ? { opacity: 0 } : { opacity: 0, y: "110%", filter: "blur(10px)" },
+    show: reduceMotion
+      ? { opacity: 1 }
+      : {
+          opacity: 1,
+          y: 0,
+          filter: "blur(0px)",
+          transition: { duration: 1.15, ease: EASE },
+        },
+  }
+
+  const heroFade = {
+    hidden: reduceMotion ? { opacity: 0 } : { opacity: 0, y: 22, filter: "blur(10px)" },
+    show: reduceMotion
+      ? { opacity: 1 }
+      : { opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.9, ease: EASE } },
+  }
+
   return (
     <div className="min-h-screen bg-transparent overflow-x-hidden">
       {/* Hero */}
       <section className="relative min-h-screen flex flex-col justify-center px-6 md:px-12" data-demo-id="demo-hero">
-        <div className="relative z-10 max-w-3xl">
+        {/* Cinematic blooms */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+          <motion.div
+            className="absolute -top-40 left-1/2 h-[520px] w-[780px] -translate-x-1/2 rounded-full bg-accent/12 blur-3xl"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={
+              heroVisible
+                ? { opacity: 1, scale: 1, y: [0, -10, 0] }
+                : { opacity: 0, scale: 0.96 }
+            }
+            transition={{
+              opacity: { duration: 1.2, ease: EASE },
+              scale: { duration: 1.2, ease: EASE },
+              y: { duration: 6, repeat: heroVisible ? Infinity : 0, ease: "easeInOut" },
+            }}
+          />
+          <motion.div
+            className="absolute top-[55%] -left-48 h-[420px] w-[520px] rounded-full bg-foreground/5 blur-3xl"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={
+              heroVisible
+                ? { opacity: 1, scale: 1, y: [0, 14, 0] }
+                : { opacity: 0, scale: 0.98 }
+            }
+            transition={{
+              opacity: { duration: 1.35, ease: EASE, delay: 0.05 },
+              scale: { duration: 1.35, ease: EASE, delay: 0.05 },
+              y: { duration: 7.5, repeat: heroVisible ? Infinity : 0, ease: "easeInOut" },
+            }}
+          />
+          <motion.div
+            className="absolute bottom-[-220px] right-[-220px] h-[620px] w-[720px] rounded-full bg-accent/10 blur-3xl"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={
+              heroVisible
+                ? { opacity: 1, scale: 1, y: [0, -12, 0] }
+                : { opacity: 0, scale: 0.98 }
+            }
+            transition={{
+              opacity: { duration: 1.5, ease: EASE, delay: 0.1 },
+              scale: { duration: 1.5, ease: EASE, delay: 0.1 },
+              y: { duration: 8, repeat: heroVisible ? Infinity : 0, ease: "easeInOut" },
+            }}
+          />
+        </div>
+
+        <motion.div
+          className="relative z-10 max-w-3xl"
+          variants={heroContainer}
+          initial="hidden"
+          animate={heroVisible ? "show" : "hidden"}
+        >
           {/* Brand name - large and prominent, clickable for color picker */}
-          <div
-            className={`text-accent mb-4 transition-all duration-1000 delay-200 ${
-              heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
+          <motion.div className="text-accent mb-4" variants={heroBrand}>
             <HeroColorPicker>
               <KanariTextLogo className="text-6xl md:text-8xl lg:text-9xl" />
             </HeroColorPicker>
-          </div>
-          <h1
-            className={`text-5xl md:text-7xl lg:text-8xl font-serif leading-[0.9] tracking-tight mb-8 transition-all duration-1000 delay-400 ${
-              heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            Your voice
-            <br />
-            <span className="text-accent">knows</span>
-            <br />
-            before you do.
+          </motion.div>
+
+          <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif leading-[0.9] tracking-tight mb-8">
+            <span className="block overflow-hidden">
+              <motion.span className="block" variants={heroLine}>
+                Your voice
+              </motion.span>
+            </span>
+            <span className="block overflow-hidden">
+              <motion.span className="block" variants={heroLine}>
+                <span className="text-accent">knows</span>
+              </motion.span>
+            </span>
+            <span className="block overflow-hidden">
+              <motion.span className="block" variants={heroLine}>
+                before you do.
+              </motion.span>
+            </span>
           </h1>
-          <p
-            className={`text-muted-foreground text-lg md:text-xl max-w-md leading-relaxed mb-12 transition-all duration-1000 delay-600 ${
-              heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
+
+          <motion.p
+            className="text-muted-foreground text-lg md:text-xl max-w-md leading-relaxed mb-12"
+            variants={heroFade}
           >
-            kanari detects early signs of burnout through your voice, predicts risk days ahead, and schedules recovery time automatically.
-          </p>
-          <div
-            className={`flex items-center gap-4 transition-all duration-1000 delay-800 ${
-              heroVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
-          >
-            <EnterButton variant="hero" />
-            <DemoTriggerButton />
-          </div>
-        </div>
+            kanari detects early signs of burnout through your voice, predicts risk days ahead, and schedules recovery
+            time automatically.
+          </motion.p>
+
+          <motion.div className="flex items-center gap-4" variants={heroFade}>
+            <motion.div whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.99 }}>
+              <EnterButton variant="hero" />
+            </motion.div>
+            <motion.div whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.99 }}>
+              <DemoTriggerButton />
+            </motion.div>
+          </motion.div>
+        </motion.div>
 
         {/* Scroll indicator */}
-        <div
-          className={`absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 transition-all duration-1000 delay-1000 ${
-            heroVisible ? "opacity-100" : "opacity-0"
-          }`}
+        <motion.div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+          initial={{ opacity: 0, y: 10 }}
+          animate={heroVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
+          transition={{ duration: 0.8, ease: EASE, delay: reduceMotion ? 0 : 1.1 }}
         >
           <div className="w-px h-12 bg-gradient-to-b from-transparent via-foreground/30 to-foreground/50 animate-pulse" />
           <span className="text-xs text-muted-foreground tracking-widest uppercase">Scroll</span>
-        </div>
+        </motion.div>
       </section>
 
       {/* Stats */}
@@ -182,9 +285,17 @@ export default function LandingPage() {
                   desc: "Receive personalized recovery suggestions. Optionally schedule rest blocks directly to your calendar before you hit the wall.",
                 },
               ].map((step, i) => (
-                <div
+                <motion.div
                   key={i}
                   className="grid md:grid-cols-12 gap-6 py-12 border-b border-border/50 last:border-b-0 group hover:bg-foreground/5 transition-colors -mx-6 px-6"
+                  initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24, filter: "blur(10px)" }}
+                  whileInView={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
+                  viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
+                  transition={
+                    reduceMotion
+                      ? { duration: 0 }
+                      : { duration: 0.9, ease: EASE, delay: i * 0.08 }
+                  }
                 >
                   <div className="md:col-span-2">
                     <span className="text-6xl md:text-8xl font-serif text-foreground/10 group-hover:text-accent/30 transition-colors">
@@ -197,7 +308,7 @@ export default function LandingPage() {
                   <div className="md:col-span-5 md:col-start-8">
                     <p className="text-muted-foreground text-lg leading-relaxed">{step.desc}</p>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>

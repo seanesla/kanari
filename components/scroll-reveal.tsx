@@ -1,44 +1,31 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { motion, useReducedMotion } from "framer-motion"
 import { cn } from "@/lib/utils"
 
 interface ScrollRevealProps {
   children: React.ReactNode
   className?: string
   delay?: number
+  y?: number
 }
 
-export function ScrollReveal({ children, className, delay = 0 }: ScrollRevealProps) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [isVisible, setIsVisible] = useState(false)
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.1, rootMargin: "0px 0px -50px 0px" }
-    )
-
-    if (ref.current) observer.observe(ref.current)
-    return () => observer.disconnect()
-  }, [])
+export function ScrollReveal({ children, className, delay = 0, y = 28 }: ScrollRevealProps) {
+  const reduceMotion = useReducedMotion()
 
   return (
-    <div
-      ref={ref}
-      className={cn(
-        "transition-all duration-1000",
-        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12",
-        className
-      )}
-      style={{ transitionDelay: delay ? `${delay}ms` : undefined }}
+    <motion.div
+      className={cn("will-change-transform", className)}
+      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y, filter: "blur(10px)" }}
+      whileInView={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
+      viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
+      transition={
+        reduceMotion
+          ? { duration: 0 }
+          : { duration: 0.95, delay: delay / 1000, ease: [0.22, 1, 0.36, 1] }
+      }
     >
       {children}
-    </div>
+    </motion.div>
   )
 }

@@ -5,7 +5,7 @@ import { db } from "@/lib/storage/db"
 import { DEFAULT_ACCENT } from "@/lib/color-utils"
 import { DEFAULT_SANS, DEFAULT_SERIF, updateFontVariable, getFontCssFamily } from "@/lib/font-utils"
 import type { FontFamily, SerifFamily } from "@/lib/types"
-import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import { patchSettings } from "@/lib/settings/patch-settings"
 
 export type SceneMode = "landing" | "transitioning" | "dashboard"
 
@@ -133,13 +133,8 @@ export function SceneProvider({ children }: { children: ReactNode }) {
 
   const setAccentColor = useCallback((color: string) => {
     setAccentColorState(color)
-    // Persist to IndexedDB
-    db.settings.update("default", { accentColor: color }).then((updated) => {
-      if (updated === 0) {
-        // No record exists, create it
-        return db.settings.put(createDefaultSettingsRecord({ accentColor: color }))
-      }
-    }).catch((error) => {
+    // Persist to IndexedDB (race-safe; avoids wiping other fields)
+    void patchSettings({ accentColor: color }).catch((error) => {
       if (process.env.NODE_ENV === "development") {
         console.warn("[SceneProvider] Failed to save accent color:", error)
       }
@@ -149,13 +144,8 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   const setSansFont = useCallback((font: string) => {
     setSelectedSansFontState(font)
     updateFontVariable("--font-sans", getFontCssFamily(font, "sans"))
-    // Persist to IndexedDB
-    db.settings.update("default", { selectedSansFont: font as FontFamily }).then((updated) => {
-      if (updated === 0) {
-        // No record exists, create it
-        return db.settings.put(createDefaultSettingsRecord({ selectedSansFont: font as FontFamily }))
-      }
-    }).catch((error) => {
+    // Persist to IndexedDB (race-safe; avoids wiping other fields)
+    void patchSettings({ selectedSansFont: font as FontFamily }).catch((error) => {
       if (process.env.NODE_ENV === "development") {
         console.warn("[SceneProvider] Failed to save sans font:", error)
       }
@@ -170,13 +160,8 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   const setSerifFont = useCallback((font: string) => {
     setSelectedSerifFontState(font)
     updateFontVariable("--font-serif", getFontCssFamily(font, "serif"))
-    // Persist to IndexedDB
-    db.settings.update("default", { selectedSerifFont: font as SerifFamily }).then((updated) => {
-      if (updated === 0) {
-        // No record exists, create it
-        return db.settings.put(createDefaultSettingsRecord({ selectedSerifFont: font as SerifFamily }))
-      }
-    }).catch((error) => {
+    // Persist to IndexedDB (race-safe; avoids wiping other fields)
+    void patchSettings({ selectedSerifFont: font as SerifFamily }).catch((error) => {
       if (process.env.NODE_ENV === "development") {
         console.warn("[SceneProvider] Failed to save serif font:", error)
       }

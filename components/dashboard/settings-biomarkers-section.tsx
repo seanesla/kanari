@@ -16,7 +16,7 @@ import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import { useRecording } from "@/hooks/use-recording"
 import { db } from "@/lib/storage/db"
-import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import { patchSettings } from "@/lib/settings/patch-settings"
 import { VALIDATION } from "@/lib/ml/thresholds"
 import type { VoiceBaseline, BiomarkerCalibration } from "@/lib/types"
 
@@ -75,18 +75,10 @@ export function SettingsBiomarkersSection() {
   const handleClear = useCallback(async () => {
     setStatus(null)
     try {
-      const updated = await db.settings.update("default", {
+      await patchSettings({
         voiceBaseline: undefined,
         voiceBiomarkerCalibration: undefined,
       })
-      if (updated === 0) {
-        await db.settings.put(
-          createDefaultSettingsRecord({
-            voiceBaseline: undefined,
-            voiceBiomarkerCalibration: undefined,
-          })
-        )
-      }
       setBaseline(null)
       setCalibration(null)
       setStatus("Cleared baseline + tuning.")
@@ -219,10 +211,7 @@ function VoiceBaselineDialog(props: {
         speechSeconds,
       }
 
-      const updated = await db.settings.update("default", { voiceBaseline: baseline })
-      if (updated === 0) {
-        await db.settings.put(createDefaultSettingsRecord({ voiceBaseline: baseline }))
-      }
+      await patchSettings({ voiceBaseline: baseline })
 
       onSaved(baseline)
       onOpenChange(false)

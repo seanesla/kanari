@@ -27,7 +27,7 @@ import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { useCoachAvatar } from "@/hooks/use-coach-avatar"
 import { synthesizeCheckInSession } from "@/lib/gemini/synthesis-client"
 import { blendAcousticAndSemanticBiomarkers } from "@/lib/ml/biomarker-fusion"
-import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import { patchSettings } from "@/lib/settings/patch-settings"
 import { SynthesisScreen } from "@/components/check-in/synthesis-screen"
 import { BiomarkerIndicator } from "./biomarker-indicator"
 import { ConversationView } from "./conversation-view"
@@ -132,10 +132,7 @@ export function CheckInDialog({
   const handleVoiceSelected = useCallback(async (voice: GeminiVoice) => {
     setIsSavingVoice(true)
     try {
-      const updated = await db.settings.update("default", { selectedGeminiVoice: voice })
-      if (updated === 0) {
-        await db.settings.put(createDefaultSettingsRecord({ selectedGeminiVoice: voice }))
-      }
+      await patchSettings({ selectedGeminiVoice: voice })
       setHasVoice(true)
     } catch (error) {
       logError("CheckInDialog", "Failed to save voice selection:", error)

@@ -5,7 +5,7 @@ import { createPortal } from "react-dom"
 import { useLiveQuery } from "dexie-react-hooks"
 import { AlertCircle, Loader2, User } from "@/lib/icons"
 import { db } from "@/lib/storage/db"
-import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import { patchSettings } from "@/lib/settings/patch-settings"
 import { Deck } from "@/components/dashboard/deck"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -63,16 +63,15 @@ export function RequireUserName() {
 
     setIsSaving(true)
     try {
-      const updated = await db.settings.update("default", { userName: trimmedName })
-      if (updated === 0) {
-        await db.settings.put(
-          createDefaultSettingsRecord({
-            userName: trimmedName,
+      await patchSettings(
+        { userName: trimmedName },
+        {
+          create: {
             hasCompletedOnboarding: true,
             onboardingCompletedAt: new Date().toISOString(),
-          })
-        )
-      }
+          },
+        }
+      )
     } catch {
       setError("Couldn't save your name. Please try again.")
     } finally {

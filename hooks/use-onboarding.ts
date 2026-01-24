@@ -11,8 +11,8 @@ import { useState, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { useLiveQuery } from "dexie-react-hooks"
 import { db } from "@/lib/storage/db"
+import { patchSettings } from "@/lib/settings/patch-settings"
 import type { UserSettings } from "@/lib/types"
-import { DEFAULT_USER_SETTINGS } from "@/lib/settings/default-settings"
 
 interface UseOnboardingResult {
   /** Whether onboarding data has loaded */
@@ -28,8 +28,6 @@ interface UseOnboardingResult {
   /** Redirect to onboarding if not completed */
   redirectIfNeeded: () => void
 }
-
-const DEFAULT_SETTINGS: UserSettings = DEFAULT_USER_SETTINGS
 
 export function useOnboarding(): UseOnboardingResult {
   const router = useRouter()
@@ -59,36 +57,17 @@ export function useOnboarding(): UseOnboardingResult {
   const completeOnboarding = useCallback(async () => {
     const now = new Date().toISOString()
 
-    if (settings) {
-      // Update existing settings
-      await db.settings.update("default", {
-        hasCompletedOnboarding: true,
-        onboardingCompletedAt: now,
-      })
-    } else {
-      // Create new settings with onboarding complete
-      await db.settings.add({
-        id: "default",
-        ...DEFAULT_SETTINGS,
-        hasCompletedOnboarding: true,
-        onboardingCompletedAt: now,
-      })
-    }
+    await patchSettings({
+      hasCompletedOnboarding: true,
+      onboardingCompletedAt: now,
+    })
   }, [settings])
 
   /**
    * Update settings during onboarding
    */
   const updateSettings = useCallback(async (updates: Partial<UserSettings>) => {
-    if (settings) {
-      await db.settings.update("default", updates)
-    } else {
-      await db.settings.add({
-        id: "default",
-        ...DEFAULT_SETTINGS,
-        ...updates,
-      })
-    }
+    await patchSettings(updates)
   }, [settings])
 
   /**

@@ -25,7 +25,8 @@ import { SettingsProfileSection } from "./settings-profile-section"
 import { SettingsBiomarkersSection } from "./settings-biomarkers-section"
 import { Deck } from "@/components/dashboard/deck"
 import { db } from "@/lib/storage/db"
-import { DEFAULT_USER_SETTINGS, createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import { DEFAULT_USER_SETTINGS } from "@/lib/settings/default-settings"
+import { patchSettings } from "@/lib/settings/patch-settings"
 import { setDisableStartupAnimationSync } from "@/lib/scene-context"
 import { useSceneMode } from "@/lib/scene-context"
 import { useTimeZone } from "@/lib/timezone-context"
@@ -216,10 +217,7 @@ export function SettingsContent() {
         disableStartupAnimation: normalizedDraft.disableStartupAnimation,
       }
 
-      const updated = await db.settings.update("default", updates)
-      if (updated === 0) {
-        await db.settings.put(createDefaultSettingsRecord(updates))
-      }
+      await patchSettings(updates)
 
       // Sync animation preference to localStorage for instant access on next page load
       setDisableStartupAnimationSync(normalizedDraft.disableStartupAnimation ?? false)

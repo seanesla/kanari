@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react"
 import { db } from "@/lib/storage/db"
-import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import { patchSettings } from "@/lib/settings/patch-settings"
 import { COMMON_TIME_ZONES, DEFAULT_TIME_ZONE, getSupportedTimeZones, normalizeTimeZone } from "@/lib/timezone"
 
 interface TimeZoneContextValue {
@@ -47,14 +47,7 @@ export function TimeZoneProvider({ children }: { children: ReactNode }) {
     const normalized = normalizeTimeZone(nextTimeZone)
     setTimeZoneState(normalized)
 
-    db.settings
-      .update("default", { timeZone: normalized })
-      .then((updated) => {
-        if (updated === 0) {
-          return db.settings.put(createDefaultSettingsRecord({ timeZone: normalized }))
-        }
-      })
-      .catch((error) => {
+    void patchSettings({ timeZone: normalized }).catch((error) => {
         if (process.env.NODE_ENV === "development") {
           console.warn("[TimeZoneProvider] Failed to save time zone:", error)
         }

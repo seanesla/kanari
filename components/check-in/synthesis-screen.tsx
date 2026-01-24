@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import { Deck } from "@/components/dashboard/deck"
 import { db } from "@/lib/storage/db"
-import { createDefaultSettingsRecord } from "@/lib/settings/default-settings"
+import { patchSettings } from "@/lib/settings/patch-settings"
 import { updateCalibrationFromSelfReportSubmission } from "@/lib/ml/personalized-biomarkers"
 import type { CheckInSession, CheckInSynthesis } from "@/lib/types"
 import { BiomarkerIndicator } from "@/components/check-in/biomarker-indicator"
@@ -105,13 +105,10 @@ export function SynthesisScreen({
             now,
           })
 
-          const updatedSettings = await db.settings.update("default", {
-            voiceBiomarkerCalibration: nextCalibration,
-          })
-          if (updatedSettings === 0) {
-            await db.settings.put(createDefaultSettingsRecord({ voiceBiomarkerCalibration: nextCalibration }))
+            await patchSettings({
+              voiceBiomarkerCalibration: nextCalibration,
+            })
           }
-        }
 
         setSelfSavedAt(now)
       } catch (error) {
