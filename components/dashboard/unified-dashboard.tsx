@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { RefreshCw, ChevronsUpDown, ArrowUpRight, X } from "@/lib/icons"
+import { RefreshCw, ChevronsUpDown, ArrowUpRight, Sparkles, TrendingUp, X } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 import {
@@ -408,9 +408,47 @@ export function UnifiedDashboard() {
               visible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-8"
             )}
           >
-            <TabsList className="w-full">
-              <TabsTrigger value="today">Today</TabsTrigger>
-              <TabsTrigger value="trends">Trends</TabsTrigger>
+            <TabsList
+              className={cn(
+                "w-full max-w-[460px] mx-auto",
+                "h-11 p-1 rounded-2xl",
+                "border border-border/60",
+                "bg-[rgba(255,255,255,0.02)] backdrop-blur-xl backdrop-saturate-150",
+                "shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_12px_30px_rgba(0,0,0,0.28)]"
+              )}
+            >
+              <TabsTrigger
+                value="today"
+                className={cn(
+                  "h-9 rounded-xl px-4",
+                  "text-sm font-semibold tracking-tight",
+                  "text-muted-foreground/90 hover:text-foreground",
+                  "hover:bg-muted/20",
+                  "data-[state=active]:bg-accent data-[state=active]:text-accent-foreground",
+                  "data-[state=active]:shadow-[0_10px_30px_oklch(from_var(--accent)_l_c_h/0.22)]",
+                  "data-[state=active]:hover:bg-accent",
+                  "transition-all duration-200"
+                )}
+              >
+                <Sparkles className="h-4 w-4" />
+                Today
+              </TabsTrigger>
+              <TabsTrigger
+                value="trends"
+                className={cn(
+                  "h-9 rounded-xl px-4",
+                  "text-sm font-semibold tracking-tight",
+                  "text-muted-foreground/90 hover:text-foreground",
+                  "hover:bg-muted/20",
+                  "data-[state=active]:bg-accent data-[state=active]:text-accent-foreground",
+                  "data-[state=active]:shadow-[0_10px_30px_oklch(from_var(--accent)_l_c_h/0.22)]",
+                  "data-[state=active]:hover:bg-accent",
+                  "transition-all duration-200"
+                )}
+              >
+                <TrendingUp className="h-4 w-4" />
+                Trends
+              </TabsTrigger>
             </TabsList>
           </div>
 
