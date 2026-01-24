@@ -18,12 +18,19 @@ import { Loader2, RefreshCw, Trash2, User } from "@/lib/icons"
 import { useClearAllData } from "@/hooks/use-storage"
 import { db } from "@/lib/storage/db"
 import { Deck } from "@/components/dashboard/deck"
+import { Switch } from "@/components/ui/switch"
 
 interface SettingsAccountSectionProps {
   isSaving: boolean
+  localStorageOnly: boolean
+  onLocalStorageOnlyChange: (checked: boolean) => void
 }
 
-export function SettingsAccountSection({ isSaving }: SettingsAccountSectionProps) {
+export function SettingsAccountSection({
+  isSaving,
+  localStorageOnly,
+  onLocalStorageOnlyChange,
+}: SettingsAccountSectionProps) {
   const router = useRouter()
   const clearAllData = useClearAllData()
 
@@ -76,6 +83,26 @@ export function SettingsAccountSection({ isSaving }: SettingsAccountSectionProps
         </div>
 
         <div className="space-y-6">
+          {/* Privacy */}
+          <div>
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <Label htmlFor="local-storage" className="text-base font-sans">
+                  Local Storage Only
+                </Label>
+                <p className="text-sm text-muted-foreground font-sans">
+                  Store all data locally in your browser. No cloud sync.
+                </p>
+              </div>
+              <Switch
+                id="local-storage"
+                checked={localStorageOnly}
+                onCheckedChange={onLocalStorageOnlyChange}
+                aria-label="Local Storage Only"
+              />
+            </div>
+          </div>
+
           {/* Modify Onboarding */}
           <div>
             <div className="flex items-center gap-2 mb-2">

@@ -14,14 +14,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { GeminiMemorySection } from "./settings-gemini-memory"
 import { SettingsAccountSection } from "./settings-account"
 import { SettingsApiSection } from "./settings-api"
 import { SettingsAccountabilitySection } from "./settings-accountability-section"
 import { SettingsAppearanceSection } from "./settings-appearance"
-import { SettingsCalendarSection } from "./settings-calendar"
 import { SettingsNotificationsSection } from "./settings-notifications"
-import { SettingsPrivacySection } from "./settings-privacy"
 import { SettingsTimeZoneSection } from "./settings-timezone"
 import { SettingsVoiceSection } from "./settings-voice-section"
 import { SettingsProfileSection } from "./settings-profile-section"
@@ -300,14 +297,6 @@ export function SettingsContent() {
           }}
         />
 
-        <SettingsPrivacySection
-          localStorageOnly={draft.localStorageOnly}
-          onLocalStorageOnlyChange={(checked) => {
-            setDraft((prev) => ({ ...prev, localStorageOnly: checked }))
-            setSaveMessage(null)
-          }}
-        />
-
         <SettingsAppearanceSection
           accentColor={draft.accentColor ?? DEFAULT_USER_SETTINGS.accentColor ?? "#d4a574"}
           onAccentColorChange={(color) => {
@@ -334,12 +323,11 @@ export function SettingsContent() {
           }}
         />
 
-        <SettingsAccountSection isSaving={isSaving} />
-
-        <SettingsCalendarSection
-          autoScheduleRecovery={draft.autoScheduleRecovery}
-          onAutoScheduleRecoveryChange={(checked) => {
-            setDraft((prev) => ({ ...prev, autoScheduleRecovery: checked }))
+        <SettingsAccountSection
+          isSaving={isSaving}
+          localStorageOnly={draft.localStorageOnly}
+          onLocalStorageOnlyChange={(checked) => {
+            setDraft((prev) => ({ ...prev, localStorageOnly: checked }))
             setSaveMessage(null)
           }}
         />
@@ -359,10 +347,6 @@ export function SettingsContent() {
           />
         </div>
 
-        {/* Gemini Memory */}
-        <div className="md:col-span-2">
-          <GeminiMemorySection />
-        </div>
       </div>
 
       {/* Reset to Defaults */}
