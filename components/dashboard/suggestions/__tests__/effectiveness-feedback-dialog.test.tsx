@@ -23,12 +23,46 @@ import type { Suggestion, EffectivenessFeedback } from "@/lib/types"
 // Mock framer-motion to avoid animation issues in tests
 vi.mock("framer-motion", () => ({
   motion: {
-    div: ({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-      <div className={className} {...props}>{children}</div>
-    ),
-    button: ({ children, className, onClick, disabled, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => (
-      <button className={className} onClick={onClick} disabled={disabled} {...props}>{children}</button>
-    ),
+    div: ({ children, className, ...props }: React.HTMLAttributes<HTMLDivElement>) => {
+      // Prevent motion-only props from reaching the DOM during tests.
+      // (React warns on unknown DOM attributes like whileHover/whileTap.)
+      type MotionOnlyProps = {
+        whileHover?: unknown
+        whileTap?: unknown
+        initial?: unknown
+        animate?: unknown
+        exit?: unknown
+        transition?: unknown
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { whileHover, whileTap, initial, animate, exit, transition, ...domProps } =
+        props as React.HTMLAttributes<HTMLDivElement> & MotionOnlyProps
+      return (
+        <div className={className} {...domProps}>
+          {children}
+        </div>
+      )
+    },
+    button: ({ children, className, onClick, disabled, ...props }: React.ButtonHTMLAttributes<HTMLButtonElement>) => {
+      type MotionOnlyProps = {
+        whileHover?: unknown
+        whileTap?: unknown
+        initial?: unknown
+        animate?: unknown
+        exit?: unknown
+        transition?: unknown
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { whileHover, whileTap, initial, animate, exit, transition, ...domProps } =
+        props as React.ButtonHTMLAttributes<HTMLButtonElement> & MotionOnlyProps
+      return (
+        <button className={className} onClick={onClick} disabled={disabled} {...domProps}>
+          {children}
+        </button>
+      )
+    },
   },
   AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))

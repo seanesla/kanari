@@ -144,7 +144,7 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
         status: "complete",
         features: extractedFeatures,
         metrics,
-        audioData: Array.from(audioData),
+        audioData,
         sampleRate,
       }
 

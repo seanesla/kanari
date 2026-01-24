@@ -29,6 +29,11 @@ export interface UseCheckInAudioResult {
   getSessionAudio: () => Float32Array | null
 }
 
+type ChunkBuffer = {
+  chunks: Float32Array[]
+  startIndex: number
+}
+
 export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudioResult {
   const { dispatch, sendAudio, getCheckInState, onUserBargeIn } = options
 
@@ -36,7 +41,9 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
   const audioContextRef = useRef<AudioContext | null>(null)
   const captureWorkletRef = useRef<AudioWorkletNode | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
-  const audioChunksRef = useRef<Float32Array[]>([])
+  // Avoid O(n) Array.shift() when enforcing a max chunk count.
+  // We keep a start index and periodically compact.
+  const audioChunksRef = useRef<ChunkBuffer>({ chunks: [], startIndex: 0 })
   // Session-level audio buffer (accumulates ALL audio for playback/final analysis)
   const sessionAudioRef = useRef<Float32Array[]>([])
 
@@ -73,13 +80,14 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
   const MAX_AUDIO_CHUNKS = 1000
 
   const resetAudioChunks = useCallback(() => {
-    audioChunksRef.current = []
+    audioChunksRef.current = { chunks: [], startIndex: 0 }
   }, [])
 
   const drainAudioChunks = useCallback(() => {
-    const chunks = audioChunksRef.current
-    audioChunksRef.current = []
-    return chunks
+    const { chunks, startIndex } = audioChunksRef.current
+    const drained = startIndex > 0 ? chunks.slice(startIndex) : chunks
+    audioChunksRef.current = { chunks: [], startIndex: 0 }
+    return drained
   }, [])
 
   const getSessionAudio = useCallback(() => {
@@ -244,11 +252,25 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
           // Convert to base64 and send to Gemini
           const base64Audio = int16ToBase64(int16Data)
           sendAudio(base64Audio)
-          // Prevent memory leak by dropping oldest chunks if at limit
-          if (audioChunksRef.current.length >= MAX_AUDIO_CHUNKS) {
-            audioChunksRef.current.shift()
+
+          // Prevent unbounded growth if VAD fails to trigger an utterance drain.
+          // Keep only the most recent MAX_AUDIO_CHUNKS, without O(n) shifts.
+          const chunkBuffer = audioChunksRef.current
+          chunkBuffer.chunks.push(float32Data)
+          if (chunkBuffer.chunks.length - chunkBuffer.startIndex > MAX_AUDIO_CHUNKS) {
+            chunkBuffer.startIndex += 1
+
+            // Periodically compact to prevent the backing array from growing forever.
+            // (Only happens in pathological cases where drainAudioChunks isn't called.)
+            if (
+              chunkBuffer.startIndex > 128 &&
+              chunkBuffer.startIndex * 2 > chunkBuffer.chunks.length
+            ) {
+              chunkBuffer.chunks = chunkBuffer.chunks.slice(chunkBuffer.startIndex)
+              chunkBuffer.startIndex = 0
+            }
           }
-          audioChunksRef.current.push(float32Data)
+
           // Also store in session buffer (for playback and final analysis)
           sessionAudioRef.current.push(float32Data)
 
@@ -307,7 +329,7 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
     }
     audioContextRef.current = null
 
-    audioChunksRef.current = []
+    audioChunksRef.current = { chunks: [], startIndex: 0 }
     sessionAudioRef.current = []
   }, [])
 

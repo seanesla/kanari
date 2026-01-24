@@ -1,4 +1,5 @@
 import { indexedDB as fakeIndexedDB, IDBKeyRange } from "fake-indexeddb"
+import Dexie from "dexie"
 
 export function installFakeIndexedDb(): void {
   Object.defineProperty(globalThis, "indexedDB", {
@@ -9,6 +10,11 @@ export function installFakeIndexedDb(): void {
     value: IDBKeyRange,
     configurable: true,
   })
+
+  // Dexie may snapshot IndexedDB availability at import time; ensure it points
+  // at the fake IndexedDB implementation for tests.
+  Dexie.dependencies.indexedDB = fakeIndexedDB
+  Dexie.dependencies.IDBKeyRange = IDBKeyRange
 }
 
 export function deleteDatabase(name: string): Promise<void> {

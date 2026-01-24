@@ -10,10 +10,23 @@ import { LoadingOverlay } from "./loading-overlay"
 export function SceneBackgroundFallback() {
   const scrollProgressRef = useRef(0)
   const [loading, setLoading] = useState(true)
+  const loadingTimeoutRef = useRef<number | null>(null)
 
   const handleAnimationComplete = () => {
-    setTimeout(() => setLoading(false), 300)
+    if (loadingTimeoutRef.current !== null) {
+      window.clearTimeout(loadingTimeoutRef.current)
+    }
+    loadingTimeoutRef.current = window.setTimeout(() => setLoading(false), 300)
   }
+
+  useEffect(() => {
+    return () => {
+      if (loadingTimeoutRef.current !== null) {
+        window.clearTimeout(loadingTimeoutRef.current)
+        loadingTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     const handleScroll = () => {

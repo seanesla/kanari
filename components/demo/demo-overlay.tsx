@@ -1,7 +1,7 @@
 "use client"
 
 import { AnimatePresence, motion } from "framer-motion"
-import { useEffect, useState, useCallback } from "react"
+import { useEffect, useRef, useState, useCallback } from "react"
 import { useDemo } from "./demo-provider"
 import { DemoSpotlight } from "./demo-spotlight"
 import { DemoTooltip } from "./demo-tooltip"
@@ -30,10 +30,20 @@ export function DemoOverlay() {
   const currentStep = getCurrentStep()
   const isComplete = currentStepIndex >= totalSteps
   const [isExiting, setIsExiting] = useState(false)
+  const exitTimeoutRef = useRef<number | null>(null)
   const demoPosition = useDemoPosition({
     targetId: highlightedElement,
     enabled: isActive,
   })
+
+  useEffect(() => {
+    return () => {
+      if (exitTimeoutRef.current !== null) {
+        window.clearTimeout(exitTimeoutRef.current)
+        exitTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!isActive) return
@@ -82,7 +92,11 @@ export function DemoOverlay() {
     if (isExiting) return
     setIsExiting(true)
 
-    window.setTimeout(() => {
+    if (exitTimeoutRef.current !== null) {
+      window.clearTimeout(exitTimeoutRef.current)
+    }
+    exitTimeoutRef.current = window.setTimeout(() => {
+      exitTimeoutRef.current = null
       stopDemo("/overview")
     }, 280)
   }, [isExiting, stopDemo])

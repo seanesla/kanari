@@ -14,9 +14,14 @@ export interface Recording {
   features?: AudioFeatures
   metrics?: VoiceMetrics
   semanticAnalysis?: GeminiSemanticAnalysis // Emotion detection from Gemini
-  audioData?: number[] // Float32Array serialized for IndexedDB storage
+  // Audio samples for playback (user voice only).
+  // New: store Float32Array directly (IndexedDB supports typed arrays).
+  // Legacy: older records may still have number[].
+  audioData?: StoredAudioData
   sampleRate?: number // For playback (default 16000)
 }
+
+export type StoredAudioData = Float32Array | number[]
 
 export interface AudioFeatures {
   // Spectral features (extracted via Meyda)
@@ -775,7 +780,10 @@ export interface CheckInSession {
   /** Optional: user self-report collected after the check-in */
   selfReport?: CheckInSelfReport
   // Audio data for session playback (user's voice only)
-  audioData?: number[] // Float32Array serialized for IndexedDB storage
+  // Audio samples for playback (user voice only).
+  // New: store Float32Array directly (IndexedDB supports typed arrays).
+  // Legacy: older sessions may still have number[].
+  audioData?: StoredAudioData
   sampleRate?: number // For playback (default 16000)
 }
 

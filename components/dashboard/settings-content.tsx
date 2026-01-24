@@ -105,6 +105,16 @@ export function SettingsContent() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const saveMessageTimeoutRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (saveMessageTimeoutRef.current !== null) {
+        window.clearTimeout(saveMessageTimeoutRef.current)
+        saveMessageTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   // Load settings from IndexedDB on mount
   useEffect(() => {
@@ -230,7 +240,13 @@ export function SettingsContent() {
       setBaseline(normalizedDraft)
       setSaveMessage({ type: "success", text: "Settings saved successfully!" })
       // Clear success message after 3 seconds
-      setTimeout(() => setSaveMessage(null), 3000)
+      if (saveMessageTimeoutRef.current !== null) {
+        window.clearTimeout(saveMessageTimeoutRef.current)
+      }
+      saveMessageTimeoutRef.current = window.setTimeout(() => {
+        setSaveMessage(null)
+        saveMessageTimeoutRef.current = null
+      }, 3000)
     } catch (error) {
       console.error("Failed to save settings:", error)
       setSaveMessage({ type: "error", text: "Failed to save settings. Please try again." })

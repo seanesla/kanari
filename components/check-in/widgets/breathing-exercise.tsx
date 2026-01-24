@@ -118,7 +118,6 @@ export function BreathingExercise({
 
   useEffect(() => {
     if (!isRunning) return
-    if (remainingSeconds <= 0) return
 
     const tick = window.setInterval(() => {
       setRemainingSeconds((s) => Math.max(0, s - 1))
@@ -128,6 +127,13 @@ export function BreathingExercise({
     return () => {
       window.clearInterval(tick)
     }
+  }, [isRunning])
+
+  // Stop the timer loop once complete so a "Restart" can re-arm it.
+  useEffect(() => {
+    if (!isRunning) return
+    if (remainingSeconds > 0) return
+    setIsRunning(false)
   }, [isRunning, remainingSeconds])
 
   useEffect(() => {

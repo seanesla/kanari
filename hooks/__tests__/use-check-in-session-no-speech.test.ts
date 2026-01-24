@@ -27,12 +27,16 @@ beforeEach(async () => {
   })
   disconnectMock = vi.fn()
 
-  const track = {
+  const track: { stop: () => void; readyState: "live" | "ended"; kind: "audio"; enabled: boolean } = {
     stop: () => {},
     readyState: "live",
     kind: "audio",
     enabled: true,
-  } satisfies { stop: () => void; readyState: "live" | "ended"; kind: "audio"; enabled: boolean }
+  }
+
+  track.stop = () => {
+    track.readyState = "ended"
+  }
 
   const stream = {
     getTracks: () => [track],

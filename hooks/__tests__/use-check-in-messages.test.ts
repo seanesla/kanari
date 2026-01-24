@@ -30,12 +30,16 @@ beforeEach(async () => {
   detectMismatchMock = vi.fn(() => ({ detected: true, confidence: 0.9 }))
   shouldRunMismatchDetectionMock = vi.fn(() => true)
 
-  const track = {
+  const track: { stop: () => void; readyState: "live" | "ended"; kind: "audio"; enabled: boolean } = {
     stop: () => {},
     readyState: "live",
     kind: "audio",
     enabled: true,
-  } satisfies { stop: () => void; readyState: "live" | "ended"; kind: "audio"; enabled: boolean }
+  }
+
+  track.stop = () => {
+    track.readyState = "ended"
+  }
 
   const stream = {
     getTracks: () => [track],

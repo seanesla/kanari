@@ -26,12 +26,16 @@ describe("useCheckIn startSession abort behavior", () => {
     const playbackCleanup = vi.fn()
     const connectMock = vi.fn(async () => {})
 
-    const track = {
+    const track: { stop: () => void; readyState: "live" | "ended"; kind: "audio"; enabled: boolean } = {
       stop: vi.fn(),
       readyState: "live",
       kind: "audio",
       enabled: true,
-    } satisfies { stop: () => void; readyState: "live" | "ended"; kind: "audio"; enabled: boolean }
+    }
+
+    track.stop = vi.fn(() => {
+      track.readyState = "ended"
+    })
 
     const stream = {
       getTracks: () => [track],

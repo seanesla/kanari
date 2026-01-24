@@ -49,8 +49,17 @@ export function AIChatDetailView({
   const [seekPosition, setSeekPosition] = useState<number | undefined>(undefined)
 
   const audioDataArray = useMemo(() => {
-    if (!session.audioData || session.audioData.length === 0) return null
-    return new Float32Array(session.audioData)
+    const stored = session.audioData
+    if (!stored) return null
+
+    // New storage format: Float32Array (no copy)
+    if (stored instanceof Float32Array) {
+      return stored.length > 0 ? stored : null
+    }
+
+    // Legacy storage format: number[]
+    if (stored.length === 0) return null
+    return new Float32Array(stored)
   }, [session.audioData])
 
   const handleTimeUpdate = useCallback(

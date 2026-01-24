@@ -734,7 +734,9 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
       clearPreservedSession(false) // false = don't disconnect, we'll do it below
 
       const sessionAudio = audio.getSessionAudio()
-      const sessionAudioData = sessionAudio ? Array.from(sessionAudio) : undefined
+      // Store audio efficiently (Float32Array) instead of inflating to number[].
+      // IndexedDB supports typed arrays; older sessions may still have number[].
+      const sessionAudioData = sessionAudio ?? undefined
       const sessionSampleRate = sessionAudio ? 16000 : undefined
 
       let acousticMetrics = data.session?.acousticMetrics

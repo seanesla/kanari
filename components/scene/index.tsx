@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Canvas } from "@react-three/fiber"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
@@ -13,11 +13,24 @@ import { SceneBackgroundFallback } from "./fallback"
 function SceneBackgroundInner() {
   const { mode, scrollProgressRef, isLoading, setIsLoading } = useSceneMode()
   const [canvasMounted, setCanvasMounted] = useState(true)
+  const loadingTimeoutRef = useRef<number | null>(null)
 
   const handleAnimationComplete = () => {
     // Small delay after animation completes for smooth transition
-    setTimeout(() => setIsLoading(false), 300)
+    if (loadingTimeoutRef.current !== null) {
+      window.clearTimeout(loadingTimeoutRef.current)
+    }
+    loadingTimeoutRef.current = window.setTimeout(() => setIsLoading(false), 300)
   }
+
+  useEffect(() => {
+    return () => {
+      if (loadingTimeoutRef.current !== null) {
+        window.clearTimeout(loadingTimeoutRef.current)
+        loadingTimeoutRef.current = null
+      }
+    }
+  }, [])
 
   // Mount/unmount the heavy 3D canvas.
   // Keep it mounted during transitions so the fade-out still renders.

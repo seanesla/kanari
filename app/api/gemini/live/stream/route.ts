@@ -239,12 +239,24 @@ export async function GET(request: NextRequest) {
         }
       }
 
+      const onAbort = () => {
+        logDebug("SSE", "Client disconnected", { sessionId })
+        cleanup()
+        if (!isClosed) {
+          isClosed = true
+          controller.close()
+        }
+        // Close server session to free resources
+        sessionManager.closeSession(sessionId)
+      }
+
       // Cleanup function to remove listeners
       const cleanup = () => {
         emitter.off("ready", onReady)
         emitter.off("message", onMessage)
         emitter.off("error", onError)
         emitter.off("close", onClose)
+        request.signal.removeEventListener("abort", onAbort)
       }
 
       // Register listeners
@@ -254,16 +266,7 @@ export async function GET(request: NextRequest) {
       emitter.on("close", onClose)
 
       // Handle client disconnect via abort signal
-      request.signal.addEventListener("abort", () => {
-        logDebug("SSE", "Client disconnected", { sessionId })
-        cleanup()
-        if (!isClosed) {
-          isClosed = true
-          controller.close()
-        }
-        // Close server session to free resources
-        sessionManager.closeSession(sessionId)
-      })
+      request.signal.addEventListener("abort", onAbort, { once: true })
 
       // Send initial connected event
       send("connected", { sessionId })
