@@ -413,10 +413,10 @@ export function UnifiedDashboard() {
               className={cn(
                 "w-full max-w-[460px] mx-auto",
                 "relative h-11 p-1 rounded-2xl",
-                "border border-border/80",
-                "bg-card/35 backdrop-blur-2xl backdrop-saturate-150",
-                "ring-1 ring-white/8",
-                "shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_50px_rgba(0,0,0,0.35)]"
+                "border border-white/10",
+                "bg-[rgba(255,255,255,0.03)] backdrop-blur-2xl backdrop-saturate-150",
+                "ring-1 ring-white/6",
+                "shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_50px_rgba(0,0,0,0.35)]"
               )}
             >
               <TabsTrigger
@@ -442,19 +442,8 @@ export function UnifiedDashboard() {
                     )}
                   />
                 ) : null}
-                {activeView === "today" ? (
-                  <motion.div
-                    layoutId="overview-tabs-underline"
-                    transition={{ type: "spring", stiffness: 520, damping: 42 }}
-                    className={cn(
-                      "absolute left-4 right-4 bottom-1 h-[2px] rounded-full",
-                      "bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--accent)_55%,white)_50%,transparent)]",
-                      "opacity-70"
-                    )}
-                  />
-                ) : null}
                 <span className="relative z-10 inline-flex items-center gap-1.5">
-                  <Sparkles className={cn("h-4 w-4", activeView === "today" ? "text-accent/70" : "")} />
+                  <Sparkles className={cn("h-4 w-4", activeView === "today" ? "text-foreground/80" : "")} />
                   Today
                 </span>
               </TabsTrigger>
@@ -481,19 +470,8 @@ export function UnifiedDashboard() {
                     )}
                   />
                 ) : null}
-                {activeView === "trends" ? (
-                  <motion.div
-                    layoutId="overview-tabs-underline"
-                    transition={{ type: "spring", stiffness: 520, damping: 42 }}
-                    className={cn(
-                      "absolute left-4 right-4 bottom-1 h-[2px] rounded-full",
-                      "bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--accent)_55%,white)_50%,transparent)]",
-                      "opacity-70"
-                    )}
-                  />
-                ) : null}
                 <span className="relative z-10 inline-flex items-center gap-1.5">
-                  <TrendingUp className={cn("h-4 w-4", activeView === "trends" ? "text-accent/70" : "")} />
+                  <TrendingUp className={cn("h-4 w-4", activeView === "trends" ? "text-foreground/80" : "")} />
                   Trends
                 </span>
               </TabsTrigger>
