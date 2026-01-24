@@ -197,7 +197,7 @@ export default function AnalyticsPage() {
 
   return (
     <div data-demo-id="demo-analytics-page" className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-4 md:px-6 lg:px-8 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-20 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
+      <main className="px-4 md:px-6 lg:px-8 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-24 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
         {/* Header */}
         <div
           className={cn(

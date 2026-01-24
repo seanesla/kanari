@@ -279,7 +279,7 @@ export function UnifiedDashboard() {
 
   return (
     <div data-demo-id="demo-dashboard-main" className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-20 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
+      <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-24 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
         {/* Compact Header with Title + Metrics */}
         <div
           data-demo-id="demo-metrics-header"
