@@ -426,7 +426,7 @@ export function UnifiedDashboard() {
                   "text-sm font-semibold tracking-tight",
                   "text-muted-foreground/90 hover:text-foreground",
                   "hover:bg-muted/20",
-                  "data-[state=active]:text-accent-foreground",
+                  "data-[state=active]:text-foreground",
                   "transition-all duration-200"
                 )}
               >
@@ -436,13 +436,25 @@ export function UnifiedDashboard() {
                     transition={{ type: "spring", stiffness: 520, damping: 42 }}
                     className={cn(
                       "absolute inset-0 rounded-xl",
-                      "bg-accent",
-                      "shadow-[0_12px_36px_oklch(from_var(--accent)_l_c_h/0.28)]"
+                      "bg-[rgba(255,255,255,0.06)] backdrop-blur-xl backdrop-saturate-150",
+                      "border border-white/10",
+                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.35)]"
+                    )}
+                  />
+                ) : null}
+                {activeView === "today" ? (
+                  <motion.div
+                    layoutId="overview-tabs-underline"
+                    transition={{ type: "spring", stiffness: 520, damping: 42 }}
+                    className={cn(
+                      "absolute left-4 right-4 bottom-1 h-[2px] rounded-full",
+                      "bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--accent)_55%,white)_50%,transparent)]",
+                      "opacity-70"
                     )}
                   />
                 ) : null}
                 <span className="relative z-10 inline-flex items-center gap-1.5">
-                  <Sparkles className="h-4 w-4" />
+                  <Sparkles className={cn("h-4 w-4", activeView === "today" ? "text-accent/70" : "")} />
                   Today
                 </span>
               </TabsTrigger>
@@ -453,7 +465,7 @@ export function UnifiedDashboard() {
                   "text-sm font-semibold tracking-tight",
                   "text-muted-foreground/90 hover:text-foreground",
                   "hover:bg-muted/20",
-                  "data-[state=active]:text-accent-foreground",
+                  "data-[state=active]:text-foreground",
                   "transition-all duration-200"
                 )}
               >
@@ -463,13 +475,25 @@ export function UnifiedDashboard() {
                     transition={{ type: "spring", stiffness: 520, damping: 42 }}
                     className={cn(
                       "absolute inset-0 rounded-xl",
-                      "bg-accent",
-                      "shadow-[0_12px_36px_oklch(from_var(--accent)_l_c_h/0.28)]"
+                      "bg-[rgba(255,255,255,0.06)] backdrop-blur-xl backdrop-saturate-150",
+                      "border border-white/10",
+                      "shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_18px_40px_rgba(0,0,0,0.35)]"
+                    )}
+                  />
+                ) : null}
+                {activeView === "trends" ? (
+                  <motion.div
+                    layoutId="overview-tabs-underline"
+                    transition={{ type: "spring", stiffness: 520, damping: 42 }}
+                    className={cn(
+                      "absolute left-4 right-4 bottom-1 h-[2px] rounded-full",
+                      "bg-[linear-gradient(90deg,transparent,color-mix(in_srgb,var(--accent)_55%,white)_50%,transparent)]",
+                      "opacity-70"
                     )}
                   />
                 ) : null}
                 <span className="relative z-10 inline-flex items-center gap-1.5">
-                  <TrendingUp className="h-4 w-4" />
+                  <TrendingUp className={cn("h-4 w-4", activeView === "trends" ? "text-accent/70" : "")} />
                   Trends
                 </span>
               </TabsTrigger>
