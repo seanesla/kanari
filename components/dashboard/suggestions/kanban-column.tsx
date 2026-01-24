@@ -108,6 +108,7 @@ export function KanbanColumn({ column, suggestions, onCardClick, variant = "full
                     key={suggestion.id}
                     suggestion={suggestion}
                     onClick={() => onCardClick(suggestion)}
+                    variant={variant}
                   />
                 ))}
               </div>

@@ -233,7 +233,7 @@ export function KanbanBoard({
       </div>
 
       <DragOverlay modifiers={[snapCenterToCursor]}>
-        {activeSuggestion && <SuggestionCardOverlay suggestion={activeSuggestion} />}
+        {activeSuggestion && <SuggestionCardOverlay suggestion={activeSuggestion} variant={variant} />}
       </DragOverlay>
     </DndContext>
   )

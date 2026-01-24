@@ -9,6 +9,8 @@ import { formatScheduledTime } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import type { Suggestion, SuggestionCategory } from "@/lib/types"
 
+type SuggestionCardVariant = "full" | "compact"
+
 const categoryIcons: Record<SuggestionCategory, typeof Coffee> = {
   break: Coffee,
   exercise: Dumbbell,
@@ -29,9 +31,10 @@ interface SuggestionCardProps {
   suggestion: Suggestion
   onClick?: () => void
   isDragging?: boolean
+  variant?: SuggestionCardVariant
 }
 
-export function SuggestionCard({ suggestion, onClick, isDragging }: SuggestionCardProps) {
+export function SuggestionCard({ suggestion, onClick, isDragging, variant = "full" }: SuggestionCardProps) {
   const { timeZone } = useTimeZone()
   const {
     attributes,
@@ -115,7 +118,7 @@ export function SuggestionCard({ suggestion, onClick, isDragging }: SuggestionCa
           </p>
 
           {/* Rationale */}
-          {suggestion.rationale && (
+          {variant === "full" && suggestion.rationale && (
             <div className="mt-2 space-y-1">
               <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
                 Why
@@ -155,8 +158,14 @@ export function SuggestionCard({ suggestion, onClick, isDragging }: SuggestionCa
 }
 
 // Overlay version for drag preview
-export function SuggestionCardOverlay({ suggestion }: { suggestion: Suggestion }) {
-  return <SuggestionCard suggestion={suggestion} isDragging />
+export function SuggestionCardOverlay({
+  suggestion,
+  variant,
+}: {
+  suggestion: Suggestion
+  variant?: SuggestionCardVariant
+}) {
+  return <SuggestionCard suggestion={suggestion} isDragging variant={variant} />
 }
 
 // Helper to extract short title

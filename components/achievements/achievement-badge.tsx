@@ -18,34 +18,34 @@ const CATEGORY_CONFIG: Record<
   DailyAchievementCategory,
   {
     icon: typeof Bonfire
-    color: string
-    bgColor: string
-    borderColor: string
+    tone: string
+    stripe: string
+    softBg: string
   }
 > = {
   consistency: {
     icon: Bonfire,
-    color: "text-orange-500",
-    bgColor: "bg-orange-500/10",
-    borderColor: "border-orange-500/30",
+    tone: "text-[color:var(--kanari-tone-consistency)]",
+    stripe: "bg-[var(--kanari-tone-consistency)]",
+    softBg: "bg-[var(--kanari-tone-consistency-soft)]",
   },
   improvement: {
     icon: GraphUp,
-    color: "text-green-500",
-    bgColor: "bg-green-500/10",
-    borderColor: "border-green-500/30",
+    tone: "text-[color:var(--kanari-tone-improvement)]",
+    stripe: "bg-[var(--kanari-tone-improvement)]",
+    softBg: "bg-[var(--kanari-tone-improvement-soft)]",
   },
   engagement: {
     icon: Flash,
-    color: "text-yellow-500",
-    bgColor: "bg-yellow-500/10",
-    borderColor: "border-yellow-500/30",
+    tone: "text-[color:var(--kanari-tone-engagement)]",
+    stripe: "bg-[var(--kanari-tone-engagement)]",
+    softBg: "bg-[var(--kanari-tone-engagement-soft)]",
   },
   recovery: {
     icon: Heart,
-    color: "text-pink-500",
-    bgColor: "bg-pink-500/10",
-    borderColor: "border-pink-500/30",
+    tone: "text-[color:var(--kanari-tone-recovery)]",
+    stripe: "bg-[var(--kanari-tone-recovery)]",
+    softBg: "bg-[var(--kanari-tone-recovery-soft)]",
   },
 }
 
@@ -78,7 +78,7 @@ export function DailyAchievementCard({
     ? "border-border/40"
     : isCompleted
       ? "border-emerald-500/30"
-      : config.borderColor
+      : "border-border/60"
   const ringClass = !achievement.expired && isCompleted ? "ring-1 ring-emerald-500/20" : undefined
 
   const statusLabel = achievement.expired
@@ -106,8 +106,7 @@ export function DailyAchievementCard({
 
   if (variant === "compact") {
     const baseClasses = cn(
-      "relative flex items-center gap-2 px-3 py-2 rounded-lg border transition-all",
-      config.bgColor,
+      "relative flex items-center gap-2 pr-3 pl-2 py-2 rounded-lg border bg-card/35 backdrop-blur-sm transition-all",
       borderClass,
       ringClass,
       achievement.expired && "opacity-60",
@@ -116,8 +115,16 @@ export function DailyAchievementCard({
 
     const content = (
       <>
+        <div
+          aria-hidden="true"
+          className={cn(
+            "w-[3px] self-stretch rounded-full",
+            config.stripe,
+            achievement.expired && "opacity-40"
+          )}
+        />
         <AchievementIcon className={cn("h-5 w-5 flex-shrink-0", achievementIconColor)} />
-        <span className={cn("text-sm font-medium truncate", config.color, shouldStrikeTitle && "line-through opacity-80")}>
+        <span className={cn("text-sm font-medium truncate", shouldStrikeTitle && "line-through opacity-80")}>
           {achievement.title}
         </span>
 
@@ -174,9 +181,8 @@ export function DailyAchievementCard({
     <motion.div
       onClick={onClick}
       className={cn(
-        "relative p-4 rounded-xl border transition-all",
+        "relative p-4 pl-6 rounded-xl border bg-card/35 backdrop-blur-sm transition-all",
         onClick && "cursor-pointer hover:shadow-lg",
-        config.bgColor,
         borderClass,
         ringClass,
         achievement.expired && "opacity-60",
@@ -185,6 +191,15 @@ export function DailyAchievementCard({
       whileHover={onClick ? { scale: 1.01 } : undefined}
       whileTap={onClick ? { scale: 0.99 } : undefined}
     >
+      <div
+        aria-hidden="true"
+        className={cn(
+          "absolute left-3 top-4 bottom-4 w-[3px] rounded-full",
+          config.stripe,
+          achievement.expired && "opacity-40"
+        )}
+      />
+
       <div
         className={cn(
           "absolute top-3 right-3 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium",
@@ -216,7 +231,7 @@ export function DailyAchievementCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className={cn("font-semibold truncate", config.color, shouldStrikeTitle && "line-through opacity-80")}>
+            <h3 className={cn("font-semibold truncate", shouldStrikeTitle && "line-through opacity-80")}>
               {achievement.title}
             </h3>
             {isNew && (
@@ -228,7 +243,7 @@ export function DailyAchievementCard({
 
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-0.5 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-1">
-              <CategoryIcon className={cn("h-3 w-3", config.color)} />
+              <CategoryIcon className={cn("h-3 w-3", config.tone)} />
               <span className="capitalize">{achievement.category}</span>
             </span>
             <span className="text-muted-foreground">•</span>

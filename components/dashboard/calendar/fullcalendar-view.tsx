@@ -102,6 +102,7 @@ interface FullCalendarViewProps {
   completedSuggestions?: Suggestion[]
   checkInSessions?: CheckInSession[]
   recoveryBlocks?: RecoveryBlock[]
+  variant?: "full" | "mini"
   onEventClick?: (suggestion: Suggestion) => void
   onCheckInClick?: (session: CheckInSession) => void
   onTimeSlotClick?: (dateISO: string, hour: number, minute: number) => void
@@ -293,6 +294,7 @@ export function FullCalendarView({
   scheduledSuggestions,
   completedSuggestions = EMPTY_SUGGESTIONS,
   checkInSessions = EMPTY_SESSIONS,
+  variant = "full",
   onEventClick,
   onCheckInClick,
   onTimeSlotClick,
@@ -306,6 +308,9 @@ export function FullCalendarView({
   const containerRef = useRef<HTMLDivElement>(null)
   const calendarRef = useRef<FullCalendar>(null)
   const [isDragOver, setIsDragOver] = useState(false)
+
+  const isMini = variant === "mini"
+  const isInteractive = !isMini
 
   // Tooltip state for check-in markers
   const [selectedCheckIn, setSelectedCheckIn] = useState<CheckInSession | null>(null)
@@ -463,29 +468,29 @@ export function FullCalendarView({
       className={cn(
         className,
         "relative transition-all duration-200 fullcalendar-wrapper",
-        isDragOver && "ring-2 ring-accent ring-offset-2 ring-offset-background rounded-lg",
-        pendingDragActive && !isDragOver && "ring-1 ring-accent/30 ring-offset-1 ring-offset-background rounded-lg"
+        isInteractive && isDragOver && "ring-2 ring-accent ring-offset-2 ring-offset-background rounded-lg",
+        isInteractive && pendingDragActive && !isDragOver && "ring-1 ring-accent/30 ring-offset-1 ring-offset-background rounded-lg"
       )}
       style={themeStyles}
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
+      onDragOver={isInteractive ? handleDragOver : undefined}
+      onDragLeave={isInteractive ? handleDragLeave : undefined}
+      onDrop={isInteractive ? handleDrop : undefined}
     >
       <FullCalendar
         ref={calendarRef}
         plugins={CALENDAR_PLUGINS}
-        initialView="timeGridWeek"
-        headerToolbar={HEADER_TOOLBAR}
+        initialView={isMini ? "dayGridMonth" : "timeGridWeek"}
+        headerToolbar={isMini ? false : HEADER_TOOLBAR}
         events={events}
         eventClick={handleEventClick}
         eventDrop={handleEventDrop}
         dateClick={handleDateClick}
-        editable={true}
-        droppable={true}
+        editable={isInteractive}
+        droppable={isInteractive}
         selectable={false}
         dayMaxEvents={true}
         weekends={true}
-        nowIndicator={true}
+        nowIndicator={!isMini}
         slotMinTime="00:00:00"
         slotMaxTime="24:00:00"
         allDaySlot={false}
@@ -495,7 +500,7 @@ export function FullCalendarView({
         slotLabelFormat={SLOT_LABEL_FORMAT}
       />
 
-      {isDragOver && (
+      {isInteractive && isDragOver && (
         <div className="absolute inset-0 bg-accent/5 rounded-lg pointer-events-none flex items-center justify-center">
           <div className="bg-background/90 px-4 py-2 rounded-lg text-sm font-medium text-accent">
             Drop to schedule

@@ -11,34 +11,43 @@ import {
   Sparks,
   Trophy,
 } from "iconoir-react"
-import type { DailyAchievement, MilestoneBadgeType } from "@/lib/achievements"
+import type { DailyAchievement, DailyAchievementCategory, MilestoneBadgeType } from "@/lib/achievements"
 
 type SvgIcon = ComponentType<SVGProps<SVGSVGElement>>
+
+const CATEGORY_TONE_CLASS: Record<DailyAchievementCategory, string> = {
+  consistency: "text-[color:var(--kanari-tone-consistency)]",
+  improvement: "text-[color:var(--kanari-tone-improvement)]",
+  engagement: "text-[color:var(--kanari-tone-engagement)]",
+  recovery: "text-[color:var(--kanari-tone-recovery)]",
+}
 
 export function getDailyAchievementIcon(achievement: DailyAchievement): {
   Icon: SvgIcon
   colorClass: string
 } {
+  const colorClass = CATEGORY_TONE_CLASS[achievement.category] ?? "text-accent"
+
   if (achievement.type === "badge") {
-    return { Icon: Sparks, colorClass: "text-yellow-500" }
+    return { Icon: Sparks, colorClass }
   }
 
   const trackingKey = achievement.tracking?.key
-  if (trackingKey === "do_check_in") return { Icon: Microphone, colorClass: "text-blue-500" }
-  if (trackingKey === "complete_suggestions") return { Icon: CheckCircle, colorClass: "text-green-500" }
-  if (trackingKey === "schedule_suggestion") return { Icon: CalendarPlus, colorClass: "text-indigo-500" }
+  if (trackingKey === "do_check_in") return { Icon: Microphone, colorClass }
+  if (trackingKey === "complete_suggestions") return { Icon: CheckCircle, colorClass }
+  if (trackingKey === "schedule_suggestion") return { Icon: CalendarPlus, colorClass }
 
   switch (achievement.category) {
     case "consistency":
-      return { Icon: Microphone, colorClass: "text-blue-500" }
+      return { Icon: Microphone, colorClass }
     case "improvement":
-      return { Icon: GraphUp, colorClass: "text-green-500" }
+      return { Icon: GraphUp, colorClass }
     case "engagement":
-      return { Icon: Sparks, colorClass: "text-yellow-500" }
+      return { Icon: Sparks, colorClass }
     case "recovery":
-      return { Icon: Heart, colorClass: "text-pink-500" }
+      return { Icon: Heart, colorClass }
     default:
-      return { Icon: Sparks, colorClass: "text-yellow-500" }
+      return { Icon: Sparks, colorClass }
   }
 }
 
@@ -56,4 +65,3 @@ export function getMilestoneBadgeIcon(type: MilestoneBadgeType): { Icon: SvgIcon
       return { Icon: Trophy, colorClass: "text-amber-500" }
   }
 }
-

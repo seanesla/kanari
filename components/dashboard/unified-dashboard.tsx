@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
-import { RefreshCw, ChevronsUpDown } from "@/lib/icons"
+import { RefreshCw, ChevronsUpDown, ArrowUpRight, X } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 import {
@@ -21,6 +21,7 @@ import { useAchievements } from "@/hooks/use-achievements"
 import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog"
 import { CollapsibleSection } from "./collapsible-section"
 import { MetricsHeaderBar } from "./metrics-header-bar"
 import { Deck } from "@/components/dashboard/deck"
@@ -40,6 +41,7 @@ export function UnifiedDashboard() {
   const searchParams = useSearchParams()
   const { isMobile } = useResponsive()
   const [kanbanExpanded, setKanbanExpanded] = useState(true)
+  const [calendarOpen, setCalendarOpen] = useState(false)
 
   // Data hooks
   const storedTrendData = useTrendData(7)
@@ -137,6 +139,12 @@ export function UnifiedDashboard() {
     ? (dayCompletion.completedCount / dayCompletion.totalCount) * 100
     : 0
 
+  const dailyRemainingCount = Math.max(0, dayCompletion.totalCount - dayCompletion.completedCount)
+  const suggestionsRemainingCount = Math.max(
+    0,
+    dayCompletion.recommendedActionsRequired - dayCompletion.recommendedActionsCompleted
+  )
+
   const handleAchievementClick = useCallback((achievement: DailyAchievement) => {
     // Prevent direct completion from the dashboard preview.
     // See docs/error-patterns/achievements-manual-completion.md
@@ -207,9 +215,6 @@ export function UnifiedDashboard() {
       <div className="flex items-center justify-between gap-3 mb-3">
         <div className="min-w-0">
           <h3 className="text-sm font-medium">Suggestions</h3>
-          <p className="text-xs text-muted-foreground">
-            Pending → Scheduled → Completed
-          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -255,20 +260,39 @@ export function UnifiedDashboard() {
 
   // Calendar content (shared between mobile and desktop)
   const calendarContent = (
-    <FullCalendarView
-      scheduledSuggestions={scheduledSuggestions}
-      completedSuggestions={completedSuggestions}
-      checkInSessions={checkInSessions}
-      recoveryBlocks={recoveryBlocks}
-      onEventClick={handlers.handleSuggestionClick}
-      onTimeSlotClick={handlers.handleTimeSlotClick}
-      onEventUpdate={(suggestion, newScheduledFor) => {
-        scheduleSuggestion(suggestion.id, newScheduledFor)
-      }}
-      onExternalDrop={handlers.handleExternalDrop}
-      pendingDragActive={pendingDragActive}
-      className="h-full"
-    />
+    <div className="relative h-full">
+      <FullCalendarView
+        variant="mini"
+        scheduledSuggestions={scheduledSuggestions}
+        completedSuggestions={completedSuggestions}
+        checkInSessions={checkInSessions}
+        recoveryBlocks={recoveryBlocks}
+        className="h-full"
+      />
+
+      <button
+        type="button"
+        onClick={() => setCalendarOpen(true)}
+        className={cn(
+          "absolute inset-0 rounded-xl",
+          "cursor-zoom-in",
+          "focus:outline-none focus:ring-2 focus:ring-accent/50"
+        )}
+        aria-label="Expand calendar"
+      >
+        <span className="sr-only">Expand calendar</span>
+        <span
+          aria-hidden="true"
+          className={cn(
+            "absolute top-3 right-3 inline-flex items-center justify-center",
+            "h-9 w-9 rounded-lg border border-border/60 bg-background/40 backdrop-blur-sm",
+            "text-muted-foreground hover:text-foreground transition-colors"
+          )}
+        >
+          <ArrowUpRight className="h-4 w-4" />
+        </span>
+      </button>
+    </div>
   )
 
   const scheduleDefaults = useMemo(() => {
@@ -308,20 +332,23 @@ export function UnifiedDashboard() {
                   <p className="text-sm font-medium truncate">
                     Level {achievementProgress.level} • {achievementProgress.levelTitle}
                   </p>
-                  <p className="text-xs text-muted-foreground">
-                    {achievementProgress.totalPoints} pts • Suggestions {dayCompletion.recommendedActionsCompleted}/{dayCompletion.recommendedActionsRequired}
-                  </p>
+                  {!dayCompletion.isComplete && (dailyRemainingCount > 0 || suggestionsRemainingCount > 0) ? (
+                    <p className="text-xs text-muted-foreground">
+                      {dailyRemainingCount > 0 ? `${dailyRemainingCount} left` : "Daily done"}
+                      {suggestionsRemainingCount > 0 ? ` • ${suggestionsRemainingCount} suggestion left` : ""}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">{achievementProgress.totalPoints} pts</p>
+                  )}
                 </div>
                 <div className="text-right text-xs text-muted-foreground">
-                  <div>
-                    Daily{" "}
+                  <div className="tabular-nums">
                     <span className="font-medium text-foreground">
                       {dayCompletion.completedCount}/{dayCompletion.totalCount}
-                    </span>
+                    </span>{" "}
+                    today
                   </div>
-                  {dayCompletion.isComplete && (
-                    <div className="text-accent">Complete</div>
-                  )}
+                  {dayCompletion.isComplete && <div className="text-accent">Complete</div>}
                 </div>
               </div>
 
@@ -333,7 +360,7 @@ export function UnifiedDashboard() {
                     {achievementsLoading ? "Generating today’s achievements…" : "No achievements yet."}
                   </div>
                 ) : (
-                  achievementsToday.slice(0, 3).map((achievement) => (
+                  achievementsToday.slice(0, 2).map((achievement) => (
                     <DailyAchievementCard
                       key={achievement.id}
                       achievement={achievement}
@@ -345,8 +372,7 @@ export function UnifiedDashboard() {
                 )}
               </div>
 
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Resets at midnight (local)</span>
+              <div className="flex items-center justify-end text-xs text-muted-foreground">
                 <Link href="/achievements" className="underline underline-offset-4 hover:text-foreground">
                   View all
                 </Link>
@@ -371,13 +397,16 @@ export function UnifiedDashboard() {
               </Deck>
 
               {/* Calendar */}
-              <Deck data-demo-id="demo-calendar" className="overflow-hidden h-[60vh]">
+              <Deck
+                data-demo-id="demo-calendar"
+                className="overflow-hidden aspect-square w-full max-w-[420px] mx-auto"
+              >
                 {calendarContent}
               </Deck>
 
 
               {/* Collapsible Journal */}
-              <CollapsibleSection title="Journal Entries" defaultOpen={true}>
+              <CollapsibleSection title="Journal Entries" defaultOpen={false}>
                 <JournalEntriesPanel embedded />
               </CollapsibleSection>
 
@@ -396,29 +425,35 @@ export function UnifiedDashboard() {
               )}
             </div>
           ) : (
-            /* Desktop Layout: Stacked sections (natural page scroll) */
+            /* Desktop Layout: 2-column grid (calmer + more scannable) */
             <div className="space-y-4">
-              {/* Kanban */}
-              <Deck
-                data-demo-id="demo-suggestions-kanban"
-                className={cn(
-                  "p-4 overflow-hidden transition-[height] duration-300",
-                  kanbanExpanded ? "h-[400px]" : "h-[240px]"
-                )}
-              >
-                {kanbanContent}
-              </Deck>
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] items-start">
+                <div className="space-y-4 min-w-0">
+                  {/* Kanban */}
+                  <Deck
+                    data-demo-id="demo-suggestions-kanban"
+                    className={cn(
+                      "p-4 overflow-hidden transition-[height] duration-300",
+                      kanbanExpanded ? "h-[420px]" : "h-[260px]"
+                    )}
+                  >
+                    {kanbanContent}
+                  </Deck>
 
-              {/* Calendar */}
-              <Deck data-demo-id="demo-calendar" className="overflow-hidden h-[70vh] min-h-[520px]">
-                {calendarContent}
-              </Deck>
+                  {/* Collapsible Journal */}
+                  <CollapsibleSection title="Journal Entries" defaultOpen={false}>
+                    <JournalEntriesPanel embedded />
+                  </CollapsibleSection>
+                </div>
 
-
-              {/* Collapsible Journal */}
-              <CollapsibleSection title="Journal Entries" defaultOpen={true}>
-                <JournalEntriesPanel embedded />
-              </CollapsibleSection>
+                {/* Calendar (square preview, expands on click) */}
+                <Deck
+                  data-demo-id="demo-calendar"
+                  className="overflow-hidden aspect-square w-full max-w-[420px] mx-auto lg:max-w-none lg:mx-0"
+                >
+                  {calendarContent}
+                </Deck>
+              </div>
 
               {/* Empty state */}
               {showEmptyState && (
@@ -452,6 +487,54 @@ export function UnifiedDashboard() {
           burnoutPrediction={burnoutPrediction ?? undefined}
           features={allRecordings?.[0]?.features}
         />
+
+        {/* Expanded Calendar Dialog */}
+        <Dialog open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <DialogContent
+            showCloseButton={false}
+            className={cn(
+              "p-0 overflow-hidden",
+              "grid grid-rows-[auto_1fr] gap-0",
+              "rounded-2xl border-border/70 bg-card/95 backdrop-blur-xl",
+              "!w-[min(96vw,80rem)] !max-w-none sm:!max-w-none",
+              "!h-[min(80vh,44rem)]"
+            )}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+              <div className="min-w-0">
+                <DialogTitle className="text-sm font-medium">Calendar</DialogTitle>
+                <DialogDescription className="sr-only">
+                  Full calendar view of scheduled recovery suggestions and check-ins.
+                </DialogDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => setCalendarOpen(false)}
+              >
+                <X className="h-4 w-4" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </div>
+
+            <div className="min-h-0">
+              <FullCalendarView
+                scheduledSuggestions={scheduledSuggestions}
+                completedSuggestions={completedSuggestions}
+                checkInSessions={checkInSessions}
+                recoveryBlocks={recoveryBlocks}
+                onEventClick={handlers.handleSuggestionClick}
+                onTimeSlotClick={handlers.handleTimeSlotClick}
+                onEventUpdate={(suggestion, newScheduledFor) => {
+                  scheduleSuggestion(suggestion.id, newScheduledFor)
+                }}
+                onExternalDrop={handlers.handleExternalDrop}
+                pendingDragActive={pendingDragActive}
+                className="h-full"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Schedule Time Dialog */}
         <ScheduleTimeDialog

@@ -334,7 +334,6 @@ export default function AnalyticsPage() {
                 chartsVisible ? "opacity-100 translate-y-0" : "opacity-95 translate-y-12"
               )}
             >
-              <p className="text-xs uppercase tracking-widest text-muted-foreground mb-3">Trends</p>
               <h2 className="text-2xl md:text-3xl font-serif">Wellness Metrics</h2>
             </div>
 
