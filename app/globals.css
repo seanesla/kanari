@@ -274,3 +274,22 @@ html[data-disable-startup-animation="true"] [data-startup-overlay="true"] {
   pointer-events: none !important;
   transition: none !important;
 }
+
+/* Dialog animations (opacity-only, avoids transform conflicts with centering) */
+@keyframes kanari-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes kanari-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}

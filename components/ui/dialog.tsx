@@ -38,7 +38,8 @@ function DialogOverlay({
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
       className={cn(
-        'data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50',
+        'fixed inset-0 z-50 bg-black/50',
+        'data-[state=open]:animate-[kanari-fade-in_180ms_ease-out_both] data-[state=closed]:animate-[kanari-fade-out_140ms_ease-in_both]',
         className,
       )}
       {...props}
@@ -60,12 +61,9 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          // Use opacity-only transitions for the content. Tailwind "animate-in" keyframes write to
-          // `transform`, which fights the centering translate and can look like the dialog flies in
-          // from a corner on some pages.
+          // Opacity-only animation: avoids transform conflicts with centering.
           'bg-background fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg sm:max-w-lg',
-          'transition-opacity duration-200',
-          'data-[state=open]:opacity-100 data-[state=closed]:opacity-0',
+          'data-[state=open]:animate-[kanari-fade-in_180ms_ease-out_both] data-[state=closed]:animate-[kanari-fade-out_140ms_ease-in_both]',
           className,
         )}
         {...props}
