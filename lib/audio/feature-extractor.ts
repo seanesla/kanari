@@ -26,6 +26,8 @@ export class FeatureExtractor {
   private sampleRate: number
   private bufferSize: number
   private hopSize: number
+  private yinDiff: Float32Array | null = null
+  private yinCmndf: Float32Array | null = null
 
   constructor(options: FeatureExtractionOptions = {}) {
     this.sampleRate = options.sampleRate ?? DEFAULT_SAMPLE_RATE
@@ -42,30 +44,25 @@ export class FeatureExtractor {
    * Extract complete audio features from audio buffer
    */
   extract(audioData: Float32Array): AudioFeatures {
-    // Extract frame-level features using windowed analysis
-    const frameFeatures = this.extractFrameFeatures(audioData)
-
-    // Aggregate frame features into summary statistics
-    const spectralCentroid = this.mean(frameFeatures.spectralCentroid)
-    const spectralFlux = this.mean(frameFeatures.spectralFlux)
-    const spectralRolloff = this.mean(frameFeatures.spectralRolloff)
-    const rms = this.mean(frameFeatures.rms)
-    const zcr = this.mean(frameFeatures.zcr)
-    const mfcc = this.aggregateMFCCs(frameFeatures.mfcc)
+    const frameSummary = this.extractFrameFeatures(audioData)
 
     // Extract temporal features (speech rate, pauses)
-    const temporalFeatures = this.extractTemporalFeatures(audioData, frameFeatures.rms)
+    const temporalFeatures = this.extractTemporalFeatures(
+      audioData,
+      frameSummary.rmsValues,
+      frameSummary.rmsMean
+    )
 
     // Extract pitch features using YIN algorithm
     const pitchFeatures = this.extractPitchFeatures(audioData)
 
     return {
-      mfcc,
-      spectralCentroid,
-      spectralFlux,
-      spectralRolloff,
-      rms,
-      zcr,
+      mfcc: frameSummary.mfcc,
+      spectralCentroid: frameSummary.spectralCentroid,
+      spectralFlux: frameSummary.spectralFlux,
+      spectralRolloff: frameSummary.spectralRolloff,
+      rms: frameSummary.rmsMean,
+      zcr: frameSummary.zcrMean,
       ...temporalFeatures,
       ...pitchFeatures,
     }
@@ -122,8 +119,10 @@ export class FeatureExtractor {
    *
    * Pattern doc: docs/error-patterns/voice-feature-unit-mismatch-causes-stuck-scores.md
    */
-  private calculateSpectralCentroidNormalized(spectrum: ArrayLike<number>): number {
-    const total = this.sumSpectrum(spectrum)
+  private calculateSpectralCentroidNormalizedWithTotal(
+    spectrum: ArrayLike<number>,
+    total: number
+  ): number {
     if (total <= 0) return 0
 
     let weightedIndexSum = 0
@@ -142,11 +141,11 @@ export class FeatureExtractor {
    * Calculate spectral rolloff as a normalized value (0..1).
    * Rolloff is the frequency below which `percent` of the spectral energy is contained.
    */
-  private calculateSpectralRolloffNormalized(
+  private calculateSpectralRolloffNormalizedWithTotal(
     spectrum: ArrayLike<number>,
+    total: number,
     percent: number = DEFAULT_SPECTRAL_ROLLOFF_PERCENT
   ): number {
-    const total = this.sumSpectrum(spectrum)
     if (total <= 0) return 0
 
     const target = total * Math.max(0, Math.min(1, percent))
@@ -172,12 +171,12 @@ export class FeatureExtractor {
    * Uses L2 distance between L1-normalized spectra, then scales by sqrt(2)
    * (the max possible L2 distance between two probability distributions).
    */
-  private calculateSpectralFluxNormalized(
+  private calculateSpectralFluxNormalizedWithSums(
     currentSpectrum: ArrayLike<number>,
-    previousSpectrum: ArrayLike<number>
+    currentSum: number,
+    previousSpectrum: ArrayLike<number>,
+    previousSum: number
   ): number {
-    const currentSum = this.sumSpectrum(currentSpectrum)
-    const previousSum = this.sumSpectrum(previousSpectrum)
     if (currentSum <= 0 || previousSum <= 0) return 0
 
     const len = Math.min(currentSpectrum.length, previousSpectrum.length)
@@ -198,128 +197,189 @@ export class FeatureExtractor {
   }
 
   /**
-   * Calculate spectral flux manually (L2 norm of spectrum difference)
-   * This avoids Meyda 5.6.3 bug with spectralFlux calculation
-   */
-  private calculateSpectralFlux(
-    currentSpectrum: number[],
-    previousSpectrum: number[]
-  ): number {
-    let sum = 0
-    const len = Math.min(currentSpectrum.length, previousSpectrum.length)
-    for (let i = 0; i < len; i++) {
-      const diff = currentSpectrum[i] - previousSpectrum[i]
-      sum += diff * diff
-    }
-    return Math.sqrt(sum)
-  }
-
-  /**
    * Extract features frame-by-frame using sliding window
    */
-  private extractFrameFeatures(audioData: Float32Array) {
-    const mfccFrames: number[][] = []
-    const spectralCentroid: number[] = []
-    const spectralFlux: number[] = []
-    const spectralRolloff: number[] = []
-    const rms: number[] = []
-    const zcr: number[] = []
+  private extractFrameFeatures(audioData: Float32Array): {
+    mfcc: number[]
+    spectralCentroid: number
+    spectralFlux: number
+    spectralRolloff: number
+    rmsMean: number
+    zcrMean: number
+    rmsValues: number[]
+  } {
+    const rmsValues: number[] = []
+
+    // Running sums/counts (avoid holding per-frame arrays for summary-only features).
+    let rmsSum = 0
+    let rmsCount = 0
+    let zcrSum = 0
+    let zcrCount = 0
+
+    let spectralCentroidSum = 0
+    let spectralCentroidCount = 0
+    let spectralFluxSum = 0
+    let spectralFluxCount = 0
+    let spectralRolloffSum = 0
+    let spectralRolloffCount = 0
+
+    // MFCC aggregation (mean per coefficient across frames).
+    let mfccSums: number[] | null = null
+    let mfccCounts: number[] | null = null
+    let mfccLength = 13
+    let mfccFramesSeen = 0
+
+    // Track previous amplitude spectrum for spectralFlux.
+    // Use a reusable `number[]` (not Float32Array) to preserve original numeric precision.
+    let previousSpectrum: number[] | null = null
+    let previousSpectrumSum = 0
 
     // Process audio in overlapping windows
-    const numFrames = Math.floor((audioData.length - this.bufferSize) / this.hopSize) + 1
-
-    // Track previous amplitude spectrum for manual spectralFlux calculation
-    // (Meyda 5.6.3 has a bug with spectralFlux when using Meyda.extract())
-    let previousSpectrum: Float32Array | number[] | null = null
+    const numFrames =
+      audioData.length >= this.bufferSize
+        ? Math.floor((audioData.length - this.bufferSize) / this.hopSize) + 1
+        : 0
 
     for (let i = 0; i < numFrames; i++) {
       const start = i * this.hopSize
       const end = start + this.bufferSize
 
-      // Extract frame
-      const frame = audioData.slice(start, end)
+      // Extract frame without copying (subarray is a view).
+      const frame = audioData.subarray(start, end)
 
       // Always compute time-domain features, even if Meyda extraction fails.
-      rms.push(this.calculateRms(frame))
-      zcr.push(this.calculateZcr(frame))
+      const rms = this.calculateRms(frame)
+      rmsValues.push(rms)
+      if (Number.isFinite(rms)) {
+        rmsSum += rms
+        rmsCount += 1
+      }
+
+      const zcr = this.calculateZcr(frame)
+      if (Number.isFinite(zcr)) {
+        zcrSum += zcr
+        zcrCount += 1
+      }
 
       try {
-        // Use Meyda to extract features for this frame
-        // Note: spectralFlux is computed manually to avoid Meyda bug
-        const features = Meyda.extract(
-          [
-            "mfcc",
-            "amplitudeSpectrum",
-          ],
-          frame
-        )
+        const features = Meyda.extract(["mfcc", "amplitudeSpectrum"], frame)
 
-        if (features) {
-          if (features.mfcc) mfccFrames.push(features.mfcc as number[])
+        if (!features) continue
 
-          // Calculate spectralFlux manually using amplitude spectrum
-          const currentSpectrum = features.amplitudeSpectrum as ArrayLike<number> | undefined
-          if (currentSpectrum) {
-            const centroidNorm = this.calculateSpectralCentroidNormalized(currentSpectrum)
-            if (Number.isFinite(centroidNorm)) {
-              spectralCentroid.push(centroidNorm)
-            }
+        const mfcc = features.mfcc as number[] | undefined
+        if (mfcc) {
+          // Match previous behavior: coefficient count comes from the first MFCC frame.
+          if (!mfccSums) {
+            mfccLength = mfcc.length || 13
+            mfccSums = Array(mfccLength).fill(0)
+            mfccCounts = Array(mfccLength).fill(0)
+          }
 
-            const rolloffNorm = this.calculateSpectralRolloffNormalized(currentSpectrum)
-            if (Number.isFinite(rolloffNorm)) {
-              spectralRolloff.push(rolloffNorm)
-            }
+          for (let coef = 0; coef < mfccLength; coef++) {
+            const value = mfcc[coef] ?? 0
+            if (!Number.isFinite(value)) continue
+            mfccSums[coef] += value
+            mfccCounts![coef] += 1
+          }
+          mfccFramesSeen += 1
+        }
 
-            if (previousSpectrum) {
-              const fluxNorm = this.calculateSpectralFluxNormalized(currentSpectrum, previousSpectrum)
-              if (Number.isFinite(fluxNorm)) {
-                spectralFlux.push(fluxNorm)
-              }
-            }
+        const currentSpectrum = features.amplitudeSpectrum as ArrayLike<number> | undefined
+        if (!currentSpectrum) continue
 
-            // Store current spectrum for next iteration (copy to avoid mutation/reuse issues).
-            previousSpectrum = Array.from(currentSpectrum)
+        const currentSum = this.sumSpectrum(currentSpectrum)
+
+        const centroidNorm =
+          currentSum > 0 ? this.calculateSpectralCentroidNormalizedWithTotal(currentSpectrum, currentSum) : 0
+        if (Number.isFinite(centroidNorm)) {
+          spectralCentroidSum += centroidNorm
+          spectralCentroidCount += 1
+        }
+
+        const rolloffNorm =
+          currentSum > 0 ? this.calculateSpectralRolloffNormalizedWithTotal(currentSpectrum, currentSum) : 0
+        if (Number.isFinite(rolloffNorm)) {
+          spectralRolloffSum += rolloffNorm
+          spectralRolloffCount += 1
+        }
+
+        if (previousSpectrum) {
+          const fluxNorm =
+            currentSum > 0 && previousSpectrumSum > 0
+              ? this.calculateSpectralFluxNormalizedWithSums(
+                  currentSpectrum,
+                  currentSum,
+                  previousSpectrum,
+                  previousSpectrumSum
+                )
+              : 0
+          if (Number.isFinite(fluxNorm)) {
+            spectralFluxSum += fluxNorm
+            spectralFluxCount += 1
           }
         }
+
+        // Store current spectrum for next iteration (copy to avoid mutation/reuse issues).
+        const spectrumLength = currentSpectrum.length
+        if (!previousSpectrum || previousSpectrum.length !== spectrumLength) {
+          previousSpectrum = new Array(spectrumLength)
+        }
+
+        for (let s = 0; s < spectrumLength; s++) {
+          previousSpectrum[s] = currentSpectrum[s] ?? 0
+        }
+        previousSpectrumSum = currentSum
       } catch (error) {
         // Skip frame on extraction error
         console.warn("Feature extraction failed for frame, skipping:", error)
       }
     }
 
+    const mfcc =
+      mfccFramesSeen > 0 && mfccSums && mfccCounts
+        ? mfccSums.map((sum, i) => (mfccCounts[i] > 0 ? sum / mfccCounts[i] : 0))
+        : Array(13).fill(0)
+
     return {
-      mfcc: mfccFrames,
-      spectralCentroid,
-      spectralFlux,
-      spectralRolloff,
-      rms,
-      zcr,
+      mfcc,
+      spectralCentroid: spectralCentroidCount > 0 ? spectralCentroidSum / spectralCentroidCount : 0,
+      spectralFlux: spectralFluxCount > 0 ? spectralFluxSum / spectralFluxCount : 0,
+      spectralRolloff: spectralRolloffCount > 0 ? spectralRolloffSum / spectralRolloffCount : 0,
+      rmsMean: rmsCount > 0 ? rmsSum / rmsCount : 0,
+      zcrMean: zcrCount > 0 ? zcrSum / zcrCount : 0,
+      rmsValues,
     }
   }
 
   /**
    * Extract temporal features: speech rate, pause ratio, pause count, average pause duration
    */
-  private extractTemporalFeatures(audioData: Float32Array, rmsValues: number[]) {
+  private extractTemporalFeatures(audioData: Float32Array, rmsValues: number[], rmsMean: number) {
     // Energy-based voice activity detection
-    const rmsThreshold = this.mean(rmsValues) * 0.3 // 30% of mean RMS as threshold
+    const rmsThreshold = rmsMean * 0.3 // 30% of mean RMS as threshold
     const frameDuration = this.hopSize / this.sampleRate // Duration of each frame in seconds
 
-    // Detect speech/silence frames
-    const speechFrames: boolean[] = rmsValues.map((rms) => rms > rmsThreshold)
-
-    // Count pauses (transitions from speech to silence)
     let pauseCount = 0
     let currentPauseDuration = 0
-    const pauseDurations: number[] = []
+    let pauseDurationsSum = 0
+    let pauseDurationsCount = 0
     let silenceDuration = 0
+    let speechFrameCount = 0
+    let speechRmsSum = 0
 
-    for (let i = 0; i < speechFrames.length; i++) {
-      if (speechFrames[i]) {
-        // Speech frame
-        // End of pause
-        if (i > 0 && !speechFrames[i - 1] && currentPauseDuration > 0) {
-          pauseDurations.push(currentPauseDuration)
+    let prevWasSpeech = false
+    for (let i = 0; i < rmsValues.length; i++) {
+      const frameRms = rmsValues[i] ?? 0
+      const isSpeech = frameRms > rmsThreshold
+
+      if (isSpeech) {
+        speechFrameCount += 1
+        speechRmsSum += frameRms
+
+        // End of pause (includes initial leading silence).
+        if (i > 0 && !prevWasSpeech && currentPauseDuration > 0) {
+          pauseDurationsSum += currentPauseDuration
+          pauseDurationsCount += 1
           currentPauseDuration = 0
         }
       } else {
@@ -328,15 +388,18 @@ export class FeatureExtractor {
         currentPauseDuration += frameDuration
 
         // Start of new pause
-        if (i > 0 && speechFrames[i - 1]) {
-          pauseCount++
+        if (i > 0 && prevWasSpeech) {
+          pauseCount += 1
         }
       }
+
+      prevWasSpeech = isSpeech
     }
 
     // Add final pause if recording ended during silence
     if (currentPauseDuration > 0) {
-      pauseDurations.push(currentPauseDuration)
+      pauseDurationsSum += currentPauseDuration
+      pauseDurationsCount += 1
     }
 
     // Calculate pause ratio
@@ -345,13 +408,16 @@ export class FeatureExtractor {
 
     // Calculate average pause duration (in milliseconds)
     const avgPauseDuration =
-      pauseDurations.length > 0
-        ? (this.mean(pauseDurations) * 1000)
+      pauseDurationsCount > 0
+        ? ((pauseDurationsSum / pauseDurationsCount) * 1000)
         : 0
 
     // Estimate speech rate (syllables per second)
     // Using energy peaks as proxy for syllables
-    const speechRate = this.estimateSpeechRate(rmsValues, speechFrames, frameDuration)
+    const speechRate = this.estimateSpeechRate(rmsValues, rmsThreshold, frameDuration, {
+      speechFrameCount,
+      speechRmsSum,
+    })
 
     return {
       speechRate,
@@ -366,31 +432,49 @@ export class FeatureExtractor {
    */
   private estimateSpeechRate(
     rmsValues: number[],
-    speechFrames: boolean[],
-    frameDuration: number
+    rmsThreshold: number,
+    frameDuration: number,
+    precomputed?: { speechFrameCount: number; speechRmsSum: number }
   ): number {
-    // Only consider speech frames
-    const speechRms = rmsValues.filter((_, i) => speechFrames[i])
+    const speechFrameCount =
+      precomputed?.speechFrameCount ??
+      rmsValues.reduce((count, v) => count + (v > rmsThreshold ? 1 : 0), 0)
+    if (speechFrameCount === 0) return 0
 
-    if (speechRms.length === 0) return 0
+    const speechRmsSum =
+      precomputed?.speechRmsSum ??
+      rmsValues.reduce((sum, v) => (v > rmsThreshold ? sum + v : sum), 0)
 
     // Find peaks in RMS (potential syllables)
-    const rmsThreshold = this.mean(speechRms) * 0.8
+    const peakThreshold = (speechRmsSum / speechFrameCount) * 0.8
     let peakCount = 0
 
-    for (let i = 1; i < speechRms.length - 1; i++) {
-      // Peak detection: local maximum above threshold
-      if (
-        speechRms[i] > rmsThreshold &&
-        speechRms[i] > speechRms[i - 1] &&
-        speechRms[i] > speechRms[i + 1]
-      ) {
-        peakCount++
+    // Iterate only speech frames, but without allocating a compacted `speechRms` array.
+    let prev: number | null = null
+    let curr: number | null = null
+    for (let i = 0; i < rmsValues.length; i++) {
+      const v = rmsValues[i] ?? 0
+      if (v <= rmsThreshold) continue
+
+      if (prev === null) {
+        prev = v
+        continue
       }
+      if (curr === null) {
+        curr = v
+        continue
+      }
+
+      const next = v
+      if (curr > peakThreshold && curr > prev && curr > next) {
+        peakCount += 1
+      }
+      prev = curr
+      curr = next
     }
 
     // Calculate speech duration (only counting speech frames)
-    const speechDuration = speechFrames.filter(Boolean).length * frameDuration
+    const speechDuration = speechFrameCount * frameDuration
 
     // Speech rate = peaks (syllables) per second
     if (speechDuration <= 0) return 0
@@ -399,25 +483,6 @@ export class FeatureExtractor {
     // Compensate by scaling with hop/buffer ratio (512/256 => 0.5).
     const overlapCompensation = this.hopSize / this.bufferSize
     return (peakCount / speechDuration) * overlapCompensation
-  }
-
-  /**
-   * Aggregate MFCCs across frames by taking mean of each coefficient
-   */
-  private aggregateMFCCs(mfccFrames: number[][]): number[] {
-    if (mfccFrames.length === 0) {
-      return Array(13).fill(0) // Return 13 zero coefficients
-    }
-
-    const numCoefficients = mfccFrames[0]?.length ?? 13
-    const aggregated: number[] = []
-
-    for (let coef = 0; coef < numCoefficients; coef++) {
-      const coefficientValues = mfccFrames.map((frame) => frame[coef] ?? 0)
-      aggregated.push(this.mean(coefficientValues))
-    }
-
-    return aggregated
   }
 
   /**
@@ -443,8 +508,15 @@ export class FeatureExtractor {
   private stdDev(values: number[]): number {
     if (values.length < 2) return 0
     const avg = this.mean(values)
-    const squaredDiffs = values.map((v) => (v - avg) ** 2)
-    return Math.sqrt(this.mean(squaredDiffs))
+    let sum = 0
+    let count = 0
+    for (const v of values) {
+      if (!Number.isFinite(v)) continue
+      const d = v - avg
+      sum += d * d
+      count += 1
+    }
+    return count > 0 ? Math.sqrt(sum / count) : 0
   }
 
   /**
@@ -461,7 +533,11 @@ export class FeatureExtractor {
     if (maxLag <= minLag) return null
 
     // Step 1: Compute difference function d(τ)
-    const diff = new Float32Array(maxLag + 1)
+    if (!this.yinDiff || this.yinDiff.length < maxLag + 1) {
+      this.yinDiff = new Float32Array(maxLag + 1)
+      this.yinCmndf = new Float32Array(maxLag + 1)
+    }
+    const diff = this.yinDiff
     for (let tau = 1; tau <= maxLag; tau++) {
       let sum = 0
       for (let j = 0; j < halfLength; j++) {
@@ -472,7 +548,7 @@ export class FeatureExtractor {
     }
 
     // Step 2: Compute cumulative mean normalized difference d'(τ)
-    const cmndf = new Float32Array(maxLag + 1)
+    const cmndf = this.yinCmndf!
     cmndf[0] = 1
     let runningSum = 0
     for (let tau = 1; tau <= maxLag; tau++) {
@@ -520,16 +596,23 @@ export class FeatureExtractor {
     pitchRange: number
   } {
     const pitchValues: number[] = []
-    const numFrames = Math.floor((audioData.length - this.bufferSize) / this.hopSize) + 1
+    const numFrames =
+      audioData.length >= this.bufferSize
+        ? Math.floor((audioData.length - this.bufferSize) / this.hopSize) + 1
+        : 0
+    let minPitch = Number.POSITIVE_INFINITY
+    let maxPitch = Number.NEGATIVE_INFINITY
 
     for (let i = 0; i < numFrames; i++) {
       const start = i * this.hopSize
       const end = start + this.bufferSize
-      const frame = audioData.slice(start, end)
+      const frame = audioData.subarray(start, end)
 
       const pitch = this.extractPitch(frame)
       if (pitch !== null) {
         pitchValues.push(pitch)
+        if (pitch < minPitch) minPitch = pitch
+        if (pitch > maxPitch) maxPitch = pitch
       }
     }
 
@@ -539,7 +622,7 @@ export class FeatureExtractor {
 
     const pitchMean = this.mean(pitchValues)
     const pitchStdDev = this.stdDev(pitchValues)
-    const pitchRange = Math.max(...pitchValues) - Math.min(...pitchValues)
+    const pitchRange = (Number.isFinite(minPitch) && Number.isFinite(maxPitch)) ? maxPitch - minPitch : 0
 
     return { pitchMean, pitchStdDev, pitchRange }
   }

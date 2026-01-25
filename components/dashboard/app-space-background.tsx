@@ -226,6 +226,22 @@ function SpaceField({ accentColor }: { accentColor: string }) {
 export function AppSpaceBackground() {
   const { accentColor } = useSceneMode()
   const reducedMotion = useReducedMotion()
+  const dpr = useMemo(() => [1, 1.5] as [number, number], [])
+  const camera = useMemo(
+    () => ({ position: [0, 0, 1] as [number, number, number], fov: 65 }),
+    []
+  )
+  const gl = useMemo(
+    () => ({ antialias: true, alpha: true, powerPreference: "high-performance" as const }),
+    []
+  )
+  const vignetteStyle = useMemo(
+    () => ({
+      background:
+        "radial-gradient(1200px 800px at 50% 20%, transparent 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0.46) 100%)",
+    }),
+    []
+  )
 
   const [isPageVisible, setIsPageVisible] = useState(() => {
     if (typeof document === "undefined") return true
@@ -248,9 +264,9 @@ export function AppSpaceBackground() {
   return (
     <div className="pointer-events-none fixed inset-0 -z-10">
       <Canvas
-        dpr={[1, 1.5]}
-        camera={{ position: [0, 0, 1], fov: 65 }}
-        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+        dpr={dpr}
+        camera={camera}
+        gl={gl}
         frameloop={reducedMotion || !isPageVisible ? "demand" : "always"}
       >
         <SpaceField accentColor={accentColor} />
@@ -260,10 +276,7 @@ export function AppSpaceBackground() {
       <div
         aria-hidden="true"
         className="absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(1200px 800px at 50% 20%, transparent 0%, rgba(0,0,0,0.18) 55%, rgba(0,0,0,0.46) 100%)",
-        }}
+        style={vignetteStyle}
       />
     </div>
   )

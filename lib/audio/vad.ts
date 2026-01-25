@@ -156,20 +156,22 @@ export class SimpleVAD {
     const frameSize = 512
     const hopSize = 256
     const frames: { energy: number; index: number }[] = []
+    let energySum = 0
 
     // Calculate energy for each frame
     for (let i = 0; i < audioData.length - frameSize; i += hopSize) {
-      const frame = audioData.slice(i, i + frameSize)
+      // `subarray` is a view (no copy) — safe here since we only read to compute energy.
+      const frame = audioData.subarray(i, i + frameSize)
       const energy = this.calculateEnergy(frame)
       frames.push({ energy, index: i })
+      energySum += energy
     }
 
     // Not enough data to evaluate speech.
     if (frames.length === 0) return []
 
     // Calculate adaptive threshold
-    const energies = frames.map((f) => f.energy)
-    const meanEnergy = energies.reduce((a, b) => a + b, 0) / energies.length
+    const meanEnergy = energySum / frames.length
     const threshold = meanEnergy * this.energyThreshold
 
     // Find speech segments
