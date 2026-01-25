@@ -12,7 +12,6 @@ import { Deck } from "@/components/dashboard/deck"
 import { StressFatigueChart } from "@/components/dashboard/stress-fatigue-chart"
 import { EngagementTracker } from "@/components/dashboard/engagement-tracker"
 import { InsightsPanel } from "@/components/dashboard/insights-panel"
-import { AnalyticsInsightsSection } from "@/components/dashboard/analytics-insights"
 import type { BurnoutPrediction, CheckInSession, Recording, TrendData } from "@/lib/types"
 
 interface OverviewAnalyticsSectionProps {
@@ -153,7 +152,7 @@ export function OverviewAnalyticsSection({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px] items-start">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_420px] items-start">
         <div className="space-y-4 min-w-0">
           {/* Burnout Forecast */}
           <div data-demo-id="demo-burnout-prediction">
@@ -245,7 +244,7 @@ export function OverviewAnalyticsSection({
           </div>
 
           {/* Trend charts */}
-          <div data-demo-id="demo-trend-charts" className="grid md:grid-cols-2 gap-4 items-start">
+          <div data-demo-id="demo-trend-charts" className="grid gap-4 items-start">
             <Deck
               className={cn(
                 "group p-4 md:p-6 transition-colors duration-300",
@@ -274,7 +273,7 @@ export function OverviewAnalyticsSection({
             >
               <h3 className="text-sm font-medium mb-3">Wellness score</h3>
               {dashboardStats.totalRecordings === 0 ? (
-                <div className="h-[280px] flex items-center justify-center">
+                <div className="h-[200px] md:h-[220px] flex items-center justify-center">
                   <div className="text-center">
                     <TrendingUp className="h-10 w-10 mx-auto mb-3 text-muted-foreground/30" />
                     <p className="text-muted-foreground">No data yet</p>
@@ -282,7 +281,7 @@ export function OverviewAnalyticsSection({
                   </div>
                 </div>
               ) : (
-                <div className="h-[280px]">
+                <div className="h-[200px] md:h-[220px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <RadialBarChart
                       data={wellnessData}
@@ -315,7 +314,7 @@ export function OverviewAnalyticsSection({
                 </div>
               )}
 
-              <p className="text-center text-xs text-muted-foreground mt-3">
+              <p className="text-center text-xs text-muted-foreground mt-2">
                 {dashboardStats.totalRecordings === 0
                   ? "Start a check-in to see your wellness score"
                   : wellnessScore > 70
@@ -327,7 +326,7 @@ export function OverviewAnalyticsSection({
 
               {dashboardStats.totalRecordings > 0 ? (
                 <>
-                  <div className="flex items-center justify-center gap-1 mt-2 text-xs text-muted-foreground/70">
+                  <div className="flex items-center justify-center gap-1 mt-1 text-xs text-muted-foreground/70">
                     <span>Tap for details</span>
                     <ChevronDown
                       className={cn(
@@ -372,11 +371,9 @@ export function OverviewAnalyticsSection({
 
         <div className="space-y-4 min-w-0">
           <InsightsPanel session={latestSynthesisSession} />
-          <AnalyticsInsightsSection />
+          <EngagementTracker variant="compact" />
         </div>
       </div>
-
-      <EngagementTracker />
     </div>
   )
 }

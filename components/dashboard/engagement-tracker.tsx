@@ -8,9 +8,10 @@ import { Deck } from "@/components/dashboard/deck"
 
 interface EngagementTrackerProps {
   className?: string
+  variant?: "wide" | "compact"
 }
 
-export function EngagementTracker({ className }: EngagementTrackerProps) {
+export function EngagementTracker({ className, variant = "wide" }: EngagementTrackerProps) {
   const stats = useDashboardStats()
 
   // Total check-ins
@@ -40,7 +41,12 @@ export function EngagementTracker({ className }: EngagementTrackerProps) {
 
   return (
     <Deck className={cn("p-4 md:p-6", className)}>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div
+        className={cn(
+          "grid grid-cols-1",
+          variant === "wide" ? "md:grid-cols-3 gap-6" : "gap-4"
+        )}
+      >
         {/* Weekly Goal */}
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
