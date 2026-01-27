@@ -4,13 +4,17 @@
  * Welcome Splash Overlay
  *
  * Full-screen overlay that plays on first load of onboarding.
- * Timing: ~1s fade in, ~3s hold, ~1s fade out.
- * Not a step - it overlays the onboarding page initially before step 1 appears.
+ * Uses the same particle word-formation animation as the 3D onboarding scene,
+ * even when the onboarding flow is in 2D mode (mobile/responsive).
  */
 
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import { Canvas } from "@react-three/fiber"
+import { AdaptiveDpr } from "@react-three/drei"
 import { useSceneMode } from "@/lib/scene-context"
+import { WelcomeParticles } from "./welcome-particles"
+import { SCENE_COLORS } from "@/lib/constants"
 
 interface WelcomeSplashProps {
   /** Called when the splash animation completes */
@@ -23,24 +27,23 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
   // Keep this hook here so the splash reflects current theme state.
   const { accentColor } = useSceneMode()
 
-  useEffect(() => {
-    // Total duration: quick fade in + short hold + fade out.
-    const fadeOutTimer = setTimeout(() => {
-      setIsVisible(false)
-    }, 1800)
+  const handleParticlesComplete = () => {
+    setIsVisible(false)
+  }
 
-    const completeTimer = setTimeout(() => {
-      onComplete()
-    }, 2200)
+  useEffect(() => {
+    // Safety net: never let onboarding get stuck if WebGL fails.
+    const fallback = window.setTimeout(() => {
+      setIsVisible(false)
+    }, 6500)
 
     return () => {
-      clearTimeout(fadeOutTimer)
-      clearTimeout(completeTimer)
+      window.clearTimeout(fallback)
     }
-  }, [onComplete])
+  }, [])
 
   return (
-    <AnimatePresence>
+    <AnimatePresence onExitComplete={onComplete}>
       {isVisible && (
         <motion.div
           className="fixed inset-0 z-50 flex items-center justify-center bg-background"
@@ -49,26 +52,19 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.35, ease: "easeOut" }}
         >
-          <div className="text-center space-y-6">
-            {/* Animated logo/brand mark */}
-            <motion.div
-              className="relative mx-auto"
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ delay: 0.12, duration: 0.55, ease: "easeOut" }}
+          <div className="absolute inset-0">
+            <Canvas
+              camera={{ position: [0, 0, 8.5], fov: 50, near: 0.1, far: 150 }}
+              dpr={[1, 1.5]}
+              gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
             >
-              {/* Brand text */}
-              <motion.h1
-                className="text-6xl md:text-8xl font-serif tracking-tight"
-                initial={{ y: 12, opacity: 0, filter: "blur(10px)" }}
-                animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-                transition={{ delay: 0.18, duration: 0.75, ease: "easeOut" }}
-              >
-                <span style={{ color: accentColor }}>k</span>anari
-              </motion.h1>
-            </motion.div>
-
-
+              <AdaptiveDpr />
+              <color attach="background" args={[SCENE_COLORS.background]} />
+              <WelcomeParticles
+                accentColor={accentColor}
+                onComplete={handleParticlesComplete}
+              />
+            </Canvas>
           </div>
         </motion.div>
       )}

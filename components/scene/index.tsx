@@ -77,20 +77,35 @@ function SceneBackgroundInner() {
 
   useEffect(() => {
     // Only track scroll in landing mode and when not loading
-    if (mode !== "landing" || isLoading) return
+    if (mode !== "landing" || isLoading || !isPageVisible) return
 
-    const handleScroll = () => {
-      const maxScroll = document.documentElement.scrollHeight - window.innerHeight
-      const progress = maxScroll > 0 ? Math.min(1, window.scrollY / maxScroll) : 0
-      scrollProgressRef.current = progress
+    let rafId: number | null = null
+    let maxScroll = 0
+
+    const computeMaxScroll = () => {
+      maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
     }
 
-    // Immediately calculate scroll position when entering landing mode
-    handleScroll()
+    const update = () => {
+      // On iOS, scroll events can be throttled heavily during momentum scrolling.
+      // Sampling scroll position on rAF keeps the 3D scene parallax in sync.
+      const progress = maxScroll > 0 ? Math.min(1, window.scrollY / maxScroll) : 0
+      scrollProgressRef.current = progress
+      rafId = window.requestAnimationFrame(update)
+    }
 
-    window.addEventListener("scroll", handleScroll, { passive: true })
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [mode, isLoading, scrollProgressRef])
+    computeMaxScroll()
+    update()
+
+    window.addEventListener("resize", computeMaxScroll, { passive: true })
+
+    return () => {
+      window.removeEventListener("resize", computeMaxScroll)
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId)
+      }
+    }
+  }, [mode, isLoading, isPageVisible, scrollProgressRef])
 
   return (
     <>

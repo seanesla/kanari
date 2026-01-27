@@ -51,7 +51,7 @@ const NebulaVolumeMaterial = shaderMaterial(
        float a = 0.5;
        // Performance note: this material is full-screen and layered.
        // Keeping octave count low prevents the landing page from becoming GPU-bound.
-       for (int i = 0; i < 3; i++) {
+       for (int i = 0; i < 2; i++) {
          v += a * noise(p);
          p *= 2.0;
          a *= 0.5;
@@ -75,9 +75,11 @@ const NebulaVolumeMaterial = shaderMaterial(
       // Slow drift so the nebula feels alive.
       vec2 drift = vec2(0.03, -0.022) * t;
 
-      // Domain warp (adds billowy depth).
-      float w1 = fbm(p * 3.2 + drift + seed * 7.1);
-      float w2 = fbm(p * 5.1 - drift * 0.9 - seed * 4.3);
+       // Domain warp (adds billowy depth).
+       // This does not need full FBM detail; keeping it to single-octave noise
+       // preserves the look but avoids a lot of per-pixel work.
+       float w1 = noise(p * 3.2 + drift + seed * 7.1);
+       float w2 = noise(p * 5.1 - drift * 0.9 - seed * 4.3);
       vec2 warp = vec2(w1, w2) - 0.5;
       p += warp * 0.28;
 
@@ -85,8 +87,8 @@ const NebulaVolumeMaterial = shaderMaterial(
       float swirl = (w1 - 0.5) * 1.2 + sin(t * 0.05 + seed) * 0.18;
       vec2 q = rot(swirl) * p;
 
-      float base = fbm(q * 3.4 + seed * 3.3 + drift * 0.6);
-      float detail = fbm(q * 9.0 + seed * 11.0 - drift * 1.2);
+       float base = fbm(q * 3.4 + seed * 3.3 + drift * 0.6);
+       float detail = noise(q * 9.0 + seed * 11.0 - drift * 1.2);
 
       // Density shaping: a few bright ridges, lots of soft mass.
       float ridges = pow(clamp(1.0 - abs(detail * 2.0 - 1.0), 0.0, 1.0), 2.4);
