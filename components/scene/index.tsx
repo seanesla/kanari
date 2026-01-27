@@ -115,7 +115,7 @@ function SceneBackgroundInner() {
           <Canvas
             camera={{ position: [...CAMERA.initialPosition], fov: CAMERA.fov }}
             dpr={[1, 1.5]}
-            gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+            gl={{ antialias: true, alpha: false, powerPreference: "high-performance" }}
             frameloop={reducedMotion || !isPageVisible ? "demand" : "always"}
           >
             <color attach="background" args={[SCENE_COLORS.background]} />

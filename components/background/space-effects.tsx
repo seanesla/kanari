@@ -24,6 +24,8 @@ const NebulaVolumeMaterial = shaderMaterial(
     }
   `,
   /* glsl */ `
+    precision mediump float;
+
     uniform float time;
     uniform vec3 colorA;
     uniform vec3 colorB;
@@ -32,7 +34,10 @@ const NebulaVolumeMaterial = shaderMaterial(
     varying vec2 vUv;
 
     float hash(vec2 p) {
-      return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      // Trig-free hash (faster on mobile GPUs than sin-based hash).
+      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
     }
 
     float noise(vec2 p) {
@@ -69,7 +74,15 @@ const NebulaVolumeMaterial = shaderMaterial(
       float t = time;
 
       vec2 uv = vUv;
-      vec2 p = uv - 0.5;
+      vec2 centered = uv - 0.5;
+
+      // Soft edges (avoid a hard rectangle).
+      // Discard fully transparent pixels early so we skip the expensive noise work.
+      float r = length(centered);
+      float edge = smoothstep(0.62, 0.24, r);
+      if (edge <= 0.0) discard;
+
+      vec2 p = centered;
       p.x *= 1.35;
 
       // Slow drift so the nebula feels alive.
@@ -91,12 +104,12 @@ const NebulaVolumeMaterial = shaderMaterial(
        float detail = noise(q * 9.0 + seed * 11.0 - drift * 1.2);
 
       // Density shaping: a few bright ridges, lots of soft mass.
-      float ridges = pow(clamp(1.0 - abs(detail * 2.0 - 1.0), 0.0, 1.0), 2.4);
+      // Avoid pow() here (exp/log on many GPUs); a polynomial approximation
+      // keeps the look while being much cheaper.
+      float ridgeBase = clamp(1.0 - abs(detail * 2.0 - 1.0), 0.0, 1.0);
+      float ridges = ridgeBase * ridgeBase * (0.6 + 0.4 * ridgeBase);
       float density = base * 0.85 + ridges * 0.35;
 
-      // Soft edges (avoid a hard rectangle).
-      float r = length(uv - 0.5);
-      float edge = smoothstep(0.62, 0.24, r);
       density *= edge;
 
       // Keep the alpha gentle so it doesn't overpower the UI.
