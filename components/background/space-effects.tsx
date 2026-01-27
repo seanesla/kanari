@@ -46,16 +46,18 @@ const NebulaVolumeMaterial = shaderMaterial(
       return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
     }
 
-    float fbm(vec2 p) {
-      float v = 0.0;
-      float a = 0.5;
-      for (int i = 0; i < 5; i++) {
-        v += a * noise(p);
-        p *= 2.0;
-        a *= 0.5;
-      }
-      return v;
-    }
+     float fbm(vec2 p) {
+       float v = 0.0;
+       float a = 0.5;
+       // Performance note: this material is full-screen and layered.
+       // Keeping octave count low prevents the landing page from becoming GPU-bound.
+       for (int i = 0; i < 3; i++) {
+         v += a * noise(p);
+         p *= 2.0;
+         a *= 0.5;
+       }
+       return v;
+     }
 
     mat2 rot(float a) {
       float c = cos(a);

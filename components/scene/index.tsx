@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Canvas } from "@react-three/fiber"
+import { useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
 import { CAMERA, FOG } from "./constants"
@@ -13,6 +14,11 @@ import { SceneBackgroundFallback } from "./fallback"
 function SceneBackgroundInner() {
   const { mode, scrollProgressRef, isLoading, setIsLoading } = useSceneMode()
   const [canvasMounted, setCanvasMounted] = useState(true)
+  const reducedMotion = useReducedMotion()
+  const [isPageVisible, setIsPageVisible] = useState(() => {
+    if (typeof document === "undefined") return true
+    return document.visibilityState !== "hidden"
+  })
   const loadingTimeoutRef = useRef<number | null>(null)
 
   const handleAnimationComplete = () => {
@@ -29,6 +35,19 @@ function SceneBackgroundInner() {
         window.clearTimeout(loadingTimeoutRef.current)
         loadingTimeoutRef.current = null
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+
+    const onVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState !== "hidden")
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
     }
   }, [])
 
@@ -81,7 +100,8 @@ function SceneBackgroundInner() {
           <Canvas
             camera={{ position: [...CAMERA.initialPosition], fov: CAMERA.fov }}
             dpr={[1, 1.5]}
-            gl={{ antialias: true, alpha: true }}
+            gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+            frameloop={reducedMotion || !isPageVisible ? "demand" : "always"}
           >
             <color attach="background" args={[SCENE_COLORS.background]} />
             <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />
