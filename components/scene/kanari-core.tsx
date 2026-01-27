@@ -11,9 +11,10 @@ import { ORBITAL_RINGS } from "./constants"
 interface KanariCoreProps {
   scrollProgressRef: MutableRefObject<number>
   mode: SceneMode
+  isMobile?: boolean
 }
 
-export function KanariCore({ scrollProgressRef, mode }: KanariCoreProps) {
+export function KanariCore({ scrollProgressRef, mode, isMobile = false }: KanariCoreProps) {
   const { accentColor } = useSceneMode()
   const groupRef = useRef<THREE.Group>(null)
   const innerRef = useRef<THREE.Mesh>(null)
@@ -155,7 +156,7 @@ export function KanariCore({ scrollProgressRef, mode }: KanariCoreProps) {
         <dodecahedronGeometry args={[1, 0]} />
         <MeshTransmissionMaterial
           backside
-          samples={8}
+          samples={isMobile ? 4 : 8}
           thickness={0.4}
           chromaticAberration={0.3}
           anisotropy={0.3}

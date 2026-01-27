@@ -23,11 +23,13 @@ import { ScrollCamera } from "./scroll-camera"
 interface SceneProps {
   scrollProgressRef: MutableRefObject<number>
   mode: SceneMode
+  isMobile?: boolean
 }
 
-export function Scene({ scrollProgressRef, mode }: SceneProps) {
+export function Scene({ scrollProgressRef, mode, isMobile = false }: SceneProps) {
   const { accentColor } = useSceneMode()
   const reducedMotion = useReducedMotion()
+  const lite = isMobile
 
   return (
     <>
@@ -45,13 +47,13 @@ export function Scene({ scrollProgressRef, mode }: SceneProps) {
       <DistantStars accentColor={accentColor} variant="landing" animate={!reducedMotion} />
       <GalaxySprites accentColor={accentColor} variant="landing" animate={!reducedMotion} />
       <StarClusters accentColor={accentColor} variant="landing" animate={!reducedMotion} />
-      <NebulaVolume accentColor={accentColor} variant="landing" animate={!reducedMotion} />
+      {lite ? null : <NebulaVolume accentColor={accentColor} variant="landing" animate={!reducedMotion} />}
       <NebulaBackdrop accentColor={accentColor} variant="landing" animate={!reducedMotion} />
       <ShootingStars accentColor={accentColor} variant="landing" animate={!reducedMotion} />
       <FloatingGeometryField accentColor={accentColor} variant="landing" animate={!reducedMotion} />
 
       {/* THE focal point - always visible, transforms with scroll */}
-      <KanariCore scrollProgressRef={scrollProgressRef} mode={mode} />
+      <KanariCore scrollProgressRef={scrollProgressRef} mode={mode} isMobile={isMobile} />
 
       {/* Section-specific accents that fade in */}
       <SectionAccent
