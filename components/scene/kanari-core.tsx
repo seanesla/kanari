@@ -22,6 +22,7 @@ export function KanariCore({ scrollProgressRef, mode, isMobile = false }: Kanari
   const outerRef = useRef<THREE.Mesh>(null)
   const ringRefs = useRef<(THREE.Mesh | null)[]>([])
   const opacityRef = useRef(1)
+  const ringSegments = isMobile ? 64 : 100
 
   useEffect(() => {
     const disposeMaterial = (material: THREE.Material | THREE.Material[]) => {
@@ -156,13 +157,13 @@ export function KanariCore({ scrollProgressRef, mode, isMobile = false }: Kanari
         <dodecahedronGeometry args={[1, 0]} />
         <MeshTransmissionMaterial
           backside
-          samples={isMobile ? 4 : 8}
+          samples={isMobile ? 2 : 8}
           thickness={0.4}
-          chromaticAberration={0.3}
-          anisotropy={0.3}
-          distortion={0.1}
-          distortionScale={0.2}
-          temporalDistortion={0.1}
+          chromaticAberration={isMobile ? 0 : 0.3}
+          anisotropy={isMobile ? 0 : 0.3}
+          distortion={isMobile ? 0 : 0.1}
+          distortionScale={isMobile ? 0 : 0.2}
+          temporalDistortion={isMobile ? 0 : 0.1}
           metalness={0.1}
           roughness={0}
           color={accentColor}
@@ -173,7 +174,7 @@ export function KanariCore({ scrollProgressRef, mode, isMobile = false }: Kanari
       {/* Orbital rings */}
       {ORBITAL_RINGS.map((radius, i) => (
         <mesh key={i} ref={(el) => { ringRefs.current[i] = el }} rotation={[Math.PI / 2 + i * 0.4, i * 0.3, 0]} scale={1}>
-          <torusGeometry args={[radius, 0.015, 16, 100]} />
+          <torusGeometry args={[radius, 0.015, 16, ringSegments]} />
           <meshStandardMaterial
             color={accentColor}
             emissive={accentColor}

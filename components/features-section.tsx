@@ -53,7 +53,7 @@ export function FeaturesSection() {
   ]
 
   return (
-    <div className="py-24 md:py-32">
+    <div className="py-20 sm:py-24 md:py-32">
       <div className="mx-auto max-w-7xl px-6">
         <motion.div
           variants={container}
@@ -61,7 +61,7 @@ export function FeaturesSection() {
           whileInView="show"
           viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
         >
-          <motion.div className="mb-16 max-w-2xl" variants={item}>
+          <motion.div className="mb-10 sm:mb-16 max-w-2xl" variants={item}>
             <h2 className="text-3xl font-semibold tracking-tight md:text-4xl text-balance">
               Everything you need to stay ahead of burnout
             </h2>
@@ -81,7 +81,7 @@ export function FeaturesSection() {
                 whileHover={reduceMotion ? undefined : { y: -6, scale: 1.01 }}
                 whileTap={reduceMotion ? undefined : { scale: 0.99 }}
                 transition={reduceMotion ? undefined : { type: "spring", stiffness: 280, damping: 22 }}
-                className="group relative rounded-lg border border-border bg-card p-8 transition-colors hover:border-accent/50 hover:bg-card/80"
+                className="group relative rounded-lg border border-border bg-card p-6 sm:p-8 transition-colors hover:border-accent/50 hover:bg-card/80"
               >
                 <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10 text-accent">
                   <feature.icon className="h-6 w-6" />

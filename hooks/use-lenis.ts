@@ -3,15 +3,17 @@
 import Lenis from "lenis"
 import { useEffect, useRef } from "react"
 import { useSceneMode } from "@/lib/scene-context"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export function useLenis() {
   const { mode } = useSceneMode()
+  const isMobile = useIsMobile()
   const lenisRef = useRef<Lenis | null>(null)
   const rafIdRef = useRef<number | null>(null)
 
   useEffect(() => {
     // Only enable Lenis smooth scroll on landing page
-    if (mode !== "landing") {
+    if (mode !== "landing" || isMobile) {
       // Clean up if mode changed away from landing
       if (lenisRef.current) {
         lenisRef.current.destroy()
@@ -77,5 +79,5 @@ export function useLenis() {
       lenis.destroy()
       lenisRef.current = null
     }
-  }, [mode])
+  }, [mode, isMobile])
 }

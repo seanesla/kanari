@@ -57,6 +57,54 @@ if (typeof window !== "undefined" && !("ResizeObserver" in window)) {
   })
 }
 
+// matchMedia is not implemented in jsdom by default, but many UI hooks expect it.
+if (typeof window !== "undefined" && !("matchMedia" in window)) {
+  const matchMedia = (query: string): MediaQueryList => {
+    const listeners = new Set<EventListenerOrEventListenerObject>()
+
+    const mql: MediaQueryList = {
+      media: query,
+      matches: false,
+      onchange: null,
+      addEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => {
+        listeners.add(listener)
+      },
+      removeEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => {
+        listeners.delete(listener)
+      },
+      addListener: (callback: ((this: MediaQueryList, ev: MediaQueryListEvent) => void) | null) => {
+        if (callback) listeners.add(callback as unknown as EventListener)
+      },
+      removeListener: (callback: ((this: MediaQueryList, ev: MediaQueryListEvent) => void) | null) => {
+        if (callback) listeners.delete(callback as unknown as EventListener)
+      },
+      dispatchEvent: (event: Event) => {
+        listeners.forEach((listener) => {
+          if (typeof listener === "function") {
+            listener.call(mql, event)
+            return
+          }
+          listener.handleEvent(event)
+        })
+        return true
+      },
+    }
+
+    return mql
+  }
+
+  Object.defineProperty(window, "matchMedia", {
+    value: matchMedia,
+    configurable: true,
+    writable: true,
+  })
+  Object.defineProperty(globalThis, "matchMedia", {
+    value: matchMedia,
+    configurable: true,
+    writable: true,
+  })
+}
+
 // Mock Web Audio API modules
 vi.mock("@ricky0123/vad-web", () => ({
   MicVAD: vi.fn(),

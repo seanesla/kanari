@@ -117,11 +117,15 @@ function SceneBackgroundInner() {
           <Canvas
             camera={{ position: [...CAMERA.initialPosition], fov: CAMERA.fov }}
             dpr={isMobile ? 1 : ([1, 1.5] as [number, number])}
-            gl={{ antialias: !isMobile, alpha: false, powerPreference: "high-performance" }}
+            gl={{
+              antialias: !isMobile,
+              alpha: false,
+              powerPreference: isMobile ? "low-power" : "high-performance",
+            }}
             frameloop={reducedMotion || !isPageVisible ? "demand" : "always"}
           >
             <color attach="background" args={[SCENE_COLORS.background]} />
-            <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />
+            {isMobile ? null : <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />}
             <Scene scrollProgressRef={scrollProgressRef} mode={mode} isMobile={isMobile} />
           </Canvas>
         </div>

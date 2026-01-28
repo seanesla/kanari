@@ -12,6 +12,7 @@ import { ScrollReveal } from "@/components/scroll-reveal"
 import { KanariTextLogo } from "@/components/kanari-text-logo"
 import { HeroColorPicker } from "@/components/hero-color-picker"
 import { DemoTriggerButton } from "@/components/demo"
+import { cn } from "@/lib/utils"
 
 export default function LandingPage() {
   const [heroVisible, setHeroVisible] = useState(false)
@@ -19,6 +20,12 @@ export default function LandingPage() {
   const reduceMotion = useReducedMotion()
 
   const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
+  const stats = [
+    { value: "76%", label: "of workers experience burnout" },
+    { value: "3-7", label: "days advance warning" },
+    { value: "100%", label: "client-side processing", highlight: true },
+    { value: "30s", label: "daily check-in" },
+  ]
 
   // Smooth scroll with inertia
   useLenis()
@@ -83,13 +90,16 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-transparent overflow-x-hidden">
+    <div className="min-h-screen min-h-[100svh] bg-transparent overflow-x-hidden">
       {/* Hero */}
-      <section className="relative min-h-screen flex flex-col justify-center px-6 md:px-12" data-demo-id="demo-hero">
+      <section
+        className="relative min-h-screen min-h-[100svh] flex flex-col justify-center px-6 md:px-12 pt-24 pb-28 pt-[calc(6rem+env(safe-area-inset-top))] pb-[calc(7rem+env(safe-area-inset-bottom))] sm:pt-28 sm:pb-32 md:py-0"
+        data-demo-id="demo-hero"
+      >
         {/* Cinematic blooms */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden hidden sm:block">
           <motion.div
-            className="absolute -top-40 left-1/2 h-[520px] w-[780px] -translate-x-1/2 rounded-full bg-accent/12 blur-3xl"
+            className="absolute -top-32 sm:-top-40 left-1/2 h-[420px] w-[620px] sm:h-[520px] sm:w-[780px] -translate-x-1/2 rounded-full bg-accent/12 blur-3xl"
             initial={{ opacity: 0, scale: 0.96 }}
             animate={
               heroVisible
@@ -103,7 +113,7 @@ export default function LandingPage() {
             }}
           />
           <motion.div
-            className="absolute top-[55%] -left-48 h-[420px] w-[520px] rounded-full bg-foreground/5 blur-3xl"
+            className="absolute top-[55%] -left-40 sm:-left-48 h-[340px] w-[420px] sm:h-[420px] sm:w-[520px] rounded-full bg-foreground/5 blur-3xl"
             initial={{ opacity: 0, scale: 0.98 }}
             animate={
               heroVisible
@@ -117,7 +127,7 @@ export default function LandingPage() {
             }}
           />
           <motion.div
-            className="absolute bottom-[-220px] right-[-220px] h-[620px] w-[720px] rounded-full bg-accent/10 blur-3xl"
+            className="absolute bottom-[-180px] right-[-180px] sm:bottom-[-220px] sm:right-[-220px] h-[460px] w-[560px] sm:h-[620px] sm:w-[720px] rounded-full bg-accent/10 blur-3xl"
             initial={{ opacity: 0, scale: 0.98 }}
             animate={
               heroVisible
@@ -141,11 +151,11 @@ export default function LandingPage() {
           {/* Brand name - large and prominent, clickable for color picker */}
           <motion.div className="text-accent mb-4" variants={heroBrand}>
             <HeroColorPicker>
-              <KanariTextLogo className="text-6xl md:text-8xl lg:text-9xl" />
+              <KanariTextLogo className="text-[clamp(3.25rem,10vw,4.5rem)] sm:text-6xl md:text-8xl lg:text-9xl" />
             </HeroColorPicker>
           </motion.div>
 
-          <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif leading-[0.9] tracking-tight mb-8">
+          <h1 className="text-[clamp(2.5rem,8.5vw,3.25rem)] sm:text-5xl md:text-7xl lg:text-8xl font-serif leading-[0.95] sm:leading-[0.9] tracking-tight mb-8">
             <span className="block overflow-hidden">
               <motion.span className="block" variants={heroLine}>
                 Your voice
@@ -164,26 +174,34 @@ export default function LandingPage() {
           </h1>
 
           <motion.p
-            className="text-muted-foreground text-lg md:text-xl max-w-md leading-relaxed mb-12"
+            className="text-muted-foreground text-base sm:text-lg md:text-xl max-w-md leading-relaxed mb-10 sm:mb-12"
             variants={heroFade}
           >
             kanari detects early signs of burnout through your voice, predicts risk days ahead, and schedules recovery
             time automatically.
           </motion.p>
 
-          <motion.div className="flex items-center gap-4" variants={heroFade}>
-            <motion.div whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.99 }}>
-              <EnterButton variant="hero" />
+          <motion.div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 max-w-sm sm:max-w-none" variants={heroFade}>
+            <motion.div
+              whileHover={reduceMotion ? undefined : { scale: 1.03 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.99 }}
+              className="w-full sm:w-auto"
+            >
+              <EnterButton variant="hero" className="w-full justify-center sm:w-auto sm:justify-start" />
             </motion.div>
-            <motion.div whileHover={reduceMotion ? undefined : { scale: 1.03 }} whileTap={reduceMotion ? undefined : { scale: 0.99 }}>
-              <DemoTriggerButton />
+            <motion.div
+              whileHover={reduceMotion ? undefined : { scale: 1.03 }}
+              whileTap={reduceMotion ? undefined : { scale: 0.99 }}
+              className="w-full sm:w-auto"
+            >
+              <DemoTriggerButton className="w-full justify-center sm:w-auto sm:justify-start" />
             </motion.div>
           </motion.div>
         </motion.div>
 
         {/* Scroll indicator */}
         <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+          className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
           initial={{ opacity: 0, y: 10 }}
           animate={heroVisible ? { opacity: 1, y: 0 } : { opacity: 0, y: 10 }}
           transition={{ duration: 0.8, ease: EASE, delay: reduceMotion ? 0 : 1.1 }}
@@ -194,18 +212,18 @@ export default function LandingPage() {
       </section>
 
       {/* Stats */}
-      <section className="border-t border-border/50 bg-background/40 backdrop-blur-xl">
+      <section className="border-t border-border/50 bg-background/40 backdrop-blur-none sm:backdrop-blur-xl">
         <ScrollReveal>
           <div className="grid grid-cols-2 md:grid-cols-4">
-            {[
-              { value: "76%", label: "of workers experience burnout" },
-              { value: "3-7", label: "days advance warning" },
-              { value: "100%", label: "client-side processing", highlight: true },
-              { value: "30s", label: "daily check-in" },
-            ].map((stat, i) => (
+            {stats.map((stat, i) => (
               <div
                 key={i}
-                className="p-8 md:p-12 border-r border-border/50 last:border-r-0 border-b md:border-b-0 group hover:bg-foreground/5 transition-colors"
+                className={cn(
+                  "p-6 sm:p-8 md:p-12 border-border/50 border-b group hover:bg-foreground/5 transition-colors",
+                  i % 2 === 0 ? "border-r" : "border-r-0",
+                  "md:border-b-0",
+                  i === stats.length - 1 ? "md:border-r-0" : "md:border-r"
+                )}
               >
                 <p
                   className={`text-3xl md:text-5xl font-serif mb-2 transition-colors stat-breathe ${
@@ -222,7 +240,7 @@ export default function LandingPage() {
       </section>
 
       {/* The Problem */}
-      <section className="py-32 px-6 md:px-12 bg-background/50 backdrop-blur-xl">
+      <section className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50 backdrop-blur-none sm:backdrop-blur-xl">
         <ScrollReveal>
           <div className="max-w-7xl mx-auto">
             <div className="grid lg:grid-cols-12 gap-12 lg:gap-24">
@@ -250,14 +268,18 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section id="features" className="bg-background/40 backdrop-blur-xl">
+      <section id="features" className="bg-background/40 backdrop-blur-none sm:backdrop-blur-xl">
         <ScrollReveal>
           <FeaturesSection />
         </ScrollReveal>
       </section>
 
       {/* How it works */}
-      <section id="how-it-works" className="py-32 px-6 md:px-12 bg-card/50 backdrop-blur-xl" data-demo-id="demo-how-it-works">
+      <section
+        id="how-it-works"
+        className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-card/50 backdrop-blur-none sm:backdrop-blur-xl"
+        data-demo-id="demo-how-it-works"
+      >
         <ScrollReveal>
           <div className="max-w-7xl mx-auto">
             <p className="text-xs uppercase tracking-widest text-muted-foreground mb-16">How It Works</p>
@@ -316,11 +338,11 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-32 px-6 md:px-12 bg-background/50 backdrop-blur-xl">
+      <section className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50 backdrop-blur-none sm:backdrop-blur-xl">
         <ScrollReveal>
           <div className="max-w-7xl mx-auto text-center">
-            <h2 className="text-5xl md:text-7xl font-serif mb-8">Prevent the crash.</h2>
-            <p className="text-muted-foreground text-xl mb-12 max-w-md mx-auto">
+            <h2 className="text-4xl sm:text-5xl md:text-7xl font-serif mb-8">Prevent the crash.</h2>
+            <p className="text-muted-foreground text-base sm:text-lg md:text-xl mb-12 max-w-md mx-auto">
               Your voice knows what you don't. Let it protect you.
             </p>
             <EnterButton variant="cta" />
@@ -329,7 +351,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <div className="bg-background/70 backdrop-blur-xl">
+      <div className="bg-background/70 backdrop-blur-none sm:backdrop-blur-xl">
         <Footer />
         <div className="border-t border-border/30 py-4 px-6 text-center">
           <p className="text-xs text-muted-foreground">Built for Google DeepMind Gemini 3 Hackathon 2025</p>
