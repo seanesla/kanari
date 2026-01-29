@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import Image from "next/image"
 import { motion, useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import { useLenis } from "@/hooks/use-lenis"
@@ -346,6 +347,38 @@ export default function LandingPage() {
               Your voice knows what you don't. Let it protect you.
             </p>
             <EnterButton variant="cta" />
+          </div>
+        </ScrollReveal>
+      </section>
+
+      {/* Cinematic artwork (endcap) */}
+      <section className="py-14 sm:py-16 md:py-20 px-6 md:px-12 bg-background/60 backdrop-blur-none sm:backdrop-blur-xl">
+        <ScrollReveal>
+          <div className="max-w-7xl mx-auto">
+            <figure className="group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]">
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+                <div className="absolute inset-0 bg-gradient-to-tr from-accent/12 via-transparent to-foreground/5" />
+                <div className="absolute inset-0 bg-accent/8 mix-blend-soft-light" />
+                <div className="absolute inset-0 opacity-60 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.08),transparent_55%)]" />
+              </div>
+
+              <motion.div
+                className="relative"
+                whileHover={reduceMotion ? undefined : { scale: 1.01 }}
+                transition={reduceMotion ? undefined : { type: "spring", stiffness: 180, damping: 26 }}
+              >
+                <Image
+                  src="/landing/kanari-orbital-crystal.png"
+                  alt="A glowing crystal with orbital lines in a smoky atmosphere"
+                  width={1600}
+                  height={893}
+                  sizes="(max-width: 768px) 100vw, 1200px"
+                  className="w-full h-auto object-cover opacity-[0.96]"
+                />
+              </motion.div>
+
+              <div aria-hidden="true" className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-foreground/10" />
+            </figure>
           </div>
         </ScrollReveal>
       </section>
