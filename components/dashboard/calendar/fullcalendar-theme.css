@@ -10,7 +10,7 @@
   --fc-event-text-color: inherit;
   --fc-list-event-dot-width: 8px;
   /* overridden by inline styles in fullcalendar-view.tsx */
-  --fc-today-bg-color: oklch(0.78 0.16 70 / 0.1);
+  --fc-today-bg-color: oklch(78% 0.16 70 / 0.1);
 
   /* Controls the time grid "entry boxes" height */
   --kanari-timegrid-slot-height: 5rem;
@@ -23,7 +23,7 @@
 /* Main calendar background */
 .fullcalendar-wrapper .fc {
   font-family: var(--font-sans), system-ui, sans-serif;
-  color: oklch(0.93 0.01 60);
+  color: oklch(93% 0.01 60);
 }
 
 /* Header toolbar */
@@ -65,7 +65,7 @@
 }
 
 .fullcalendar-wrapper .fc .fc-button:focus {
-  box-shadow: 0 0 0 2px oklch(0.08 0.01 60), 0 0 0 4px var(--fc-button-bg-color);
+  box-shadow: 0 0 0 2px oklch(8% 0.01 60), 0 0 0 4px var(--fc-button-bg-color);
 }
 
 .fullcalendar-wrapper .fc .fc-button-primary:not(:disabled).fc-button-active,
@@ -179,12 +179,12 @@
 
 /* Now indicator */
 .fullcalendar-wrapper .fc .fc-timegrid-now-indicator-line {
-  border-color: oklch(0.65 0.20 25);
+  border-color: oklch(65% 0.20 25);
   border-width: 2px;
 }
 
 .fullcalendar-wrapper .fc .fc-timegrid-now-indicator-arrow {
-  border-color: oklch(0.65 0.20 25);
+  border-color: oklch(65% 0.20 25);
   border-top-color: transparent;
   border-bottom-color: transparent;
 }
@@ -216,16 +216,16 @@
 }
 
 .fullcalendar-wrapper .fc-scroller::-webkit-scrollbar-track {
-  background: oklch(0.14 0.01 60);
+  background: oklch(14% 0.01 60);
 }
 
 .fullcalendar-wrapper .fc-scroller::-webkit-scrollbar-thumb {
-  background: oklch(0.30 0.01 60);
+  background: oklch(30% 0.01 60);
   border-radius: 3px;
 }
 
 .fullcalendar-wrapper .fc-scroller::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.40 0.01 60);
+  background: oklch(40% 0.01 60);
 }
 
 /* Month view */
@@ -250,16 +250,16 @@
 
 /* Border fixes */
 .fullcalendar-wrapper .fc .fc-scrollgrid {
-  border-color: oklch(0.25 0.01 60);
+  border-color: oklch(25% 0.01 60);
 }
 
 .fullcalendar-wrapper .fc .fc-scrollgrid-section > * {
-  border-color: oklch(0.25 0.01 60);
+  border-color: oklch(25% 0.01 60);
 }
 
 .fullcalendar-wrapper .fc td,
 .fullcalendar-wrapper .fc th {
-  border-color: oklch(0.20 0.01 60);
+  border-color: oklch(20% 0.01 60);
 }
 
 /* Remove double borders */
@@ -268,7 +268,7 @@
 }
 
 .fullcalendar-wrapper .fc .fc-scrollgrid-section-header > th {
-  border-bottom: 1px solid oklch(0.25 0.01 60);
+  border-bottom: 1px solid oklch(25% 0.01 60);
 }
 
 /* Mobile responsive styles */

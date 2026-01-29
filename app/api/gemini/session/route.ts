@@ -22,6 +22,7 @@ import {
   type SystemContextSummary,
   type SystemTimeContext,
 } from "@/lib/gemini/live-prompts"
+import { safeRandomUUID } from "@/lib/uuid"
 
 interface SessionResponse {
   sessionId: string
@@ -118,7 +119,7 @@ export async function POST(
     }
 
     // Generate session ID
-    const sessionId = crypto.randomUUID()
+    const sessionId = safeRandomUUID()
 
     // Create session on server and get session secret
     const { secret } = await sessionManager.createSession(sessionId, systemInstruction, apiKey)

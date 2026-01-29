@@ -27,6 +27,7 @@ import {
   type UserProgress,
 } from "@/lib/achievements"
 import type { CheckInSession, Recording, Suggestion } from "@/lib/types"
+import { safeRandomUUID } from "@/lib/uuid"
 
 const DEFAULT_PROGRESS: UserProgress = {
   id: "default",
@@ -148,7 +149,7 @@ function fallbackLevelTitle(level: number): string {
 function buildStarterAchievements(nowISO: string, todayISO: string): DailyAchievement[] {
   return [
     {
-      id: crypto.randomUUID(),
+      id: safeRandomUUID(),
       dateISO: todayISO,
       sourceDateISO: todayISO,
       type: "challenge",
@@ -164,7 +165,7 @@ function buildStarterAchievements(nowISO: string, todayISO: string): DailyAchiev
       tracking: { key: "do_check_in", target: 1 },
     },
     {
-      id: crypto.randomUUID(),
+      id: safeRandomUUID(),
       dateISO: todayISO,
       sourceDateISO: todayISO,
       type: "challenge",
@@ -180,7 +181,7 @@ function buildStarterAchievements(nowISO: string, todayISO: string): DailyAchiev
       tracking: { key: "complete_suggestions", target: 2 },
     },
     {
-      id: crypto.randomUUID(),
+      id: safeRandomUUID(),
       dateISO: todayISO,
       sourceDateISO: todayISO,
       type: "badge",
@@ -667,7 +668,7 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
                     : undefined
 
                 return {
-                  id: crypto.randomUUID(),
+                  id: safeRandomUUID(),
                   dateISO: todayISO,
                   sourceDateISO: todayISO,
                   type,

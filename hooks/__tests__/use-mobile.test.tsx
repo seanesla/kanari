@@ -39,6 +39,12 @@ describe("useIsMobile", () => {
     }))
   })
 
+  it("does not throw during render (regression for undefined hook deps)", async () => {
+    setViewportWidth(375)
+    const { useIsMobile } = await import("../use-mobile")
+    expect(() => renderHook(() => useIsMobile())).not.toThrow()
+  })
+
   it("returns true on initial render for small screens", async () => {
     setViewportWidth(375)
     const { useIsMobile } = await import("../use-mobile")
@@ -58,5 +64,26 @@ describe("useIsMobile", () => {
     })
 
     expect(result.current).toBe(false)
+  })
+
+  it("falls back to resize events when matchMedia is unavailable", async () => {
+    setViewportWidth(1200)
+    const { useIsMobile } = await import("../use-mobile")
+
+    Object.defineProperty(window, "matchMedia", {
+      value: undefined,
+      configurable: true,
+      writable: true,
+    })
+
+    const { result } = renderHook(() => useIsMobile())
+    expect(result.current).toBe(false)
+
+    act(() => {
+      setViewportWidth(375)
+      window.dispatchEvent(new Event("resize"))
+    })
+
+    expect(result.current).toBe(true)
   })
 })

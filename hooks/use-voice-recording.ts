@@ -15,6 +15,7 @@ import {
 } from "@/lib/ml/personalized-biomarkers"
 import { db } from "@/lib/storage/db"
 import type { AudioFeatures, BiomarkerCalibration, Recording } from "@/lib/types"
+import { safeRandomUUID } from "@/lib/uuid"
 
 export interface VoiceRecordingSavedEvent {
   recording: Recording
@@ -138,7 +139,7 @@ export function useVoiceRecording(options: UseVoiceRecordingOptions = {}) {
 
       // Create recording object
       const recording: Recording = {
-        id: crypto.randomUUID(),
+        id: safeRandomUUID(),
         createdAt: new Date().toISOString(),
         duration: processingDuration,
         status: "complete",

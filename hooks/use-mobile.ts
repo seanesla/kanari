@@ -1,42 +1,36 @@
 "use client"
 
-import * as React from "react"
+import { useCallback, useSyncExternalStore } from "react"
 import { BREAKPOINTS } from "@/lib/constants"
 
 export function useIsMobile() {
-  const getSnapshot = React.useCallback(() => {
-    if (typeof window === "undefined") return false
-    return window.innerWidth < BREAKPOINTS.mobile
-  }, [])
+  // Error pattern doc: docs/error-patterns/undefined-hook-deps-getSnapshot.md
+  const mediaQuery = `(max-width: ${BREAKPOINTS.mobile - 1}px)`
 
-  const [isMobile, setIsMobile] = React.useState<boolean>(() => getSnapshot())
+  const subscribe = useCallback((callback: () => void) => {
+    const onChange = () => callback()
 
-  React.useEffect(() => {
-    const matchMedia = window.matchMedia?.bind(window)
+    const mql = window.matchMedia?.(mediaQuery)
 
-    const onChange = () => setIsMobile(getSnapshot())
-
-    // Some environments (jsdom, older browsers) may not implement matchMedia.
-    if (!matchMedia) {
-      window.addEventListener("resize", onChange)
-      setIsMobile(getSnapshot())
-      return () => window.removeEventListener("resize", onChange)
+    if (mql) {
+      if ("addEventListener" in mql) mql.addEventListener("change", onChange)
+      else (mql as unknown as { addListener: (cb: () => void) => void }).addListener(onChange)
     }
-
-    const mql = matchMedia(`(max-width: ${BREAKPOINTS.mobile - 1}px)`)
-    const onMqlChange = () => setIsMobile(mql.matches || window.innerWidth < BREAKPOINTS.mobile)
-
-    mql.addEventListener("change", onMqlChange)
-    setIsMobile(mql.matches || window.innerWidth < BREAKPOINTS.mobile)
 
     // Fallback for browsers that don't reliably fire matchMedia events on rotate.
-    window.addEventListener("resize", onMqlChange)
+    window.addEventListener("resize", onChange)
 
     return () => {
-      mql.removeEventListener("change", onMqlChange)
-      window.removeEventListener("resize", onMqlChange)
+      if (mql) {
+        if ("removeEventListener" in mql) mql.removeEventListener("change", onChange)
+        else (mql as unknown as { removeListener: (cb: () => void) => void }).removeListener(onChange)
+      }
+      window.removeEventListener("resize", onChange)
     }
-  }, [getSnapshot])
+  }, [mediaQuery])
 
-  return isMobile
+  const getSnapshot = useCallback(() => window.innerWidth < BREAKPOINTS.mobile, [])
+  const getServerSnapshot = useCallback(() => false, [])
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
 }

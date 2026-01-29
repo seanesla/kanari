@@ -3,16 +3,18 @@ import { oklch, formatHex } from "culori"
 export const DEFAULT_ACCENT = "#d4a574"
 export const DEFAULT_ACCENT_DARK = "#8b4513"
 
+// Error pattern doc: docs/error-patterns/oklch-lightness-must-be-percent.md
+
 /**
  * Convert hex color to OKLCH format for CSS variables
- * Example: #d4a574 → "0.78 0.16 70"
+ * Example: #d4a574 → "78% 0.16 70"
  */
 export function hexToOklch(hex: string): string {
   const color = oklch(hex)
-  if (!color) return "0.78 0.16 70" // fallback to amber
+  if (!color) return "78% 0.16 70" // fallback to amber
 
   // Return as space-separated values (no oklch() wrapper)
-  return `${color.l.toFixed(2)} ${color.c.toFixed(2)} ${(color.h || 0).toFixed(0)}`
+  return `${(color.l * 100).toFixed(2)}% ${color.c.toFixed(2)} ${(color.h || 0).toFixed(0)}`
 }
 
 /**
@@ -53,10 +55,10 @@ export function generateLightVariant(hex: string): string {
  */
 export function generateMutedOklch(hex: string): string {
   const color = oklch(hex)
-  if (!color) return "oklch(0.78 0.08 70)" // fallback to amber muted
+  if (!color) return "oklch(78% 0.08 70)" // fallback to amber muted
 
   // Use accent hue with muted chroma (0.08) and standard lightness (0.78)
-  return `oklch(0.78 0.08 ${(color.h || 0).toFixed(0)})`
+  return `oklch(78% 0.08 ${(color.h || 0).toFixed(0)})`
 }
 
 /**
@@ -66,6 +68,11 @@ export function generateMutedOklch(hex: string): string {
 export function updateCSSVariables(hex: string) {
   if (typeof document === "undefined") return
 
+  const supportsOklch =
+    typeof CSS !== "undefined" &&
+    typeof CSS.supports === "function" &&
+    CSS.supports("color", "oklch(50% 0.1 0)")
+
   const color = oklch(hex)
   const hue = (color?.h || 60).toFixed(0)
 
@@ -74,6 +81,19 @@ export function updateCSSVariables(hex: string) {
   const lightOklchValue = hexToOklch(lightVariant)
   const mutedValue = generateMutedOklch(hex)
   const root = document.documentElement
+
+  if (!supportsOklch) {
+    // Keep the app readable on browsers without OKLCH support by emitting hex values.
+    // We intentionally avoid rewriting the whole base palette in this mode.
+    root.style.setProperty("--accent", hex)
+    root.style.setProperty("--accent-light", lightVariant)
+    root.style.setProperty("--muted-foreground", formatHex({ mode: "oklch", l: 0.78, c: 0.08, h: color?.h || 60 }) || "#d9af7f")
+    root.style.setProperty("--ring", hex)
+    root.style.setProperty("--chart-1", hex)
+    root.style.setProperty("--sidebar-primary", hex)
+    root.style.setProperty("--sidebar-ring", hex)
+    return
+  }
 
   // Update accent-related CSS variables
   root.style.setProperty("--accent", `oklch(${oklchValue})`)
@@ -85,24 +105,24 @@ export function updateCSSVariables(hex: string) {
   root.style.setProperty("--sidebar-ring", `oklch(${oklchValue})`)
 
   // Update base palette hues to match accent (keep original L and C values)
-  root.style.setProperty("--background", `oklch(0.08 0.01 ${hue})`)
-  root.style.setProperty("--foreground", `oklch(0.93 0.01 ${hue})`)
-  root.style.setProperty("--card", `oklch(0.14 0.01 ${hue})`)
-  root.style.setProperty("--card-foreground", `oklch(0.93 0.01 ${hue})`)
-  root.style.setProperty("--popover", `oklch(0.14 0.01 ${hue})`)
-  root.style.setProperty("--popover-foreground", `oklch(0.93 0.01 ${hue})`)
-  root.style.setProperty("--primary", `oklch(0.93 0.01 ${hue})`)
-  root.style.setProperty("--primary-foreground", `oklch(0.08 0.01 ${hue})`)
-  root.style.setProperty("--secondary", `oklch(0.18 0.01 ${hue})`)
-  root.style.setProperty("--secondary-foreground", `oklch(0.93 0.01 ${hue})`)
-  root.style.setProperty("--muted", `oklch(0.21 0.01 ${hue})`)
-  root.style.setProperty("--accent-foreground", `oklch(0.08 0.01 ${hue})`)
-  root.style.setProperty("--border", `oklch(0.30 0.01 ${hue})`)
-  root.style.setProperty("--input", `oklch(0.18 0.01 ${hue})`)
-  root.style.setProperty("--sidebar", `oklch(0.06 0.01 ${hue})`)
-  root.style.setProperty("--sidebar-foreground", `oklch(0.93 0.01 ${hue})`)
-  root.style.setProperty("--sidebar-accent", `oklch(0.18 0.01 ${hue})`)
-  root.style.setProperty("--sidebar-accent-foreground", `oklch(0.93 0.01 ${hue})`)
-  root.style.setProperty("--sidebar-border", `oklch(0.25 0.01 ${hue})`)
-  root.style.setProperty("--sidebar-primary-foreground", `oklch(0.08 0.01 ${hue})`)
+  root.style.setProperty("--background", `oklch(8% 0.01 ${hue})`)
+  root.style.setProperty("--foreground", `oklch(93% 0.01 ${hue})`)
+  root.style.setProperty("--card", `oklch(14% 0.01 ${hue})`)
+  root.style.setProperty("--card-foreground", `oklch(93% 0.01 ${hue})`)
+  root.style.setProperty("--popover", `oklch(14% 0.01 ${hue})`)
+  root.style.setProperty("--popover-foreground", `oklch(93% 0.01 ${hue})`)
+  root.style.setProperty("--primary", `oklch(93% 0.01 ${hue})`)
+  root.style.setProperty("--primary-foreground", `oklch(8% 0.01 ${hue})`)
+  root.style.setProperty("--secondary", `oklch(18% 0.01 ${hue})`)
+  root.style.setProperty("--secondary-foreground", `oklch(93% 0.01 ${hue})`)
+  root.style.setProperty("--muted", `oklch(21% 0.01 ${hue})`)
+  root.style.setProperty("--accent-foreground", `oklch(8% 0.01 ${hue})`)
+  root.style.setProperty("--border", `oklch(30% 0.01 ${hue})`)
+  root.style.setProperty("--input", `oklch(18% 0.01 ${hue})`)
+  root.style.setProperty("--sidebar", `oklch(6% 0.01 ${hue})`)
+  root.style.setProperty("--sidebar-foreground", `oklch(93% 0.01 ${hue})`)
+  root.style.setProperty("--sidebar-accent", `oklch(18% 0.01 ${hue})`)
+  root.style.setProperty("--sidebar-accent-foreground", `oklch(93% 0.01 ${hue})`)
+  root.style.setProperty("--sidebar-border", `oklch(25% 0.01 ${hue})`)
+  root.style.setProperty("--sidebar-primary-foreground", `oklch(8% 0.01 ${hue})`)
 }

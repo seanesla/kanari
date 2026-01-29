@@ -10,6 +10,7 @@ import {
   getTimeOfDay,
   getDayType,
 } from "@/lib/gemini/prompts"
+import { safeRandomUUID } from "@/lib/uuid"
 import type {
   Suggestion,
   StressLevel,
@@ -473,7 +474,7 @@ export async function POST(request: NextRequest) {
 
     // Transform to Suggestion type with IDs and timestamps
     const suggestions: Suggestion[] = rawSuggestions.map((raw) => ({
-      id: crypto.randomUUID(),
+      id: safeRandomUUID(),
       content: raw.content,
       rationale: raw.rationale,
       duration: raw.duration,
