@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import { motion, useReducedMotion } from "framer-motion"
+import { oklch } from "culori"
 import { useSceneMode } from "@/lib/scene-context"
 import { useLenis } from "@/hooks/use-lenis"
 import { useSectionObserver } from "@/hooks/use-section-observer"
@@ -17,10 +18,22 @@ import { cn } from "@/lib/utils"
 
 export default function LandingPage() {
   const [heroVisible, setHeroVisible] = useState(false)
-  const { resetToLanding, isLoading } = useSceneMode()
+  const { resetToLanding, isLoading, accentColor } = useSceneMode()
   const reduceMotion = useReducedMotion()
 
   const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
+
+  const artworkHueShift = useMemo(() => {
+    // The source painting is "gold" by default. We rotate its hue so it matches the user's accent.
+    const BASE_HUE = 67
+    const c = oklch(accentColor)
+    const h = c?.h
+    if (typeof h !== "number" || Number.isNaN(h)) return 0
+
+    let d = h - BASE_HUE
+    d = ((d + 180) % 360) - 180
+    return d
+  }, [accentColor])
   const stats = [
     { value: "76%", label: "of workers experience burnout" },
     { value: "3-7", label: "days advance warning" },
@@ -227,7 +240,7 @@ export default function LandingPage() {
                 )}
               >
                 <p
-                  className={`text-3xl md:text-5xl font-serif mb-2 transition-colors stat-breathe ${
+                  className={`text-3xl md:text-5xl font-serif mb-2 transition-colors ${
                     stat.highlight ? "text-accent" : "group-hover:text-accent"
                   }`}
                 >
@@ -364,7 +377,7 @@ export default function LandingPage() {
                     opacity: 1,
                     y: 0,
                     filter: "blur(0px)",
-                    transition: { duration: 0.95, ease: EASE },
+                    transition: { duration: 1.25, ease: EASE },
                   }
             }
             viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
@@ -383,9 +396,9 @@ export default function LandingPage() {
                   ? { opacity: 1 }
                   : {
                       opacity: 0,
-                      scale: 1.02,
-                      filter: "blur(14px)",
-                      clipPath: "inset(18% 22% 18% 22% round 28px)",
+                      scale: 1.03,
+                      filter: "blur(16px)",
+                      clipPath: "inset(22% 26% 22% 26% round 28px)",
                     }
               }
               whileInView={
@@ -396,7 +409,7 @@ export default function LandingPage() {
                       scale: 1,
                       filter: "blur(0px)",
                       clipPath: "inset(0% 0% 0% 0% round 32px)",
-                      transition: { duration: 1.25, ease: EASE, delay: 0.08 },
+                      transition: { duration: 2.4, ease: EASE, delay: 0.22 },
                     }
               }
               viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
@@ -412,6 +425,20 @@ export default function LandingPage() {
                 className="w-full h-auto object-cover opacity-[0.96]"
               />
 
+              {/* Accent colorization pass (keeps the artwork responsive to theme changes) */}
+              <Image
+                src="/landing/kanari-orbital-crystal.png"
+                alt=""
+                aria-hidden="true"
+                width={1120}
+                height={625}
+                sizes="(max-width: 768px) 100vw, 1200px"
+                className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-color pointer-events-none"
+                style={{
+                  filter: `hue-rotate(${artworkHueShift}deg) saturate(2.2) contrast(1.05)`,
+                }}
+              />
+
               {/* One-time sheen pass (ties to accent color) */}
               {!reduceMotion && (
                 <motion.div
@@ -420,7 +447,7 @@ export default function LandingPage() {
                   initial={{ opacity: 0, x: "-120%" }}
                   whileInView={{ opacity: 1, x: "120%" }}
                   viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
-                  transition={{ duration: 1.2, ease: EASE, delay: 0.25 }}
+                  transition={{ duration: 2.2, ease: EASE, delay: 0.9 }}
                   style={{
                     background:
                       "linear-gradient(90deg, transparent 0%, oklch(from var(--accent) l c h / 0.10) 45%, transparent 60%)",

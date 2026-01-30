@@ -313,20 +313,6 @@
   }
 }
 
-/* Breathing animation for stats */
-@keyframes breathe {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.015);
-  }
-}
-
-.stat-breathe {
-  animation: breathe 4s ease-in-out infinite;
-}
-
 /* Subtle glitch for failing status */
 @keyframes subtle-glitch {
   0%, 97%, 100% {
