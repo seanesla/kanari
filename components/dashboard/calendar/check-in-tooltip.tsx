@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   useFloating,
@@ -56,10 +56,9 @@ export function CheckInTooltip({
 }: CheckInTooltipProps) {
   const router = useRouter()
   const { timeZone } = useTimeZone()
-  const [positionReady, setPositionReady] = useState(false)
 
   // Source: Context7 - /floating-ui/floating-ui docs - "Configure useFloating Hook for Popover Positioning"
-  const { refs, floatingStyles, context } = useFloating({
+  const { refs, floatingStyles, context, isPositioned } = useFloating({
     open,
     onOpenChange,
     placement: 'right-start',
@@ -73,10 +72,7 @@ export function CheckInTooltip({
   // Source: Context7 - /floating-ui/floating-ui docs - "Position Floating Element Relative to Click (React)"
   // Set virtual element as position reference when anchor position changes
   useEffect(() => {
-    if (!anchorPosition) {
-      setPositionReady(false)
-      return
-    }
+    if (!anchorPosition) return
     refs.setPositionReference({
       getBoundingClientRect() {
         return {
@@ -91,7 +87,6 @@ export function CheckInTooltip({
         }
       },
     })
-    setPositionReady(true)
   }, [anchorPosition, refs])
 
   // Source: Context7 - /floating-ui/floating-ui docs - "Enable Dismiss on Ancestor Scroll"
@@ -106,8 +101,7 @@ export function CheckInTooltip({
 
   const { getFloatingProps } = useInteractions([dismiss, role])
 
-  // Defensive check - don't render until position is ready to prevent scroll jump
-  if (!session?.id || !open || !anchorPosition || !positionReady) return null
+  if (!session?.id || !open || !anchorPosition) return null
 
   const stressScore = session.acousticMetrics?.stressScore
   const fatigueScore = session.acousticMetrics?.fatigueScore
@@ -121,10 +115,27 @@ export function CheckInTooltip({
     <FloatingPortal>
       <div
         ref={refs.setFloating}
-        style={floatingStyles}
+        // Prevents the initial (0,0) paint while Floating UI computes position, which causes
+        // a visible "fly-in" from the top-left corner.
+        // See docs/error-patterns/floating-ui-tooltip-initial-position-flash.md
+        style={{
+          ...floatingStyles,
+          visibility: isPositioned ? 'visible' : 'hidden',
+        }}
         {...getFloatingProps()}
-        className="w-64 max-w-[calc(100vw-2rem)] p-0 bg-card/95 backdrop-blur-xl border border-border/70 rounded-md shadow-md z-50 animate-in fade-in-0 zoom-in-95"
+        className="z-50"
       >
+        {/* 
+          Important: keep Floating UI positioning (`transform: translate(...)`) on this outer node.
+          Tailwind's `animate-in` utilities animate `transform`, which would override positioning
+          and make the popup appear at (0,0) before snapping into place.
+        */}
+        <div
+          className={cn(
+            "w-64 max-w-[calc(100vw-2rem)] p-0 bg-card/95 backdrop-blur-xl border border-border/70 rounded-md shadow-md",
+            isPositioned && "animate-in fade-in-0 zoom-in-95"
+          )}
+        >
           {/* Header */}
           <div className="flex items-center justify-between p-3 border-b border-border/50">
             <div className="flex items-center gap-2">
@@ -212,6 +223,7 @@ export function CheckInTooltip({
               <ArrowRight className="h-3.5 w-3.5 ml-auto" />
             </Button>
           </div>
+        </div>
       </div>
     </FloatingPortal>
   )
