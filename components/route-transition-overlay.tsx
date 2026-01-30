@@ -66,11 +66,11 @@ export function RouteTransitionOverlay() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.14, ease: "easeOut" }}
         >
-          <div className="absolute inset-0 bg-background/70 backdrop-blur-none sm:backdrop-blur-md" />
+          <div className="absolute inset-0 bg-background/70 backdrop-blur-md" />
 
           {/* Soft glass bloom (no sweeping/strobe) */}
           <motion.div
-            className="pointer-events-none absolute inset-0 hidden sm:block"
+            className="pointer-events-none absolute inset-0"
             initial={{ opacity: 0, scale: 0.985 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 1.015 }}

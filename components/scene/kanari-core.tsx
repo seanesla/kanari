@@ -11,10 +11,9 @@ import { ORBITAL_RINGS } from "./constants"
 interface KanariCoreProps {
   scrollProgressRef: MutableRefObject<number>
   mode: SceneMode
-  isMobile?: boolean
 }
 
-export function KanariCore({ scrollProgressRef, mode, isMobile = false }: KanariCoreProps) {
+export function KanariCore({ scrollProgressRef, mode }: KanariCoreProps) {
   const { accentColor } = useSceneMode()
   const groupRef = useRef<THREE.Group>(null)
   const innerRef = useRef<THREE.Mesh>(null)
@@ -22,7 +21,7 @@ export function KanariCore({ scrollProgressRef, mode, isMobile = false }: Kanari
   const outerRef = useRef<THREE.Mesh>(null)
   const ringRefs = useRef<(THREE.Mesh | null)[]>([])
   const opacityRef = useRef(1)
-  const ringSegments = isMobile ? 64 : 100
+  const ringSegments = 100
 
   useEffect(() => {
     const disposeMaterial = (material: THREE.Material | THREE.Material[]) => {
@@ -157,13 +156,13 @@ export function KanariCore({ scrollProgressRef, mode, isMobile = false }: Kanari
         <dodecahedronGeometry args={[1, 0]} />
         <MeshTransmissionMaterial
           backside
-          samples={isMobile ? 2 : 8}
+          samples={8}
           thickness={0.4}
-          chromaticAberration={isMobile ? 0 : 0.3}
-          anisotropy={isMobile ? 0 : 0.3}
-          distortion={isMobile ? 0 : 0.1}
-          distortionScale={isMobile ? 0 : 0.2}
-          temporalDistortion={isMobile ? 0 : 0.1}
+          chromaticAberration={0.3}
+          anisotropy={0.3}
+          distortion={0.1}
+          distortionScale={0.2}
+          temporalDistortion={0.1}
           metalness={0.1}
           roughness={0}
           color={accentColor}

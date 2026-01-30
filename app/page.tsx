@@ -111,7 +111,7 @@ export default function LandingPage() {
         data-demo-id="demo-hero"
       >
         {/* Cinematic blooms */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden hidden sm:block">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
           <motion.div
             className="absolute -top-32 sm:-top-40 left-1/2 h-[420px] w-[620px] sm:h-[520px] sm:w-[780px] -translate-x-1/2 rounded-full bg-accent/12 blur-3xl"
             initial={{ opacity: 0, scale: 0.96 }}
@@ -170,17 +170,17 @@ export default function LandingPage() {
           </motion.div>
 
           <h1 className="text-[clamp(2.5rem,8.5vw,3.25rem)] sm:text-5xl md:text-7xl lg:text-8xl font-serif leading-[0.95] sm:leading-[0.9] tracking-tight mb-8">
-            <span className="block overflow-hidden">
+            <span className="block overflow-hidden pb-[0.08em] -mb-[0.08em]">
               <motion.span className="block" variants={heroLine}>
                 Your voice
               </motion.span>
             </span>
-            <span className="block overflow-hidden">
+            <span className="block overflow-hidden pb-[0.08em] -mb-[0.08em]">
               <motion.span className="block" variants={heroLine}>
                 <span className="text-accent">knows</span>
               </motion.span>
             </span>
-            <span className="block overflow-hidden">
+            <span className="block overflow-hidden pb-[0.08em] -mb-[0.08em]">
               <motion.span className="block" variants={heroLine}>
                 before you do.
               </motion.span>
@@ -226,7 +226,7 @@ export default function LandingPage() {
       </section>
 
       {/* Stats */}
-      <section className="border-t border-border/50 bg-background/40 backdrop-blur-none sm:backdrop-blur-xl">
+      <section className="border-t border-border/50 bg-background/40 backdrop-blur-xl">
         <ScrollReveal>
           <div className="grid grid-cols-2 md:grid-cols-4">
             {stats.map((stat, i) => (
@@ -254,7 +254,7 @@ export default function LandingPage() {
       </section>
 
       {/* The Problem */}
-      <section className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50 backdrop-blur-none sm:backdrop-blur-xl">
+      <section className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50 backdrop-blur-xl">
         <ScrollReveal>
           <div className="max-w-7xl mx-auto">
             <div className="grid lg:grid-cols-12 gap-12 lg:gap-24">
@@ -282,7 +282,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section id="features" className="bg-background/40 backdrop-blur-none sm:backdrop-blur-xl">
+      <section id="features" className="bg-background/40 backdrop-blur-xl">
         <ScrollReveal>
           <FeaturesSection />
         </ScrollReveal>
@@ -291,7 +291,7 @@ export default function LandingPage() {
       {/* How it works */}
       <section
         id="how-it-works"
-        className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-card/50 backdrop-blur-none sm:backdrop-blur-xl"
+        className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-card/50 backdrop-blur-xl"
         data-demo-id="demo-how-it-works"
       >
         <ScrollReveal>
@@ -352,7 +352,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50 backdrop-blur-none sm:backdrop-blur-xl">
+      <section className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50 backdrop-blur-xl">
         <ScrollReveal>
           <div className="max-w-7xl mx-auto text-center">
             <h2 className="text-4xl sm:text-5xl md:text-7xl font-serif mb-8">Prevent the crash.</h2>
@@ -365,7 +365,7 @@ export default function LandingPage() {
       </section>
 
       {/* Cinematic artwork (endcap) */}
-      <section className="py-14 sm:py-16 md:py-20 px-6 md:px-12 bg-background/60 backdrop-blur-none sm:backdrop-blur-xl">
+      <section className="py-14 sm:py-16 md:py-20 px-6 md:px-12 bg-background/60 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto">
           <motion.figure
             className="group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]"
@@ -462,7 +462,7 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <div className="bg-background/70 backdrop-blur-none sm:backdrop-blur-xl">
+      <div className="bg-background/70 backdrop-blur-xl">
         <Footer />
         <div className="border-t border-border/30 py-4 px-6 text-center">
           <p className="text-xs text-muted-foreground">Built for Google DeepMind Gemini 3 Hackathon 2025</p>

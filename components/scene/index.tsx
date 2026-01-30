@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Canvas } from "@react-three/fiber"
+import { AdaptiveDpr } from "@react-three/drei"
 import { useReducedMotion } from "framer-motion"
-import { useIsMobile } from "@/hooks/use-mobile"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
 import { CAMERA, FOG } from "./constants"
@@ -16,7 +16,6 @@ function SceneBackgroundInner() {
   const { mode, scrollProgressRef, isLoading, setIsLoading } = useSceneMode()
   const [canvasMounted, setCanvasMounted] = useState(true)
   const reducedMotion = useReducedMotion()
-  const isMobile = useIsMobile()
   const [isPageVisible, setIsPageVisible] = useState(() => {
     if (typeof document === "undefined") return true
     return document.visibilityState !== "hidden"
@@ -116,17 +115,18 @@ function SceneBackgroundInner() {
         <div className="fixed inset-0 -z-10">
           <Canvas
             camera={{ position: [...CAMERA.initialPosition], fov: CAMERA.fov }}
-            dpr={isMobile ? 1 : ([1, 1.5] as [number, number])}
+            dpr={[1, 1.5] as [number, number]}
             gl={{
-              antialias: !isMobile,
+              antialias: true,
               alpha: false,
-              powerPreference: isMobile ? "low-power" : "high-performance",
+              powerPreference: "high-performance",
             }}
             frameloop={reducedMotion || !isPageVisible ? "demand" : "always"}
           >
+            <AdaptiveDpr />
             <color attach="background" args={[SCENE_COLORS.background]} />
-            {isMobile ? null : <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />}
-            <Scene scrollProgressRef={scrollProgressRef} mode={mode} isMobile={isMobile} />
+            <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />
+            <Scene scrollProgressRef={scrollProgressRef} mode={mode} />
           </Canvas>
         </div>
       ) : null}

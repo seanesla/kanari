@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
-import { Sparkles, Stars, shaderMaterial } from "@react-three/drei"
+import { AdaptiveDpr, Sparkles, Stars, shaderMaterial } from "@react-three/drei"
 import * as THREE from "three"
 import { useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
@@ -256,8 +256,8 @@ export function AppSpaceBackground3D() {
       gl={gl}
       frameloop={reducedMotion || !isPageVisible ? "demand" : "always"}
     >
+      <AdaptiveDpr />
       <SpaceField accentColor={accentColor} />
     </Canvas>
   )
 }
-

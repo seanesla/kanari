@@ -44,7 +44,7 @@ export function MaskReveal({
   }
 
   return (
-    <span className="block overflow-hidden">
+    <span className="block overflow-hidden pb-[0.08em] -mb-[0.08em]">
       {trigger === "inView" ? (
         <motion.span
           {...shared}

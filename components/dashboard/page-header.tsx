@@ -50,7 +50,7 @@ export function PageHeader({
     >
       <div className="flex flex-col gap-1">
         <h1 className="text-xl md:text-2xl font-serif tracking-tight">
-          <span className="block overflow-hidden">
+          <span className="block overflow-hidden pb-[0.08em] -mb-[0.08em]">
             <motion.span
               className="block"
               initial={titleInitial}
