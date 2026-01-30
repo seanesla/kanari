@@ -8,7 +8,7 @@
 
 "use client"
 
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { MessageSquare, Calendar, AlertCircle, Trash2, Clock, TrendingUp, TrendingDown, Minus } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -48,6 +48,12 @@ export function AIChatDetailView({
   const [playheadPosition, setPlayheadPosition] = useState(0)
   const [seekPosition, setSeekPosition] = useState<number | undefined>(undefined)
 
+  const waveformWrapRef = useRef<HTMLDivElement | null>(null)
+  const [waveformWidth, setWaveformWidth] = useState(() => {
+    if (typeof window === "undefined") return 400
+    return Math.max(240, Math.min(640, Math.floor(window.innerWidth - 48)))
+  })
+
   const audioDataArray = useMemo(() => {
     const stored = session.audioData
     if (!stored) return null
@@ -76,6 +82,23 @@ export function AIChatDetailView({
     setSeekPosition(position)
   }, [])
 
+  useEffect(() => {
+    const el = waveformWrapRef.current
+    if (!el || typeof ResizeObserver === "undefined") return
+
+    const update = () => {
+      const rect = el.getBoundingClientRect()
+      if (!rect.width) return
+      setWaveformWidth(Math.max(240, Math.min(640, Math.floor(rect.width))))
+    }
+
+    update()
+
+    const observer = new ResizeObserver(() => update())
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
   const stressBand = scoreToBand(session.acousticMetrics?.stressScore)
   const fatigueBand = scoreToBand(session.acousticMetrics?.fatigueScore)
 
@@ -88,13 +111,13 @@ export function AIChatDetailView({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b border-accent/30">
+      <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-accent/30">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-full bg-accent/10">
             <MessageSquare className="h-5 w-5 text-accent" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold">AI Chat</h2>
+            <h2 className="text-base sm:text-lg font-semibold">AI Chat</h2>
             <p className="text-sm text-muted-foreground">
               {session.messages.length} messages{duration && ` • ${duration}`}
             </p>
@@ -112,7 +135,7 @@ export function AIChatDetailView({
       </div>
 
       {/* Session info bar */}
-      <div className="px-6 py-3 border-b border-border/60">
+      <div className="px-4 py-3 sm:px-6 border-b border-border/60">
         <Deck tone="quiet" className="p-3 space-y-2">
         {/* Date */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -139,7 +162,7 @@ export function AIChatDetailView({
 
       {/* Messages scroll area */}
       <ScrollArea className="flex-1 min-h-0">
-        <div className="px-6 py-6 space-y-6">
+        <div className="px-4 py-4 sm:px-6 sm:py-6 space-y-6">
           {session.acousticMetrics && (
             <Deck tone="default" className="p-4">
               <h3 className="text-sm font-medium mb-3">Voice Analysis</h3>
@@ -165,15 +188,17 @@ export function AIChatDetailView({
           {audioDataArray && (
             <Deck tone="default" className="p-4">
               <div className="flex justify-center mb-4">
-                <RecordingWaveform
-                  mode="static"
-                  audioData={audioDataArray}
-                  width={400}
-                  height={80}
-                  playheadPosition={playheadPosition}
-                  onSeek={handleSeek}
-                  className="border border-border/30 bg-background/50"
-                />
+                <div ref={waveformWrapRef} className="w-full max-w-xl">
+                  <RecordingWaveform
+                    mode="static"
+                    audioData={audioDataArray}
+                    width={waveformWidth}
+                    height={80}
+                    playheadPosition={playheadPosition}
+                    onSeek={handleSeek}
+                    className="border border-border/30 bg-background/50"
+                  />
+                </div>
               </div>
               <div className="max-w-md mx-auto">
                 <AudioPlayer

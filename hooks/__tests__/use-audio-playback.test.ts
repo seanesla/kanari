@@ -63,6 +63,84 @@ beforeEach(() => {
 })
 
 describe("useAudioPlayback", () => {
+  it("falls back to buffered playback when AudioWorklet is unavailable", async () => {
+    let lastSource: {
+      start: ReturnType<typeof vi.fn>
+      stop: ReturnType<typeof vi.fn>
+      connect: ReturnType<typeof vi.fn>
+      onended: (() => void) | null
+      buffer: unknown
+    } | null = null
+
+    class NoWorkletAudioContext {
+      state: string = "running"
+      destination = {}
+      currentTime = 0
+      resume = vi.fn(async () => {})
+      suspend = vi.fn(async () => {})
+      close = vi.fn(async () => {
+        this.state = "closed"
+      })
+      createGain = vi.fn(() => ({
+        gain: { value: 1 },
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      }))
+      createBuffer = vi.fn((_channels: number, _length: number, _sampleRate: number) => ({
+        copyToChannel: vi.fn(),
+      }))
+      createBufferSource = vi.fn(() => {
+        const source = {
+          start: vi.fn(),
+          stop: vi.fn(),
+          connect: vi.fn(),
+          onended: null as (() => void) | null,
+          buffer: null as unknown,
+        }
+        lastSource = source
+        return source
+      })
+    }
+
+    // @ts-expect-error - override globals for this test
+    global.AudioContext = NoWorkletAudioContext
+    // @ts-expect-error - simulate missing AudioWorkletNode
+    global.AudioWorkletNode = undefined
+
+    vi.resetModules()
+    vi.unmock("@/hooks/use-audio-playback")
+    const { useAudioPlayback } = await import("@/hooks/use-audio-playback")
+
+    const onPlaybackStart = vi.fn()
+    const onPlaybackEnd = vi.fn()
+
+    const { result } = renderHook(() =>
+      useAudioPlayback({ onPlaybackStart, onPlaybackEnd })
+    )
+
+    await act(async () => {
+      await result.current[1].initialize()
+    })
+
+    expect(result.current[0].state).toBe("ready")
+    expect(result.current[0].isReady).toBe(true)
+
+    act(() => {
+      result.current[1].queueAudio("AAA=")
+    })
+
+    expect(onPlaybackStart).toHaveBeenCalledTimes(1)
+    expect(lastSource?.start).toHaveBeenCalled()
+    expect(result.current[0].isPlaying).toBe(true)
+
+    act(() => {
+      lastSource?.onended?.()
+    })
+
+    expect(onPlaybackEnd).toHaveBeenCalledTimes(1)
+    expect(result.current[0].isPlaying).toBe(false)
+  })
+
   it("initializes and reacts to worklet queue status + buffer empty messages", async () => {
     vi.resetModules()
     vi.unmock("@/hooks/use-audio-playback")

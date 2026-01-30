@@ -16,11 +16,12 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { Clock, Plus, Sparkles } from "@/lib/icons"
+import { ChevronLeft, Clock, Plus, Sparkles } from "@/lib/icons"
 import { useDashboardAnimation } from "@/lib/dashboard-animation-context"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Empty, EmptyMedia, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import {
   SidebarProvider,
   Sidebar,
@@ -36,6 +37,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { useIsMobile } from "@/hooks/use-mobile"
 import { useHistory } from "@/hooks/use-history"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
 import { CheckInListItem } from "@/components/dashboard/check-in-list-item"
@@ -200,12 +202,12 @@ function NewCheckInContent({
     <div className="flex flex-col h-full p-3 md:p-4">
       <Deck tone="raised" className={cn("flex flex-col h-full rounded-2xl overflow-hidden")}>
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border/60">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-border/60">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-full bg-accent/10">
               <Sparkles className="h-5 w-5 text-accent" />
             </div>
-            <h2 className="text-lg font-semibold">New Check-in</h2>
+            <h2 className="text-base sm:text-lg font-semibold">New Check-in</h2>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Close
@@ -232,6 +234,7 @@ function HistoryPageContent() {
   const searchParams = useSearchParams()
   const { shouldAnimate } = useDashboardAnimation()
   const { timeZone } = useTimeZone()
+  const isMobile = useIsMobile()
 
   // Animation state
   const [visible, setVisible] = useState(!shouldAnimate)
@@ -369,11 +372,19 @@ function HistoryPageContent() {
     setAutoStartNewCheckIn(false)
   }, [])
 
+  const handleBackToList = useCallback(() => {
+    if (isCreatingNew) {
+      handleCloseNewCheckIn()
+      return
+    }
+    setSelectedItemId(null)
+  }, [handleCloseNewCheckIn, isCreatingNew])
+
   return (
     <div
       data-demo-id="demo-history-page"
       className={cn(
-        "h-svh bg-transparent relative overflow-hidden transition-all duration-500 pt-[calc(env(safe-area-inset-top)+4rem)] pb-[env(safe-area-inset-bottom)] md:pt-0",
+        "h-svh bg-transparent relative overflow-hidden transition-all duration-500 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-0",
         visible ? "opacity-100" : "opacity-95"
       )}
     >
@@ -387,11 +398,46 @@ function HistoryPageContent() {
           isLoading={isHistoryLoading}
         />
 
-        <SidebarInset transparent className="flex flex-col bg-transparent pb-3">
-          {/* Header - mobile shows full header */}
-          <header className="md:hidden flex items-center gap-2 px-4 py-3 border-b border-accent/30">
-            <SidebarTrigger className="-ml-1" />
-            <h1 className="text-sm font-medium">Check-ins</h1>
+        <SidebarInset
+          transparent
+          className="flex flex-col bg-transparent pb-[calc(env(safe-area-inset-bottom)+5rem)] md:pb-3"
+        >
+          {/* Header - mobile */}
+          <header className="md:hidden flex items-center justify-between gap-2 px-4 py-3 border-b border-accent/30">
+            {isCreatingNew || selectedItem ? (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="-ml-1"
+                  onClick={handleBackToList}
+                  aria-label="Back to check-ins"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <h1 className="text-sm font-medium min-w-0 truncate">
+                  {isCreatingNew ? "New Check-in" : "Check-in"}
+                </h1>
+                {selectedItem ? <SidebarTrigger className="-mr-1" /> : <div className="size-7" />}
+              </>
+            ) : (
+              <>
+                <div className="min-w-0">
+                  <h1 className="text-sm font-medium">Check-ins</h1>
+                  <p className="text-[11px] text-muted-foreground truncate">
+                    {isHistoryLoading ? "Loading…" : `${historyItems.length} total`}
+                  </p>
+                </div>
+                <Button
+                  onClick={handleStartNewCheckIn}
+                  size="sm"
+                  className="bg-accent text-accent-foreground hover:bg-accent/90"
+                >
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                  New
+                </Button>
+              </>
+            )}
           </header>
 
           {/* Desktop: Edge-hover glow trigger (appears only when collapsed) */}
@@ -429,6 +475,70 @@ function HistoryPageContent() {
                     session={selectedItem.session}
                     onDelete={() => handleDeleteSession(selectedItem.session.id)}
                   />
+                </motion.div>
+              ) : isMobile ? (
+                <motion.div
+                  key="mobile-history"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="h-full p-3"
+                >
+                  <Deck tone="raised" className="flex flex-col h-full rounded-2xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
+                      <h2 className="text-sm font-medium">Past check-ins</h2>
+                      <Button variant="ghost" size="sm" onClick={handleStartNewCheckIn}>
+                        <Plus className="h-4 w-4 mr-1.5" />
+                        New
+                      </Button>
+                    </div>
+                    <ScrollArea className="flex-1 min-h-0">
+                      <div className="p-2">
+                        {isHistoryLoading ? (
+                          <div className="py-2">
+                            {Array.from({ length: 10 }).map((_, idx) => (
+                              <SidebarMenuSkeleton key={idx} showIcon />
+                            ))}
+                          </div>
+                        ) : historyItems.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+                            <Clock className="h-8 w-8 text-muted-foreground/50 mb-3" />
+                            <p className="text-sm text-muted-foreground">No check-ins yet</p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">
+                              Start your first check-in to see it here.
+                            </p>
+                            <Button
+                              onClick={handleStartNewCheckIn}
+                              className="bg-accent text-accent-foreground hover:bg-accent/90 mt-4"
+                            >
+                              <Sparkles className="mr-2 h-4 w-4" />
+                              New Check-in
+                            </Button>
+                          </div>
+                        ) : (
+                          groupedByDate.map((group) => (
+                            <div key={group.dateKey} className="py-2">
+                              <div className="px-2 pb-2">
+                                <p className="text-xs text-muted-foreground/70">{group.dateLabel}</p>
+                              </div>
+                              <SidebarMenu>
+                                {group.items.map((item) => (
+                                  <SidebarMenuItem key={item.id}>
+                                    <CheckInListItem
+                                      item={item}
+                                      isSelected={selectedItemId === item.id}
+                                      onSelect={() => handleSelectItem(item)}
+                                    />
+                                  </SidebarMenuItem>
+                                ))}
+                              </SidebarMenu>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </Deck>
                 </motion.div>
               ) : (
                 <motion.div

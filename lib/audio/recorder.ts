@@ -23,6 +23,8 @@ export class AudioRecorder {
   private mediaStream: MediaStream | null = null
   private sourceNode: MediaStreamAudioSourceNode | null = null
   private workletNode: AudioWorkletNode | null = null
+  private scriptProcessorNode: ScriptProcessorNode | null = null
+  private silenceGainNode: GainNode | null = null
   private audioChunks: Float32Array[] = []
 
   private state: RecorderState = "idle"
@@ -74,24 +76,55 @@ export class AudioRecorder {
       // Create source from stream
       this.sourceNode = this.audioContext.createMediaStreamSource(this.mediaStream)
 
-      // Load AudioWorklet module (modern replacement for deprecated ScriptProcessorNode)
-      await this.audioContext.audioWorklet.addModule("/audio-processor.worklet.js")
+      const workletSupported =
+        typeof AudioWorkletNode !== "undefined" &&
+        typeof (this.audioContext as unknown as { audioWorklet?: { addModule?: unknown } }).audioWorklet
+          ?.addModule === "function"
 
-      // Create AudioWorkletNode
-      this.workletNode = new AudioWorkletNode(this.audioContext, "audio-processor", {
-        channelCount: this.options.channelCount,
-        channelCountMode: "explicit",
-      })
+      if (workletSupported) {
+        // Load AudioWorklet module (modern replacement for deprecated ScriptProcessorNode)
+        await this.audioContext.audioWorklet.addModule("/audio-processor.worklet.js")
 
-      // Handle audio data from worklet
-      this.workletNode.port.onmessage = (event) => {
-        const chunk = event.data as Float32Array
-        this.audioChunks.push(chunk)
-        this.options.onDataAvailable(chunk)
+        // Create AudioWorkletNode
+        this.workletNode = new AudioWorkletNode(this.audioContext, "audio-processor", {
+          channelCount: this.options.channelCount,
+          channelCountMode: "explicit",
+        })
+
+        // Handle audio data from worklet
+        this.workletNode.port.onmessage = (event) => {
+          const chunk = event.data as Float32Array
+          this.audioChunks.push(chunk)
+          this.options.onDataAvailable(chunk)
+        }
+
+        // Connect nodes (worklet doesn't need to connect to destination for input-only processing)
+        this.sourceNode.connect(this.workletNode)
+      } else {
+        // Fallback for Safari/iOS builds without AudioWorklet.
+        // Pattern doc: docs/error-patterns/safari-audioworklet-missing.md
+        if (typeof this.audioContext.createScriptProcessor !== "function") {
+          throw new Error(
+            "Audio recording not supported in this browser (missing AudioWorklet + ScriptProcessorNode)"
+          )
+        }
+
+        this.scriptProcessorNode = this.audioContext.createScriptProcessor(2048, 1, 1)
+        this.silenceGainNode = this.audioContext.createGain()
+        this.silenceGainNode.gain.value = 0
+
+        this.scriptProcessorNode.onaudioprocess = (event) => {
+          const input = event.inputBuffer.getChannelData(0)
+          if (!input || input.length === 0) return
+          const chunk = new Float32Array(input)
+          this.audioChunks.push(chunk)
+          this.options.onDataAvailable(chunk)
+        }
+
+        this.sourceNode.connect(this.scriptProcessorNode)
+        this.scriptProcessorNode.connect(this.silenceGainNode)
+        this.silenceGainNode.connect(this.audioContext.destination)
       }
-
-      // Connect nodes (worklet doesn't need to connect to destination for input-only processing)
-      this.sourceNode.connect(this.workletNode)
 
       this.state = "recording"
       this.startTime = Date.now()
@@ -117,6 +150,17 @@ export class AudioRecorder {
         this.workletNode.port.postMessage("stop")
         this.workletNode.disconnect()
         this.workletNode = null
+      }
+
+      if (this.scriptProcessorNode) {
+        this.scriptProcessorNode.onaudioprocess = null
+        this.scriptProcessorNode.disconnect()
+        this.scriptProcessorNode = null
+      }
+
+      if (this.silenceGainNode) {
+        this.silenceGainNode.disconnect()
+        this.silenceGainNode = null
       }
 
       if (this.sourceNode) {
@@ -172,6 +216,17 @@ export class AudioRecorder {
       this.workletNode = null
     }
 
+    if (this.scriptProcessorNode) {
+      this.scriptProcessorNode.onaudioprocess = null
+      this.scriptProcessorNode.disconnect()
+      this.scriptProcessorNode = null
+    }
+
+    if (this.silenceGainNode) {
+      this.silenceGainNode.disconnect()
+      this.silenceGainNode = null
+    }
+
     if (this.sourceNode) {
       this.sourceNode.disconnect()
       this.sourceNode = null
@@ -195,11 +250,21 @@ export class AudioRecorder {
  * Check if the browser supports audio recording
  */
 export function isRecordingSupported(): boolean {
-  return !!(
+  const hasWebAudio = typeof AudioContext !== "undefined"
+  const hasGetUserMedia =
     typeof navigator !== "undefined" &&
-    navigator.mediaDevices &&
-    typeof navigator.mediaDevices.getUserMedia === "function" &&
-    typeof AudioContext !== "undefined"
+    !!navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getUserMedia === "function"
+
+  if (!hasWebAudio || !hasGetUserMedia) return false
+
+  const hasWorklet = typeof AudioWorkletNode !== "undefined"
+  const hasScriptProcessor =
+    typeof (AudioContext.prototype as unknown as { createScriptProcessor?: unknown }).createScriptProcessor ===
+    "function"
+
+  return !!(
+    hasWorklet || hasScriptProcessor
   )
 }
 
