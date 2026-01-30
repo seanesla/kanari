@@ -353,34 +353,85 @@ export default function LandingPage() {
 
       {/* Cinematic artwork (endcap) */}
       <section className="py-14 sm:py-16 md:py-20 px-6 md:px-12 bg-background/60 backdrop-blur-none sm:backdrop-blur-xl">
-        <ScrollReveal>
-          <div className="max-w-7xl mx-auto">
-            <figure className="group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]">
-              <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-                <div className="absolute inset-0 bg-gradient-to-tr from-accent/12 via-transparent to-foreground/5" />
-                <div className="absolute inset-0 bg-accent/8 mix-blend-soft-light" />
-                <div className="absolute inset-0 opacity-60 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.08),transparent_55%)]" />
-              </div>
+        <div className="max-w-7xl mx-auto">
+          <motion.figure
+            className="group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]"
+            initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, filter: "blur(10px)" }}
+            whileInView={
+              reduceMotion
+                ? { opacity: 1 }
+                : {
+                    opacity: 1,
+                    y: 0,
+                    filter: "blur(0px)",
+                    transition: { duration: 0.95, ease: EASE },
+                  }
+            }
+            viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
+          >
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+              <div className="absolute inset-0 bg-gradient-to-tr from-accent/12 via-transparent to-foreground/5" />
+              <div className="absolute inset-0 bg-accent/8 mix-blend-soft-light" />
+              <div className="absolute inset-0 opacity-60 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.08),transparent_55%)]" />
+            </div>
 
-              <motion.div
-                className="relative"
-                whileHover={reduceMotion ? undefined : { scale: 1.01 }}
-                transition={reduceMotion ? undefined : { type: "spring", stiffness: 180, damping: 26 }}
-              >
-                <Image
-                  src="/landing/kanari-orbital-crystal.png"
-                  alt="A glowing crystal with orbital lines in a smoky atmosphere"
-                  width={1600}
-                  height={893}
-                  sizes="(max-width: 768px) 100vw, 1200px"
-                  className="w-full h-auto object-cover opacity-[0.96]"
+            {/* Minimalist reveal: clip-mask + soft focus settle */}
+            <motion.div
+              className="relative"
+              initial={
+                reduceMotion
+                  ? { opacity: 1 }
+                  : {
+                      opacity: 0,
+                      scale: 1.02,
+                      filter: "blur(14px)",
+                      clipPath: "inset(18% 22% 18% 22% round 28px)",
+                    }
+              }
+              whileInView={
+                reduceMotion
+                  ? { opacity: 1 }
+                  : {
+                      opacity: 1,
+                      scale: 1,
+                      filter: "blur(0px)",
+                      clipPath: "inset(0% 0% 0% 0% round 32px)",
+                      transition: { duration: 1.25, ease: EASE, delay: 0.08 },
+                    }
+              }
+              viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
+              whileHover={reduceMotion ? undefined : { scale: 1.01 }}
+              transition={reduceMotion ? undefined : { type: "spring", stiffness: 180, damping: 26 }}
+            >
+              <Image
+                src="/landing/kanari-orbital-crystal.png"
+                alt="A glowing crystal with orbital lines in a smoky atmosphere"
+                width={1120}
+                height={625}
+                sizes="(max-width: 768px) 100vw, 1200px"
+                className="w-full h-auto object-cover opacity-[0.96]"
+              />
+
+              {/* One-time sheen pass (ties to accent color) */}
+              {!reduceMotion && (
+                <motion.div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 mix-blend-soft-light"
+                  initial={{ opacity: 0, x: "-120%" }}
+                  whileInView={{ opacity: 1, x: "120%" }}
+                  viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
+                  transition={{ duration: 1.2, ease: EASE, delay: 0.25 }}
+                  style={{
+                    background:
+                      "linear-gradient(90deg, transparent 0%, oklch(from var(--accent) l c h / 0.10) 45%, transparent 60%)",
+                  }}
                 />
-              </motion.div>
+              )}
+            </motion.div>
 
-              <div aria-hidden="true" className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-foreground/10" />
-            </figure>
-          </div>
-        </ScrollReveal>
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-foreground/10" />
+          </motion.figure>
+        </div>
       </section>
 
       {/* Footer */}
