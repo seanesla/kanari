@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, useRef, useMemo, useE
 import { db } from "@/lib/storage/db"
 import { DEFAULT_ACCENT } from "@/lib/color-utils"
 import { DEFAULT_SANS, DEFAULT_SERIF, updateFontVariable, getFontCssFamily } from "@/lib/font-utils"
-import type { FontFamily, SerifFamily } from "@/lib/types"
+import type { FontFamily, GraphicsQuality, SerifFamily } from "@/lib/types"
 import { patchSettings } from "@/lib/settings/patch-settings"
 
 export type SceneMode = "landing" | "transitioning" | "dashboard"
@@ -53,6 +53,11 @@ interface SceneContextValue {
   previewAccentColor: (color: string) => void
   /** Update accent color and persist to IndexedDB. */
   setAccentColor: (color: string) => void
+  graphicsQuality: GraphicsQuality
+  /** Update graphics quality in-memory only (no IndexedDB write). */
+  previewGraphicsQuality: (quality: GraphicsQuality) => void
+  /** Update graphics quality and persist to IndexedDB. */
+  setGraphicsQuality: (quality: GraphicsQuality) => void
   selectedSansFont: string
   /** Update dashboard font in-memory only (no IndexedDB write). */
   previewSansFont: (font: string) => void
@@ -77,6 +82,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   // that sets a data attribute for CSS to hide the overlay before hydration.
   const [isLoading, setIsLoading] = useState(true)
   const [accentColor, setAccentColorState] = useState(DEFAULT_ACCENT)
+  const [graphicsQuality, setGraphicsQualityState] = useState<GraphicsQuality>("auto")
   const [selectedSansFont, setSelectedSansFontState] = useState(DEFAULT_SANS)
   const [selectedSerifFont, setSelectedSerifFontState] = useState(DEFAULT_SERIF)
 
@@ -94,6 +100,9 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     db.settings.get("default").then((settings) => {
       if (settings?.accentColor) {
         setAccentColorState(settings.accentColor)
+      }
+      if (settings?.graphicsQuality) {
+        setGraphicsQualityState(settings.graphicsQuality)
       }
       if (settings?.selectedSansFont) {
         setSelectedSansFontState(settings.selectedSansFont)
@@ -131,12 +140,25 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     setAccentColorState(color)
   }, [])
 
+  const previewGraphicsQuality = useCallback((quality: GraphicsQuality) => {
+    setGraphicsQualityState(quality)
+  }, [])
+
   const setAccentColor = useCallback((color: string) => {
     setAccentColorState(color)
     // Persist to IndexedDB (race-safe; avoids wiping other fields)
     void patchSettings({ accentColor: color }).catch((error) => {
       if (process.env.NODE_ENV === "development") {
         console.warn("[SceneProvider] Failed to save accent color:", error)
+      }
+    })
+  }, [])
+
+  const setGraphicsQuality = useCallback((quality: GraphicsQuality) => {
+    setGraphicsQualityState(quality)
+    void patchSettings({ graphicsQuality: quality }).catch((error) => {
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[SceneProvider] Failed to save graphics quality:", error)
       }
     })
   }, [])
@@ -188,6 +210,9 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     accentColor,
     previewAccentColor,
     setAccentColor,
+    graphicsQuality,
+    previewGraphicsQuality,
+    setGraphicsQuality,
     selectedSansFont,
     previewSansFont,
     setSansFont,
@@ -195,7 +220,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     previewSerifFont,
     setSerifFont,
     resetFontsToDefault,
-  }), [mode, isLoading, accentColor, selectedSansFont, selectedSerifFont, setMode, resetToLanding, previewAccentColor, setAccentColor, previewSansFont, setSansFont, previewSerifFont, setSerifFont, resetFontsToDefault])
+  }), [mode, isLoading, accentColor, graphicsQuality, selectedSansFont, selectedSerifFont, setMode, resetToLanding, previewAccentColor, setAccentColor, previewGraphicsQuality, setGraphicsQuality, previewSansFont, setSansFont, previewSerifFont, setSerifFont, resetFontsToDefault])
 
   return (
     <SceneContext.Provider value={contextValue}>

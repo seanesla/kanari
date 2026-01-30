@@ -7,9 +7,10 @@
  * Camera flies between panels as user navigates steps.
  * All panels exist in 3D space - you physically travel to each one.
  *
- * New flow (navbar steps: intro -> api -> coach -> prefs -> done):
+ * New flow (navbar steps: intro -> graphics -> api -> coach -> prefs -> done):
  * - WelcomeSplash: Overlay animation before steps begin
  * - StepIntro: Name + accent color selection
+ * - StepGraphicsQuality: Graphics quality selection
  * - StepApiKey: Gemini API key input
  * - StepMeetCoach: Voice selection + avatar generation
  * - StepPreferences: Accountability mode + reminders
@@ -25,6 +26,7 @@ import { Onboarding2DScene } from "@/components/onboarding/onboarding-2d-scene"
 import {
   WelcomeSplash,
   StepIntro,
+  StepGraphicsQuality,
   StepApiKey,
   StepMeetCoach,
   StepPreferences,
@@ -76,6 +78,12 @@ export default function OnboardingPage() {
     goNext()
   }, [updateSettings, goNext])
 
+  const handleGraphicsSubmit = useCallback(async (graphicsSettings: Partial<UserSettings>) => {
+    setPendingSettings((prev) => ({ ...prev, ...graphicsSettings }))
+    await updateSettings(graphicsSettings)
+    goNext()
+  }, [updateSettings, goNext])
+
   // Handler for StepApiKey
   const handleApiKeySubmit = useCallback(async (apiSettings: Partial<UserSettings>) => {
     setPendingSettings((prev) => ({ ...prev, ...apiSettings }))
@@ -124,7 +132,7 @@ export default function OnboardingPage() {
   // Merged settings for passing to components
   const mergedSettings = { ...settings, ...pendingSettings }
 
-  // New flow steps: intro -> api -> coach -> prefs -> done
+  // New flow steps: intro -> graphics -> api -> coach -> prefs -> done
   const steps = [
     // Step 0: Intro (name + accent color)
     <StepIntro
@@ -132,30 +140,37 @@ export default function OnboardingPage() {
       initialSettings={mergedSettings}
       onNext={handleIntroSubmit}
     />,
-    // Step 1: API Key
+    // Step 1: Graphics Quality
+    <StepGraphicsQuality
+      key="graphics"
+      initialSettings={mergedSettings}
+      onNext={handleGraphicsSubmit}
+      onBack={goBack}
+    />,
+    // Step 2: API Key
     <StepApiKey
       key="apiKey"
       initialApiKey={mergedSettings?.geminiApiKey || ""}
       initialApiKeySource={mergedSettings?.geminiApiKeySource}
       onNext={handleApiKeySubmit}
       onBack={goBack}
-      isActive={onboardingStep === 1}
+      isActive={onboardingStep === 2}
     />,
-    // Step 2: Meet Your Coach (voice + avatar)
+    // Step 3: Meet Your Coach (voice + avatar)
     <StepMeetCoach
       key="coach"
       initialSettings={mergedSettings}
       onNext={handleCoachSubmit}
       onBack={goBack}
     />,
-    // Step 3: Preferences (accountability + reminders)
+    // Step 4: Preferences (accountability + reminders)
     <StepPreferences
       key="preferences"
       initialSettings={mergedSettings}
       onNext={handlePreferencesSubmit}
       onBack={goBack}
     />,
-    // Step 4: Complete
+    // Step 5: Complete
     <StepComplete
       key="complete"
       onComplete={handleComplete}

@@ -9,10 +9,12 @@
  */
 
 import { useEffect, useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion"
 import { Canvas } from "@react-three/fiber"
 import { AdaptiveDpr } from "@react-three/drei"
 import { useSceneMode } from "@/lib/scene-context"
+import { getGraphicsProfile } from "@/lib/graphics/quality"
+import { FrameLimiter } from "@/components/scene/frame-limiter"
 import { WelcomeParticles } from "./welcome-particles"
 import { SCENE_COLORS } from "@/lib/constants"
 
@@ -25,7 +27,11 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
   const [isVisible, setIsVisible] = useState(true)
 
   // Keep this hook here so the splash reflects current theme state.
-  const { accentColor } = useSceneMode()
+  const { accentColor, graphicsQuality } = useSceneMode()
+  const reducedMotion = useReducedMotion()
+  const profile = getGraphicsProfile(graphicsQuality, { prefersReducedMotion: Boolean(reducedMotion) })
+  const powerPreference: WebGLPowerPreference =
+    profile.quality === "high" ? "high-performance" : "low-power"
 
   const handleParticlesComplete = () => {
     setIsVisible(false)
@@ -55,10 +61,12 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
           <div className="absolute inset-0">
             <Canvas
               camera={{ position: [0, 0, 8.5], fov: 50, near: 0.1, far: 150 }}
-              dpr={[1, 1.5]}
-              gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+              dpr={profile.dpr}
+              gl={{ antialias: profile.antialias, alpha: true, powerPreference }}
+              frameloop={profile.maxFps === null && profile.animate ? "always" : "demand"}
             >
               <AdaptiveDpr />
+              {profile.maxFps !== null ? <FrameLimiter maxFps={profile.maxFps} /> : null}
               <color attach="background" args={[SCENE_COLORS.background]} />
               <WelcomeParticles
                 accentColor={accentColor}

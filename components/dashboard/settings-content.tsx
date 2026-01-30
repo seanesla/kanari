@@ -23,6 +23,7 @@ import { SettingsTimeZoneSection } from "./settings-timezone"
 import { SettingsVoiceSection } from "./settings-voice-section"
 import { SettingsProfileSection } from "./settings-profile-section"
 import { SettingsBiomarkersSection } from "./settings-biomarkers-section"
+import { SettingsGraphicsSection } from "./settings-graphics"
 import { Deck } from "@/components/dashboard/deck"
 import { db } from "@/lib/storage/db"
 import { DEFAULT_USER_SETTINGS } from "@/lib/settings/default-settings"
@@ -31,7 +32,7 @@ import { setDisableStartupAnimationSync } from "@/lib/scene-context"
 import { useSceneMode } from "@/lib/scene-context"
 import { useTimeZone } from "@/lib/timezone-context"
 import { Globe2, User } from "@/lib/icons"
-import type { AccountabilityMode, FontFamily, GeminiVoice, SerifFamily, UserSettings } from "@/lib/types"
+import type { AccountabilityMode, FontFamily, GeminiVoice, GraphicsQuality, SerifFamily, UserSettings } from "@/lib/types"
 
 // Pattern doc: docs/error-patterns/settings-schema-drift-and-partial-save.md
 type SettingsDraft = Pick<
@@ -51,6 +52,7 @@ type SettingsDraft = Pick<
   | "selectedSansFont"
   | "selectedSerifFont"
   | "disableStartupAnimation"
+  | "graphicsQuality"
 >
 
 const DEFAULT_DRAFT: SettingsDraft = {
@@ -69,6 +71,7 @@ const DEFAULT_DRAFT: SettingsDraft = {
   selectedSansFont: DEFAULT_USER_SETTINGS.selectedSansFont,
   selectedSerifFont: DEFAULT_USER_SETTINGS.selectedSerifFont,
   disableStartupAnimation: DEFAULT_USER_SETTINGS.disableStartupAnimation,
+  graphicsQuality: DEFAULT_USER_SETTINGS.graphicsQuality,
 }
 
 export function SettingsContent() {
@@ -77,7 +80,7 @@ export function SettingsContent() {
   const [baseline, setBaseline] = useState<SettingsDraft | null>(null)
 
   const baselineRef = useRef<SettingsDraft | null>(null)
-  const { previewAccentColor, previewSansFont, previewSerifFont } = useSceneMode()
+  const { previewAccentColor, previewSansFont, previewSerifFont, previewGraphicsQuality } = useSceneMode()
   const { setTimeZone: setTimeZoneInContext } = useTimeZone()
   useEffect(() => {
     baselineRef.current = baseline
@@ -92,15 +95,16 @@ export function SettingsContent() {
       if (saved.accentColor) previewAccentColor(saved.accentColor)
       if (saved.selectedSansFont) previewSansFont(saved.selectedSansFont)
       if (saved.selectedSerifFont) previewSerifFont(saved.selectedSerifFont)
+      if (saved.graphicsQuality) previewGraphicsQuality(saved.graphicsQuality)
     }
-  }, [previewAccentColor, previewSansFont, previewSerifFont])
+  }, [previewAccentColor, previewSansFont, previewSerifFont, previewGraphicsQuality])
 
   // Render the floating save bar into <body> so it's not affected by any
   // parent transforms (e.g. translate-y entry animations on the Settings page).
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
   useEffect(() => {
     setPortalRoot(document.body)
-  }, [])
+  }, [previewAccentColor, previewSansFont, previewSerifFont, previewGraphicsQuality])
 
   const [isSaving, setIsSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
@@ -139,12 +143,14 @@ export function SettingsContent() {
           selectedSansFont: (savedSettings?.selectedSansFont as FontFamily | undefined) ?? DEFAULT_USER_SETTINGS.selectedSansFont,
           selectedSerifFont: (savedSettings?.selectedSerifFont as SerifFamily | undefined) ?? DEFAULT_USER_SETTINGS.selectedSerifFont,
           disableStartupAnimation: savedSettings?.disableStartupAnimation ?? DEFAULT_USER_SETTINGS.disableStartupAnimation,
+          graphicsQuality: (savedSettings?.graphicsQuality as GraphicsQuality | undefined) ?? DEFAULT_USER_SETTINGS.graphicsQuality,
         }
 
         // Apply the saved appearance immediately so the page matches the stored settings.
         if (hydrated.accentColor) previewAccentColor(hydrated.accentColor)
         if (hydrated.selectedSansFont) previewSansFont(hydrated.selectedSansFont)
         if (hydrated.selectedSerifFont) previewSerifFont(hydrated.selectedSerifFont)
+        if (hydrated.graphicsQuality) previewGraphicsQuality(hydrated.graphicsQuality)
 
         // Keep localStorage in sync so SceneProvider can read it synchronously on load.
         setDisableStartupAnimationSync(hydrated.disableStartupAnimation ?? false)
@@ -165,6 +171,7 @@ export function SettingsContent() {
     const trimmedKey = draft.geminiApiKey?.trim() ?? ""
     const trimmedName = draft.userName?.trim() ?? ""
     const geminiApiKeySource = draft.geminiApiKeySource === "kanari" ? "kanari" : "user"
+    const graphicsQuality = draft.graphicsQuality ?? DEFAULT_USER_SETTINGS.graphicsQuality
     return {
       ...draft,
       userName: trimmedName.length > 0 ? trimmedName : undefined,
@@ -173,6 +180,7 @@ export function SettingsContent() {
       dailyReminderTime: draft.dailyReminderTime ? draft.dailyReminderTime : undefined,
       selectedGeminiVoice: draft.selectedGeminiVoice ?? undefined,
       accountabilityMode: draft.accountabilityMode ?? DEFAULT_USER_SETTINGS.accountabilityMode,
+      graphicsQuality,
     }
   }, [draft])
 
@@ -193,7 +201,8 @@ export function SettingsContent() {
       baseline.accentColor !== normalizedDraft.accentColor ||
       baseline.selectedSansFont !== normalizedDraft.selectedSansFont ||
       baseline.selectedSerifFont !== normalizedDraft.selectedSerifFont ||
-      baseline.disableStartupAnimation !== normalizedDraft.disableStartupAnimation
+      baseline.disableStartupAnimation !== normalizedDraft.disableStartupAnimation ||
+      baseline.graphicsQuality !== normalizedDraft.graphicsQuality
     )
   }, [baseline, normalizedDraft])
 
@@ -225,6 +234,7 @@ export function SettingsContent() {
         selectedSansFont: normalizedDraft.selectedSansFont,
         selectedSerifFont: normalizedDraft.selectedSerifFont,
         disableStartupAnimation: normalizedDraft.disableStartupAnimation,
+        graphicsQuality: normalizedDraft.graphicsQuality,
       }
 
       await patchSettings(updates)
@@ -265,7 +275,8 @@ export function SettingsContent() {
     if (DEFAULT_DRAFT.accentColor) previewAccentColor(DEFAULT_DRAFT.accentColor)
     if (DEFAULT_DRAFT.selectedSansFont) previewSansFont(DEFAULT_DRAFT.selectedSansFont)
     if (DEFAULT_DRAFT.selectedSerifFont) previewSerifFont(DEFAULT_DRAFT.selectedSerifFont)
-  }, [previewAccentColor, previewSansFont, previewSerifFont])
+    if (DEFAULT_DRAFT.graphicsQuality) previewGraphicsQuality(DEFAULT_DRAFT.graphicsQuality)
+  }, [previewAccentColor, previewSansFont, previewSerifFont, previewGraphicsQuality])
 
   return (
     <div className={`w-full space-y-6 ${isDirty ? "pb-24" : ""}`}>
@@ -332,6 +343,15 @@ export function SettingsContent() {
           onDisableStartupAnimationChange={(checked) => {
             setDraft((prev) => ({ ...prev, disableStartupAnimation: checked }))
             setSaveMessage(null)
+          }}
+        />
+
+        <SettingsGraphicsSection
+          graphicsQuality={(draft.graphicsQuality ?? DEFAULT_USER_SETTINGS.graphicsQuality ?? "auto") as GraphicsQuality}
+          onGraphicsQualityChange={(quality: GraphicsQuality) => {
+            setDraft((prev) => ({ ...prev, graphicsQuality: quality }))
+            setSaveMessage(null)
+            previewGraphicsQuality(quality)
           }}
         />
 

@@ -16,10 +16,11 @@ import * as THREE from "three"
 // Panel positions in 3D space - spread along Z axis with varied X/Y
 export const PANEL_POSITIONS: [number, number, number][] = [
   [0, 0, 0],       // Intro
-  [6, 1.5, -14],   // API Key
-  [-5, -1, -28],   // Coach
-  [4, 2, -42],     // Preferences
-  [0, 0, -56],     // Complete
+  [6, 1.5, -14],   // Graphics
+  [-5, -1, -28],   // API Key
+  [4, 2, -42],     // Coach
+  [0, 0, -56],     // Preferences
+  [0, 0, -70],     // Complete
 ]
 
 // Welcome staging position (camera starts here).

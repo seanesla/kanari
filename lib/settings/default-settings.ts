@@ -35,6 +35,7 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
   accentColor: DEFAULT_ACCENT,
   selectedSansFont: DEFAULT_SANS,
   selectedSerifFont: DEFAULT_SERIF,
+  graphicsQuality: "auto",
 
   disableStartupAnimation: false,
 

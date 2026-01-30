@@ -6,16 +6,21 @@ import { AdaptiveDpr } from "@react-three/drei"
 import { useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
+import { getGraphicsProfile } from "@/lib/graphics/quality"
 import { CAMERA, FOG } from "./constants"
 import { Scene } from "./scene-canvas"
 import { LoadingOverlay } from "./loading-overlay"
 import { SceneBackgroundFallback } from "./fallback"
+import { FrameLimiter } from "./frame-limiter"
 
 // Inner component that uses the scene context
 function SceneBackgroundInner() {
-  const { mode, scrollProgressRef, isLoading, setIsLoading } = useSceneMode()
+  const { mode, scrollProgressRef, isLoading, setIsLoading, graphicsQuality } = useSceneMode()
   const [canvasMounted, setCanvasMounted] = useState(true)
   const reducedMotion = useReducedMotion()
+  const profile = getGraphicsProfile(graphicsQuality, { prefersReducedMotion: Boolean(reducedMotion) })
+  const powerPreference: WebGLPowerPreference =
+    profile.quality === "high" ? "high-performance" : "low-power"
   const [isPageVisible, setIsPageVisible] = useState(() => {
     if (typeof document === "undefined") return true
     return document.visibilityState !== "hidden"
@@ -87,26 +92,39 @@ function SceneBackgroundInner() {
       maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
     }
 
+    const updateProgress = () => {
+      const progress = maxScroll > 0 ? Math.min(1, window.scrollY / maxScroll) : 0
+      scrollProgressRef.current = progress
+    }
+
+    const useRaf = profile.animate
+
     const update = () => {
       // On iOS, scroll events can be throttled heavily during momentum scrolling.
       // Sampling scroll position on rAF keeps the 3D scene parallax in sync.
-      const progress = maxScroll > 0 ? Math.min(1, window.scrollY / maxScroll) : 0
-      scrollProgressRef.current = progress
+      updateProgress()
       rafId = window.requestAnimationFrame(update)
     }
 
     computeMaxScroll()
-    update()
+
+    if (useRaf) {
+      update()
+    } else {
+      updateProgress()
+      window.addEventListener("scroll", updateProgress, { passive: true })
+    }
 
     window.addEventListener("resize", computeMaxScroll, { passive: true })
 
     return () => {
       window.removeEventListener("resize", computeMaxScroll)
+      window.removeEventListener("scroll", updateProgress)
       if (rafId !== null) {
         window.cancelAnimationFrame(rafId)
       }
     }
-  }, [mode, isLoading, isPageVisible, scrollProgressRef])
+  }, [mode, isLoading, isPageVisible, profile.animate, scrollProgressRef])
 
   return (
     <>
@@ -115,15 +133,18 @@ function SceneBackgroundInner() {
         <div className="fixed inset-0 -z-10">
           <Canvas
             camera={{ position: [...CAMERA.initialPosition], fov: CAMERA.fov }}
-            dpr={[1, 1.5] as [number, number]}
+            dpr={profile.dpr}
             gl={{
-              antialias: true,
+              antialias: profile.antialias,
               alpha: false,
-              powerPreference: "high-performance",
+              powerPreference,
             }}
-            frameloop={reducedMotion || !isPageVisible ? "demand" : "always"}
+            frameloop={profile.maxFps === null && isPageVisible && profile.animate ? "always" : "demand"}
           >
             <AdaptiveDpr />
+            {profile.maxFps !== null ? (
+              <FrameLimiter maxFps={profile.maxFps} enabled={isPageVisible} />
+            ) : null}
             <color attach="background" args={[SCENE_COLORS.background]} />
             <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />
             <Scene scrollProgressRef={scrollProgressRef} mode={mode} />

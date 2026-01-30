@@ -19,10 +19,11 @@ import { useEffect, useMemo, useRef } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { AdaptiveDpr, Float, Sparkles } from "@react-three/drei"
 import * as THREE from "three"
+import { useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
-
-type QualityTier = "low" | "medium" | "high"
+import { getGraphicsProfile } from "@/lib/graphics/quality"
+import { FrameLimiter } from "@/components/scene/frame-limiter"
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value))
@@ -32,19 +33,18 @@ function easeOutCubic(t: number) {
   return 1 - Math.pow(1 - t, 3)
 }
 
-function getQualityTier(): QualityTier {
-  if (typeof window === "undefined") return "high"
+type QualityTier = "low" | "medium" | "high"
 
-  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches
-  if (reduceMotion) return "low"
+function useGraphicsProfile() {
+  const { graphicsQuality } = useSceneMode()
+  const reducedMotion = useReducedMotion()
+  return getGraphicsProfile(graphicsQuality, { prefersReducedMotion: Boolean(reducedMotion) })
+}
 
-  const cores = navigator.hardwareConcurrency ?? 6
-  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8
-
-  // Keep low-end devices stable, but don't over-downshift. We still want the
-  // background to be visible and expressive.
-  if (cores <= 2 || memory <= 2) return "medium"
-  return "high"
+function getTierFromProfile(profile: ReturnType<typeof getGraphicsProfile>): QualityTier {
+  if (profile.quality === "high") return "high"
+  if (profile.quality === "low") return "low"
+  return "medium"
 }
 
 function createSoftDiscTexture() {
@@ -369,7 +369,8 @@ function TwinklingStarPoints({
  */
 export function Starfield() {
   const { accentColor } = useSceneMode()
-  const quality = useMemo(() => getQualityTier(), [])
+  const profile = useGraphicsProfile()
+  const quality = useMemo(() => getTierFromProfile(profile), [profile])
   const discTexture = useMemo(() => createSoftDiscTexture(), [])
 
   useEffect(() => {
@@ -377,8 +378,8 @@ export function Starfield() {
     return () => discTexture.dispose()
   }, [discTexture])
 
-  const animate = quality !== "low"
-  const updateStride = quality === "high" ? 1 : 2
+  const animate = profile.animate
+  const updateStride = quality === "high" ? 1 : quality === "medium" ? 2 : 3
 
   const smallCount = quality === "high" ? 1500 : quality === "medium" ? 1100 : 800
   const largeCount = quality === "high" ? 340 : quality === "medium" ? 240 : 180
@@ -417,8 +418,9 @@ export function Starfield() {
  * Extended to span the entire onboarding journey (Z=+10 to Z=-70).
  */
 export function AccentNebula({ accentColor }: { accentColor: string }) {
-  const quality = useMemo(() => getQualityTier(), [])
-  const animate = quality !== "low"
+  const profile = useGraphicsProfile()
+  const quality = useMemo(() => getTierFromProfile(profile), [profile])
+  const animate = profile.animate
 
   const nebulaTexture = useMemo(() => createNebulaTexture(), [])
   useEffect(() => {
@@ -428,12 +430,12 @@ export function AccentNebula({ accentColor }: { accentColor: string }) {
 
   const counts = {
     // Sparkle layer: visible particles (accent-tinted dust)
-    sparklesA: quality === "high" ? 190 : quality === "medium" ? 150 : 110,
-    sparklesB: quality === "high" ? 120 : quality === "medium" ? 90 : 65,
+    sparklesA: Math.max(0, Math.round((quality === "high" ? 190 : quality === "medium" ? 150 : 110) * profile.sparklesScale)),
+    sparklesB: Math.max(0, Math.round((quality === "high" ? 120 : quality === "medium" ? 90 : 65) * profile.sparklesScale)),
 
     // Sprite layer: the actual "gas cloud" feeling
     // Higher count + lower alpha spreads it around, especially at distance.
-    sprites: quality === "high" ? 26 : quality === "medium" ? 20 : 14,
+    sprites: Math.max(0, Math.round((quality === "high" ? 26 : quality === "medium" ? 20 : 14) * profile.nebulaBackdropDensity)),
   }
 
   const colors = useMemo(() => {
@@ -578,8 +580,9 @@ export function AccentNebula({ accentColor }: { accentColor: string }) {
 }
 
 export function ShootingStars({ accentColor }: { accentColor: string }) {
-  const quality = useMemo(() => getQualityTier(), [])
-  const reduceMotion = quality === "low"
+  const profile = useGraphicsProfile()
+  const quality = useMemo(() => getTierFromProfile(profile), [profile])
+  const reduceMotion = !profile.animate || !profile.shootingStars
 
   // Allocate a few more particles on higher tiers for a nicer streak.
   const trailPoints = quality === "high" ? 32 : quality === "medium" ? 28 : 24
@@ -756,6 +759,11 @@ export function ShootingStars({ accentColor }: { accentColor: string }) {
  * FloatingGeometry - distant geometric shapes that drift gently.
  */
 export function FloatingGeometry({ accentColor }: { accentColor: string }) {
+  const profile = useGraphicsProfile()
+  const animate = profile.animate && profile.floatingGeometry
+
+  if (!profile.floatingGeometry) return null
+
   const shapes = useMemo(
     () => [
       { pos: [-10, 5, -5] as [number, number, number], scale: 0.35, type: "octahedron" },
@@ -774,14 +782,8 @@ export function FloatingGeometry({ accentColor }: { accentColor: string }) {
 
   return (
     <>
-      {shapes.map((shape, i) => (
-        <Float
-          key={i}
-          position={shape.pos}
-          speed={0.42}
-          rotationIntensity={0.15}
-          floatIntensity={0.33}
-        >
+      {shapes.map((shape, i) => {
+        const content = (
           <mesh scale={shape.scale}>
             {shape.type === "octahedron" && <octahedronGeometry args={[1, 0]} />}
             {shape.type === "icosahedron" && <icosahedronGeometry args={[1, 0]} />}
@@ -798,8 +800,28 @@ export function FloatingGeometry({ accentColor }: { accentColor: string }) {
               wireframe={i % 2 === 0}
             />
           </mesh>
-        </Float>
-      ))}
+        )
+
+        if (!animate) {
+          return (
+            <group key={i} position={shape.pos}>
+              {content}
+            </group>
+          )
+        }
+
+        return (
+          <Float
+            key={i}
+            position={shape.pos}
+            speed={0.42}
+            rotationIntensity={0.15}
+            floatIntensity={0.33}
+          >
+            {content}
+          </Float>
+        )
+      })}
     </>
   )
 }
@@ -821,14 +843,25 @@ function OnboardingScene() {
 }
 
 export function FloatingOrbs() {
+  const profile = useGraphicsProfile()
+  const useDemand = profile.maxFps !== null || !profile.animate
+  const powerPreference: WebGLPowerPreference =
+    profile.quality === "high" ? "high-performance" : "low-power"
+
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
       <Canvas
         camera={{ position: [0, 0, 8], fov: 60 }}
-        dpr={[1, 1.5]}
-        gl={{ antialias: true, alpha: true }}
+        dpr={profile.dpr}
+        gl={{
+          antialias: profile.antialias,
+          alpha: true,
+          powerPreference,
+        }}
+        frameloop={useDemand ? "demand" : "always"}
       >
         <AdaptiveDpr />
+        {useDemand ? <FrameLimiter maxFps={profile.maxFps} /> : null}
         <color attach="background" args={[SCENE_COLORS.background]} />
         <OnboardingScene />
       </Canvas>

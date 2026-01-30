@@ -10,9 +10,10 @@ import { PARTICLES } from "./constants"
 interface AmbientParticlesProps {
   scrollProgressRef: MutableRefObject<number>
   mode: SceneMode
+  animate?: boolean
 }
 
-export function AmbientParticles({ scrollProgressRef, mode }: AmbientParticlesProps) {
+export function AmbientParticles({ scrollProgressRef, mode, animate = true }: AmbientParticlesProps) {
   const { accentColor } = useSceneMode()
   const meshRef = useRef<THREE.InstancedMesh>(null)
   const dummy = useMemo(() => new THREE.Object3D(), [])
@@ -57,6 +58,7 @@ export function AmbientParticles({ scrollProgressRef, mode }: AmbientParticlesPr
   }, [])
 
   useFrame((state) => {
+    if (!animate) return
     if (!meshRef.current) return
     const t = state.clock.elapsedTime
 

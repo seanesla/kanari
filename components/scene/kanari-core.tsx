@@ -4,8 +4,10 @@ import { useEffect, useRef, type MutableRefObject } from "react"
 import { useFrame } from "@react-three/fiber"
 import { MeshTransmissionMaterial } from "@react-three/drei"
 import * as THREE from "three"
+import { useReducedMotion } from "framer-motion"
 import type { SceneMode } from "@/lib/types"
 import { useSceneMode } from "@/lib/scene-context"
+import { getGraphicsProfile } from "@/lib/graphics/quality"
 import { ORBITAL_RINGS } from "./constants"
 
 interface KanariCoreProps {
@@ -14,7 +16,9 @@ interface KanariCoreProps {
 }
 
 export function KanariCore({ scrollProgressRef, mode }: KanariCoreProps) {
-  const { accentColor } = useSceneMode()
+  const { accentColor, graphicsQuality } = useSceneMode()
+  const reducedMotion = useReducedMotion()
+  const profile = getGraphicsProfile(graphicsQuality, { prefersReducedMotion: Boolean(reducedMotion) })
   const groupRef = useRef<THREE.Group>(null)
   const innerRef = useRef<THREE.Mesh>(null)
   const middleRef = useRef<THREE.Mesh>(null)
@@ -156,7 +160,7 @@ export function KanariCore({ scrollProgressRef, mode }: KanariCoreProps) {
         <dodecahedronGeometry args={[1, 0]} />
         <MeshTransmissionMaterial
           backside
-          samples={8}
+          samples={profile.orbSamples}
           thickness={0.4}
           chromaticAberration={0.3}
           anisotropy={0.3}

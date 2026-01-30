@@ -19,6 +19,9 @@ import { FloatingPanel } from "./floating-panel"
 import { WelcomeParticles } from "./welcome-particles"
 import { SCENE_COLORS } from "@/lib/constants"
 import { SceneContext, useSceneMode } from "@/lib/scene-context"
+import { getGraphicsProfile } from "@/lib/graphics/quality"
+import { FrameLimiter } from "@/components/scene/frame-limiter"
+import { useReducedMotion } from "framer-motion"
 
 interface Onboarding3DSceneProps {
   currentStep: number
@@ -107,6 +110,11 @@ export function Onboarding3DScene({
   // Bridge React context INTO the Canvas (required for Drei Html portals)
   // Source: Context7 - /pmndrs/drei docs - "useContextBridge"
   const ContextBridge = useContextBridge(SceneContext)
+  const { graphicsQuality } = useSceneMode()
+  const reducedMotion = useReducedMotion()
+  const profile = getGraphicsProfile(graphicsQuality, { prefersReducedMotion: Boolean(reducedMotion) })
+  const powerPreference: WebGLPowerPreference =
+    profile.quality === "high" ? "high-performance" : "low-power"
 
   // Initial camera position.
   // If we're showing the welcome, we start a bit further back so the particle
@@ -125,10 +133,12 @@ export function Onboarding3DScene({
           near: 0.1,
           far: 150,
         }}
-        dpr={[1, 1.5]}
-        gl={{ antialias: true, alpha: true }}
+        dpr={profile.dpr}
+        gl={{ antialias: profile.antialias, alpha: true, powerPreference }}
+        frameloop={profile.maxFps === null && profile.animate ? "always" : "demand"}
       >
         <AdaptiveDpr />
+        {profile.maxFps !== null ? <FrameLimiter maxFps={profile.maxFps} /> : null}
         <color attach="background" args={[SCENE_COLORS.background]} />
         <ContextBridge>
           <SceneContent

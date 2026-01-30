@@ -6,6 +6,7 @@ import { AdaptiveDpr, Sparkles, Stars, shaderMaterial } from "@react-three/drei"
 import * as THREE from "three"
 import { useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
+import { getGraphicsProfile } from "@/lib/graphics/quality"
 import { generateLightVariant } from "@/lib/color-utils"
 import {
   FloatingGeometryField,
@@ -15,6 +16,7 @@ import {
   ShootingStars,
   StarClusters,
 } from "@/components/background/space-effects"
+import { FrameLimiter } from "@/components/scene/frame-limiter"
 
 // Source: Context7 - pmndrs/drei docs - "shaderMaterial"
 const AuroraCurtainMaterial = shaderMaterial(
@@ -103,9 +105,7 @@ type AuroraCurtainMaterialInstance = THREE.ShaderMaterial & {
   seed: number
 }
 
-function Aurora({ accentColor }: { accentColor: string }) {
-  const reducedMotion = useReducedMotion()
-
+function Aurora({ accentColor, animate }: { accentColor: string; animate: boolean }) {
   const colorA = useMemo(() => new THREE.Color(generateLightVariant(accentColor)), [accentColor])
   const colorB = useMemo(() => new THREE.Color(accentColor), [accentColor])
 
@@ -139,7 +139,7 @@ function Aurora({ accentColor }: { accentColor: string }) {
   }, [materials])
 
   useFrame((_, delta) => {
-    if (reducedMotion) return
+    if (!animate) return
     const step = delta * 0.4
     for (const material of materials) {
       material.time += step
@@ -164,14 +164,23 @@ function Aurora({ accentColor }: { accentColor: string }) {
   )
 }
 
-function SpaceField({ accentColor }: { accentColor: string }) {
-  const reducedMotion = useReducedMotion()
+function SpaceField({
+  accentColor,
+  profile,
+}: {
+  accentColor: string
+  profile: ReturnType<typeof getGraphicsProfile>
+}) {
   const rigRef = useRef<THREE.Group>(null)
 
   const sparkleColor = useMemo(() => generateLightVariant(accentColor), [accentColor])
+  const shouldAnimate = profile.animate
+
+  const starsCount = Math.max(0, Math.round(1350 * profile.starfieldScale))
+  const sparklesCount = Math.max(0, Math.round(90 * profile.sparklesScale))
 
   useFrame((state) => {
-    if (reducedMotion) return
+    if (!shouldAnimate) return
     if (!rigRef.current) return
     const t = state.clock.elapsedTime
     rigRef.current.rotation.y = t * 0.003
@@ -184,37 +193,55 @@ function SpaceField({ accentColor }: { accentColor: string }) {
       <pointLight position={[6, 4, 6]} intensity={0.35} color={sparkleColor} />
       <pointLight position={[-6, -2, 4]} intensity={0.15} color="#ffffff" />
 
-      <Aurora accentColor={accentColor} />
+      {profile.auroraEnabled ? <Aurora accentColor={accentColor} animate={shouldAnimate} /> : null}
 
-      <NebulaVolume accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
-
-      <GalaxySprites accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
-
-      <Stars
-        radius={120}
-        depth={60}
-        count={reducedMotion ? 600 : 1350}
-        factor={4}
-        saturation={0.2}
-        fade
+      <NebulaVolume
+        accentColor={accentColor}
+        variant="dashboard"
+        animate={shouldAnimate}
+        layers={profile.nebulaVolumeLayers}
       />
 
-      <StarClusters accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
+      <GalaxySprites accentColor={accentColor} variant="dashboard" animate={shouldAnimate} />
 
-      <Sparkles
-        count={reducedMotion ? 30 : 90}
-        // Keep the drift subtle; avoid occasional fast streaks.
-        speed={reducedMotion ? 0 : 0.08}
-        opacity={0.55}
-        color={sparkleColor}
-        size={2.2}
-        scale={[18, 10, 10]}
-        noise={[0.55, 0.85, 0.55]}
+      {starsCount > 0 ? (
+        <Stars
+          radius={120}
+          depth={60}
+          count={starsCount}
+          factor={4}
+          saturation={0.2}
+          fade
+        />
+      ) : null}
+
+      <StarClusters accentColor={accentColor} variant="dashboard" animate={shouldAnimate} />
+
+      {sparklesCount > 0 ? (
+        <Sparkles
+          count={sparklesCount}
+          // Keep the drift subtle; avoid occasional fast streaks.
+          speed={shouldAnimate ? 0.08 : 0}
+          opacity={0.55}
+          color={sparkleColor}
+          size={2.2}
+          scale={[18, 10, 10]}
+          noise={[0.55, 0.85, 0.55]}
+        />
+      ) : null}
+
+      <NebulaBackdrop
+        accentColor={accentColor}
+        variant="dashboard"
+        animate={shouldAnimate}
+        density={profile.nebulaBackdropDensity}
       />
-
-      <NebulaBackdrop accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
-      <ShootingStars accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
-      <FloatingGeometryField accentColor={accentColor} variant="dashboard" animate={!reducedMotion} />
+      {profile.shootingStars ? (
+        <ShootingStars accentColor={accentColor} variant="dashboard" animate={shouldAnimate} />
+      ) : null}
+      {profile.floatingGeometry ? (
+        <FloatingGeometryField accentColor={accentColor} variant="dashboard" animate={shouldAnimate} />
+      ) : null}
     </group>
   )
 }
@@ -224,12 +251,21 @@ function SpaceField({ accentColor }: { accentColor: string }) {
  * Distinct from the landing KanariCore scene: no orb/rings, just warm starfield + dust.
  */
 export function AppSpaceBackground3D() {
-  const { accentColor } = useSceneMode()
+  const { accentColor, graphicsQuality } = useSceneMode()
   const reducedMotion = useReducedMotion()
+  const profile = getGraphicsProfile(graphicsQuality, { prefersReducedMotion: Boolean(reducedMotion) })
 
-  const dpr = useMemo(() => [1, 1.5] as [number, number], [])
+  const dpr = useMemo(() => profile.dpr, [profile.dpr])
   const camera = useMemo(() => ({ position: [0, 0, 1] as [number, number, number], fov: 65 }), [])
-  const gl = useMemo(() => ({ antialias: true, alpha: true, powerPreference: "high-performance" as const }), [])
+  const gl = useMemo(() => {
+    const powerPreference: WebGLPowerPreference =
+      profile.quality === "high" ? "high-performance" : "low-power"
+    return {
+      antialias: profile.antialias,
+      alpha: true,
+      powerPreference,
+    }
+  }, [profile.antialias, profile.quality])
 
   const [isPageVisible, setIsPageVisible] = useState(() => {
     if (typeof document === "undefined") return true
@@ -249,15 +285,18 @@ export function AppSpaceBackground3D() {
     }
   }, [])
 
+  const useDemand = profile.maxFps !== null || !profile.animate || !isPageVisible
+
   return (
     <Canvas
       dpr={dpr}
       camera={camera}
       gl={gl}
-      frameloop={reducedMotion || !isPageVisible ? "demand" : "always"}
+      frameloop={useDemand ? "demand" : "always"}
     >
       <AdaptiveDpr />
-      <SpaceField accentColor={accentColor} />
+      {useDemand ? <FrameLimiter maxFps={profile.maxFps} enabled={isPageVisible} /> : null}
+      <SpaceField accentColor={accentColor} profile={profile} />
     </Canvas>
   )
 }

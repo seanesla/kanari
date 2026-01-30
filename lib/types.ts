@@ -494,6 +494,8 @@ export type MonoFamily =
   | "Inconsolata"
   | "Source Code Pro"
 
+export type GraphicsQuality = "auto" | "low" | "medium" | "high" | "static"
+
 export type GeminiApiKeySource = "kanari" | "user"
 
 export interface UserSettings {
@@ -539,6 +541,7 @@ export interface UserSettings {
   selectedSerifFont?: SerifFamily
   selectedMonoFont?: MonoFamily
   disableStartupAnimation?: boolean // Skip the animated logo on app load
+  graphicsQuality?: GraphicsQuality
 
   // API Configuration
   geminiApiKey?: string // User's Gemini API key (stored locally)

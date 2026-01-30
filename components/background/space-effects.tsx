@@ -483,14 +483,18 @@ export function NebulaVolume({
   accentColor,
   variant,
   animate = true,
+  layers = 3,
 }: {
   accentColor: string
   variant: SpaceVariant
   animate?: boolean
+  layers?: number
 }) {
+  const layerCount = Math.max(0, Math.min(3, Math.round(layers)))
   const colors = useMemo(() => makeNebulaColors(accentColor, variant), [accentColor, variant])
 
   const materials = useMemo(() => {
+    if (layerCount === 0) return [] as NebulaVolumeMaterialInstance[]
     const create = (seed: number, opacity: number) => {
       const material = new (NebulaVolumeMaterial as unknown as new () => NebulaVolumeMaterialInstance)()
       material.transparent = true
@@ -508,10 +512,12 @@ export function NebulaVolume({
     const opMid = variant === "landing" ? 0.07 : 0.058
     const opFar = variant === "landing" ? 0.055 : 0.046
 
-    return [create(0.2, opNear), create(1.37, opMid), create(2.91, opFar)]
-  }, [variant])
+    const all = [create(0.2, opNear), create(1.37, opMid), create(2.91, opFar)]
+    return all.slice(0, layerCount)
+  }, [variant, layerCount])
 
   useEffect(() => {
+    if (materials.length === 0) return
     for (const material of materials) {
       material.colorA = colors.soft
       material.colorB = colors.pale
@@ -526,6 +532,7 @@ export function NebulaVolume({
 
   useFrame((_, delta) => {
     if (!animate) return
+    if (materials.length === 0) return
     const step = delta * 0.35
     for (const material of materials) {
       material.time += step
@@ -572,9 +579,13 @@ export function NebulaVolume({
     ]
   }, [variant])
 
+  if (layerCount === 0) return null
+
+  const visibleLayout = layout.slice(0, layerCount)
+
   return (
     <group>
-      {layout.map((l, idx) => (
+      {visibleLayout.map((l, idx) => (
         <mesh key={idx} position={l.position} rotation={l.rotation} scale={l.scale} renderOrder={-20}>
           <planeGeometry args={[1, 1]} />
           <primitive object={materials[idx]} attach="material" />
@@ -588,19 +599,25 @@ export function NebulaBackdrop({
   accentColor,
   variant,
   animate = true,
+  density = 1,
 }: {
   accentColor: string
   variant: SpaceVariant
   animate?: boolean
+  density?: number
 }) {
+  const clampedDensity = clamp01(density)
   const textures = useMemo(() => {
+    if (clampedDensity <= 0) {
+      return { gasA: null, gasB: null, dust: null }
+    }
     const a = variant === "landing" ? 21 : 11
     return {
       gasA: createNebulaTexture(a),
       gasB: createNebulaTexture(a + 1),
       dust: createDustLaneTexture(a + 2),
     }
-  }, [variant])
+  }, [variant, clampedDensity])
 
   useEffect(() => {
     return () => {
@@ -615,8 +632,10 @@ export function NebulaBackdrop({
   const data = useMemo(() => {
     const rand = mulberry32(variant === "landing" ? 801 : 401)
 
-    const gasCount = variant === "landing" ? 12 : 10
-    const dustCount = variant === "landing" ? 5 : 4
+    const baseGasCount = variant === "landing" ? 12 : 10
+    const baseDustCount = variant === "landing" ? 5 : 4
+    const gasCount = Math.max(0, Math.round(baseGasCount * clampedDensity))
+    const dustCount = Math.max(0, Math.round(baseDustCount * clampedDensity))
 
     const gas = Array.from({ length: gasCount }).map((_, i) => {
       const u = gasCount <= 1 ? 0.5 : i / (gasCount - 1)
@@ -640,7 +659,7 @@ export function NebulaBackdrop({
 
       const opacityBase = variant === "landing" ? 0.036 : 0.03
       const opacityJitter = variant === "landing" ? 0.05 : 0.04
-      const opacity = (opacityBase + rand() * opacityJitter) * (1 - u * 0.45)
+      const opacity = (opacityBase + rand() * opacityJitter) * (1 - u * 0.45) * clampedDensity
 
       return {
         x,
@@ -678,7 +697,7 @@ export function NebulaBackdrop({
       const ay = 0.55 + rand() * 1.1
       // Dust lanes should read as depth, not obvious "blobs".
       const opacityBase = variant === "landing" ? 0.036 : 0.03
-      const opacity = (opacityBase + rand() * 0.03) * (1 - u * 0.35)
+      const opacity = (opacityBase + rand() * 0.03) * (1 - u * 0.35) * clampedDensity
 
       return {
         x,
@@ -695,7 +714,7 @@ export function NebulaBackdrop({
     })
 
     return { gas, dust }
-  }, [variant])
+  }, [variant, clampedDensity])
 
   const groupRef = useRef<THREE.Group | null>(null)
   const gasSpriteRefs = useRef<(THREE.Sprite | null)[]>([])
@@ -750,6 +769,8 @@ export function NebulaBackdrop({
       }
     }
   })
+
+  if (clampedDensity <= 0) return null
 
   return (
     <group ref={groupRef} matrixAutoUpdate={false}>

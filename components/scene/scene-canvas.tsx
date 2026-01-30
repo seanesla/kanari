@@ -5,6 +5,7 @@ import { Environment } from "@react-three/drei"
 import { useReducedMotion } from "framer-motion"
 import type { SceneMode } from "@/lib/types"
 import { useSceneMode } from "@/lib/scene-context"
+import { getGraphicsProfile } from "@/lib/graphics/quality"
 import {
   DistantStars,
   FloatingGeometryField,
@@ -26,9 +27,10 @@ interface SceneProps {
 }
 
 export function Scene({ scrollProgressRef, mode }: SceneProps) {
-  const { accentColor } = useSceneMode()
+  const { accentColor, graphicsQuality } = useSceneMode()
   const reducedMotion = useReducedMotion()
-  const shouldAnimate = !reducedMotion
+  const profile = getGraphicsProfile(graphicsQuality, { prefersReducedMotion: Boolean(reducedMotion) })
+  const shouldAnimate = profile.animate
 
   return (
     <>
@@ -47,10 +49,24 @@ export function Scene({ scrollProgressRef, mode }: SceneProps) {
         <DistantStars accentColor={accentColor} variant="landing" animate={shouldAnimate} />
         <GalaxySprites accentColor={accentColor} variant="landing" animate={shouldAnimate} />
         <StarClusters accentColor={accentColor} variant="landing" animate={shouldAnimate} />
-        <NebulaVolume accentColor={accentColor} variant="landing" animate={shouldAnimate} />
-        <NebulaBackdrop accentColor={accentColor} variant="landing" animate={shouldAnimate} />
-        <ShootingStars accentColor={accentColor} variant="landing" animate={shouldAnimate} />
-        <FloatingGeometryField accentColor={accentColor} variant="landing" animate={shouldAnimate} />
+        <NebulaVolume
+          accentColor={accentColor}
+          variant="landing"
+          animate={shouldAnimate}
+          layers={profile.nebulaVolumeLayers}
+        />
+        <NebulaBackdrop
+          accentColor={accentColor}
+          variant="landing"
+          animate={shouldAnimate}
+          density={profile.nebulaBackdropDensity}
+        />
+        {profile.shootingStars ? (
+          <ShootingStars accentColor={accentColor} variant="landing" animate={shouldAnimate} />
+        ) : null}
+        {profile.floatingGeometry ? (
+          <FloatingGeometryField accentColor={accentColor} variant="landing" animate={shouldAnimate} />
+        ) : null}
       </>
 
       {/* THE focal point - always visible, transforms with scroll */}
@@ -88,7 +104,7 @@ export function Scene({ scrollProgressRef, mode }: SceneProps) {
         />
 
         {/* Subtle ambient particles */}
-        <AmbientParticles scrollProgressRef={scrollProgressRef} mode={mode} />
+        <AmbientParticles scrollProgressRef={scrollProgressRef} mode={mode} animate={shouldAnimate} />
       </>
     </>
   )
