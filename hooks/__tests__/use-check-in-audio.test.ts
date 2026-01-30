@@ -180,6 +180,42 @@ beforeEach(async () => {
 // --- Tests ---------------------------------------------------------------
 
 describe("useCheckIn microphone lifecycle", () => {
+  it("falls back to ScriptProcessorNode when AudioWorklet is unavailable", async () => {
+    const createScriptProcessorMock = vi.fn(() => ({
+      onaudioprocess: null as ((event: unknown) => void) | null,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    }))
+
+    class NoWorkletAudioContext {
+      state = "running" as const
+      destination = {}
+      resume = vi.fn().mockResolvedValue(undefined)
+      close = vi.fn().mockResolvedValue(undefined)
+      createMediaStreamSource = vi.fn(() => ({ connect: vi.fn(), disconnect: vi.fn() }))
+      createScriptProcessor = createScriptProcessorMock
+      createGain = vi.fn(() => ({
+        gain: { value: 1 },
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+      }))
+    }
+
+    // @ts-expect-error - override globals for this test
+    global.AudioContext = NoWorkletAudioContext
+    // @ts-expect-error - simulate missing AudioWorkletNode
+    global.AudioWorkletNode = undefined
+
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    expect(result.current[0].state).not.toBe("error")
+    expect(createScriptProcessorMock).toHaveBeenCalled()
+  })
+
   it("stops microphone tracks when Gemini disconnects unexpectedly", async () => {
     const { result } = renderHook(() => useCheckIn())
 

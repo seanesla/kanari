@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch } from "react"
 import { int16ToBase64 } from "@/lib/audio/pcm-converter"
-import { logDebug } from "@/lib/logger"
+import { logDebug, logWarn } from "@/lib/logger"
 import type { CheckInState } from "@/lib/types"
 import type { CheckInAction } from "./use-check-in-messages"
 
@@ -40,6 +40,9 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
   // Audio capture refs
   const audioContextRef = useRef<AudioContext | null>(null)
   const captureWorkletRef = useRef<AudioWorkletNode | null>(null)
+  const captureSourceRef = useRef<MediaStreamAudioSourceNode | null>(null)
+  const captureScriptProcessorRef = useRef<ScriptProcessorNode | null>(null)
+  const captureSilenceGainRef = useRef<GainNode | null>(null)
   const mediaStreamRef = useRef<MediaStream | null>(null)
   // Avoid O(n) Array.shift() when enforcing a max chunk count.
   // We keep a start index and periodically compact.
@@ -176,6 +179,104 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
         throw new Error("INITIALIZATION_ABORTED")
       }
 
+      const source = audioContext.createMediaStreamSource(stream)
+      captureSourceRef.current = source
+
+      const workletSupported =
+        typeof AudioWorkletNode !== "undefined" &&
+        typeof (audioContext as unknown as { audioWorklet?: { addModule?: unknown } }).audioWorklet
+          ?.addModule === "function"
+
+      // AudioWorklet is missing on some Safari/iOS builds and in some contexts (e.g. non-secure origins).
+      // Pattern doc: docs/error-patterns/safari-audioworklet-missing.md
+      // Fall back to ScriptProcessorNode so check-ins still work.
+      if (!workletSupported) {
+        logWarn("useCheckIn", "AudioWorklet not supported; falling back to ScriptProcessorNode")
+        if (typeof audioContext.createScriptProcessor !== "function") {
+          throw new Error(
+            "Audio capture not supported in this browser (missing AudioWorklet + ScriptProcessorNode)"
+          )
+        }
+
+        const processor = audioContext.createScriptProcessor(2048, 1, 1)
+        const silence = audioContext.createGain()
+        silence.gain.value = 0
+
+        captureScriptProcessorRef.current = processor
+        captureSilenceGainRef.current = silence
+
+        processor.onaudioprocess = (event) => {
+          const input = event.inputBuffer.getChannelData(0)
+          if (!input || input.length === 0) return
+
+          let sumSquares = 0
+          const float32Data = new Float32Array(input.length)
+          const int16Data = new Int16Array(input.length)
+
+          for (let i = 0; i < input.length; i++) {
+            const sample = Math.max(-1, Math.min(1, input[i] ?? 0))
+            float32Data[i] = sample
+            sumSquares += sample * sample
+            int16Data[i] = sample < 0 ? sample * 0x8000 : sample * 0x7fff
+          }
+
+          const rms = Math.sqrt(sumSquares / Math.max(1, float32Data.length))
+          const inputLevel = Math.min(rms * 5, 1)
+
+          const state = getCheckInState?.()
+          const assistantSpeaking = state === "assistant_speaking" || state === "ai_greeting"
+          if (!assistantSpeaking) {
+            bargeInTriggeredRef.current = false
+            bargeInConsecutiveRef.current = 0
+          } else if (onUserBargeIn && getCheckInState) {
+            if (!bargeInTriggeredRef.current) {
+              if (inputLevel >= BARGE_IN_LEVEL_THRESHOLD) {
+                bargeInConsecutiveRef.current += 1
+              } else {
+                bargeInConsecutiveRef.current = 0
+              }
+
+              if (bargeInConsecutiveRef.current >= BARGE_IN_CONSECUTIVE_CHUNKS) {
+                bargeInTriggeredRef.current = true
+                bargeInConsecutiveRef.current = 0
+                onUserBargeIn()
+              }
+            }
+          }
+
+          const base64Audio = int16ToBase64(int16Data)
+          sendAudio(base64Audio)
+
+          const chunkBuffer = audioChunksRef.current
+          chunkBuffer.chunks.push(float32Data)
+          if (chunkBuffer.chunks.length - chunkBuffer.startIndex > MAX_AUDIO_CHUNKS) {
+            chunkBuffer.startIndex += 1
+
+            if (
+              chunkBuffer.startIndex > 128 &&
+              chunkBuffer.startIndex * 2 > chunkBuffer.chunks.length
+            ) {
+              chunkBuffer.chunks = chunkBuffer.chunks.slice(chunkBuffer.startIndex)
+              chunkBuffer.startIndex = 0
+            }
+          }
+
+          sessionAudioRef.current.push(float32Data)
+
+          const now = Date.now()
+          if (now - lastAudioLevelDispatchRef.current >= AUDIO_LEVEL_THROTTLE_MS) {
+            dispatch({ type: "SET_INPUT_LEVEL", level: inputLevel })
+            lastAudioLevelDispatchRef.current = now
+          }
+        }
+
+        source.connect(processor)
+        processor.connect(silence)
+        silence.connect(audioContext.destination)
+
+        return
+      }
+
       // Load capture worklet
       await audioContext.audioWorklet.addModule("/capture.worklet.js")
 
@@ -206,7 +307,6 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
       const captureWorklet = new AudioWorkletNode(audioContext, "capture-processor")
 
       // Connect microphone to worklet
-      const source = audioContext.createMediaStreamSource(stream)
       source.connect(captureWorklet)
 
       // Handle audio chunks from worklet
@@ -320,6 +420,24 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
       captureWorkletRef.current.port.onmessage = null
       captureWorkletRef.current.disconnect()
       captureWorkletRef.current = null
+    }
+
+    if (captureScriptProcessorRef.current) {
+      captureScriptProcessorRef.current.onaudioprocess = null
+      captureScriptProcessorRef.current.disconnect()
+      captureScriptProcessorRef.current = null
+    }
+
+    if (captureSilenceGainRef.current) {
+      captureSilenceGainRef.current.disconnect()
+      captureSilenceGainRef.current = null
+    }
+
+    if (captureSourceRef.current) {
+      if (typeof (captureSourceRef.current as unknown as { disconnect?: unknown }).disconnect === "function") {
+        captureSourceRef.current.disconnect()
+      }
+      captureSourceRef.current = null
     }
 
     // Close audio context if not already closed

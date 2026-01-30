@@ -22,7 +22,7 @@ export function CheckInInputBar({ onStartNewCheckIn }: CheckInInputBarProps) {
   return (
     <Deck
       tone="raised"
-      className="mx-auto w-full max-w-2xl p-4 rounded-2xl group"
+      className="mx-auto w-full max-w-2xl p-4 rounded-2xl group shrink-0"
       onMouseMove={glow.onMouseMove}
       onMouseLeave={glow.onMouseLeave}
       style={glow.style}

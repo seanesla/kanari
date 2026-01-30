@@ -209,6 +209,14 @@ export function useAudioPlayback(
   const workletNodeRef = useRef<AudioWorkletNode | null>(null)
   const isPlayingRef = useRef(false)
 
+  // Fallback playback (for browsers without AudioWorklet)
+  const fallbackInitializedRef = useRef(false)
+  const fallbackModeRef = useRef<"worklet" | "buffer">("worklet")
+  const fallbackGainRef = useRef<GainNode | null>(null)
+  const fallbackSourcesRef = useRef<AudioBufferSourceNode[]>([])
+  const fallbackNextStartTimeRef = useRef(0)
+  const fallbackBufferedSamplesRef = useRef(0)
+
   // Initialization / teardown coordination (handles StrictMode + rapid open/close).
   // Pattern doc: docs/error-patterns/audioplayback-init-after-unmount.md
   const mountedRef = useRef(true)
@@ -233,7 +241,7 @@ export function useAudioPlayback(
     if (
       audioContextRef.current &&
       (audioContextRef.current.state as string) !== "closed" &&
-      workletNodeRef.current
+      (workletNodeRef.current || fallbackInitializedRef.current)
     ) {
       return
     }
@@ -277,6 +285,29 @@ export function useAudioPlayback(
       if ((audioContext.state as string) === "closed") {
         logDebug("useAudioPlayback", "AudioContext closed during initialization; aborting")
         throw new Error("INITIALIZATION_ABORTED")
+      }
+
+      const workletSupported =
+        typeof AudioWorkletNode !== "undefined" &&
+        typeof (audioContext as unknown as { audioWorklet?: { addModule?: unknown } }).audioWorklet
+          ?.addModule === "function"
+
+      // Fallback path: no AudioWorklet support (Safari/iOS builds, or restricted contexts).
+      // Pattern doc: docs/error-patterns/safari-audioworklet-missing.md
+      if (!workletSupported) {
+        fallbackModeRef.current = "buffer"
+        fallbackInitializedRef.current = true
+        fallbackSourcesRef.current = []
+        fallbackBufferedSamplesRef.current = 0
+        fallbackNextStartTimeRef.current = audioContext.currentTime
+
+        const gain = audioContext.createGain()
+        gain.gain.value = 1
+        gain.connect(audioContext.destination)
+        fallbackGainRef.current = gain
+
+        dispatch({ type: "INITIALIZED" })
+        return
       }
 
       // Load the playback worklet
@@ -346,6 +377,8 @@ export function useAudioPlayback(
       }
 
       workletNodeRef.current = workletNode
+      fallbackModeRef.current = "worklet"
+      fallbackInitializedRef.current = false
       dispatch({ type: "INITIALIZED" })
     } catch (error) {
       cleanupRequestedRef.current = true
@@ -359,19 +392,100 @@ export function useAudioPlayback(
    * Queue audio chunk for playback
    */
   const queueAudio = useCallback((base64Audio: string) => {
-    const worklet = workletNodeRef.current
     const audioContext = audioContextRef.current
 
-    // Check if worklet is initialized
-    if (!worklet) {
+    if (!audioContext) {
       console.warn("[useAudioPlayback] Not initialized, cannot queue audio")
       return
     }
 
     // Check if AudioContext is still open
     // Web Audio API spec includes "closed" state: https://webaudio.github.io/web-audio-api/#dom-audiocontextstate
-    if (!audioContext || (audioContext.state as string) === "closed") {
+    if ((audioContext.state as string) === "closed") {
       console.warn("[useAudioPlayback] AudioContext closed, cannot queue audio")
+      return
+    }
+
+    if (fallbackModeRef.current === "buffer") {
+      if (!fallbackInitializedRef.current) {
+        console.warn("[useAudioPlayback] Not initialized, cannot queue audio")
+        return
+      }
+
+      try {
+        const int16Data = base64ToInt16(base64Audio)
+        if (int16Data.length === 0) return
+
+        let sumSquares = 0
+        const float32Data = new Float32Array(int16Data.length)
+        for (let i = 0; i < int16Data.length; i++) {
+          const v = int16Data[i] / (int16Data[i] < 0 ? 0x8000 : 0x7fff)
+          float32Data[i] = v
+          sumSquares += v * v
+        }
+
+        const buffer = audioContext.createBuffer(1, float32Data.length, sampleRate)
+        buffer.copyToChannel(float32Data, 0)
+
+        const source = audioContext.createBufferSource()
+        source.buffer = buffer
+        source.connect(fallbackGainRef.current ?? audioContext.destination)
+
+        const startAt = Math.max(audioContext.currentTime, fallbackNextStartTimeRef.current)
+        source.start(startAt)
+
+        fallbackNextStartTimeRef.current = startAt + float32Data.length / sampleRate
+        fallbackSourcesRef.current.push(source)
+        fallbackBufferedSamplesRef.current += float32Data.length
+
+        const rms = Math.sqrt(sumSquares / Math.max(1, float32Data.length))
+        const level = Math.min(rms * 5, 1)
+        dispatch({ type: "AUDIO_LEVEL", level })
+        callbacksRef.current.onAudioLevel?.(level)
+
+        dispatch({
+          type: "QUEUE_STATUS",
+          queueLength: fallbackSourcesRef.current.length,
+          bufferedSamples: fallbackBufferedSamplesRef.current,
+        })
+
+        if (!isPlayingRef.current) {
+          isPlayingRef.current = true
+          dispatch({ type: "PLAYING" })
+          callbacksRef.current.onPlaybackStart?.()
+        }
+
+        source.onended = () => {
+          const idx = fallbackSourcesRef.current.indexOf(source)
+          if (idx >= 0) fallbackSourcesRef.current.splice(idx, 1)
+          fallbackBufferedSamplesRef.current = Math.max(0, fallbackBufferedSamplesRef.current - float32Data.length)
+
+          dispatch({
+            type: "QUEUE_STATUS",
+            queueLength: fallbackSourcesRef.current.length,
+            bufferedSamples: fallbackBufferedSamplesRef.current,
+          })
+
+          if (fallbackSourcesRef.current.length === 0) {
+            if (isPlayingRef.current) {
+              isPlayingRef.current = false
+              dispatch({ type: "BUFFER_EMPTY" })
+              callbacksRef.current.onPlaybackEnd?.()
+            }
+          }
+        }
+
+        return
+      } catch (error) {
+        console.error("[useAudioPlayback] Failed to queue audio (fallback):", error)
+        return
+      }
+    }
+
+    const worklet = workletNodeRef.current
+    // Check if worklet is initialized
+    if (!worklet) {
+      console.warn("[useAudioPlayback] Not initialized, cannot queue audio")
       return
     }
 
@@ -390,13 +504,34 @@ export function useAudioPlayback(
     } catch (error) {
       console.error("[useAudioPlayback] Failed to queue audio:", error)
     }
-  }, [])
+  }, [sampleRate])
 
   /**
    * Clear the playback queue (for barge-in)
    * Immediately stops any playing audio and clears the queue
    */
   const clearQueue = useCallback(() => {
+    if (fallbackModeRef.current === "buffer") {
+      isPlayingRef.current = false
+      for (const source of fallbackSourcesRef.current) {
+        try {
+          source.onended = null
+          source.stop()
+        } catch {
+          // ignore
+        }
+      }
+      fallbackSourcesRef.current = []
+      fallbackBufferedSamplesRef.current = 0
+      if (audioContextRef.current && (audioContextRef.current.state as string) !== "closed") {
+        fallbackNextStartTimeRef.current = audioContextRef.current.currentTime
+      } else {
+        fallbackNextStartTimeRef.current = 0
+      }
+      dispatch({ type: "CLEARED" })
+      return
+    }
+
     const worklet = workletNodeRef.current
     if (!worklet) return
 
@@ -412,6 +547,16 @@ export function useAudioPlayback(
    * Pause playback
    */
   const pause = useCallback(() => {
+    if (fallbackModeRef.current === "buffer") {
+      const ctx = audioContextRef.current
+      if (!ctx || (ctx.state as string) === "closed") return
+      if (typeof ctx.suspend === "function") {
+        void ctx.suspend()
+      }
+      dispatch({ type: "STOPPED" })
+      return
+    }
+
     const worklet = workletNodeRef.current
     if (!worklet) return
 
@@ -423,6 +568,19 @@ export function useAudioPlayback(
    * Resume playback
    */
   const resume = useCallback(() => {
+    if (fallbackModeRef.current === "buffer") {
+      const ctx = audioContextRef.current
+      if (!ctx || (ctx.state as string) === "closed") return
+      if (typeof ctx.resume === "function") {
+        void ctx.resume()
+      }
+      if (fallbackSourcesRef.current.length > 0) {
+        isPlayingRef.current = true
+        dispatch({ type: "PLAYING" })
+      }
+      return
+    }
+
     const worklet = workletNodeRef.current
     if (!worklet) return
 
@@ -445,6 +603,24 @@ export function useAudioPlayback(
       workletNodeRef.current.port.onmessage = null
       workletNodeRef.current.disconnect()
       workletNodeRef.current = null
+    }
+
+    for (const source of fallbackSourcesRef.current) {
+      try {
+        source.onended = null
+        source.stop()
+      } catch {
+        // ignore
+      }
+    }
+    fallbackSourcesRef.current = []
+    fallbackBufferedSamplesRef.current = 0
+    fallbackNextStartTimeRef.current = 0
+    fallbackInitializedRef.current = false
+    fallbackModeRef.current = "worklet"
+    if (fallbackGainRef.current) {
+      fallbackGainRef.current.disconnect()
+      fallbackGainRef.current = null
     }
 
     // Close audio context if not already closed
