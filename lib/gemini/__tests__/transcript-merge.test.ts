@@ -93,6 +93,17 @@ describe("mergeTranscriptUpdate", () => {
     expect(result.kind).toBe("replace")
   })
 
+  it("does not shorten the transcript when a corrected snapshot would make text disappear mid-stream", () => {
+    const previous =
+      "Hey, happy New Year's Eve! It was good to see your mood improve after yesterday morning. How are you feeling tonight?"
+    const incoming =
+      "Hey, happy New Year's Eve! It was great to see your mood improve after yesterday morning."
+
+    const result = mergeTranscriptUpdate(previous, incoming)
+    expect(result.next).toBe(previous)
+    expect(result.delta).toBe("")
+  })
+
   // Tests for short message restart detection (garbled greeting bug)
   // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
   describe("short message restart detection", () => {

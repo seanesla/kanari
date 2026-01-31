@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useLayoutEffect, useRef } from "react"
 import type { Dispatch, MutableRefObject } from "react"
 import { processAudio, validateAudioData } from "@/lib/audio/processor"
 import { db, fromCommitment } from "@/lib/storage/db"
@@ -552,10 +552,17 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
   const unmountedRef = useRef(false)
   const endSessionInProgressRef = useRef(false)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     // React StrictMode (dev) may run effect cleanups and then re-run effects
     // while preserving refs. Reset this flag on (re)mount so sessions can start.
-    // Pattern doc: docs/error-patterns/strictmode-effect-cleanup-preserves-refs.md
+    //
+    // IMPORTANT: This is a layout effect because auto-start can be triggered
+    // from a parent useLayoutEffect. If we only reset in useEffect, startSession()
+    // can see a stale "unmounted" flag and abort before dispatching START_INITIALIZING,
+    // leaving the UI stuck in "idle".
+    // Pattern docs:
+    // - docs/error-patterns/strictmode-effect-cleanup-preserves-refs.md
+    // - docs/error-patterns/check-in-autostart-stuck-idle.md
     unmountedRef.current = false
     return () => {
       unmountedRef.current = true
