@@ -15,7 +15,14 @@ import { SceneBackgroundFallback } from "./fallback"
 // Inner component that uses the scene context
 function SceneBackgroundInner() {
   const { mode, scrollProgressRef, isLoading, setIsLoading, graphicsQuality } = useSceneMode()
-  const [canvasMounted, setCanvasMounted] = useState(true)
+  // Avoid mounting the heavy R3F scene while the startup logo animation is playing.
+  // The logo overlay fully covers the screen anyway, and deferring the 3D mount
+  // prevents main-thread + GPU work from causing visible stutter in the logo.
+  //
+  // Once the logo finishes, we *prewarm* the canvas behind the overlay before it fades
+  // out. That hides any one-time WebGL init work and avoids a noticeable hitch.
+  const [prewarmCanvas, setPrewarmCanvas] = useState(false)
+  const [canvasMounted, setCanvasMounted] = useState(() => !isLoading && mode !== "dashboard")
   const reducedMotion = useReducedMotion()
   const profile = getGraphicsProfile(graphicsQuality, { prefersReducedMotion: Boolean(reducedMotion) })
   const powerPreference: WebGLPowerPreference =
@@ -27,6 +34,10 @@ function SceneBackgroundInner() {
   const loadingTimeoutRef = useRef<number | null>(null)
 
   const handleAnimationComplete = () => {
+    // Mount the canvas *behind* the overlay immediately so WebGL setup doesn't
+    // happen on the same frame the overlay starts fading out.
+    setPrewarmCanvas(true)
+
     // Small delay after animation completes for smooth transition
     if (loadingTimeoutRef.current !== null) {
       window.clearTimeout(loadingTimeoutRef.current)
@@ -57,16 +68,23 @@ function SceneBackgroundInner() {
   }, [])
 
   // Mount/unmount the heavy 3D canvas.
-  // Keep it mounted during transitions so the fade-out still renders.
-  // Unmount it once we are fully in dashboard mode to stop the R3F render loop.
+  // - Never mount during the startup overlay (keeps the logo animation smooth)
+  //   unless we're explicitly prewarming right after the logo completes.
+  // - Keep it mounted during transitions so the fade-out still renders.
+  // - Unmount it once we are fully in dashboard mode to stop the R3F render loop.
   useEffect(() => {
     if (mode === "dashboard") {
       const timer = window.setTimeout(() => setCanvasMounted(false), 250)
       return () => window.clearTimeout(timer)
     }
 
+    if (isLoading && !prewarmCanvas) {
+      setCanvasMounted(false)
+      return
+    }
+
     setCanvasMounted(true)
-  }, [mode])
+  }, [mode, isLoading, prewarmCanvas])
 
   // Disable body scroll during loading animation
   useEffect(() => {
@@ -150,7 +168,9 @@ function SceneBackgroundInner() {
             <Scene scrollProgressRef={scrollProgressRef} mode={mode} />
           </Canvas>
         </div>
-      ) : null}
+      ) : (
+        <div className="fixed inset-0 -z-10" style={{ background: SCENE_COLORS.background }} />
+      )}
     </>
   )
 }
