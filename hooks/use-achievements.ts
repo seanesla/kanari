@@ -146,56 +146,94 @@ function fallbackLevelTitle(level: number): string {
   return `${adj} ${noun}`
 }
 
-function buildStarterAchievements(nowISO: string, todayISO: string): DailyAchievement[] {
-  return [
-    {
+function looksLikeAutoCompletionAchievementText(input: { title: string; description: string }): boolean {
+  const text = `${input.title} ${input.description}`.toLowerCase()
+  return (
+    text.includes("visit") ||
+    text.includes("open") ||
+    text.includes("enter") ||
+    text.includes("log in") ||
+    text.includes("login") ||
+    text.includes("sign in") ||
+    text.includes("sign-in") ||
+    text.includes("sign up") ||
+    text.includes("sign-up") ||
+    text.includes("website") ||
+    text.includes("homepage") ||
+    text.includes("landing page")
+  )
+}
+
+function buildFallbackChallenge(input: { index: number; nowISO: string; todayISO: string }): DailyAchievement {
+  const slot = input.index % 3
+  const tracking =
+    slot === 0
+      ? ({ key: "do_check_in", target: 1 } as const)
+      : slot === 1
+        ? ({ key: "complete_suggestions", target: 2 } as const)
+        : ({ key: "schedule_suggestion", target: 1 } as const)
+
+  if (tracking.key === "do_check_in") {
+    return {
       id: safeRandomUUID(),
-      dateISO: todayISO,
-      sourceDateISO: todayISO,
+      dateISO: input.todayISO,
+      sourceDateISO: input.todayISO,
       type: "challenge",
       category: "consistency",
       title: "First Check-In",
       description: "Complete one check-in today to start building momentum.",
       insight: "Any voice note or AI check-in counts.",
       points: 20,
-      createdAt: nowISO,
+      createdAt: input.nowISO,
       completed: false,
       carriedOver: false,
       seen: true,
-      tracking: { key: "do_check_in", target: 1 },
-    },
-    {
+      tracking,
+    }
+  }
+
+  if (tracking.key === "complete_suggestions") {
+    return {
       id: safeRandomUUID(),
-      dateISO: todayISO,
-      sourceDateISO: todayISO,
+      dateISO: input.todayISO,
+      sourceDateISO: input.todayISO,
       type: "challenge",
       category: "recovery",
       title: "Do Two Suggestions",
       description: "Complete two recovery suggestions today (small wins count).",
       insight: "This unlocks daily completion streak progress.",
       points: 35,
-      createdAt: nowISO,
+      createdAt: input.nowISO,
       completed: false,
       carriedOver: false,
       seen: true,
-      tracking: { key: "complete_suggestions", target: 2 },
-    },
-    {
-      id: safeRandomUUID(),
-      dateISO: todayISO,
-      sourceDateISO: todayISO,
-      type: "badge",
-      category: "engagement",
-      title: "Welcome Ritual",
-      description: "You showed up — let’s make today count.",
-      insight: "Daily challenges reset at midnight in your time zone.",
-      points: 10,
-      createdAt: nowISO,
-      completed: true,
-      completedAt: nowISO,
-      carriedOver: false,
-      seen: false,
-    },
+      tracking,
+    }
+  }
+
+  return {
+    id: safeRandomUUID(),
+    dateISO: input.todayISO,
+    sourceDateISO: input.todayISO,
+    type: "challenge",
+    category: "engagement",
+    title: "Schedule One Suggestion",
+    description: "Schedule one recovery suggestion so it actually happens.",
+    insight: "Pick the easiest one and put it on your calendar.",
+    points: 25,
+    createdAt: input.nowISO,
+    completed: false,
+    carriedOver: false,
+    seen: true,
+    tracking,
+  }
+}
+
+function buildStarterAchievements(nowISO: string, todayISO: string): DailyAchievement[] {
+  return [
+    buildFallbackChallenge({ index: 0, nowISO, todayISO }),
+    buildFallbackChallenge({ index: 1, nowISO, todayISO }),
+    buildFallbackChallenge({ index: 2, nowISO, todayISO }),
   ]
 }
 
@@ -659,13 +697,26 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
 
             newDaily = (data.achievements as Array<Record<string, unknown>>)
               .slice(0, 12)
-              .map((a) => {
+              .map((a, index) => {
                 const type = a.type === "badge" ? "badge" : "challenge"
+
+                const title = typeof a.title === "string" ? a.title : "Daily Win"
+                const description =
+                  typeof a.description === "string" ? a.description : "Make a small move forward today."
+
+                if (looksLikeAutoCompletionAchievementText({ title, description })) {
+                  return buildFallbackChallenge({ index, nowISO, todayISO })
+                }
+
                 const points = clampInt(typeof a.points === "number" ? a.points : 20, 10, 80)
                 const tracking =
                   typeof a.tracking === "object" && a.tracking !== null
                     ? (a.tracking as DailyAchievement["tracking"])
                     : undefined
+
+                if (type === "challenge" && !tracking) {
+                  return buildFallbackChallenge({ index, nowISO, todayISO })
+                }
 
                 return {
                   id: safeRandomUUID(),
@@ -673,8 +724,8 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
                   sourceDateISO: todayISO,
                   type,
                   category: (a.category as DailyAchievement["category"]) ?? "engagement",
-                  title: typeof a.title === "string" ? a.title : "Daily Win",
-                  description: typeof a.description === "string" ? a.description : "Make a small move forward today.",
+                  title,
+                  description,
                   insight: typeof a.insight === "string" ? a.insight : undefined,
                   points,
                   createdAt: nowISO,
@@ -688,6 +739,13 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
           } catch {
             // Fallback: starter set (still yields something usable offline)
             newDaily = buildStarterAchievements(nowISO, todayISO)
+          }
+        }
+
+        if (newDaily.length < prep.requestedCount) {
+          const start = newDaily.length
+          for (let i = start; i < prep.requestedCount; i++) {
+            newDaily.push(buildFallbackChallenge({ index: i, nowISO, todayISO }))
           }
         }
 
@@ -773,8 +831,8 @@ export function useAchievements(input?: UseAchievementsInput): UseAchievementsRe
     if (loading) return
     if (lastEnsureAttemptRef.current === todayISO) return
 
-    lastEnsureAttemptRef.current = todayISO
     const timer = setTimeout(() => {
+      lastEnsureAttemptRef.current = todayISO
       void ensureToday()
     }, 1200)
 
