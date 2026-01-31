@@ -21,6 +21,10 @@ vi.mock("@/hooks/use-check-in", () => ({
   useCheckIn: (...args: unknown[]) => useCheckInMock(...args),
 }))
 
+vi.mock("@/hooks/use-strict-mode-ready", () => ({
+  useStrictModeReady: () => true,
+}))
+
 vi.mock("@/hooks/use-storage", () => ({
   useCheckInSessionActions: () => ({
     addCheckInSession: addCheckInSessionMock,
@@ -242,5 +246,56 @@ describe("AIChatContent", () => {
     expect(
       screen.getByText(/check-in ended too quickly to synthesize/i)
     ).toBeInTheDocument()
+  })
+
+  it("does not keep the Start button disabled forever if auto-start fails before state advances", async () => {
+    const startSession = vi.fn(async () => {
+      throw new Error("start failed")
+    })
+
+    useCheckInMock.mockReturnValue([
+      {
+        state: "idle",
+        initPhase: null,
+        isActive: false,
+        session: null,
+        messages: [],
+        currentUserTranscript: "",
+        widgets: [],
+        error: null,
+        isMuted: false,
+      },
+      {
+        startSession,
+        endSession: vi.fn(async () => {}),
+        cancelSession: vi.fn(),
+        getSession: vi.fn(() => null),
+        toggleMute: vi.fn(),
+        dismissWidget: vi.fn(),
+        undoScheduledActivity: vi.fn(async () => {}),
+        runQuickAction: vi.fn(),
+        saveJournalEntry: vi.fn(async () => {}),
+        triggerManualTool: vi.fn(),
+        sendTextMessage: vi.fn(),
+        preserveSession: vi.fn(),
+        hasPreservedSession: vi.fn(() => false),
+        resumePreservedSession: vi.fn(async () => {}),
+        getContextFingerprint: vi.fn(async () => ""),
+        interruptAssistant: vi.fn(),
+      },
+    ])
+
+    const { AIChatContent } = await import("../check-in-ai-chat")
+    render(<AIChatContent autoStart />)
+
+    // Auto-start failure should release the UI so the user can manually start.
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(startSession).toHaveBeenCalledTimes(1)
+    const startButton = screen.getByRole("button", { name: /start check-in/i })
+    expect(startButton).toBeEnabled()
   })
 })

@@ -8,6 +8,7 @@ import { MotionConfig } from "framer-motion"
 import { SceneProvider } from "@/lib/scene-context"
 import { NavbarProvider } from "@/lib/navbar-context"
 import { TimeZoneProvider } from "@/lib/timezone-context"
+import { CheckInSessionsProvider } from "@/lib/check-in-sessions-context"
 import { applySafariViewTransitionFix } from "@/lib/utils"
 import SceneBackground from "@/components/scene"
 import { PersistentNavbar } from "@/components/persistent-navbar"
@@ -29,21 +30,23 @@ export function Providers({ children }: { children: ReactNode }) {
       <MotionConfig reducedMotion="user">
         <JankLogger />
         <DataPreloader>
-          <SceneProvider>
-            <TimeZoneProvider>
-              <ColorSync />
-              <DemoProvider>
-                <NavbarProvider>
-                  <SceneBackground />
-                  <PersistentNavbar />
-                  <RouteTransitionOverlay />
-                  <RequireUserName />
-                  {children}
-                  <DemoOverlay />
-                </NavbarProvider>
-              </DemoProvider>
-            </TimeZoneProvider>
-          </SceneProvider>
+          <CheckInSessionsProvider>
+            <SceneProvider>
+              <TimeZoneProvider>
+                <ColorSync />
+                <DemoProvider>
+                  <NavbarProvider>
+                    <SceneBackground />
+                    <PersistentNavbar />
+                    <RouteTransitionOverlay />
+                    <RequireUserName />
+                    {children}
+                    <DemoOverlay />
+                  </NavbarProvider>
+                </DemoProvider>
+              </TimeZoneProvider>
+            </SceneProvider>
+          </CheckInSessionsProvider>
         </DataPreloader>
       </MotionConfig>
     </IconProvider>

@@ -119,6 +119,7 @@ export function AIChatContent({
   const [focusedWidgetId, setFocusedWidgetId] = useState<string | null>(null)
   const [journalDrafts, setJournalDrafts] = useState<Record<string, string>>({})
   const [breathingDrafts, setBreathingDrafts] = useState<Record<string, number>>({})
+  const [autoStartStatus, setAutoStartStatus] = useState<"idle" | "starting" | "done">("idle")
 
   useEffect(() => {
     return () => {
@@ -337,21 +338,29 @@ export function AIChatContent({
     await controls.startSession({ userGesture: true })
   }, [controls])
 
-  const autoStartRanRef = useRef(false)
   useLayoutEffect(() => {
     // Auto-start is only safe when this mount was triggered by a real click/tap.
     // (We use it to remove the redundant "Start" click after the user already
     // clicked "New Check-in".)
+    // Pattern doc: docs/error-patterns/check-in-autostart-stuck-idle.md
     if (!autoStart) return
-    if (autoStartRanRef.current) return
+    if (autoStartStatus !== "idle") return
     if (!canStart) return
     if (checkIn.state !== "idle") return
 
-    autoStartRanRef.current = true
-    void startOrResume()
-  }, [autoStart, canStart, checkIn.state, startOrResume])
+    setAutoStartStatus("starting")
+    void (async () => {
+      try {
+        await startOrResume()
+      } catch (error) {
+        logError("AIChatContent", "Auto-start failed:", error)
+      } finally {
+        setAutoStartStatus("done")
+      }
+    })()
+  }, [autoStart, autoStartStatus, canStart, checkIn.state, startOrResume])
 
-  const isAutoStarting = autoStart && checkIn.state === "idle" && canStart
+  const isAutoStarting = autoStart && autoStartStatus === "starting" && checkIn.state === "idle" && canStart
 
   // Handle closing the chat - preserve session for later resumption
   // User can come back and continue where they left off

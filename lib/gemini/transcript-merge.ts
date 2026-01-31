@@ -118,6 +118,43 @@ function looksLikeGreetingStart(text: string): boolean {
   return false
 }
 
+function shouldAllowShorteningReplace(options: {
+  previous: string
+  incoming: string
+  previousTokens: Token[]
+  incomingTokens: Token[]
+}): boolean {
+  const { previous, incoming, previousTokens, incomingTokens } = options
+
+  if (incoming.length >= previous.length) return true
+  if (previous.length - incoming.length <= 8) return true
+
+  // If we're still in the "greeting" / very short starter phase, allow
+  // replacement even if it shortens. This avoids garbled openers from
+  // parallel/interleaved streams.
+  const previousIsShort = previousTokens.length <= 6 && previous.trim().length <= 60
+  if (previousIsShort) return true
+
+  const incomingTrimmed = incoming.trim()
+  const incomingLooksGreeting = looksLikeGreetingStart(incomingTrimmed)
+  // Only treat greeting-like openings as "safe to shorten" while the transcript
+  // is still very short. Once the assistant has produced a longer message,
+  // shortening replacements read as text disappearing.
+  if (incomingLooksGreeting && previousTokens.length <= 10 && previous.trim().length <= 80) return true
+
+  // If incoming looks like a restart (capitalized start, no boundary overlap),
+  // allow replacement even if it shortens.
+  const incomingStartsCapital = /^[A-Z]/.test(incomingTrimmed)
+  const previousEndsIncomplete = !/[.!?]$/.test(previous.trim())
+  const boundaryOverlap = findOverlapCount(previousTokens, incomingTokens)
+  if (incomingStartsCapital && previousEndsIncomplete && boundaryOverlap === 0) return true
+
+  // Otherwise, avoid shortening replacements: they look like text "disappearing"
+  // while the model is streaming.
+  // Pattern doc: docs/error-patterns/transcript-replace-shortening.md
+  return false
+}
+
 function findOverlapCount(previousTokens: Token[], incomingTokens: Token[]): number {
   const maxOverlap = Math.min(previousTokens.length, incomingTokens.length)
   for (let count = maxOverlap; count >= 1; count--) {
@@ -224,15 +261,17 @@ export function mergeTranscriptUpdate(previous: string, incoming: string): Trans
       const previousIsShort = previousTokens.length <= 6 && previous.trim().length <= 60
       const incomingLooksGreeting = looksLikeGreetingStart(incomingTrimmed)
 
-      if (
-        sharedAnyCount >= 2 ||
-        (commonPrefix >= 1 && previousTokens.length >= 3 && incomingTokens.length <= 3) ||
-        (incomingLooksGreeting && previousIsShort)
-      ) {
-        return { next: incoming, delta: "", kind: "replace" }
-      }
-    }
-  }
+	      if (
+	        sharedAnyCount >= 2 ||
+	        (commonPrefix >= 1 && previousTokens.length >= 3 && incomingTokens.length <= 3) ||
+	        (incomingLooksGreeting && previousIsShort)
+	      ) {
+	        return shouldAllowShorteningReplace({ previous, incoming, previousTokens, incomingTokens })
+	          ? { next: incoming, delta: "", kind: "replace" }
+	          : { next: previous, delta: "", kind: "delta" }
+	      }
+	    }
+	  }
 
   // Detect corrected cumulative snapshots that revise earlier words.
   // These can share a long prefix or have high token overlap, but won't
@@ -252,14 +291,16 @@ export function mergeTranscriptUpdate(previous: string, incoming: string): Trans
       overlapMin >= 0.85 ||
       ((overlapPrev >= 0.75 || overlapInc >= 0.75) && overlapMin >= 0.7)
 
-    if (shouldReplace) {
-      return {
-        next: incoming,
-        delta: "",
-        kind: "replace",
-      }
-    }
-  }
+	    if (shouldReplace) {
+	      return shouldAllowShorteningReplace({ previous, incoming, previousTokens, incomingTokens })
+	        ? {
+	            next: incoming,
+	            delta: "",
+	            kind: "replace",
+	          }
+	        : { next: previous, delta: "", kind: "delta" }
+	    }
+	  }
 
   const overlapCount = findOverlapCount(previousTokens, incomingTokens)
 
