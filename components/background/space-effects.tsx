@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { useFrame } from "@react-three/fiber"
 import { Float } from "@react-three/drei"
 import * as THREE from "three"
@@ -200,12 +200,58 @@ function createNebulaVolumeTexture(seed: number, size = 512) {
   ctx.fillRect(0, 0, size, size)
 
   const texture = new THREE.CanvasTexture(canvas)
-  texture.generateMipmaps = true
-  texture.minFilter = THREE.LinearMipmapLinearFilter
+  // This texture stays intentionally smooth; mipmaps are rarely needed here and
+  // can cause a noticeable hitch when generated/uploaded.
+  texture.generateMipmaps = false
+  texture.minFilter = THREE.LinearFilter
   texture.magFilter = THREE.LinearFilter
   texture.wrapS = THREE.ClampToEdgeWrapping
   texture.wrapT = THREE.ClampToEdgeWrapping
   return texture
+}
+
+type TextureCacheEntry = {
+  texture: THREE.Texture
+  refs: number
+}
+
+const NEBULA_VOLUME_TEX_CACHE_KEY = "__kanari_nebula_volume_tex_key"
+const nebulaVolumeTextureCache = new Map<string, TextureCacheEntry>()
+
+function retainNebulaVolumeTexture(seed: number, size = 512) {
+  const key = `${seed}:${size}`
+  const cached = nebulaVolumeTextureCache.get(key)
+  if (cached) {
+    cached.refs += 1
+    return cached.texture
+  }
+
+  const created = createNebulaVolumeTexture(seed, size)
+  if (!created) return null
+  ;(created.userData as Record<string, unknown>)[NEBULA_VOLUME_TEX_CACHE_KEY] = key
+  nebulaVolumeTextureCache.set(key, { texture: created, refs: 1 })
+  return created
+}
+
+function releaseNebulaVolumeTexture(texture: THREE.Texture | null) {
+  if (!texture) return
+  const key = (texture.userData as Record<string, unknown>)[NEBULA_VOLUME_TEX_CACHE_KEY]
+  if (typeof key !== "string") {
+    texture.dispose()
+    return
+  }
+
+  const cached = nebulaVolumeTextureCache.get(key)
+  if (!cached || cached.texture !== texture) {
+    texture.dispose()
+    return
+  }
+
+  cached.refs -= 1
+  if (cached.refs <= 0) {
+    cached.texture.dispose()
+    nebulaVolumeTextureCache.delete(key)
+  }
 }
 
 function createDustLaneTexture(seed: number, size = 512) {
@@ -422,6 +468,7 @@ export function NebulaVolume({
   layers?: number
 }) {
   const layerCount = Math.max(0, Math.min(3, Math.round(layers)))
+  const enabled = layerCount > 0
   const baseColors = useMemo(() => makeNebulaColors(accentColor, variant), [accentColor, variant])
 
   // Turn down intensity here: these layers are large and blended.
@@ -432,21 +479,30 @@ export function NebulaVolume({
     return { soft, pale }
   }, [baseColors])
 
-  const textures = useMemo(() => {
-    if (layerCount === 0) return [null, null, null] as Array<THREE.Texture | null>
-    const baseSeed = variant === "landing" ? 1201 : 2201
-    return [
-      createNebulaVolumeTexture(baseSeed),
-      createNebulaVolumeTexture(baseSeed + 1),
-      createNebulaVolumeTexture(baseSeed + 2),
-    ]
-  }, [variant, layerCount])
+  const [textures, setTextures] = useState<
+    [THREE.Texture | null, THREE.Texture | null, THREE.Texture | null]
+  >([null, null, null])
 
   useEffect(() => {
-    return () => {
-      for (const texture of textures) texture?.dispose()
+    if (!enabled) {
+      setTextures([null, null, null])
+      return
     }
-  }, [textures])
+
+    // Only depends on variant + enabled so we don't regenerate when `layers`
+    // changes between 1..3.
+    const baseSeed = variant === "landing" ? 1201 : 2201
+    const next: [THREE.Texture | null, THREE.Texture | null, THREE.Texture | null] = [
+      retainNebulaVolumeTexture(baseSeed),
+      retainNebulaVolumeTexture(baseSeed + 1),
+      retainNebulaVolumeTexture(baseSeed + 2),
+    ]
+
+    setTextures(next)
+    return () => {
+      for (const texture of next) releaseNebulaVolumeTexture(texture)
+    }
+  }, [variant, enabled])
 
   const layerSettings = useMemo(() => {
     if (variant === "landing") {
@@ -519,24 +575,14 @@ export function NebulaVolume({
   }, [variant])
 
   const materials = useMemo(() => {
-    if (layerCount === 0) return [] as THREE.SpriteMaterial[]
-
     const mats: THREE.SpriteMaterial[] = []
     for (let i = 0; i < layerCount; i += 1) {
-      const layer = layerSettings[i]
-      if (!layer) continue
-
-      const map = textures[layer.textureIndex]
-      const color = layer.colorKey === "soft" ? volumeColors.soft : volumeColors.pale
-
       const material = new THREE.SpriteMaterial({
-        map: map ?? undefined,
         transparent: true,
-        opacity: layer.opacity,
+        opacity: 0,
         depthWrite: false,
         depthTest: true,
         blending: THREE.NormalBlending,
-        color: color.clone(),
         fog: false,
       })
       material.toneMapped = false
@@ -544,13 +590,30 @@ export function NebulaVolume({
       mats.push(material)
     }
     return mats
-  }, [layerCount, layerSettings, textures, volumeColors])
+  }, [layerCount])
 
   useEffect(() => {
     return () => {
       for (const material of materials) material.dispose()
     }
   }, [materials])
+
+  useEffect(() => {
+    for (let i = 0; i < layerCount; i += 1) {
+      const layer = layerSettings[i]
+      const material = materials[i]
+      if (!layer || !material) continue
+
+      const map = textures[layer.textureIndex] ?? null
+      const color = layer.colorKey === "soft" ? volumeColors.soft : volumeColors.pale
+
+      const mapChanged = material.map !== map
+      material.map = map
+      material.opacity = map ? layer.opacity : 0
+      material.color.copy(color)
+      if (mapChanged) material.needsUpdate = true
+    }
+  }, [layerCount, layerSettings, materials, textures, volumeColors])
 
   const spriteDataByLayer = useMemo(() => {
     const layers = layerSettings.slice(0, layerCount)

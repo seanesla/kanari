@@ -1,7 +1,7 @@
 "use client"
 
 import type { MutableRefObject } from "react"
-import { Environment } from "@react-three/drei"
+import { Environment, Lightformer } from "@react-three/drei"
 import { useReducedMotion } from "framer-motion"
 import type { SceneMode } from "@/lib/types"
 import { useSceneMode } from "@/lib/scene-context"
@@ -40,7 +40,24 @@ export function Scene({ scrollProgressRef, mode }: SceneProps) {
       <pointLight position={[-5, -3, -5]} intensity={0.4} color="#ffffff" />
       <spotLight position={[0, 10, 0]} intensity={0.8} angle={0.6} penumbra={1} color={accentColor} />
 
-      <Environment preset="night" />
+      {/*
+        Avoid preset environments here: drei presets fetch HDRs over the network.
+        This custom environment is fully local and stable on first paint.
+      */}
+      <Environment key={accentColor} frames={1} resolution={128} background={false}>
+        {/* Key light source to drive the glass highlights */}
+        <Lightformer
+          intensity={2.2}
+          color={accentColor}
+          position={[6, 4, -6]}
+          rotation={[0, -0.7, 0]}
+          scale={[10, 10, 1]}
+        />
+        {/* Soft fill */}
+        <Lightformer intensity={0.9} color="#ffffff" position={[-6, -2, 6]} rotation={[0, 0.7, 0]} scale={[12, 8, 1]} />
+        {/* Cool rim to keep the orb readable against fog */}
+        <Lightformer intensity={0.6} color="#7aa6ff" position={[-10, 6, -2]} rotation={[0, 1.2, 0]} scale={[8, 6, 1]} />
+      </Environment>
 
       <ScrollCamera scrollProgressRef={scrollProgressRef} mode={mode} />
 

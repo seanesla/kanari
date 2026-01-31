@@ -12,6 +12,8 @@ export type SceneMode = "landing" | "transitioning" | "dashboard"
 
 // localStorage key for instant (synchronous) access to animation preference
 const DISABLE_ANIMATION_KEY = "kanari:disableStartupAnimation"
+const ACCENT_COLOR_KEY = "kanari:accentColor"
+const GRAPHICS_QUALITY_KEY = "kanari:graphicsQuality"
 
 /**
  * Read the animation preference from localStorage synchronously.
@@ -23,6 +25,48 @@ function getDisableStartupAnimation(): boolean {
     return localStorage.getItem(DISABLE_ANIMATION_KEY) === "true"
   } catch {
     return false
+  }
+}
+
+function getAccentColorSync(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    const stored = localStorage.getItem(ACCENT_COLOR_KEY)
+    if (!stored) return null
+    // Expect a hex color (what we persist today).
+    if (!/^#[0-9a-fA-F]{6}$/.test(stored)) return null
+    return stored
+  } catch {
+    return null
+  }
+}
+
+function setAccentColorSync(color: string): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(ACCENT_COLOR_KEY, color)
+  } catch {
+    // localStorage not available, ignore
+  }
+}
+
+function getGraphicsQualitySync(): GraphicsQuality | null {
+  if (typeof window === "undefined") return null
+  try {
+    const stored = localStorage.getItem(GRAPHICS_QUALITY_KEY)
+    if (!stored) return null
+    return normalizeGraphicsQuality(stored)
+  } catch {
+    return null
+  }
+}
+
+function setGraphicsQualitySync(quality: GraphicsQuality): void {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(GRAPHICS_QUALITY_KEY, quality)
+  } catch {
+    // localStorage not available, ignore
   }
 }
 
@@ -82,8 +126,8 @@ export function SceneProvider({ children }: { children: ReactNode }) {
   // Startup animation suppression is handled by an early inline script (app/layout.tsx)
   // that sets a data attribute for CSS to hide the overlay before hydration.
   const [isLoading, setIsLoading] = useState(true)
-  const [accentColor, setAccentColorState] = useState(DEFAULT_ACCENT)
-  const [graphicsQuality, setGraphicsQualityState] = useState<GraphicsQuality>("auto")
+  const [accentColor, setAccentColorState] = useState(() => getAccentColorSync() ?? DEFAULT_ACCENT)
+  const [graphicsQuality, setGraphicsQualityState] = useState<GraphicsQuality>(() => getGraphicsQualitySync() ?? "auto")
   const [selectedSansFont, setSelectedSansFontState] = useState(DEFAULT_SANS)
   const [selectedSerifFont, setSelectedSerifFontState] = useState(DEFAULT_SERIF)
 
@@ -101,11 +145,14 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     db.settings.get("default").then((settings) => {
       if (settings?.accentColor) {
         setAccentColorState(settings.accentColor)
+        setAccentColorSync(settings.accentColor)
       }
       if (settings?.graphicsQuality) {
         const raw = (settings as { graphicsQuality?: unknown }).graphicsQuality
         const normalized = normalizeGraphicsQuality(raw)
         setGraphicsQualityState(normalized)
+
+        setGraphicsQualitySync(normalized)
 
         // Migrate legacy stored value ("static" -> "medium") once.
         if (raw === "static") {
@@ -158,6 +205,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
 
   const setAccentColor = useCallback((color: string) => {
     setAccentColorState(color)
+    setAccentColorSync(color)
     // Persist to IndexedDB (race-safe; avoids wiping other fields)
     void patchSettings({ accentColor: color }).catch((error) => {
       if (process.env.NODE_ENV === "development") {
@@ -168,6 +216,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
 
   const setGraphicsQuality = useCallback((quality: GraphicsQuality) => {
     setGraphicsQualityState(quality)
+    setGraphicsQualitySync(quality)
     void patchSettings({ graphicsQuality: quality }).catch((error) => {
       if (process.env.NODE_ENV === "development") {
         console.warn("[SceneProvider] Failed to save graphics quality:", error)

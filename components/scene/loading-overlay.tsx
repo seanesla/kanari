@@ -1,7 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useSceneMode } from "@/lib/scene-context"
+import { AnimatedLogo } from "@/components/animated-logo"
 
 interface LoadingOverlayProps {
   visible: boolean
@@ -9,18 +8,6 @@ interface LoadingOverlayProps {
 }
 
 export function LoadingOverlay({ visible, onAnimationComplete }: LoadingOverlayProps) {
-  const { accentColor } = useSceneMode()
-
-  // Dynamically import to avoid SSR issues with framer-motion
-  const [AnimatedLogo, setAnimatedLogo] = useState<React.ComponentType<{
-    onComplete?: () => void
-    size?: number
-  }> | null>(null)
-
-  useEffect(() => {
-    import("../animated-logo").then((mod) => setAnimatedLogo(() => mod.AnimatedLogo))
-  }, [])
-
   return (
     <div
       data-startup-overlay="true"
@@ -28,20 +15,7 @@ export function LoadingOverlay({ visible, onAnimationComplete }: LoadingOverlayP
         visible ? "opacity-100" : "opacity-0 pointer-events-none"
       }`}
     >
-      {AnimatedLogo ? (
-        <AnimatedLogo size={280} onComplete={onAnimationComplete} />
-      ) : (
-        // Fallback spinner while AnimatedLogo loads
-        <div className="relative">
-          <div
-            className="w-20 h-20 border rounded-full animate-spin"
-            style={{
-              borderColor: `${accentColor}4d`,
-              borderTopColor: accentColor,
-            }}
-          />
-        </div>
-      )}
+      <AnimatedLogo size={280} onComplete={onAnimationComplete} />
     </div>
   )
 }

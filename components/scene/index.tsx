@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react"
 import { Canvas } from "@react-three/fiber"
-import { AdaptiveDpr } from "@react-three/drei"
 import { useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
@@ -19,7 +18,7 @@ function SceneBackgroundInner() {
   const reducedMotion = useReducedMotion()
   const profile = getGraphicsProfile(graphicsQuality, { prefersReducedMotion: Boolean(reducedMotion) })
   const powerPreference: WebGLPowerPreference =
-    profile.quality === "high" ? "high-performance" : "low-power"
+    mode === "landing" ? "high-performance" : profile.quality === "high" ? "high-performance" : "low-power"
   const [isPageVisible, setIsPageVisible] = useState(() => {
     if (typeof document === "undefined") return true
     return document.visibilityState !== "hidden"
@@ -129,7 +128,7 @@ function SceneBackgroundInner() {
     <>
       <LoadingOverlay visible={isLoading} onAnimationComplete={handleAnimationComplete} />
       {canvasMounted ? (
-        <div className="fixed inset-0 -z-10">
+        <div className="fixed inset-0 -z-10" style={{ background: SCENE_COLORS.background }}>
           <Canvas
             camera={{ position: [...CAMERA.initialPosition], fov: CAMERA.fov }}
             dpr={profile.dpr}
@@ -139,8 +138,11 @@ function SceneBackgroundInner() {
               powerPreference,
             }}
             frameloop={isPageVisible && profile.animate ? "always" : "demand"}
+            onCreated={({ gl }) => {
+              gl.setClearColor(SCENE_COLORS.background, 1)
+              gl.clear(true, true, true)
+            }}
           >
-            <AdaptiveDpr />
             <color attach="background" args={[SCENE_COLORS.background]} />
             <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />
             <Scene scrollProgressRef={scrollProgressRef} mode={mode} />
