@@ -8,11 +8,14 @@ import { SCENE_COLORS } from "@/lib/constants"
 import { Scene } from "./scene-canvas"
 import { LoadingOverlay } from "./loading-overlay"
 import { getGraphicsProfile } from "@/lib/graphics/quality"
-import { FrameLimiter } from "./frame-limiter"
 
 export function SceneBackgroundFallback() {
   const scrollProgressRef = useRef(0)
   const [loading, setLoading] = useState(true)
+  const [isPageVisible, setIsPageVisible] = useState(() => {
+    if (typeof document === "undefined") return true
+    return document.visibilityState !== "hidden"
+  })
   const loadingTimeoutRef = useRef<number | null>(null)
   const reducedMotion = useReducedMotion()
   const profile = getGraphicsProfile("auto", { prefersReducedMotion: Boolean(reducedMotion) })
@@ -30,6 +33,19 @@ export function SceneBackgroundFallback() {
         window.clearTimeout(loadingTimeoutRef.current)
         loadingTimeoutRef.current = null
       }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+
+    const onVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState !== "hidden")
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
     }
   }, [])
 
@@ -52,9 +68,8 @@ export function SceneBackgroundFallback() {
           camera={{ position: [...CAMERA.initialPosition], fov: CAMERA.fov }}
           dpr={profile.dpr}
           gl={{ antialias: profile.antialias, alpha: true }}
-          frameloop={profile.maxFps === null && profile.animate ? "always" : "demand"}
+          frameloop={profile.animate && isPageVisible ? "always" : "demand"}
         >
-          {profile.maxFps !== null ? <FrameLimiter maxFps={profile.maxFps} /> : null}
           <color attach="background" args={[SCENE_COLORS.background]} />
           <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />
           <Scene scrollProgressRef={scrollProgressRef} mode="landing" />

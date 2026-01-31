@@ -6,13 +6,14 @@
  * Lets the user pick a performance preset before heavy 3D scenes.
  */
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 import { Gauge } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useSceneMode } from "@/lib/scene-context"
-import { GRAPHICS_PRESET_OPTIONS } from "@/lib/graphics/quality"
+import { GRAPHICS_PRESET_OPTIONS, normalizeGraphicsQuality } from "@/lib/graphics/quality"
+import { patchSettings } from "@/lib/settings/patch-settings"
 import { cn } from "@/lib/utils"
 import type { GraphicsQuality, UserSettings } from "@/lib/types"
 
@@ -28,9 +29,20 @@ export function StepGraphicsQuality({
   onBack,
 }: StepGraphicsQualityProps) {
   const { previewGraphicsQuality } = useSceneMode()
-  const initialQuality = (initialSettings.graphicsQuality ?? "auto") as GraphicsQuality
+  const rawInitialQuality = (initialSettings as { graphicsQuality?: unknown }).graphicsQuality
+  const initialQuality = normalizeGraphicsQuality(rawInitialQuality)
   const [selectedQuality, setSelectedQuality] = useState<GraphicsQuality>(initialQuality)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const didMigrateRef = useRef(false)
+
+  useEffect(() => {
+    if (didMigrateRef.current) return
+    if (rawInitialQuality !== "static") return
+    didMigrateRef.current = true
+    void patchSettings({ graphicsQuality: "medium" }).catch(() => {
+      // Non-fatal: onboarding can continue even if IndexedDB write fails.
+    })
+  }, [rawInitialQuality])
 
   useEffect(() => {
     previewGraphicsQuality(selectedQuality)

@@ -494,7 +494,7 @@ export type MonoFamily =
   | "Inconsolata"
   | "Source Code Pro"
 
-export type GraphicsQuality = "auto" | "low" | "medium" | "high" | "static"
+export type GraphicsQuality = "auto" | "low" | "medium" | "high"
 
 export type GeminiApiKeySource = "kanari" | "user"
 

@@ -20,7 +20,6 @@ import { WelcomeParticles } from "./welcome-particles"
 import { SCENE_COLORS } from "@/lib/constants"
 import { SceneContext, useSceneMode } from "@/lib/scene-context"
 import { getGraphicsProfile } from "@/lib/graphics/quality"
-import { FrameLimiter } from "@/components/scene/frame-limiter"
 import { useReducedMotion } from "framer-motion"
 
 interface Onboarding3DSceneProps {
@@ -116,6 +115,24 @@ export function Onboarding3DScene({
   const powerPreference: WebGLPowerPreference =
     profile.quality === "high" ? "high-performance" : "low-power"
 
+  const [isPageVisible, setIsPageVisible] = React.useState(() => {
+    if (typeof document === "undefined") return true
+    return document.visibilityState !== "hidden"
+  })
+
+  React.useEffect(() => {
+    if (typeof document === "undefined") return
+
+    const onVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState !== "hidden")
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+    }
+  }, [])
+
   // Initial camera position.
   // If we're showing the welcome, we start a bit further back so the particle
   // formation has room to breathe.
@@ -135,10 +152,9 @@ export function Onboarding3DScene({
         }}
         dpr={profile.dpr}
         gl={{ antialias: profile.antialias, alpha: true, powerPreference }}
-        frameloop={profile.maxFps === null && profile.animate ? "always" : "demand"}
+        frameloop={profile.animate && isPageVisible ? "always" : "demand"}
       >
         <AdaptiveDpr />
-        {profile.maxFps !== null ? <FrameLimiter maxFps={profile.maxFps} /> : null}
         <color attach="background" args={[SCENE_COLORS.background]} />
         <ContextBridge>
           <SceneContent

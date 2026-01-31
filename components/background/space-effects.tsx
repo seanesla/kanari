@@ -2,133 +2,10 @@
 
 import { useEffect, useMemo, useRef } from "react"
 import { useFrame } from "@react-three/fiber"
-import { Float, shaderMaterial } from "@react-three/drei"
+import { Float } from "@react-three/drei"
 import * as THREE from "three"
 
 export type SpaceVariant = "landing" | "dashboard"
-
-// Source: Context7 - pmndrs/drei docs - "shaderMaterial"
-const NebulaVolumeMaterial = shaderMaterial(
-  {
-    time: 0,
-    colorA: new THREE.Color("#ffffff"),
-    colorB: new THREE.Color("#ffffff"),
-    opacity: 0.08,
-    seed: 0,
-  },
-  /* glsl */ `
-    varying vec2 vUv;
-    void main() {
-      vUv = uv;
-      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    }
-  `,
-  /* glsl */ `
-    precision mediump float;
-
-    uniform float time;
-    uniform vec3 colorA;
-    uniform vec3 colorB;
-    uniform float opacity;
-    uniform float seed;
-    varying vec2 vUv;
-
-    float hash(vec2 p) {
-      // Trig-free hash (faster on mobile GPUs than sin-based hash).
-      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-      p3 += dot(p3, p3.yzx + 33.33);
-      return fract((p3.x + p3.y) * p3.z);
-    }
-
-    float noise(vec2 p) {
-      vec2 i = floor(p);
-      vec2 f = fract(p);
-      float a = hash(i);
-      float b = hash(i + vec2(1.0, 0.0));
-      float c = hash(i + vec2(0.0, 1.0));
-      float d = hash(i + vec2(1.0, 1.0));
-      vec2 u = f * f * (3.0 - 2.0 * f);
-      return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
-    }
-
-     float fbm(vec2 p) {
-       float v = 0.0;
-       float a = 0.5;
-       // Performance note: this material is full-screen and layered.
-       // Keeping octave count low prevents the landing page from becoming GPU-bound.
-       for (int i = 0; i < 2; i++) {
-         v += a * noise(p);
-         p *= 2.0;
-         a *= 0.5;
-       }
-       return v;
-     }
-
-    mat2 rot(float a) {
-      float c = cos(a);
-      float s = sin(a);
-      return mat2(c, -s, s, c);
-    }
-
-    void main() {
-      float t = time;
-
-      vec2 uv = vUv;
-      vec2 centered = uv - 0.5;
-
-      // Soft edges (avoid a hard rectangle).
-      // Discard fully transparent pixels early so we skip the expensive noise work.
-      float r = length(centered);
-      float edge = smoothstep(0.62, 0.24, r);
-      if (edge <= 0.0) discard;
-
-      vec2 p = centered;
-      p.x *= 1.35;
-
-      // Slow drift so the nebula feels alive.
-      vec2 drift = vec2(0.03, -0.022) * t;
-
-       // Domain warp (adds billowy depth).
-       // This does not need full FBM detail; keeping it to single-octave noise
-       // preserves the look but avoids a lot of per-pixel work.
-       float w1 = noise(p * 3.2 + drift + seed * 7.1);
-       float w2 = noise(p * 5.1 - drift * 0.9 - seed * 4.3);
-      vec2 warp = vec2(w1, w2) - 0.5;
-      p += warp * 0.28;
-
-      // Swirl slightly so it doesn't feel like a static cloud sheet.
-      float swirl = (w1 - 0.5) * 1.2 + sin(t * 0.05 + seed) * 0.18;
-      vec2 q = rot(swirl) * p;
-
-       float base = fbm(q * 3.4 + seed * 3.3 + drift * 0.6);
-       float detail = noise(q * 9.0 + seed * 11.0 - drift * 1.2);
-
-      // Density shaping: a few bright ridges, lots of soft mass.
-      // Avoid pow() here (exp/log on many GPUs); a polynomial approximation
-      // keeps the look while being much cheaper.
-      float ridgeBase = clamp(1.0 - abs(detail * 2.0 - 1.0), 0.0, 1.0);
-      float ridges = ridgeBase * ridgeBase * (0.6 + 0.4 * ridgeBase);
-      float density = base * 0.85 + ridges * 0.35;
-
-      density *= edge;
-
-      // Keep the alpha gentle so it doesn't overpower the UI.
-      float alpha = smoothstep(0.28, 0.95, density) * opacity;
-      alpha *= edge;
-
-      vec3 col = mix(colorA, colorB, clamp(density, 0.0, 1.0));
-      gl_FragColor = vec4(col, alpha);
-    }
-  `
-)
-
-type NebulaVolumeMaterialInstance = THREE.ShaderMaterial & {
-  time: number
-  colorA: THREE.Color
-  colorB: THREE.Color
-  opacity: number
-  seed: number
-}
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value))
@@ -271,6 +148,60 @@ function createNebulaTexture(seed: number, size = 512) {
   const texture = new THREE.CanvasTexture(canvas)
   texture.generateMipmaps = false
   texture.minFilter = THREE.LinearFilter
+  texture.magFilter = THREE.LinearFilter
+  texture.wrapS = THREE.ClampToEdgeWrapping
+  texture.wrapT = THREE.ClampToEdgeWrapping
+  return texture
+}
+
+function createNebulaVolumeTexture(seed: number, size = 512) {
+  if (typeof document === "undefined") return null
+
+  const canvas = document.createElement("canvas")
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return null
+
+  const rand = mulberry32(seed)
+
+  ctx.clearRect(0, 0, size, size)
+  ctx.globalCompositeOperation = "source-over"
+
+  // Very soft, low-frequency cloud mass.
+  // Avoid filament/detail passes here: this texture is meant to stay smooth
+  // when layered and blended (no "TV static" look).
+  for (let i = 0; i < 18; i += 1) {
+    const x = size * (0.18 + rand() * 0.64)
+    const y = size * (0.18 + rand() * 0.64)
+    const r = size * (0.16 + rand() * 0.34)
+    const a = 0.05 + rand() * 0.12
+    const blur = size * (0.02 + rand() * 0.045)
+
+    ctx.filter = `blur(${Math.max(1, Math.round(blur))}px)`
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r)
+    g.addColorStop(0, `rgba(255, 255, 255, ${a})`)
+    g.addColorStop(1, "rgba(255, 255, 255, 0)")
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(x, y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+
+  ctx.filter = "none"
+
+  // Fade edges so sprites never show hard borders.
+  ctx.globalCompositeOperation = "destination-in"
+  const center = size / 2
+  const mask = ctx.createRadialGradient(center, center, size * 0.12, center, center, size * 0.56)
+  mask.addColorStop(0, "rgba(255, 255, 255, 1)")
+  mask.addColorStop(1, "rgba(255, 255, 255, 0)")
+  ctx.fillStyle = mask
+  ctx.fillRect(0, 0, size, size)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.generateMipmaps = true
+  texture.minFilter = THREE.LinearMipmapLinearFilter
   texture.magFilter = THREE.LinearFilter
   texture.wrapS = THREE.ClampToEdgeWrapping
   texture.wrapT = THREE.ClampToEdgeWrapping
@@ -491,71 +422,64 @@ export function NebulaVolume({
   layers?: number
 }) {
   const layerCount = Math.max(0, Math.min(3, Math.round(layers)))
-  const colors = useMemo(() => makeNebulaColors(accentColor, variant), [accentColor, variant])
+  const baseColors = useMemo(() => makeNebulaColors(accentColor, variant), [accentColor, variant])
 
-  const materials = useMemo(() => {
-    if (layerCount === 0) return [] as NebulaVolumeMaterialInstance[]
-    const create = (seed: number, opacity: number) => {
-      const material = new (NebulaVolumeMaterial as unknown as new () => NebulaVolumeMaterialInstance)()
-      material.transparent = true
-      material.depthWrite = false
-      material.depthTest = true
-      material.blending = THREE.AdditiveBlending
-      material.side = THREE.DoubleSide
-      material.toneMapped = false
-      material.seed = seed
-      material.opacity = opacity
-      return material
-    }
+  // Turn down intensity here: these layers are large and blended.
+  // (NebulaBackdrop is responsible for the crisp, brighter accents.)
+  const volumeColors = useMemo(() => {
+    const soft = baseColors.soft.clone().multiplyScalar(0.42)
+    const pale = baseColors.pale.clone().multiplyScalar(0.36)
+    return { soft, pale }
+  }, [baseColors])
 
-    const opNear = variant === "landing" ? 0.09 : 0.075
-    const opMid = variant === "landing" ? 0.07 : 0.058
-    const opFar = variant === "landing" ? 0.055 : 0.046
-
-    const all = [create(0.2, opNear), create(1.37, opMid), create(2.91, opFar)]
-    return all.slice(0, layerCount)
+  const textures = useMemo(() => {
+    if (layerCount === 0) return [null, null, null] as Array<THREE.Texture | null>
+    const baseSeed = variant === "landing" ? 1201 : 2201
+    return [
+      createNebulaVolumeTexture(baseSeed),
+      createNebulaVolumeTexture(baseSeed + 1),
+      createNebulaVolumeTexture(baseSeed + 2),
+    ]
   }, [variant, layerCount])
 
   useEffect(() => {
-    if (materials.length === 0) return
-    for (const material of materials) {
-      material.colorA = colors.soft
-      material.colorB = colors.pale
-    }
-  }, [colors, materials])
-
-  useEffect(() => {
     return () => {
-      for (const material of materials) material.dispose()
+      for (const texture of textures) texture?.dispose()
     }
-  }, [materials])
+  }, [textures])
 
-  useFrame((_, delta) => {
-    if (!animate) return
-    if (materials.length === 0) return
-    const step = delta * 0.35
-    for (const material of materials) {
-      material.time += step
-    }
-  })
-
-  const layout = useMemo(() => {
+  const layerSettings = useMemo(() => {
     if (variant === "landing") {
       return [
         {
           position: [0, 10, -56] as [number, number, number],
           rotation: [0.08, 0.32, 0.06] as [number, number, number],
-          scale: [190, 110, 1] as [number, number, number],
+          bounds: [92, 54, 18] as [number, number, number],
+          segments: 28,
+          size: [20, 50] as [number, number],
+          opacity: 0.11,
+          colorKey: "pale" as const,
+          textureIndex: 0,
         },
         {
           position: [-14, -12, -76] as [number, number, number],
           rotation: [0.02, -0.26, -0.08] as [number, number, number],
-          scale: [210, 120, 1] as [number, number, number],
+          bounds: [104, 62, 20] as [number, number, number],
+          segments: 24,
+          size: [22, 56] as [number, number],
+          opacity: 0.085,
+          colorKey: "soft" as const,
+          textureIndex: 1,
         },
         {
           position: [18, 6, -102] as [number, number, number],
           rotation: [-0.03, 0.58, 0.04] as [number, number, number],
-          scale: [240, 140, 1] as [number, number, number],
+          bounds: [124, 72, 24] as [number, number, number],
+          segments: 20,
+          size: [26, 62] as [number, number],
+          opacity: 0.065,
+          colorKey: "pale" as const,
+          textureIndex: 2,
         },
       ]
     }
@@ -564,32 +488,148 @@ export function NebulaVolume({
       {
         position: [0, 7.5, -42] as [number, number, number],
         rotation: [0.09, 0.34, 0.05] as [number, number, number],
-        scale: [160, 92, 1] as [number, number, number],
+        bounds: [78, 44, 16] as [number, number, number],
+        segments: 22,
+        size: [18, 44] as [number, number],
+        opacity: 0.095,
+        colorKey: "pale" as const,
+        textureIndex: 0,
       },
       {
         position: [-12, -10, -58] as [number, number, number],
         rotation: [0.03, -0.22, -0.08] as [number, number, number],
-        scale: [178, 102, 1] as [number, number, number],
+        bounds: [90, 50, 18] as [number, number, number],
+        segments: 18,
+        size: [20, 48] as [number, number],
+        opacity: 0.072,
+        colorKey: "soft" as const,
+        textureIndex: 1,
       },
       {
         position: [14, 4, -78] as [number, number, number],
         rotation: [-0.03, 0.56, 0.04] as [number, number, number],
-        scale: [200, 116, 1] as [number, number, number],
+        bounds: [104, 58, 22] as [number, number, number],
+        segments: 14,
+        size: [24, 56] as [number, number],
+        opacity: 0.055,
+        colorKey: "pale" as const,
+        textureIndex: 2,
       },
     ]
   }, [variant])
 
-  if (layerCount === 0) return null
+  const materials = useMemo(() => {
+    if (layerCount === 0) return [] as THREE.SpriteMaterial[]
 
-  const visibleLayout = layout.slice(0, layerCount)
+    const mats: THREE.SpriteMaterial[] = []
+    for (let i = 0; i < layerCount; i += 1) {
+      const layer = layerSettings[i]
+      if (!layer) continue
+
+      const map = textures[layer.textureIndex]
+      const color = layer.colorKey === "soft" ? volumeColors.soft : volumeColors.pale
+
+      const material = new THREE.SpriteMaterial({
+        map: map ?? undefined,
+        transparent: true,
+        opacity: layer.opacity,
+        depthWrite: false,
+        depthTest: true,
+        blending: THREE.NormalBlending,
+        color: color.clone(),
+        fog: false,
+      })
+      material.toneMapped = false
+      material.alphaTest = 0.001
+      mats.push(material)
+    }
+    return mats
+  }, [layerCount, layerSettings, textures, volumeColors])
+
+  useEffect(() => {
+    return () => {
+      for (const material of materials) material.dispose()
+    }
+  }, [materials])
+
+  const spriteDataByLayer = useMemo(() => {
+    const layers = layerSettings.slice(0, layerCount)
+
+    return layers.map((layer, layerIdx) => {
+      const seed = (variant === "landing" ? 9101 : 8101) + layerIdx * 197
+      const rand = mulberry32(seed)
+
+      return Array.from({ length: layer.segments }).map(() => {
+        const nx = Math.max(-1, Math.min(1, randNorm(rand) * 0.52))
+        const ny = Math.max(-1, Math.min(1, randNorm(rand) * 0.52))
+        const nz = Math.max(-1, Math.min(1, randNorm(rand) * 0.36))
+
+        const x = nx * (layer.bounds[0] * 0.5)
+        const y = ny * (layer.bounds[1] * 0.5)
+        const z = nz * (layer.bounds[2] * 0.5)
+
+        const t = Math.pow(rand(), 1.65)
+        const base = THREE.MathUtils.lerp(layer.size[0], layer.size[1], t)
+        const ax = 0.72 + rand() * 0.7
+        const ay = 0.72 + rand() * 0.7
+
+        return {
+          position: [x, y, z] as [number, number, number],
+          scale: [base * ax, base * ay, 1] as [number, number, number],
+          rotation: rand() * Math.PI * 2,
+        }
+      })
+    })
+  }, [layerCount, layerSettings, variant])
+
+  const layerGroupRefs = useRef<(THREE.Group | null)[]>([])
+
+  useFrame((state) => {
+    if (!animate) return
+    if (layerCount === 0) return
+
+    const t = state.clock.elapsedTime
+    for (let i = 0; i < layerCount; i += 1) {
+      const group = layerGroupRefs.current[i]
+      const base = layerSettings[i]
+      if (!group || !base) continue
+
+      const phase = i * 1.7
+      group.rotation.x = base.rotation[0] + Math.sin(t * 0.023 + phase) * 0.01
+      group.rotation.y = base.rotation[1] + Math.cos(t * 0.018 + phase) * 0.02
+      group.rotation.z = base.rotation[2] + Math.sin(t * 0.02 + phase) * 0.02
+
+      group.position.x =
+        base.position[0] + Math.sin(t * 0.06 + phase) * 0.55 + Math.sin(t * 0.083 + phase) * 0.22
+      group.position.y =
+        base.position[1] + Math.cos(t * 0.055 + phase) * 0.42 + Math.sin(t * 0.071 + phase) * 0.18
+    }
+  })
+
+  if (layerCount === 0) return null
 
   return (
     <group>
-      {visibleLayout.map((l, idx) => (
-        <mesh key={idx} position={l.position} rotation={l.rotation} scale={l.scale} renderOrder={-20}>
-          <planeGeometry args={[1, 1]} />
-          <primitive object={materials[idx]} attach="material" />
-        </mesh>
+      {layerSettings.slice(0, layerCount).map((layer, layerIdx) => (
+        <group
+          key={layerIdx}
+          ref={(el) => {
+            layerGroupRefs.current[layerIdx] = el
+          }}
+          position={layer.position}
+          rotation={layer.rotation}
+        >
+          {spriteDataByLayer[layerIdx]?.map((sprite, idx) => (
+            <sprite
+              key={idx}
+              position={sprite.position}
+              scale={sprite.scale}
+              rotation={[0, 0, sprite.rotation]}
+              material={materials[layerIdx]}
+              renderOrder={-20}
+            />
+          ))}
+        </group>
       ))}
     </group>
   )

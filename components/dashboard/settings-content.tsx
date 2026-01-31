@@ -31,6 +31,7 @@ import { patchSettings } from "@/lib/settings/patch-settings"
 import { setDisableStartupAnimationSync } from "@/lib/scene-context"
 import { useSceneMode } from "@/lib/scene-context"
 import { useTimeZone } from "@/lib/timezone-context"
+import { normalizeGraphicsQuality } from "@/lib/graphics/quality"
 import { Globe2, User } from "@/lib/icons"
 import type { AccountabilityMode, FontFamily, GeminiVoice, GraphicsQuality, SerifFamily, UserSettings } from "@/lib/types"
 
@@ -127,6 +128,20 @@ export function SettingsContent() {
     async function loadSettings() {
       try {
         const savedSettings = await db.settings.get("default")
+
+        const rawGraphicsQuality = (savedSettings as { graphicsQuality?: unknown })?.graphicsQuality
+        const normalizedGraphicsQuality =
+          rawGraphicsQuality === undefined
+            ? DEFAULT_USER_SETTINGS.graphicsQuality
+            : normalizeGraphicsQuality(rawGraphicsQuality)
+
+        // Migrate legacy stored value ("static" -> "medium") once.
+        if (rawGraphicsQuality === "static") {
+          void patchSettings({ graphicsQuality: normalizedGraphicsQuality }).catch((error) => {
+            console.warn("Failed to migrate graphics quality:", error)
+          })
+        }
+
         const hydrated: SettingsDraft = {
           userName: savedSettings?.userName ?? DEFAULT_USER_SETTINGS.userName,
           enableNotifications: savedSettings?.enableNotifications ?? DEFAULT_USER_SETTINGS.enableNotifications,
@@ -143,7 +158,7 @@ export function SettingsContent() {
           selectedSansFont: (savedSettings?.selectedSansFont as FontFamily | undefined) ?? DEFAULT_USER_SETTINGS.selectedSansFont,
           selectedSerifFont: (savedSettings?.selectedSerifFont as SerifFamily | undefined) ?? DEFAULT_USER_SETTINGS.selectedSerifFont,
           disableStartupAnimation: savedSettings?.disableStartupAnimation ?? DEFAULT_USER_SETTINGS.disableStartupAnimation,
-          graphicsQuality: (savedSettings?.graphicsQuality as GraphicsQuality | undefined) ?? DEFAULT_USER_SETTINGS.graphicsQuality,
+          graphicsQuality: normalizedGraphicsQuality,
         }
 
         // Apply the saved appearance immediately so the page matches the stored settings.

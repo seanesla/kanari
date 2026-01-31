@@ -16,7 +16,6 @@ import {
   ShootingStars,
   StarClusters,
 } from "@/components/background/space-effects"
-import { FrameLimiter } from "@/components/scene/frame-limiter"
 
 // Source: Context7 - pmndrs/drei docs - "shaderMaterial"
 const AuroraCurtainMaterial = shaderMaterial(
@@ -285,7 +284,7 @@ export function AppSpaceBackground3D() {
     }
   }, [])
 
-  const useDemand = profile.maxFps !== null || !profile.animate || !isPageVisible
+  const useDemand = !profile.animate || !isPageVisible
 
   return (
     <Canvas
@@ -295,7 +294,6 @@ export function AppSpaceBackground3D() {
       frameloop={useDemand ? "demand" : "always"}
     >
       <AdaptiveDpr />
-      {useDemand ? <FrameLimiter maxFps={profile.maxFps} enabled={isPageVisible} /> : null}
       <SpaceField accentColor={accentColor} profile={profile} />
     </Canvas>
   )

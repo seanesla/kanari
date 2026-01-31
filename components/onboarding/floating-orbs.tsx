@@ -15,7 +15,7 @@
  * Source: Context7 - /pmndrs/drei docs - "Sparkles", "Float"
  */
 
-import { useEffect, useMemo, useRef } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Canvas, useFrame } from "@react-three/fiber"
 import { AdaptiveDpr, Float, Sparkles } from "@react-three/drei"
 import * as THREE from "three"
@@ -23,7 +23,6 @@ import { useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
 import { getGraphicsProfile } from "@/lib/graphics/quality"
-import { FrameLimiter } from "@/components/scene/frame-limiter"
 
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value))
@@ -844,7 +843,25 @@ function OnboardingScene() {
 
 export function FloatingOrbs() {
   const profile = useGraphicsProfile()
-  const useDemand = profile.maxFps !== null || !profile.animate
+  const [isPageVisible, setIsPageVisible] = useState(() => {
+    if (typeof document === "undefined") return true
+    return document.visibilityState !== "hidden"
+  })
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+
+    const onVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState !== "hidden")
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+    }
+  }, [])
+
+  const useDemand = !profile.animate || !isPageVisible
   const powerPreference: WebGLPowerPreference =
     profile.quality === "high" ? "high-performance" : "low-power"
 
@@ -861,7 +878,6 @@ export function FloatingOrbs() {
         frameloop={useDemand ? "demand" : "always"}
       >
         <AdaptiveDpr />
-        {useDemand ? <FrameLimiter maxFps={profile.maxFps} /> : null}
         <color attach="background" args={[SCENE_COLORS.background]} />
         <OnboardingScene />
       </Canvas>

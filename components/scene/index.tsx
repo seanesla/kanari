@@ -11,7 +11,6 @@ import { CAMERA, FOG } from "./constants"
 import { Scene } from "./scene-canvas"
 import { LoadingOverlay } from "./loading-overlay"
 import { SceneBackgroundFallback } from "./fallback"
-import { FrameLimiter } from "./frame-limiter"
 
 // Inner component that uses the scene context
 function SceneBackgroundInner() {
@@ -139,12 +138,9 @@ function SceneBackgroundInner() {
               alpha: false,
               powerPreference,
             }}
-            frameloop={profile.maxFps === null && isPageVisible && profile.animate ? "always" : "demand"}
+            frameloop={isPageVisible && profile.animate ? "always" : "demand"}
           >
             <AdaptiveDpr />
-            {profile.maxFps !== null ? (
-              <FrameLimiter maxFps={profile.maxFps} enabled={isPageVisible} />
-            ) : null}
             <color attach="background" args={[SCENE_COLORS.background]} />
             <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />
             <Scene scrollProgressRef={scrollProgressRef} mode={mode} />

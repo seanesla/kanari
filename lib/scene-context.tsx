@@ -5,6 +5,7 @@ import { db } from "@/lib/storage/db"
 import { DEFAULT_ACCENT } from "@/lib/color-utils"
 import { DEFAULT_SANS, DEFAULT_SERIF, updateFontVariable, getFontCssFamily } from "@/lib/font-utils"
 import type { FontFamily, GraphicsQuality, SerifFamily } from "@/lib/types"
+import { normalizeGraphicsQuality } from "@/lib/graphics/quality"
 import { patchSettings } from "@/lib/settings/patch-settings"
 
 export type SceneMode = "landing" | "transitioning" | "dashboard"
@@ -102,7 +103,18 @@ export function SceneProvider({ children }: { children: ReactNode }) {
         setAccentColorState(settings.accentColor)
       }
       if (settings?.graphicsQuality) {
-        setGraphicsQualityState(settings.graphicsQuality)
+        const raw = (settings as { graphicsQuality?: unknown }).graphicsQuality
+        const normalized = normalizeGraphicsQuality(raw)
+        setGraphicsQualityState(normalized)
+
+        // Migrate legacy stored value ("static" -> "medium") once.
+        if (raw === "static") {
+          void patchSettings({ graphicsQuality: normalized }).catch((error) => {
+            if (process.env.NODE_ENV === "development") {
+              console.warn("[SceneProvider] Failed to migrate graphics quality:", error)
+            }
+          })
+        }
       }
       if (settings?.selectedSansFont) {
         setSelectedSansFontState(settings.selectedSansFont)

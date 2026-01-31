@@ -14,7 +14,6 @@ import { Canvas } from "@react-three/fiber"
 import { AdaptiveDpr } from "@react-three/drei"
 import { useSceneMode } from "@/lib/scene-context"
 import { getGraphicsProfile } from "@/lib/graphics/quality"
-import { FrameLimiter } from "@/components/scene/frame-limiter"
 import { WelcomeParticles } from "./welcome-particles"
 import { SCENE_COLORS } from "@/lib/constants"
 
@@ -33,6 +32,11 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
   const powerPreference: WebGLPowerPreference =
     profile.quality === "high" ? "high-performance" : "low-power"
 
+  const [isPageVisible, setIsPageVisible] = useState(() => {
+    if (typeof document === "undefined") return true
+    return document.visibilityState !== "hidden"
+  })
+
   const handleParticlesComplete = () => {
     setIsVisible(false)
   }
@@ -45,6 +49,19 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
 
     return () => {
       window.clearTimeout(fallback)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof document === "undefined") return
+
+    const onVisibilityChange = () => {
+      setIsPageVisible(document.visibilityState !== "hidden")
+    }
+
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
     }
   }, [])
 
@@ -63,10 +80,9 @@ export function WelcomeSplash({ onComplete }: WelcomeSplashProps) {
               camera={{ position: [0, 0, 8.5], fov: 50, near: 0.1, far: 150 }}
               dpr={profile.dpr}
               gl={{ antialias: profile.antialias, alpha: true, powerPreference }}
-              frameloop={profile.maxFps === null && profile.animate ? "always" : "demand"}
+              frameloop={profile.animate && isPageVisible ? "always" : "demand"}
             >
               <AdaptiveDpr />
-              {profile.maxFps !== null ? <FrameLimiter maxFps={profile.maxFps} /> : null}
               <color attach="background" args={[SCENE_COLORS.background]} />
               <WelcomeParticles
                 accentColor={accentColor}

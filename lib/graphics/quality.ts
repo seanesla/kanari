@@ -1,6 +1,17 @@
 import type { GraphicsQuality } from "@/lib/types"
 
-export type ResolvedGraphicsQuality = "low" | "medium" | "high" | "static"
+export type ResolvedGraphicsQuality = "low" | "medium" | "high"
+
+export function normalizeGraphicsQuality(quality: unknown): GraphicsQuality {
+  if (quality === "auto" || quality === "low" || quality === "medium" || quality === "high") {
+    return quality
+  }
+
+  // Legacy migration target: "static" -> "medium"
+  if (quality === "static") return "medium"
+
+  return "auto"
+}
 
 export interface GraphicsProfile {
   quality: ResolvedGraphicsQuality
@@ -43,23 +54,9 @@ export const GRAPHICS_PRESET_OPTIONS: Array<{
     label: "High",
     description: "Maximum detail and animation (most GPU).",
   },
-  {
-    value: "static",
-    label: "Static",
-    description: "Keeps the fog look, but stops animation.",
-  },
 ]
 
-function clampQuality(quality: GraphicsQuality | undefined): GraphicsQuality {
-  if (!quality) return "auto"
-  if (quality === "auto" || quality === "low" || quality === "medium" || quality === "high" || quality === "static") {
-    return quality
-  }
-  return "auto"
-}
-
-function resolveAutoQuality(prefersReducedMotion?: boolean): ResolvedGraphicsQuality {
-  if (prefersReducedMotion) return "static"
+function resolveAutoQuality(): ResolvedGraphicsQuality {
   if (typeof window === "undefined") return "medium"
 
   const cores = navigator.hardwareConcurrency ?? 6
@@ -71,10 +68,10 @@ function resolveAutoQuality(prefersReducedMotion?: boolean): ResolvedGraphicsQua
 
 export function resolveGraphicsQuality(
   quality: GraphicsQuality | undefined,
-  options?: { prefersReducedMotion?: boolean }
+  _options?: { prefersReducedMotion?: boolean }
 ): ResolvedGraphicsQuality {
-  const resolved = clampQuality(quality)
-  if (resolved === "auto") return resolveAutoQuality(options?.prefersReducedMotion)
+  const resolved = normalizeGraphicsQuality(quality)
+  if (resolved === "auto") return resolveAutoQuality()
   return resolved
 }
 
@@ -83,7 +80,7 @@ const GRAPHICS_PROFILES: Record<ResolvedGraphicsQuality, GraphicsProfile> = {
     quality: "low",
     dpr: [1, 1.15],
     antialias: false,
-    maxFps: 20,
+    maxFps: null,
     animate: true,
     nebulaVolumeLayers: 0,
     nebulaBackdropDensity: 0.6,
@@ -98,7 +95,7 @@ const GRAPHICS_PROFILES: Record<ResolvedGraphicsQuality, GraphicsProfile> = {
     quality: "medium",
     dpr: [1, 1.25],
     antialias: false,
-    maxFps: 30,
+    maxFps: null,
     animate: true,
     nebulaVolumeLayers: 1,
     nebulaBackdropDensity: 0.8,
@@ -124,21 +121,6 @@ const GRAPHICS_PROFILES: Record<ResolvedGraphicsQuality, GraphicsProfile> = {
     floatingGeometry: true,
     orbSamples: 8,
   },
-  static: {
-    quality: "static",
-    dpr: [1, 1.25],
-    antialias: false,
-    maxFps: 0,
-    animate: false,
-    nebulaVolumeLayers: 1,
-    nebulaBackdropDensity: 0.8,
-    auroraEnabled: false,
-    starfieldScale: 0.8,
-    sparklesScale: 0.6,
-    shootingStars: false,
-    floatingGeometry: false,
-    orbSamples: 4,
-  },
 }
 
 export function getGraphicsProfile(
@@ -152,9 +134,7 @@ export function getGraphicsProfile(
 
   return {
     ...base,
-    quality: "static",
     animate: false,
-    maxFps: 0,
     shootingStars: false,
   }
 }
