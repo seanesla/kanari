@@ -49,6 +49,15 @@ export function useCheckInSessionsContext(): CheckInSessionsContextValue {
   return context
 }
 
+/**
+ * Optional variant for cases where the tree may render without the provider
+ * (e.g., during route-level isolation or partial renders). Prefer
+ * `useCheckInSessionsContext()` when you want to enforce the provider.
+ */
+export function useOptionalCheckInSessionsContext(): CheckInSessionsContextValue | null {
+  return useContext(CheckInSessionsContext)
+}
+
 export function useCheckInSessionsFromContext(limit?: number): CheckInSession[] {
   const { sessions } = useCheckInSessionsContext()
   if (limit) {

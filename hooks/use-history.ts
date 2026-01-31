@@ -5,7 +5,9 @@
  */
 
 import { useMemo } from "react"
-import { useCheckInSessionsContext } from "@/lib/check-in-sessions-context"
+import { useLiveQuery } from "dexie-react-hooks"
+import { useOptionalCheckInSessionsContext } from "@/lib/check-in-sessions-context"
+import { db, toCheckInSession } from "@/lib/storage/db"
 import type { HistoryItem, AIChatHistoryItem } from "@/lib/types"
 
 /**
@@ -16,7 +18,17 @@ import type { HistoryItem, AIChatHistoryItem } from "@/lib/types"
  * @returns History timeline + loading state
  */
 export function useHistory(limit?: number): { items: HistoryItem[]; isLoading: boolean } {
-  const { sessions, isLoading } = useCheckInSessionsContext()
+  const context = useOptionalCheckInSessionsContext()
+  const shouldUseFallback = !context
+
+  const fallbackSessions = useLiveQuery(async () => {
+    if (!shouldUseFallback) return null
+    const results = await db.checkInSessions.orderBy("startedAt").reverse().toArray()
+    return results.map(toCheckInSession)
+  }, [shouldUseFallback])
+
+  const sessions = context?.sessions ?? fallbackSessions ?? []
+  const isLoading = context ? context.isLoading : fallbackSessions === undefined
 
   const limitedSessions = useMemo(() => {
     if (!limit) return sessions
