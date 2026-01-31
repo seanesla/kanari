@@ -141,11 +141,15 @@ export default function AchievementsPage() {
                 {achievementsToday.length === 0 ? (
                   <div className="space-y-3">
                     <div className="text-sm text-muted-foreground">
-                      {loading ? "Generating today’s achievements…" : "No achievements generated yet."}
+                      {loading
+                        ? "Generating today’s achievements…"
+                        : error
+                          ? "Couldn’t generate today’s achievements."
+                          : "Generating today’s achievements automatically…"}
                     </div>
-                    {!loading && (
+                    {!loading && error && (
                       <Button variant="outline" size="sm" onClick={() => void ensureToday()}>
-                        Generate today&apos;s achievements
+                        Retry
                       </Button>
                     )}
                   </div>

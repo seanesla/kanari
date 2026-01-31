@@ -30,6 +30,22 @@ describe("useAchievements AI level titles", () => {
     }))
 
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (input === "/api/gemini/achievements") {
+        return {
+          ok: true,
+          json: async () => ({
+            achievements: [
+              {
+                type: "badge",
+                category: "engagement",
+                title: "Test Badge",
+                description: "You did a thing recently.",
+                points: 15,
+              },
+            ],
+          }),
+        }
+      }
       if (input === "/api/gemini/achievements/level-title") {
         return {
           ok: true,
@@ -67,7 +83,7 @@ describe("useAchievements AI level titles", () => {
       currentDailyCompletionStreak: 0,
       longestDailyCompletionStreak: 0,
       lastCompletedDateISO: null,
-      lastGeneratedDateISO: null,
+      lastGeneratedDateISO: "2026-01-15",
     }
 
     const { db } = await import("@/lib/storage/db")

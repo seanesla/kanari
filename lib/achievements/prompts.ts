@@ -22,10 +22,11 @@ Create a small daily set that feels motivating, achievable, and specific to the 
 1) Return EXACTLY the requested number of achievements.
 2) Total returned achievements must be between 0 and 3 (the app enforces this).
 3) Challenges MUST be measurable using one of the allowed tracking keys.
-4) Avoid duplicates: do not reuse titles from the "recentDailyTitles" list.
-5) Keep titles short (2–5 words). No hashtags. No quoted text.
-6) Keep descriptions to 1 sentence. Insights are optional and must be 1 short sentence.
-7) Use exactly ONE emoji per achievement.
+4) Never create an achievement for simply opening Kanari / visiting the website / logging in.
+5) Avoid duplicates: do not reuse titles from the "recentDailyTitles" list.
+6) Keep titles short (2–5 words). No hashtags. No quoted text.
+7) Keep descriptions to 1 sentence. Insights are optional and must be 1 short sentence.
+8) Use exactly ONE emoji per achievement.
 
 ## Allowed Tracking Keys (challenges only)
 
@@ -191,4 +192,3 @@ export const LEVEL_TITLE_RESPONSE_SCHEMA = {
   },
   required: ["title", "reasoning"],
 }
-
