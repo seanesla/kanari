@@ -354,8 +354,31 @@ export default function LandingPage() {
       {/* Cinematic artwork (endcap) */}
       <section className="py-14 sm:py-16 md:py-20 px-6 md:px-12 bg-background/60 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto">
+          {/*
+            Mobile browsers (esp. iOS Safari) can rasterize filtered + blended layers at a
+            low internal resolution, which looks like pixelation. Keep the artwork clean
+            on small screens; keep the cinematic treatment on desktop.
+          */}
+          <figure className="md:hidden group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+              <div className="absolute inset-0 bg-gradient-to-tr from-accent/12 via-transparent to-foreground/5" />
+              <div className="absolute inset-0 bg-accent/8" />
+              <div className="absolute inset-0 opacity-60 bg-[radial-gradient(circle_at_50%_35%,rgba(255,255,255,0.08),transparent_55%)]" />
+            </div>
+
+            <Image
+              src="/landing/kanari-orbital-crystal.png"
+              alt="A glowing crystal with orbital lines in a smoky atmosphere"
+              width={1120}
+              height={625}
+              className="w-full h-auto object-cover opacity-[0.96]"
+            />
+
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-foreground/10" />
+          </figure>
+
           <motion.figure
-            className="group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]"
+            className="hidden md:block group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]"
             initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, filter: "blur(10px)" }}
             whileInView={
               reduceMotion
