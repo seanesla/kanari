@@ -49,7 +49,8 @@ export function UnifiedDashboard() {
   const [calendarOpen, setCalendarOpen] = useState(false)
 
   // Data hooks
-  const storedTrendData = useTrendData(7)
+  // Keep a longer window for the Trends tab, but use the most-recent week for forecasting.
+  const storedTrendData = useTrendData(30)
   const allRecordings = useRecordings(14)
   const {
     isConnected: isCalendarConnected,
@@ -171,7 +172,7 @@ export function UnifiedDashboard() {
   // Burnout prediction
   const burnoutPrediction: BurnoutPrediction | null = useMemo(() => {
     if (storedTrendData.length < 2) return null
-    return predictBurnoutRisk(storedTrendData)
+    return predictBurnoutRisk(storedTrendData.slice(-7))
   }, [storedTrendData])
 
   const latestSynthesisSession = useMemo(() => {
