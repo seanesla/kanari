@@ -26,9 +26,11 @@ describe("color-utils OKLCH formatting", () => {
 
     const foreground = document.documentElement.style.getPropertyValue("--foreground")
     const accent = document.documentElement.style.getPropertyValue("--accent")
+    const artworkHueShift = document.documentElement.style.getPropertyValue("--kanari-artwork-hue-shift")
 
     expect(foreground).toMatch(/^oklch\(\d+(\.\d+)?% /)
     expect(accent).toMatch(/^oklch\(\d+(\.\d+)?% /)
+    expect(artworkHueShift).toBe("0deg")
   })
 
   it("falls back to hex CSS vars when OKLCH is unsupported", async () => {
@@ -38,5 +40,14 @@ describe("color-utils OKLCH formatting", () => {
 
     expect(document.documentElement.style.getPropertyValue("--accent")).toBe("#d4a574")
     expect(document.documentElement.style.getPropertyValue("--foreground")).toBe("")
+    expect(document.documentElement.style.getPropertyValue("--kanari-artwork-hue-shift")).toBe("0deg")
+  })
+
+  it("computes a stable landing artwork hue-shift from hex (used via CSS var to avoid hydration mismatch)", async () => {
+    vi.stubGlobal("CSS", { supports: () => true })
+    const { updateCSSVariables } = await import("@/lib/color-utils")
+    updateCSSVariables("#00ff00")
+
+    expect(document.documentElement.style.getPropertyValue("--kanari-artwork-hue-shift")).toBe("89.375deg")
   })
 })

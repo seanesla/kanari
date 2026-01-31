@@ -1,9 +1,8 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image"
 import { motion, useReducedMotion } from "framer-motion"
-import { oklch } from "culori"
 import { useSceneMode } from "@/lib/scene-context"
 import { useLenis } from "@/hooks/use-lenis"
 import { useSectionObserver } from "@/hooks/use-section-observer"
@@ -18,22 +17,10 @@ import { cn } from "@/lib/utils"
 
 export default function LandingPage() {
   const [heroVisible, setHeroVisible] = useState(false)
-  const { resetToLanding, isLoading, accentColor } = useSceneMode()
+  const { resetToLanding, isLoading } = useSceneMode()
   const reduceMotion = useReducedMotion()
 
   const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
-
-  const artworkHueShift = useMemo(() => {
-    // The source painting is "gold" by default. We rotate its hue so it matches the user's accent.
-    const BASE_HUE = 67
-    const c = oklch(accentColor)
-    const h = c?.h
-    if (typeof h !== "number" || Number.isNaN(h)) return 0
-
-    let d = h - BASE_HUE
-    d = ((d + 180) % 360) - 180
-    return d
-  }, [accentColor])
   const stats = [
     { value: "76%", label: "of workers experience burnout" },
     { value: "3-7", label: "days advance warning" },
@@ -426,18 +413,19 @@ export default function LandingPage() {
               />
 
               {/* Accent colorization pass (keeps the artwork responsive to theme changes) */}
-              <Image
-                src="/landing/kanari-orbital-crystal.png"
-                alt=""
-                aria-hidden="true"
-                width={1120}
-                height={625}
-                sizes="(max-width: 768px) 100vw, 1200px"
-                className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-color pointer-events-none"
-                style={{
-                  filter: `hue-rotate(${artworkHueShift}deg) saturate(2.2) contrast(1.05)`,
-                }}
-              />
+	              <Image
+	                src="/landing/kanari-orbital-crystal.png"
+	                alt=""
+	                aria-hidden="true"
+	                width={1120}
+	                height={625}
+	                sizes="(max-width: 768px) 100vw, 1200px"
+	                className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-color pointer-events-none"
+	                style={{
+	                  // Use a CSS variable so SSR/client HTML stays deterministic (avoids hydration mismatch).
+	                  filter: "hue-rotate(var(--kanari-artwork-hue-shift, 0deg)) saturate(2.2) contrast(1.05)",
+	                }}
+	              />
 
               {/* One-time sheen pass (ties to accent color) */}
               {!reduceMotion && (

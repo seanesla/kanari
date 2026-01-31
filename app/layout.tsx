@@ -144,15 +144,15 @@ export default function RootLayout({
     return Math.max(0, Math.min(255, n | 0));
   }
 
-  function shadeHex(hex, mode, amount) {
-    // mode: "lighten" | "darken"
-    var c = normalizeHexColor(hex);
-    if (!c) return null;
-    var raw = c.slice(1);
-    var r = parseInt(raw.slice(0, 2), 16);
-    var g = parseInt(raw.slice(2, 4), 16);
-    var b = parseInt(raw.slice(4, 6), 16);
-    if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
+	  function shadeHex(hex, mode, amount) {
+	    // mode: "lighten" | "darken"
+	    var c = normalizeHexColor(hex);
+	    if (!c) return null;
+	    var raw = c.slice(1);
+	    var r = parseInt(raw.slice(0, 2), 16);
+	    var g = parseInt(raw.slice(2, 4), 16);
+	    var b = parseInt(raw.slice(4, 6), 16);
+	    if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
 
     if (mode === "lighten") {
       r = clampByte(r + (255 - r) * amount);
@@ -164,13 +164,42 @@ export default function RootLayout({
       b = clampByte(b * (1 - amount));
     }
 
-    var toHex = function (n) { return n.toString(16).padStart(2, "0"); };
-    return ("#" + toHex(r) + toHex(g) + toHex(b));
-  }
+	    var toHex = function (n) { return n.toString(16).padStart(2, "0"); };
+	    return ("#" + toHex(r) + toHex(g) + toHex(b));
+	  }
 
-  function applyAccent(hex) {
-    var accent = normalizeHexColor(hex);
-    if (!accent) return;
+	  function hueFromHex(hex) {
+	    var c = normalizeHexColor(hex);
+	    if (!c) return null;
+	    var raw = c.slice(1);
+	    var r = parseInt(raw.slice(0, 2), 16) / 255;
+	    var g = parseInt(raw.slice(2, 4), 16) / 255;
+	    var b = parseInt(raw.slice(4, 6), 16) / 255;
+	    if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null;
+
+	    var max = Math.max(r, g, b);
+	    var min = Math.min(r, g, b);
+	    var d = max - min;
+	    if (d === 0) return 0;
+
+	    var h;
+	    if (max === r) h = ((g - b) / d) % 6;
+	    else if (max === g) h = (b - r) / d + 2;
+	    else h = (r - g) / d + 4;
+
+	    h = h * 60;
+	    if (h < 0) h += 360;
+	    return h;
+	  }
+
+	  // Keep landing page artwork colorization deterministic for SSR by driving it via a CSS variable.
+	  // We compute hue deltas in simple RGB/HSL space (same on startup + runtime sync).
+	  var ARTWORK_BASE_HEX = "#d4a574";
+	  var ARTWORK_BASE_HUE = hueFromHex(ARTWORK_BASE_HEX);
+
+	  function applyAccent(hex) {
+	    var accent = normalizeHexColor(hex);
+	    if (!accent) return;
 
     var light = shadeHex(accent, "lighten", 0.15) || accent;
     var dark = shadeHex(accent, "darken", 0.30) || accent;
@@ -179,11 +208,23 @@ export default function RootLayout({
     root.style.setProperty("--accent", accent);
     root.style.setProperty("--accent-light", light);
     root.style.setProperty("--accent-dark", dark);
-    root.style.setProperty("--ring", accent);
-    root.style.setProperty("--chart-1", accent);
-    root.style.setProperty("--sidebar-primary", accent);
-    root.style.setProperty("--sidebar-ring", accent);
-  }
+	    root.style.setProperty("--ring", accent);
+	    root.style.setProperty("--chart-1", accent);
+	    root.style.setProperty("--sidebar-primary", accent);
+	    root.style.setProperty("--sidebar-ring", accent);
+
+	    try {
+	      var accentHue = hueFromHex(accent);
+	      if (typeof ARTWORK_BASE_HUE === "number" && typeof accentHue === "number") {
+	        var delta = accentHue - ARTWORK_BASE_HUE;
+	        delta = ((delta + 180) % 360) - 180;
+	        delta = Math.round(delta * 1000) / 1000;
+	        root.style.setProperty("--kanari-artwork-hue-shift", delta + "deg");
+	      } else {
+	        root.style.setProperty("--kanari-artwork-hue-shift", "0deg");
+	      }
+	    } catch (e) {}
+	  }
 
   try {
     var fromStorage = localStorage.getItem("kanari:accentColor");

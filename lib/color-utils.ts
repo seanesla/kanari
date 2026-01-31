@@ -5,6 +5,46 @@ export const DEFAULT_ACCENT_DARK = "#8b4513"
 
 // Error pattern doc: docs/error-patterns/oklch-lightness-must-be-percent.md
 
+function hexToHslHueDegrees(hex: string): number | null {
+  if (typeof hex !== "string") return null
+  const value = hex.trim().toLowerCase()
+  if (!value.startsWith("#")) return null
+  const raw = value.slice(1)
+  const expanded =
+    raw.length === 3
+      ? `#${raw[0]}${raw[0]}${raw[1]}${raw[1]}${raw[2]}${raw[2]}`
+      : raw.length === 6
+        ? `#${raw}`
+        : null
+  if (!expanded) return null
+
+  const r = parseInt(expanded.slice(1, 3), 16) / 255
+  const g = parseInt(expanded.slice(3, 5), 16) / 255
+  const b = parseInt(expanded.slice(5, 7), 16) / 255
+  if (Number.isNaN(r) || Number.isNaN(g) || Number.isNaN(b)) return null
+
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const d = max - min
+  if (d === 0) return 0
+
+  let h: number
+  if (max === r) h = ((g - b) / d) % 6
+  else if (max === g) h = (b - r) / d + 2
+  else h = (r - g) / d + 4
+
+  h *= 60
+  if (h < 0) h += 360
+  return h
+}
+
+function normalizeHueDeltaDegrees(delta: number): number {
+  // Normalize to [-180, 180]
+  return ((delta + 180) % 360) - 180
+}
+
+const ARTWORK_BASE_HUE_DEG = hexToHslHueDegrees(DEFAULT_ACCENT) ?? 0
+
 /**
  * Convert hex color to OKLCH format for CSS variables
  * Example: #d4a574 → "78% 0.16 70"
@@ -83,6 +123,10 @@ export function updateCSSVariables(hex: string) {
   const darkOklchValue = hexToOklch(darkVariant)
   const mutedValue = generateMutedOklch(hex)
   const root = document.documentElement
+  const accentHueDeg = hexToHslHueDegrees(hex) ?? ARTWORK_BASE_HUE_DEG
+  const artworkHueShiftDeg = Math.round(normalizeHueDeltaDegrees(accentHueDeg - ARTWORK_BASE_HUE_DEG) * 1000) / 1000
+
+  root.style.setProperty("--kanari-artwork-hue-shift", `${artworkHueShiftDeg}deg`)
 
   if (!supportsOklch) {
     // Keep the app readable on browsers without OKLCH support by emitting hex values.
