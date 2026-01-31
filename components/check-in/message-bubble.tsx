@@ -10,7 +10,7 @@
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
-import { User, AlertTriangle, ChevronDown, ChevronRight, VolumeX } from "@/lib/icons"
+import { User, AlertTriangle, ChevronDown, ChevronRight } from "@/lib/icons"
 import { CoachAvatar } from "@/components/coach-avatar"
 import { useTimeZone } from "@/lib/timezone-context"
 import type { CheckInMessage } from "@/lib/types"
@@ -36,7 +36,6 @@ export function MessageBubble({
   const isAssistant = message.role === "assistant"
   const hasMismatch = message.mismatch?.detected
   const hasThinking = isAssistant && message.thinking
-  const wasSkipped = isUser && message.silenceTriggered
   const isAssistantStreaming = isAssistant && message.isStreaming
 
   // State for expandable thinking section
@@ -77,8 +76,6 @@ export function MessageBubble({
             isUser
               ? "bg-accent text-accent-foreground rounded-tr-sm"
               : "bg-muted rounded-tl-sm",
-            // Darken message when AI chose to skip responding
-            wasSkipped && "opacity-60"
           )}
         >
           <p className={cn("whitespace-pre-wrap", isAssistantStreaming && "opacity-90")}>
@@ -130,14 +127,6 @@ export function MessageBubble({
           )}
         >
           <span>{time}</span>
-
-          {/* Skipped indicator - AI chose not to respond */}
-          {wasSkipped && (
-            <div className="flex items-center gap-1 text-muted-foreground/70">
-              <VolumeX className="w-3 h-3" />
-              <span>skipped</span>
-            </div>
-          )}
 
           {/* Mismatch indicator */}
           {showMismatchIndicator && hasMismatch && (

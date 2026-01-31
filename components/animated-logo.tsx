@@ -1,10 +1,8 @@
 "use client"
 
 import { motion, useAnimation } from "framer-motion"
-import { useEffect, useId, useMemo } from "react"
+import { useEffect, useId } from "react"
 import { LOGO_PATHS } from "./logo"
-import { useSceneMode } from "@/lib/scene-context"
-import { generateLightVariant, generateDarkVariant } from "@/lib/color-utils"
 
 interface AnimatedLogoProps {
   onComplete?: () => void
@@ -13,14 +11,7 @@ interface AnimatedLogoProps {
 
 export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
   const controls = useAnimation()
-  const { accentColor } = useSceneMode()
   const gradientId = useId()
-
-  const gradientColors = useMemo(() => ({
-    light: generateLightVariant(accentColor),
-    base: accentColor,
-    dark: generateDarkVariant(accentColor),
-  }), [accentColor])
 
   useEffect(() => {
     const sequence = async () => {
@@ -41,9 +32,9 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
       <svg viewBox="0 0 152.65443 173.92413" className="w-full h-full" overflow="visible">
         <defs>
           <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={gradientColors.light} />
-            <stop offset="50%" stopColor={gradientColors.base} />
-            <stop offset="100%" stopColor={gradientColors.dark} />
+            <stop offset="0%" stopColor="var(--accent-light)" />
+            <stop offset="50%" stopColor="var(--accent)" />
+            <stop offset="100%" stopColor="var(--accent-dark, var(--accent))" />
           </linearGradient>
         </defs>
 
@@ -73,7 +64,7 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
               key={`stroke-${index}`}
               d={path}
               fill="transparent"
-              stroke={gradientColors.base}
+              stroke="var(--accent)"
               strokeWidth={1.5}
               strokeLinecap="round"
               strokeLinejoin="round"

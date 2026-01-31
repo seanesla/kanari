@@ -91,7 +91,6 @@ export interface LiveClientEvents {
   onUserSpeechEnd: () => void
 
   // Tool/function calling
-  onSilenceChosen: (reason: string) => void
   onWidget: (event: GeminiWidgetEvent) => void
   onCommitment: (commitment: CommitmentToolArgs) => void
 
@@ -140,9 +139,6 @@ export class GeminiLiveClient {
 
   // Connection timeout tracking
   private connectionTimeoutId: ReturnType<typeof setTimeout> | null = null
-
-  // Silence mode - when model calls mute_audio_response, suppress all audio for current turn
-  private silenceMode = false
 
   // Track whether we've received ordered text output this turn.
   // When available, prefer this over outputAudioTranscription which can be out-of-order.
@@ -689,14 +685,10 @@ export class GeminiLiveClient {
       logDebug("LiveClient", "Function call:", fc.name, "args:", fc.args)
 
       if (fc.name === "mute_audio_response") {
-        // Model chose silence - activate silence mode to suppress audio
         const reason = (fc.args?.reason as string) || "no reason provided"
-        logDebug("LiveClient", "Model chose silence:", reason)
-
-        // CRITICAL: Set silence mode to suppress all audio for this turn
-        this.silenceMode = true
-
-        this.config.events.onSilenceChosen?.(reason)
+        // Backwards-compat: older sessions/prompts may still attempt to call this tool.
+        // We acknowledge it but do not suppress output (Kanari should always respond).
+        logDebug("LiveClient", "mute_audio_response called (ignored):", reason)
 
         // Send tool response to complete the turn
         this.sendToolResponse([{
@@ -986,24 +978,11 @@ export class GeminiLiveClient {
         const inlineData = part.inlineData as { mimeType?: string; data?: string } | undefined
         if (inlineData?.data) {
           if (inlineData.mimeType?.startsWith("audio/")) {
-            // BUG FIX: Suppress ALL output when in silence mode (audio + text).
-            // Pattern doc: docs/error-patterns/mute-audio-response-text-leak.md
-            if (this.silenceMode) {
-              logDebug("LiveClient", "Suppressing audio chunk in silence mode")
-              continue // Skip this audio chunk
-            }
             this.config.events.onAudioChunk?.(inlineData.data)
           }
         }
 
         if (part.text) {
-          // If the model chose silence for this turn, ignore any text output (transcript or thoughts).
-          // This prevents UI "leaks" like "Let me check" showing up while a message is marked skipped.
-          // Pattern doc: docs/error-patterns/mute-audio-response-text-leak.md
-          if (this.silenceMode) {
-            logDebug("LiveClient", "Suppressing text chunk in silence mode")
-            continue
-          }
           // BUG FIX 2: Sanitize control characters from text output
           const sanitizedText = (part.text as string).replace(/<ctrl\d+>/g, "")
           if (sanitizedText.trim()) {
@@ -1025,22 +1004,16 @@ export class GeminiLiveClient {
     // Note: outputTranscription.finished indicates when transcription is complete.
     // This is INDEPENDENT of turnComplete - they can arrive in any order.
     const outputTranscription = content.outputTranscription as { text?: string; finished?: boolean } | undefined
-    if (outputTranscription?.text && !this.hasTextOutputThisTurn && !this.silenceMode) {
+    if (outputTranscription?.text && !this.hasTextOutputThisTurn) {
       this.config.events.onModelTranscript?.(
         outputTranscription.text ?? "",
         outputTranscription.finished ?? false
       )
     }
 
-    // Check for turn complete - reset silence mode
+    // Check for turn complete
     if (content.turnComplete) {
       logDebug("GeminiLive", "Turn complete")
-
-      // Reset silence mode for next turn
-      if (this.silenceMode) {
-        logDebug("LiveClient", "Resetting silence mode")
-        this.silenceMode = false
-      }
 
       this.hasTextOutputThisTurn = false
       this.config.events.onTurnComplete?.()

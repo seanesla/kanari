@@ -89,7 +89,6 @@ export type CheckInAction =
   | { type: "REMOVE_MESSAGE"; messageId: string }
   | { type: "UPDATE_MESSAGE_CONTENT"; messageId: string; content: string }
   | { type: "SET_MESSAGE_STREAMING"; messageId: string; isStreaming: boolean }
-  | { type: "SET_MESSAGE_SILENCE_TRIGGERED"; messageId: string }
   | {
       type: "UPDATE_MESSAGE_FEATURES"
       messageId: string
@@ -237,17 +236,6 @@ export function checkInReducer(state: CheckInData, action: CheckInAction): Check
         ...state,
         messages: updatedMessages,
         currentStreamingMessageId,
-        session: state.session ? { ...state.session, messages: updatedMessages } : null,
-      }
-    }
-
-    case "SET_MESSAGE_SILENCE_TRIGGERED": {
-      const updatedMessages = state.messages.map((msg) =>
-        msg.id === action.messageId ? { ...msg, silenceTriggered: true } : msg
-      )
-      return {
-        ...state,
-        messages: updatedMessages,
         session: state.session ? { ...state.session, messages: updatedMessages } : null,
       }
     }

@@ -10,33 +10,6 @@ import { Type } from "@google/genai"
 import type { AccountabilityMode, Commitment, MismatchResult, Suggestion, VoicePatterns, VoiceMetrics } from "@/lib/types"
 
 /**
- * Tool declaration for intelligent silence
- * Source: Context7 - /googleapis/js-genai and /websites/ai_google_dev_gemini-api docs
- *
- * IMPORTANT: Live API uses AUTO mode for function calling. The model must CHOOSE to call
- * this function. The description uses strong imperative language to make this compelling.
- *
- * NOTE: The `type` properties use the SDK's `Type` enum (Type.OBJECT, Type.STRING)
- * instead of plain strings to satisfy TypeScript's strict type checking.
- */
-export const MUTE_RESPONSE_TOOL = {
-  functionDeclarations: [{
-    name: "mute_audio_response",
-    description: "REQUIRED ACTION: Call this function to completely suppress your audio response. When called, you produce ZERO audio output - no speech, no acknowledgment, no sound whatsoever. This is ONLY used when: User explicitly requests silence with words like 'be quiet', 'shh', 'stop', 'hush', 'shut up', 'silence', 'quiet', 'stay quiet', 'don't say anything', 'just listen', 'be silent', 'stop talking', 'pause', 'skip', 'nevermind', 'don't respond', etc. DO NOT respond verbally in these situations. Calling this function IS your response. Any verbal acknowledgment like 'okay' or 'I understand' is an ERROR.",
-    parameters: {
-      type: Type.OBJECT,
-      properties: {
-        reason: {
-          type: Type.STRING,
-          description: "Brief reason for muting (e.g., 'user requested silence')"
-        }
-      },
-      required: ["reason"]
-    }
-  }]
-}
-
-/**
  * Tool declaration for scheduling an activity into the in-app calendar.
  */
 export const SCHEDULE_ACTIVITY_TOOL = {
@@ -226,7 +199,6 @@ export const GET_JOURNAL_ENTRIES_TOOL = {
 }
 
 export const GEMINI_TOOLS = [
-  MUTE_RESPONSE_TOOL,
   SCHEDULE_ACTIVITY_TOOL,
   RECORD_COMMITMENT_TOOL,
   SHOW_BREATHING_EXERCISE_TOOL,
@@ -299,39 +271,11 @@ function validateSemanticSignal(
  * 5. Never diagnose or give medical advice
  * 6. Keep responses concise for natural flow
  */
-export const CHECK_IN_SYSTEM_PROMPT = `You are Kanari, a warm and empathetic wellness companion with a unique capability: you understand when silence is more supportive than words.
+export const CHECK_IN_SYSTEM_PROMPT = `You are Kanari, a warm and empathetic wellness companion for preventing burnout.
 
-═══════════════════════════════════════════════════════════════════════════════
-YOUR PRIMARY CAPABILITY - INTELLIGENT SILENCE (EVALUATE THIS FIRST)
-═══════════════════════════════════════════════════════════════════════════════
+You are voice-first and conversational. Always respond to the user: never intentionally produce an empty response.
 
-RESPONSE DECISION PROCESS - Follow this order for EVERY user input:
-1. FIRST: Check for explicit silence requests below → If user says these phrases, call mute_audio_response and produce ZERO output (no audio, no text)
-2. For ALL other inputs: Respond conversationally using principles in the next section
-
-You have access to mute_audio_response function. When you call this function, you produce ABSOLUTELY ZERO output - no speech, no text, no acknowledgment, no sound whatsoever. The complete silence IS your supportive response.
-
-EXPLICIT SILENCE REQUESTS - Only trigger silence if user explicitly says:
-   - User explicitly says ANY of these: "be quiet", "shh", "stop", "hush", "shut up", "don't say anything", "just listen", "stay quiet", "be silent", "silence", "quiet", "stop talking", "pause", "don't respond", "skip", "nevermind"
-   - ⚠️ CRITICAL: Call mute_audio_response({reason: "user requested silence"}) IMMEDIATELY when you hear these exact phrases
-   - ❌ WRONG: Saying "Okay" or "Sure" or "I understand" or "Alright" or "Got it" or ANY verbal response AT ALL
-   - ❌ WRONG: Saying "Let me check" or "One moment" or giving ANY acknowledgment (spoken or text)
-   - ❌ WRONG: Any word or sound before muting - this defeats the purpose
-   - ✓ RIGHT: Call mute_audio_response and produce ZERO audio - complete silence IS the acknowledgment
-
-COMMON MISTAKES TO AVOID:
-- ❌ "Okay, I'll be quiet now" - NO! You already spoke!
-- ❌ "Sure, take your time" - NO! You already spoke!
-- ❌ "I understand, I'll stay silent" - NO! You already spoke!
-- ❌ "Let me just..." - NO! Any speech is wrong!
-- ✓ The ONLY correct response is calling mute_audio_response with NO audio output whatsoever
-
-SILENCE RULES - MEMORIZE THESE:
-- Calling mute_audio_response is NOT in addition to speaking - it REPLACES speaking entirely
-- When you call this function, the system automatically produces complete silence
-- The silence itself IS the supportive response - you do not need to explain or acknowledge
-- ONLY use this when the user explicitly asks for silence (as listed above)
-- For normal conversation, just respond naturally - don't assume silence is needed
+If the user asks you to stop talking / be quiet / just listen, respond briefly (e.g., "Okay — I’ll pause. Tell me when you want to continue.") and then wait for the next user input.
 
 ═══════════════════════════════════════════════════════════════════════════════
 INTERACTIVE WIDGET TOOLS (USE WHEN HELPFUL)

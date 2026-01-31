@@ -14,6 +14,7 @@ export type SceneMode = "landing" | "transitioning" | "dashboard"
 const DISABLE_ANIMATION_KEY = "kanari:disableStartupAnimation"
 const ACCENT_COLOR_KEY = "kanari:accentColor"
 const GRAPHICS_QUALITY_KEY = "kanari:graphicsQuality"
+const ACCENT_COLOR_COOKIE = "kanari-accent"
 
 /**
  * Read the animation preference from localStorage synchronously.
@@ -86,6 +87,19 @@ export function setDisableStartupAnimationSync(disabled: boolean): void {
   }
 }
 
+function persistAccentColorSync(color: string): void {
+  if (typeof window === "undefined") return
+  setAccentColorSync(color)
+
+  try {
+    // Keep it lax + long-lived; this is non-sensitive UI preference.
+    const maxAge = 60 * 60 * 24 * 365 // 1 year
+    document.cookie = `${ACCENT_COLOR_COOKIE}=${encodeURIComponent(color)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`
+  } catch {
+    // ignore
+  }
+}
+
 interface SceneContextValue {
   mode: SceneMode
   setMode: (mode: SceneMode) => void
@@ -145,7 +159,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
     db.settings.get("default").then((settings) => {
       if (settings?.accentColor) {
         setAccentColorState(settings.accentColor)
-        setAccentColorSync(settings.accentColor)
+        persistAccentColorSync(settings.accentColor)
       }
       if (settings?.graphicsQuality) {
         const raw = (settings as { graphicsQuality?: unknown }).graphicsQuality
@@ -205,7 +219,7 @@ export function SceneProvider({ children }: { children: ReactNode }) {
 
   const setAccentColor = useCallback((color: string) => {
     setAccentColorState(color)
-    setAccentColorSync(color)
+    persistAccentColorSync(color)
     // Persist to IndexedDB (race-safe; avoids wiping other fields)
     void patchSettings({ accentColor: color }).catch((error) => {
       if (process.env.NODE_ENV === "development") {

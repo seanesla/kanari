@@ -290,10 +290,6 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
       assistantHasStartedRef.current = true
       messages.handlers.onAudioChunk(base64Audio)
     },
-    onSilenceChosen: (reason: string) => {
-      assistantHasStartedRef.current = true
-      messages.handlers.onSilenceChosen(reason)
-    },
     onTurnComplete: () => {
       suppressAssistantAudioRef.current = false
       messages.handlers.onTurnComplete()

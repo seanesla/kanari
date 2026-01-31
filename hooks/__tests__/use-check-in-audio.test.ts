@@ -15,7 +15,6 @@ type GeminiLiveCallbacks = {
   onUserTranscript?: (text: string, isFinal: boolean) => void
   onModelTranscript?: (text: string, finished: boolean) => void
   onAudioChunk?: (base64Audio: string) => void
-  onSilenceChosen?: (reason: string) => void
 }
 
 let geminiCallbacks: GeminiLiveCallbacks | null = null

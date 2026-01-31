@@ -78,7 +78,9 @@ export function updateCSSVariables(hex: string) {
 
   const oklchValue = hexToOklch(hex)
   const lightVariant = generateLightVariant(hex)
+  const darkVariant = generateDarkVariant(hex)
   const lightOklchValue = hexToOklch(lightVariant)
+  const darkOklchValue = hexToOklch(darkVariant)
   const mutedValue = generateMutedOklch(hex)
   const root = document.documentElement
 
@@ -87,6 +89,7 @@ export function updateCSSVariables(hex: string) {
     // We intentionally avoid rewriting the whole base palette in this mode.
     root.style.setProperty("--accent", hex)
     root.style.setProperty("--accent-light", lightVariant)
+    root.style.setProperty("--accent-dark", darkVariant)
     root.style.setProperty("--muted-foreground", formatHex({ mode: "oklch", l: 0.78, c: 0.08, h: color?.h || 60 }) || "#d9af7f")
     root.style.setProperty("--ring", hex)
     root.style.setProperty("--chart-1", hex)
@@ -98,6 +101,7 @@ export function updateCSSVariables(hex: string) {
   // Update accent-related CSS variables
   root.style.setProperty("--accent", `oklch(${oklchValue})`)
   root.style.setProperty("--accent-light", `oklch(${lightOklchValue})`)
+  root.style.setProperty("--accent-dark", `oklch(${darkOklchValue})`)
   root.style.setProperty("--muted-foreground", mutedValue)
   root.style.setProperty("--ring", `oklch(${oklchValue})`)
   root.style.setProperty("--chart-1", `oklch(${oklchValue})`)

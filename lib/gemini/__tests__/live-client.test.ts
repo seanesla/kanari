@@ -98,7 +98,6 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
         onInterrupted: vi.fn(),
         onUserSpeechStart: vi.fn(),
         onUserSpeechEnd: vi.fn(),
-        onSilenceChosen: vi.fn(),
         onWidget: vi.fn(),
         onCommitment: vi.fn(),
         onSendError: vi.fn(),
@@ -216,7 +215,7 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
     expect(mockSession.close).toHaveBeenCalled()
   })
 
-  test("handles mute_audio_response tool call and suppresses all output for the turn", async () => {
+  test("acknowledges mute_audio_response tool call but does not suppress output", async () => {
     await client.connect()
 
     getClientInternals(client).handleMessage({
@@ -231,7 +230,6 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
       },
     })
 
-    expect(config.events.onSilenceChosen).toHaveBeenCalledWith("user requested silence")
     expect(mockSession.sendToolResponse).toHaveBeenCalledWith({
       functionResponses: [
         {
@@ -242,13 +240,14 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
       ],
     })
 
+    ;(config.events.onAudioChunk as ReturnType<typeof vi.fn>).mockClear()
     ;(config.events.onModelTranscript as ReturnType<typeof vi.fn>).mockClear()
     ;(config.events.onModelThinking as ReturnType<typeof vi.fn>).mockClear()
 
     getClientInternals(client).handleServerContent({
       modelTurn: {
         parts: [
-          { inlineData: { mimeType: "audio/pcm", data: "suppressed==" } },
+          { inlineData: { mimeType: "audio/pcm", data: "ok==" } },
           { text: "Let me check" },
           { text: "internal", thought: true },
         ],
@@ -256,16 +255,9 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
       outputTranscription: { text: "Let me check", finished: true },
     })
 
-    expect(config.events.onAudioChunk).not.toHaveBeenCalledWith("suppressed==")
-    expect(config.events.onModelTranscript).not.toHaveBeenCalled()
-    expect(config.events.onModelThinking).not.toHaveBeenCalled()
-
-    // After turnComplete, silence mode resets and output is allowed again.
-    getClientInternals(client).handleServerContent({ turnComplete: true })
-    getClientInternals(client).handleServerContent({
-      modelTurn: { parts: [{ text: "Hello" }] },
-    })
-    expect(config.events.onModelTranscript).toHaveBeenCalledWith("Hello", false)
+    expect(config.events.onAudioChunk).toHaveBeenCalledWith("ok==")
+    expect(config.events.onModelTranscript).toHaveBeenCalledWith("Let me check", false)
+    expect(config.events.onModelThinking).toHaveBeenCalledWith("internal")
   })
 
   test("handles record_commitment tool call and acknowledges", async () => {

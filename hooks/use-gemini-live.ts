@@ -84,8 +84,6 @@ export interface UseGeminiLiveOptions {
   /** Callbacks for turn events */
   onTurnComplete?: () => void
   onInterrupted?: () => void
-  /** Called when AI chooses silence (doesn't respond) */
-  onSilenceChosen?: (reason: string) => void
   /** Called when Gemini triggers an interactive widget */
   onWidget?: (event: GeminiWidgetEvent) => void
   /** Called when Gemini records a user commitment */
@@ -174,11 +172,6 @@ function createLiveClientEvents({
       if (!mountedRef.current) return
       dispatch({ type: "MODEL_SPEECH_END" })
       callbacksRef.current.onInterrupted?.()
-    },
-    onSilenceChosen: (reason) => {
-      if (!mountedRef.current) return
-      dispatch({ type: "MODEL_SPEECH_END" })
-      callbacksRef.current.onSilenceChosen?.(reason)
     },
     onUserSpeechStart: () => {
       if (!mountedRef.current) return
@@ -346,19 +339,18 @@ export function geminiReducer(state: GeminiLiveData, action: GeminiAction): Gemi
 export function useGeminiLive(
   options: UseGeminiLiveOptions = {}
 ): [GeminiLiveData, GeminiLiveControls] {
-  const {
-    onAudioChunk,
-    onAudioEnd,
-    onUserTranscript,
-    onModelTranscript,
-    onModelThinking,
-    onTurnComplete,
-    onInterrupted,
-    onSilenceChosen,
-    onWidget,
-    onCommitment,
-    onUserSpeechStart,
-    onUserSpeechEnd,
+	  const {
+	    onAudioChunk,
+	    onAudioEnd,
+	    onUserTranscript,
+	    onModelTranscript,
+	    onModelThinking,
+	    onTurnComplete,
+	    onInterrupted,
+	    onWidget,
+	    onCommitment,
+	    onUserSpeechStart,
+	    onUserSpeechEnd,
     onConnected,
     onDisconnected,
     onError,
@@ -371,19 +363,18 @@ export function useGeminiLive(
   const mountedRef = useRef(true)
 
   // Store callbacks in refs to avoid stale closures
-  const callbacksRef = useRef({
-    onAudioChunk,
-    onAudioEnd,
-    onUserTranscript,
-    onModelTranscript,
-    onModelThinking,
-    onTurnComplete,
-    onInterrupted,
-    onSilenceChosen,
-    onWidget,
-    onCommitment,
-    onUserSpeechStart,
-    onUserSpeechEnd,
+	  const callbacksRef = useRef({
+	    onAudioChunk,
+	    onAudioEnd,
+	    onUserTranscript,
+	    onModelTranscript,
+	    onModelThinking,
+	    onTurnComplete,
+	    onInterrupted,
+	    onWidget,
+	    onCommitment,
+	    onUserSpeechStart,
+	    onUserSpeechEnd,
     onConnected,
     onDisconnected,
     onError,
@@ -391,40 +382,38 @@ export function useGeminiLive(
 
   // Update refs when callbacks change
   useEffect(() => {
-    callbacksRef.current = {
-      onAudioChunk,
-      onAudioEnd,
-      onUserTranscript,
-      onModelTranscript,
-      onModelThinking,
-      onTurnComplete,
-      onInterrupted,
-      onSilenceChosen,
-      onWidget,
-      onCommitment,
-      onUserSpeechStart,
-      onUserSpeechEnd,
+	    callbacksRef.current = {
+	      onAudioChunk,
+	      onAudioEnd,
+	      onUserTranscript,
+	      onModelTranscript,
+	      onModelThinking,
+	      onTurnComplete,
+	      onInterrupted,
+	      onWidget,
+	      onCommitment,
+	      onUserSpeechStart,
+	      onUserSpeechEnd,
       onConnected,
       onDisconnected,
       onError,
     }
-  }, [
-    onAudioChunk,
-    onAudioEnd,
-    onUserTranscript,
-    onModelTranscript,
-    onModelThinking,
-    onTurnComplete,
-    onInterrupted,
-    onSilenceChosen,
-    onWidget,
-    onCommitment,
-    onUserSpeechStart,
-    onUserSpeechEnd,
-    onConnected,
-    onDisconnected,
-    onError,
-  ])
+	  }, [
+	    onAudioChunk,
+	    onAudioEnd,
+	    onUserTranscript,
+	    onModelTranscript,
+	    onModelThinking,
+	    onTurnComplete,
+	    onInterrupted,
+	    onWidget,
+	    onCommitment,
+	    onUserSpeechStart,
+	    onUserSpeechEnd,
+	    onConnected,
+	    onDisconnected,
+	    onError,
+	  ])
 
   // Cleanup on unmount
   useEffect(() => {

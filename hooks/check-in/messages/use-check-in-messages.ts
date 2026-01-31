@@ -46,7 +46,6 @@ export interface CheckInMessagesGeminiHandlers {
   onAudioChunk: (base64Audio: string) => void
   onTurnComplete: () => void
   onInterrupted: () => void
-  onSilenceChosen: (reason: string) => void
 }
 
 export interface UseCheckInMessagesOptions {
@@ -89,11 +88,6 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
   // Track the last user message ID for updating with features
   const lastUserMessageIdRef = useRef<string | null>(null)
   const lastAssistantMessageIdRef = useRef<string | null>(null)
-
-  // When the model calls mute_audio_response, we must suppress ALL assistant output
-  // for the rest of the turn (no transcript, no thinking, no audio).
-  // Pattern doc: docs/error-patterns/mute-audio-response-text-leak.md
-  const suppressAssistantOutputRef = useRef(false)
 
   // When VAD "speech start" events are missing, user transcript updates can keep
   // appending into the previous bubble. We treat the end of an assistant turn
@@ -166,7 +160,6 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       // Reset all per-session message/transcript refs.
       lastUserMessageIdRef.current = null
       lastAssistantMessageIdRef.current = null
-      suppressAssistantOutputRef.current = false
       currentTranscriptRef.current = ""
       currentThinkingRef.current = ""
       userTranscriptRef.current = ""
@@ -476,7 +469,6 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
   const onModelTranscript = useCallback(
     (text: string, finished: boolean) => {
       if (!text) return
-      if (suppressAssistantOutputRef.current) return
 
       const mergedAssistant = mergeTranscriptUpdate(currentTranscriptRef.current, text)
       if (debugTranscriptMergeRef.current) {
@@ -521,7 +513,6 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
   const onModelThinking = useCallback(
     (text: string) => {
-      if (suppressAssistantOutputRef.current) return
       // Simple: just accumulate thinking text
       currentThinkingRef.current += text
       dispatch({ type: "APPEND_ASSISTANT_THINKING", text })
@@ -531,7 +522,6 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
   const onAudioChunk = useCallback(
     (base64Audio: string) => {
-      if (suppressAssistantOutputRef.current) return
       // If the model starts speaking and we still have a streaming user message,
       // finalize it so it doesn't look "in-progress" throughout the reply.
       const messageId = lastUserMessageIdRef.current
@@ -549,7 +539,6 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
   )
 
   const onTurnComplete = useCallback(() => {
-    suppressAssistantOutputRef.current = false
     // Finalize the streaming message (just removes isStreaming flag - no DOM change)
     dispatch({ type: "FINALIZE_STREAMING_MESSAGE" })
     // Reset refs for next response
@@ -570,36 +559,6 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     dispatch({ type: "CLEAR_CURRENT_TRANSCRIPTS" })
     dispatch({ type: "SET_USER_SPEAKING" })
   }, [clearQueuedAudio, dispatch])
-
-  const onSilenceChosen = useCallback(
-    (reason: string) => {
-      // Model chose to stay silent - don't play audio, transition to listening
-      logDebug("useCheckIn", "AI chose silence:", reason)
-      suppressAssistantOutputRef.current = true
-
-      // If any assistant text already started streaming for this turn, remove it.
-      // Pattern doc: docs/error-patterns/mute-audio-response-text-leak.md
-      const assistantMessageIdToRemove = lastAssistantMessageIdRef.current
-      if (assistantMessageIdToRemove) {
-        dispatch({ type: "REMOVE_MESSAGE", messageId: assistantMessageIdToRemove })
-      }
-      lastAssistantMessageIdRef.current = null
-      currentTranscriptRef.current = ""
-      currentThinkingRef.current = ""
-      dispatch({ type: "CLEAR_CURRENT_TRANSCRIPTS" })
-
-      // Mark the last user message as having triggered silence
-      // This provides visual feedback that AI intentionally chose not to respond
-      const messageIdToMark = lastUserMessageIdRef.current
-      if (messageIdToMark) {
-        dispatch({ type: "SET_MESSAGE_SILENCE_TRIGGERED", messageId: messageIdToMark })
-      }
-
-      dispatch({ type: "SET_LISTENING" })
-      pendingUserUtteranceResetRef.current = true
-    },
-    [dispatch]
-  )
 
   const sendTextMessage = useCallback(
     (text: string) => {
@@ -622,8 +581,6 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     (_reason?: string) => {
       // Treat disconnects like an abrupt "turn end" so new sessions don't
       // merge transcripts into a previously streaming bubble.
-      suppressAssistantOutputRef.current = false
-
       // Finalize any in-flight assistant message.
       dispatch({ type: "FINALIZE_STREAMING_MESSAGE" })
 
@@ -662,7 +619,6 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     onAudioChunk,
     onTurnComplete,
     onInterrupted,
-    onSilenceChosen,
   }
 
   return {

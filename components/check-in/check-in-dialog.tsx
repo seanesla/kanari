@@ -695,7 +695,18 @@ export function CheckInDialog({
                 <Button
                   variant="destructive"
                   size="icon"
-                  className="absolute right-0 top-1/2 -translate-y-1/2 h-14 w-14 rounded-full shadow-lg"
+                  className={[
+                    "absolute right-0 top-1/2 h-14 w-14 rounded-full shadow-lg",
+                    "-translate-y-1/2",
+                    // Override shared Button animations (translate/scale/brightness) and use our own hover animation instead.
+                    "transition-transform duration-200 ease-out",
+                    "hover:-translate-y-1/2 active:-translate-y-1/2",
+                    "hover:scale-100 active:scale-100",
+                    "hover:brightness-100 active:brightness-100",
+                    "hover:bg-destructive active:bg-destructive",
+                    "hover:shadow-lg active:shadow-lg",
+                    "hover:rotate-6",
+                  ].join(" ")}
                   onClick={handleEndCall}
                 >
                   <PhoneOff className="h-6 w-6" />
