@@ -13,6 +13,7 @@ import SceneBackground from "@/components/scene"
 import { PersistentNavbar } from "@/components/persistent-navbar"
 import { RequireUserName } from "@/components/require-user-name"
 import { ColorSync } from "@/components/color-sync"
+import { JankLogger } from "@/components/perf/jank-logger"
 import { IconProvider } from "./icon-provider"
 import { DataPreloader } from "./data-preloader"
 import { DemoProvider, DemoOverlay } from "@/components/demo"
@@ -26,6 +27,7 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <IconProvider>
       <MotionConfig reducedMotion="user">
+        <JankLogger />
         <DataPreloader>
           <SceneProvider>
             <TimeZoneProvider>

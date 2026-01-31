@@ -29,36 +29,12 @@ function getDisableStartupAnimation(): boolean {
   }
 }
 
-function getAccentColorSync(): string | null {
-  if (typeof window === "undefined") return null
-  try {
-    const stored = localStorage.getItem(ACCENT_COLOR_KEY)
-    if (!stored) return null
-    // Expect a hex color (what we persist today).
-    if (!/^#[0-9a-fA-F]{6}$/.test(stored)) return null
-    return stored
-  } catch {
-    return null
-  }
-}
-
 function setAccentColorSync(color: string): void {
   if (typeof window === "undefined") return
   try {
     localStorage.setItem(ACCENT_COLOR_KEY, color)
   } catch {
     // localStorage not available, ignore
-  }
-}
-
-function getGraphicsQualitySync(): GraphicsQuality | null {
-  if (typeof window === "undefined") return null
-  try {
-    const stored = localStorage.getItem(GRAPHICS_QUALITY_KEY)
-    if (!stored) return null
-    return normalizeGraphicsQuality(stored)
-  } catch {
-    return null
   }
 }
 
@@ -136,12 +112,12 @@ export const SceneContext = createContext<SceneContextValue | null>(null)
 export function SceneProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<SceneMode>("landing")
   const scrollProgressRef = useRef(0)
-  // Keep SSR + client hydration consistent.
+  // Keep SSR + client hydration consistent (no localStorage reads here).
   // Startup animation suppression is handled by an early inline script (app/layout.tsx)
   // that sets a data attribute for CSS to hide the overlay before hydration.
   const [isLoading, setIsLoading] = useState(true)
-  const [accentColor, setAccentColorState] = useState(() => getAccentColorSync() ?? DEFAULT_ACCENT)
-  const [graphicsQuality, setGraphicsQualityState] = useState<GraphicsQuality>(() => getGraphicsQualitySync() ?? "auto")
+  const [accentColor, setAccentColorState] = useState(DEFAULT_ACCENT)
+  const [graphicsQuality, setGraphicsQualityState] = useState<GraphicsQuality>("auto")
   const [selectedSansFont, setSelectedSansFontState] = useState(DEFAULT_SANS)
   const [selectedSerifFont, setSelectedSerifFontState] = useState(DEFAULT_SERIF)
 

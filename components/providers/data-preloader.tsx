@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, type ReactNode } from "react"
-import { CheckInSessionsProvider } from "@/lib/check-in-sessions-context"
 import { db } from "@/lib/storage/db"
 import { logWarn } from "@/lib/logger"
 
@@ -20,5 +19,5 @@ export function DataPreloader({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  return <CheckInSessionsProvider>{children}</CheckInSessionsProvider>
+  return children
 }

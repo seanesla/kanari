@@ -6,6 +6,7 @@ import { useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import { SCENE_COLORS } from "@/lib/constants"
 import { getGraphicsProfile } from "@/lib/graphics/quality"
+import { R3FJankLogger } from "@/components/perf/r3f-jank-logger"
 import { CAMERA, FOG } from "./constants"
 import { Scene } from "./scene-canvas"
 import { LoadingOverlay } from "./loading-overlay"
@@ -137,12 +138,13 @@ function SceneBackgroundInner() {
               alpha: false,
               powerPreference,
             }}
-            frameloop={isPageVisible && profile.animate ? "always" : "demand"}
+            frameloop={isPageVisible && profile.animate && !isLoading ? "always" : "demand"}
             onCreated={({ gl }) => {
               gl.setClearColor(SCENE_COLORS.background, 1)
               gl.clear(true, true, true)
             }}
           >
+            <R3FJankLogger />
             <color attach="background" args={[SCENE_COLORS.background]} />
             <fog attach="fog" args={[FOG.color, FOG.near, FOG.far]} />
             <Scene scrollProgressRef={scrollProgressRef} mode={mode} />

@@ -44,15 +44,9 @@ export function Scene({ scrollProgressRef, mode }: SceneProps) {
         Avoid preset environments here: drei presets fetch HDRs over the network.
         This custom environment is fully local and stable on first paint.
       */}
-      <Environment key={accentColor} frames={1} resolution={128} background={false}>
+      <Environment frames={1} resolution={128} background={false}>
         {/* Key light source to drive the glass highlights */}
-        <Lightformer
-          intensity={2.2}
-          color={accentColor}
-          position={[6, 4, -6]}
-          rotation={[0, -0.7, 0]}
-          scale={[10, 10, 1]}
-        />
+        <Lightformer intensity={2.2} color="#ffffff" position={[6, 4, -6]} rotation={[0, -0.7, 0]} scale={[10, 10, 1]} />
         {/* Soft fill */}
         <Lightformer intensity={0.9} color="#ffffff" position={[-6, -2, 6]} rotation={[0, 0.7, 0]} scale={[12, 8, 1]} />
         {/* Cool rim to keep the orb readable against fog */}
