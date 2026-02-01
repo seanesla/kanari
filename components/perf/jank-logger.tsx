@@ -31,10 +31,11 @@ export function JankLogger() {
       const now = performance.now()
       const dt = now - lastFrameAt
       if (dt > FRAME_GAP_WARN_MS) {
+        const dtRounded = Math.round(dt)
         const memory = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory
         const usedMB = memory?.usedJSHeapSize ? Math.round(memory.usedJSHeapSize / (1024 * 1024)) : null
-        console.warn("[Perf] Frame gap", {
-          dtMs: Math.round(dt),
+        console.warn(`[Perf] Frame gap ${dtRounded}ms`, {
+          dtMs: dtRounded,
           hidden: typeof document !== "undefined" ? document.visibilityState === "hidden" : null,
           usedHeapMB: usedMB,
         })

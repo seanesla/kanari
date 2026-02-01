@@ -68,7 +68,7 @@ export function FeaturesSection() {
             <p className="mt-4 text-lg text-muted-foreground">
               <span className="inline-flex items-center gap-2">
                 Privacy-first. Browser-based. Powered by Gemini 3.
-                <Image src="/gemini-logo.svg" alt="Gemini" width={16} height={16} />
+                <Image src="/gemini-logo.svg" alt="Gemini" width={16} height={16} className="h-4 w-4" />
               </span>
             </p>
           </motion.div>

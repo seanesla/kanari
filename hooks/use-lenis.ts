@@ -49,7 +49,22 @@ export function useLenis() {
       if (rafIdRef.current !== null) return
       const raf = (time: number) => {
         if (cancelled) return
+
         lenis.raf(time)
+
+        if (cancelled) return
+        if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+          rafIdRef.current = null
+          return
+        }
+
+        // Lenis exposes `isScrolling` as 'smooth' | 'native' | false.
+        // When it returns to false, we're idle and can stop the loop.
+        if (!lenis.isScrolling) {
+          rafIdRef.current = null
+          return
+        }
+
         rafIdRef.current = requestAnimationFrame(raf)
       }
       rafIdRef.current = requestAnimationFrame(raf)
@@ -61,12 +76,22 @@ export function useLenis() {
         stopLoop()
         return
       }
+      if (lenis.isScrolling) startLoop()
+    }
+
+    const kick = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return
       startLoop()
     }
 
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", onVisibilityChange)
     }
+
+    // Only run the rAF loop while Lenis is actively scrolling.
+    window.addEventListener("wheel", kick, { passive: true })
+    window.addEventListener("scroll", kick, { passive: true })
+
     onVisibilityChange()
 
     return () => {
@@ -74,6 +99,9 @@ export function useLenis() {
       if (typeof document !== "undefined") {
         document.removeEventListener("visibilitychange", onVisibilityChange)
       }
+
+      window.removeEventListener("wheel", kick)
+      window.removeEventListener("scroll", kick)
 
       stopLoop()
       lenis.destroy()

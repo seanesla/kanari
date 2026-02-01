@@ -28,7 +28,7 @@ export function TrustSection() {
   return (
     <section
       id="trust"
-      className="scroll-mt-28 py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50 backdrop-blur-xl"
+      className="scroll-mt-28 py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50"
       aria-label="Trust"
     >
       <ScrollReveal>
@@ -60,7 +60,7 @@ export function TrustSection() {
             </div>
 
             <div className="lg:col-span-6 lg:col-start-7">
-              <div className="rounded-2xl border border-border/60 bg-background/40 backdrop-blur-xl p-6">
+              <div className="rounded-2xl border border-border/60 bg-background/40 p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="text-lg font-medium">Trust drawer</h3>

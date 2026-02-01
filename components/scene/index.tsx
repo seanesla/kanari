@@ -104,6 +104,10 @@ function SceneBackgroundInner() {
 
     let rafId: number | null = null
     let maxScroll = 0
+    let lastScrollY = -1
+    let lastScrollEventAt = 0
+    let lastScrollChangeAt = 0
+    const IDLE_STOP_MS = 140
 
     const computeMaxScroll = () => {
       maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
@@ -114,32 +118,63 @@ function SceneBackgroundInner() {
       scrollProgressRef.current = progress
     }
 
-    const useRaf = profile.animate
+    const stopRaf = () => {
+      if (rafId === null) return
+      window.cancelAnimationFrame(rafId)
+      rafId = null
+    }
 
-    const update = () => {
+    const tick = () => {
+      const y = window.scrollY
+      const now = performance.now()
+
+      if (y !== lastScrollY) {
+        lastScrollY = y
+        lastScrollChangeAt = now
+        updateProgress()
+      }
+
       // On iOS, scroll events can be throttled heavily during momentum scrolling.
-      // Sampling scroll position on rAF keeps the 3D scene parallax in sync.
+      // Sampling scroll position on rAF keeps the 3D scene parallax in sync, but we
+      // only keep the rAF loop alive while scroll is actually changing.
+      if (now - lastScrollChangeAt > IDLE_STOP_MS && now - lastScrollEventAt > IDLE_STOP_MS) {
+        stopRaf()
+        return
+      }
+
+      rafId = window.requestAnimationFrame(tick)
+    }
+
+    const startRaf = () => {
+      if (rafId !== null) return
+      const now = performance.now()
+      lastScrollEventAt = now
+      lastScrollChangeAt = now
+      lastScrollY = window.scrollY
       updateProgress()
-      rafId = window.requestAnimationFrame(update)
+      rafId = window.requestAnimationFrame(tick)
+    }
+
+    const onScroll = () => {
+      lastScrollEventAt = performance.now()
+      updateProgress()
+      if (profile.animate) startRaf()
+    }
+
+    const onResize = () => {
+      computeMaxScroll()
+      updateProgress()
     }
 
     computeMaxScroll()
-
-    if (useRaf) {
-      update()
-    } else {
-      updateProgress()
-      window.addEventListener("scroll", updateProgress, { passive: true })
-    }
-
-    window.addEventListener("resize", computeMaxScroll, { passive: true })
+    updateProgress()
+    window.addEventListener("scroll", onScroll, { passive: true })
+    window.addEventListener("resize", onResize, { passive: true })
 
     return () => {
-      window.removeEventListener("resize", computeMaxScroll)
-      window.removeEventListener("scroll", updateProgress)
-      if (rafId !== null) {
-        window.cancelAnimationFrame(rafId)
-      }
+      window.removeEventListener("scroll", onScroll)
+      window.removeEventListener("resize", onResize)
+      stopRaf()
     }
   }, [mode, isLoading, isPageVisible, profile.animate, scrollProgressRef])
 

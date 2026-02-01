@@ -33,13 +33,15 @@ export function R3FJankLogger() {
     const dtMs = delta * 1000
     if (dtMs < 140) return
 
+    const dtRounded = Math.round(dtMs)
+
     const now = performance.now()
     if (now - lastLogAtRef.current < 800) return
     lastLogAtRef.current = now
 
     const info = state.gl.info
-    console.warn("[Perf] R3F frame gap", {
-      dtMs: Math.round(dtMs),
+    console.warn(`[Perf] R3F frame gap ${dtRounded}ms`, {
+      dtMs: dtRounded,
       calls: info.render.calls,
       triangles: info.render.triangles,
       points: info.render.points,
