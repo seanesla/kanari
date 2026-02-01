@@ -342,6 +342,15 @@
     display: none;
   }
 
+  /*
+   * iOS fallback: apply hue shift directly to the source image.
+   * This keeps the artwork responsive to the accent color without relying on
+   * mix-blend-mode + filters (which can artifact on WebKit).
+   */
+  .kanari-artwork-image {
+    filter: hue-rotate(var(--kanari-artwork-hue-shift, 0deg));
+  }
+
   .kanari-artwork .mix-blend-soft-light,
   .kanari-artwork .mix-blend-color {
     mix-blend-mode: normal;

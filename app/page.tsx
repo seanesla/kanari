@@ -411,7 +411,7 @@ export default function LandingPage() {
                   width={1120}
                   height={625}
                   sizes="(max-width: 768px) 100vw, 1200px"
-                  className="w-full h-auto object-cover opacity-[0.96]"
+                  className="w-full h-auto object-cover opacity-[0.96] kanari-artwork-image"
                 />
 
                 {/* Accent colorization pass (disabled on iOS/iPadOS Safari due to WebKit artifacts) */}
@@ -490,7 +490,7 @@ export default function LandingPage() {
                       width={1120}
                       height={625}
                       sizes="(max-width: 768px) 100vw, 1200px"
-                      className="w-full h-auto object-cover opacity-[0.96]"
+                      className="w-full h-auto object-cover opacity-[0.96] kanari-artwork-image"
                     />
 
                     {/* Accent colorization pass (disabled on iOS/iPadOS Safari due to WebKit artifacts) */}
