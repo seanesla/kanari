@@ -38,7 +38,8 @@ This is not medical advice and it does not diagnose burnout.
 - **Achievement System**: Track streaks and milestones
 
 ### Demo
-- **Guided Feature Tour**: Interactive walkthrough at `/demo` showcasing all features with video demos
+- **Guided Feature Tour**: Interactive walkthrough on the landing page (`/#feature-tour`) showcasing features with short video demos
+- **Demo Mode**: One-click seeded workspace so you can explore the dashboard without doing a real check-in
 
 ### Privacy
 - **On-device Features**: Acoustic feature extraction runs in your browser (voice patterns/biomarkers)

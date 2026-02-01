@@ -46,15 +46,19 @@ Note: `NEXT_PUBLIC_GEMINI_API_KEY` is exposed to the browser. Prefer BYO key for
 - `app/(app)/` - Dashboard routes: overview, check-ins, analytics, achievements, settings (URLs: `/overview`, `/check-ins`, etc.)
 - `app/api/gemini/live/` - Gemini Live streaming routes (WebSocket proxy)
 - `app/api/gemini/synthesize/` - Post-check-in synthesis API (insights, journal entries)
-- `app/demo/` - Interactive feature tour with video demos
+- `components/feature-tour/` - Guided feature tour UI (used on the landing page)
+- `components/demo/` - Demo overlay/spotlight + demo run controller (guided in-app walkthrough)
+- `components/demo-mode-button.tsx` - Entry point for starting demo workspace
 - `components/check-in/` - Check-in dialog, voice picker, synthesis screen, conversation UI
 - `components/dashboard/` - Dashboard UI (metrics, charts, kanban, history, insights panel, journal entries panel)
 - `hooks/` - `use-check-in`, `use-gemini-live`, `use-audio-playback`, `use-recording`, `use-storage`, `use-voice-preview`
 - `lib/audio/` - Web Audio, VAD, Meyda features, PCM conversion
 - `lib/gemini/` - API client, prompts, `live-client.ts` (WebSocket), `synthesis-client.ts`, `voices.ts`, mismatch detection
+- `lib/demo/` - Demo seed data, videos/images helpers, and utilities
 - `lib/ml/` - Forecasting, inference, `thresholds.ts`, `personalized-biomarkers.ts` (calibration), `biomarker-fusion.ts` (semantic+acoustic blending)
 - `lib/server/` - Rate limiting utilities for shared API key
 - `lib/settings/` - Default settings configuration
+- `lib/workspace.ts` - Demo vs real workspace flag (localStorage)
 
 ### State Management
 - `SceneProvider` - Scene mode, accent color, loading
