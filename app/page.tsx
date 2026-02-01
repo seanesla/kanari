@@ -17,6 +17,7 @@ import { DemoModeButton } from "@/components/demo-mode-button"
 import { cn } from "@/lib/utils"
 import { TrustSection } from "@/components/trust-section"
 import { FeatureTour } from "@/components/feature-tour/feature-tour"
+import { ExitDemoOnLanding } from "@/components/demo/exit-demo-on-landing"
 
 export default function LandingPage() {
   const [heroVisible, setHeroVisible] = useState(false)
@@ -124,6 +125,7 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen min-h-[100svh] bg-transparent overflow-x-hidden">
+      <ExitDemoOnLanding />
       {/* Hero */}
       <section
         ref={heroSectionRef}
