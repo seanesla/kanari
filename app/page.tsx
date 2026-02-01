@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type CSSProperties } from "react"
 import Image from "next/image"
 import { motion, useReducedMotion } from "framer-motion"
 import { useRouter } from "next/navigation"
@@ -398,7 +398,7 @@ export default function LandingPage() {
                 low internal resolution, which looks like pixelation. Keep the artwork clean
                 on small screens; keep the cinematic treatment on desktop.
               */}
-              <figure className="md:hidden group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]">
+              <figure className="md:hidden kanari-artwork group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]">
                 <div aria-hidden="true" className="pointer-events-none absolute inset-0">
                   <div className="absolute inset-0 bg-gradient-to-tr from-accent/12 via-transparent to-foreground/5" />
                   <div className="absolute inset-0 bg-accent/8" />
@@ -414,7 +414,7 @@ export default function LandingPage() {
                   className="w-full h-auto object-cover opacity-[0.96]"
                 />
 
-                {/* Accent colorization pass (keeps the artwork responsive to theme changes) */}
+                {/* Accent colorization pass (disabled on iOS/iPadOS Safari due to WebKit artifacts) */}
                 <Image
                   src="/landing/kanari-orbital-crystal.png"
                   alt=""
@@ -422,18 +422,21 @@ export default function LandingPage() {
                   width={1120}
                   height={625}
                   sizes="(max-width: 768px) 100vw, 1200px"
-                  className="absolute inset-0 w-full h-full object-cover opacity-55 mix-blend-color pointer-events-none"
-                  style={{
-                    // Use a CSS variable so SSR/client HTML stays deterministic (avoids hydration mismatch).
-                    filter: "hue-rotate(var(--kanari-artwork-hue-shift, 0deg)) saturate(2.0) contrast(1.03)",
-                  }}
+                  className="absolute inset-0 w-full h-full object-cover pointer-events-none kanari-artwork-colorize"
+                  style={
+                    {
+                      "--kanari-artwork-colorize-opacity": 0.55,
+                      "--kanari-artwork-colorize-saturate": 2.0,
+                      "--kanari-artwork-colorize-contrast": 1.03,
+                    } as CSSProperties
+                  }
                 />
 
                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-foreground/10" />
               </figure>
 
               <motion.figure
-                className="hidden md:block group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]"
+                className="hidden md:block kanari-artwork group relative overflow-hidden rounded-[2rem] border border-border/50 bg-card/30 shadow-[0_30px_80px_-50px_rgba(0,0,0,0.9)]"
                   initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 18, filter: "blur(10px)" }}
                   whileInView={
                     reduceMotion
@@ -490,7 +493,7 @@ export default function LandingPage() {
                       className="w-full h-auto object-cover opacity-[0.96]"
                     />
 
-                    {/* Accent colorization pass (keeps the artwork responsive to theme changes) */}
+                    {/* Accent colorization pass (disabled on iOS/iPadOS Safari due to WebKit artifacts) */}
                     <Image
                       src="/landing/kanari-orbital-crystal.png"
                       alt=""
@@ -498,11 +501,14 @@ export default function LandingPage() {
                       width={1120}
                       height={625}
                       sizes="(max-width: 768px) 100vw, 1200px"
-                      className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-color pointer-events-none"
-                      style={{
-                        // Use a CSS variable so SSR/client HTML stays deterministic (avoids hydration mismatch).
-                        filter: "hue-rotate(var(--kanari-artwork-hue-shift, 0deg)) saturate(2.2) contrast(1.05)",
-                      }}
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none kanari-artwork-colorize"
+                      style={
+                        {
+                          "--kanari-artwork-colorize-opacity": 0.6,
+                          "--kanari-artwork-colorize-saturate": 2.2,
+                          "--kanari-artwork-colorize-contrast": 1.05,
+                        } as CSSProperties
+                      }
                     />
 
                     {/* One-time sheen pass (ties to accent color) */}

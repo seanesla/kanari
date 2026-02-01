@@ -16,13 +16,21 @@ type DemoSlide = {
   title: string
   subtitle: string
   bullets: string[]
-  media: {
-    poster: string
-    webm?: string
-    mp4?: string
-    fallbackImage: string
-    replaceHint: string
-  }
+  media:
+    | {
+        kind: "video"
+        poster: string
+        webm?: string
+        mp4?: string
+        fallbackImage: string
+        replaceHint: string
+      }
+    | {
+        kind: "image"
+        src: string
+        alt: string
+        replaceHint: string
+      }
 }
 
 const SLIDES: DemoSlide[] = [
@@ -36,11 +44,11 @@ const SLIDES: DemoSlide[] = [
       "Designed for daily use: low friction, fast feedback",
     ],
     media: {
+      kind: "video",
       poster: "/demo/posters/01-checkin.svg",
-      webm: "/demo/01-checkin.webm",
       mp4: "/demo/01-checkin.mp4",
       fallbackImage: "/demo/posters/01-checkin.svg",
-      replaceHint: "Drop your recording at public/demo/01-checkin.webm (or .mp4)",
+      replaceHint: "Drop your recording at public/demo/01-checkin.mp4",
     },
   },
   {
@@ -53,11 +61,11 @@ const SLIDES: DemoSlide[] = [
       "This is the privacy-first core: analysis near the user",
     ],
     media: {
+      kind: "video",
       poster: "/demo/posters/02-biomarkers.svg",
-      webm: "/demo/02-biomarkers.webm",
       mp4: "/demo/02-biomarkers.mp4",
       fallbackImage: "/demo/posters/02-biomarkers.svg",
-      replaceHint: "Drop your recording at public/demo/02-biomarkers.webm (or .mp4)",
+      replaceHint: "Drop your recording at public/demo/02-biomarkers.mp4",
     },
   },
   {
@@ -70,11 +78,11 @@ const SLIDES: DemoSlide[] = [
       "Creates a longitudinal narrative, not just a score",
     ],
     media: {
+      kind: "video",
       poster: "/demo/posters/03-insights.svg",
-      webm: "/demo/03-insights.webm",
       mp4: "/demo/03-insights.mp4",
       fallbackImage: "/demo/posters/03-insights.svg",
-      replaceHint: "Drop your recording at public/demo/03-insights.webm (or .mp4)",
+      replaceHint: "Drop your recording at public/demo/03-insights.mp4",
     },
   },
   {
@@ -87,11 +95,10 @@ const SLIDES: DemoSlide[] = [
       "Shows trend charts to prove it's longitudinal, not a one-off score",
     ],
     media: {
-      poster: "/demo/posters/04-forecast.svg",
-      webm: "/demo/04-forecast.webm",
-      mp4: "/demo/04-forecast.mp4",
-      fallbackImage: "/demo/posters/04-forecast.svg",
-      replaceHint: "Drop your recording at public/demo/04-forecast.webm (or .mp4)",
+      kind: "image",
+      src: "/demo/04-forecast.png",
+      alt: "Forecast trends chart",
+      replaceHint: "Drop your screenshot at public/demo/04-forecast.png",
     },
   },
   {
@@ -104,11 +111,10 @@ const SLIDES: DemoSlide[] = [
       "Workflow-friendly: triage, schedule, complete",
     ],
     media: {
-      poster: "/demo/posters/05-suggestions.svg",
-      webm: "/demo/05-suggestions.webm",
-      mp4: "/demo/05-suggestions.mp4",
-      fallbackImage: "/demo/posters/05-suggestions.svg",
-      replaceHint: "Drop your recording at public/demo/05-suggestions.webm (or .mp4)",
+      kind: "image",
+      src: "/demo/05-suggestions.png",
+      alt: "Kanban suggestions board",
+      replaceHint: "Drop your screenshot at public/demo/05-suggestions.png",
     },
   },
   {
@@ -121,28 +127,11 @@ const SLIDES: DemoSlide[] = [
       "Optional Google Calendar integration for real-world follow-through",
     ],
     media: {
+      kind: "video",
       poster: "/demo/posters/06-calendar.svg",
-      webm: "/demo/06-calendar.webm",
       mp4: "/demo/06-calendar.mp4",
       fallbackImage: "/demo/posters/06-calendar.svg",
-      replaceHint: "Drop your recording at public/demo/06-calendar.webm (or .mp4)",
-    },
-  },
-  {
-    id: "history",
-    title: "Check-in history timeline",
-    subtitle: "A unified place to browse past sessions and outcomes.",
-    bullets: [
-      "ChatGPT-style history layout with fast navigation",
-      "Stores sessions locally (offline-first, instant load)",
-      "Supports bulk selection + delete for control",
-    ],
-    media: {
-      poster: "/demo/posters/07-history.svg",
-      webm: "/demo/07-history.webm",
-      mp4: "/demo/07-history.mp4",
-      fallbackImage: "/demo/posters/07-history.svg",
-      replaceHint: "Drop your recording at public/demo/07-history.webm (or .mp4)",
+      replaceHint: "Drop your recording at public/demo/06-calendar.mp4",
     },
   },
   {
@@ -155,28 +144,11 @@ const SLIDES: DemoSlide[] = [
       "Keeps engagement without turning the app into a game",
     ],
     media: {
+      kind: "video",
       poster: "/demo/posters/08-achievements.svg",
-      webm: "/demo/08-achievements.webm",
       mp4: "/demo/08-achievements.mp4",
       fallbackImage: "/demo/posters/08-achievements.svg",
-      replaceHint: "Drop your recording at public/demo/08-achievements.webm (or .mp4)",
-    },
-  },
-  {
-    id: "coach",
-    title: "Personalized coach (voice + avatar)",
-    subtitle: "A more human interface that makes check-ins easier to stick with.",
-    bullets: [
-      "Voice selection + previews during onboarding",
-      "Avatar generation for a consistent coach identity",
-      "Preferences: reminders + accountability mode",
-    ],
-    media: {
-      poster: "/demo/posters/09-coach.svg",
-      webm: "/demo/09-coach.webm",
-      mp4: "/demo/09-coach.mp4",
-      fallbackImage: "/demo/posters/09-coach.svg",
-      replaceHint: "Drop your recording at public/demo/09-coach.webm (or .mp4)",
+      replaceHint: "Drop your recording at public/demo/08-achievements.mp4",
     },
   },
   {
@@ -189,11 +161,10 @@ const SLIDES: DemoSlide[] = [
       "Designed for trust: clear boundaries on what leaves the device",
     ],
     media: {
-      poster: "/demo/posters/10-privacy.svg",
-      webm: "/demo/10-privacy.webm",
-      mp4: "/demo/10-privacy.mp4",
-      fallbackImage: "/demo/posters/10-privacy.svg",
-      replaceHint: "Drop your recording at public/demo/10-privacy.webm (or .mp4)",
+      kind: "image",
+      src: "/demo/posters/10-privacy.svg",
+      alt: "Privacy and bring-your-own-key",
+      replaceHint: "Replace the poster at public/demo/posters/10-privacy.svg",
     },
   },
 ]
@@ -225,7 +196,10 @@ function DemoFeatureTour() {
   }, [resetToLanding])
 
   const slide = SLIDES[index]!
-  const videoSources = useMemo(() => getDemoVideoSources(slide.media), [slide.media.mp4, slide.media.webm])
+  const videoSources = useMemo(() => {
+    if (slide.media.kind !== "video") return []
+    return getDemoVideoSources(slide.media)
+  }, [slide.media])
   const mediaStatus = mediaState.slideId === slide.id ? mediaState.status : "unknown"
 
   // Use the latest requested index (if any) for button enable/disable.
@@ -267,6 +241,13 @@ function DemoFeatureTour() {
   useEffect(() => {
     let cancelled = false
 
+    if (slide.media.kind !== "video") {
+      setMediaState({ slideId: slide.id, status: "available" })
+      return () => {
+        cancelled = true
+      }
+    }
+
     const check = async () => {
       setMediaState({ slideId: slide.id, status: "unknown" })
       const candidates = videoSources.map((source) => source.src)
@@ -289,7 +270,7 @@ function DemoFeatureTour() {
     return () => {
       cancelled = true
     }
-  }, [slide.id, videoSources])
+  }, [slide.id, slide.media.kind, videoSources])
 
   // Keyboard navigation
   useEffect(() => {
@@ -404,10 +385,10 @@ function DemoFeatureTour() {
                           "shadow-[0_18px_60px_rgba(0,0,0,0.22)]"
                         )}
                       >
-                        {mediaStatus === "missing" ? (
+                        {slide.media.kind === "image" || mediaStatus === "missing" ? (
                           <Image
-                            src={slide.media.fallbackImage}
-                            alt={`${slide.title} screenshot`}
+                            src={slide.media.kind === "image" ? slide.media.src : slide.media.fallbackImage}
+                            alt={slide.media.kind === "image" ? slide.media.alt : `${slide.title} screenshot`}
                             fill
                             sizes="(max-width: 1024px) 100vw, 900px"
                             className="object-cover"
@@ -434,7 +415,7 @@ function DemoFeatureTour() {
 
                         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
 
-                        {mediaStatus === "missing" ? (
+                        {slide.media.kind === "video" && mediaStatus === "missing" ? (
                           <div className="pointer-events-none absolute left-0 right-0 bottom-0 p-4 md:p-6">
                             <p className="text-xs text-white/80 font-mono truncate">{slide.media.replaceHint}</p>
                           </div>

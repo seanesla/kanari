@@ -317,6 +317,37 @@
 
 }
 
+/*
+ * Landing page artwork colorization
+ *
+ * We intentionally implement this as a CSS class (not inline styles) so we can
+ * disable it on iOS/iPadOS Safari. WebKit on iOS is prone to severe rendering
+ * artifacts when combining large images with mix-blend-mode + CSS filters.
+ */
+
+.kanari-artwork {
+  isolation: isolate;
+}
+
+.kanari-artwork-colorize {
+  opacity: var(--kanari-artwork-colorize-opacity, 0.6);
+  mix-blend-mode: color;
+  filter: hue-rotate(var(--kanari-artwork-hue-shift, 0deg))
+    saturate(var(--kanari-artwork-colorize-saturate, 2.2))
+    contrast(var(--kanari-artwork-colorize-contrast, 1.05));
+}
+
+@supports (-webkit-touch-callout: none) {
+  .kanari-artwork-colorize {
+    display: none;
+  }
+
+  .kanari-artwork .mix-blend-soft-light,
+  .kanari-artwork .mix-blend-color {
+    mix-blend-mode: normal;
+  }
+}
+
 /* Subtle glitch for failing status */
 @keyframes subtle-glitch {
   0%, 97%, 100% {

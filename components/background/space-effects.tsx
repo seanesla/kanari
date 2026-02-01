@@ -5,6 +5,21 @@ import { useFrame } from "@react-three/fiber"
 import { Float } from "@react-three/drei"
 import * as THREE from "three"
 
+const PROCEDURAL_TEXTURE_SIZE = (() => {
+  // Safari is noticeably slower at Canvas 2D blur + gradients. Keeping these procedural
+  // textures smaller prevents multi-second main-thread stalls during scene mount.
+  if (typeof navigator === "undefined") return 512
+
+  const ua = navigator.userAgent ?? ""
+  const isAppleWebKit = /AppleWebKit\//.test(ua)
+  const isSafariLike = /Safari\//.test(ua)
+  const isChromiumLike = /Chrome\//.test(ua) || /Chromium\//.test(ua) || /Edg\//.test(ua) || /OPR\//.test(ua)
+  const isOtherIosBrowser = /CriOS\//.test(ua) || /FxiOS\//.test(ua) || /EdgiOS\//.test(ua)
+  const isSafari = isAppleWebKit && isSafariLike && !isChromiumLike && !isOtherIosBrowser
+
+  return isSafari ? 256 : 512
+})()
+
 export type SpaceVariant = "landing" | "dashboard"
 
 function clamp01(value: number) {
@@ -493,9 +508,9 @@ export function NebulaVolume({
     // changes between 1..3.
     const baseSeed = variant === "landing" ? 1201 : 2201
     const next: [THREE.Texture | null, THREE.Texture | null, THREE.Texture | null] = [
-      retainNebulaVolumeTexture(baseSeed),
-      retainNebulaVolumeTexture(baseSeed + 1),
-      retainNebulaVolumeTexture(baseSeed + 2),
+      retainNebulaVolumeTexture(baseSeed, PROCEDURAL_TEXTURE_SIZE),
+      retainNebulaVolumeTexture(baseSeed + 1, PROCEDURAL_TEXTURE_SIZE),
+      retainNebulaVolumeTexture(baseSeed + 2, PROCEDURAL_TEXTURE_SIZE),
     ]
 
     setTextures(next)
@@ -710,17 +725,18 @@ export function NebulaBackdrop({
   density?: number
 }) {
   const clampedDensity = clamp01(density)
+  const texturesEnabled = clampedDensity > 0
   const textures = useMemo(() => {
-    if (clampedDensity <= 0) {
+    if (!texturesEnabled) {
       return { gasA: null, gasB: null, dust: null }
     }
     const a = variant === "landing" ? 21 : 11
     return {
-      gasA: createNebulaTexture(a),
-      gasB: createNebulaTexture(a + 1),
-      dust: createDustLaneTexture(a + 2),
+      gasA: createNebulaTexture(a, PROCEDURAL_TEXTURE_SIZE),
+      gasB: createNebulaTexture(a + 1, PROCEDURAL_TEXTURE_SIZE),
+      dust: createDustLaneTexture(a + 2, PROCEDURAL_TEXTURE_SIZE),
     }
-  }, [variant, clampedDensity])
+  }, [variant, texturesEnabled])
 
   useEffect(() => {
     return () => {
@@ -1171,8 +1187,8 @@ export function GalaxySprites({
   variant: SpaceVariant
   animate?: boolean
 }) {
-  const galaxyA = useDisposableTexture(() => createGalaxyTexture(77), [])
-  const galaxyB = useDisposableTexture(() => createGalaxyTexture(78), [])
+  const galaxyA = useDisposableTexture(() => createGalaxyTexture(77, PROCEDURAL_TEXTURE_SIZE), [])
+  const galaxyB = useDisposableTexture(() => createGalaxyTexture(78, PROCEDURAL_TEXTURE_SIZE), [])
 
   const color = useMemo(() => {
     const accent = new THREE.Color(accentColor)
