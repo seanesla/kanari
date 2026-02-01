@@ -174,17 +174,21 @@ export function CelebrationToast({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={handleDismiss}
           />
 
           {/* Toast Container */}
-          <div className="fixed inset-0 flex items-center justify-center z-50 pointer-events-none">
+          <div
+            className="fixed inset-0 flex items-center justify-center z-50"
+            data-testid="celebration-toast-overlay"
+            onClick={handleDismiss}
+          >
             <motion.div
               className="relative pointer-events-auto max-w-sm w-full mx-4"
               initial={{ scale: 0.8, opacity: 0, y: 50 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.8, opacity: 0, y: 50 }}
               transition={{ type: "spring", stiffness: 400, damping: 30 }}
+              onClick={(event) => event.stopPropagation()}
             >
               {/* Confetti */}
               <ConfettiExplosion />

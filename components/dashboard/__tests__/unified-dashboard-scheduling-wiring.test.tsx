@@ -8,9 +8,11 @@ import type { Suggestion } from "@/lib/types"
 
 let lastCalendarProps: Record<string, unknown> | null = null
 let lastScheduleDialogProps: Record<string, unknown> | null = null
+let lastSuggestionDetailProps: Record<string, unknown> | null = null
 
 const handleTimeSlotClick = vi.fn()
 const handleExternalDrop = vi.fn()
+const handleScheduleConfirm = vi.fn(async () => true)
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -65,7 +67,7 @@ const scheduleDialogSuggestion: Suggestion = {
 
 vi.mock("@/hooks/use-suggestion-workflow", () => ({
   useSuggestionWorkflow: () => ({
-    selectedSuggestion: null,
+    selectedSuggestion: scheduleDialogSuggestion,
     scheduleDialogSuggestion,
     pendingDragActive: true,
     droppedSuggestion: {
@@ -79,7 +81,7 @@ vi.mock("@/hooks/use-suggestion-workflow", () => ({
       handleScheduleFromDialog: vi.fn(),
       handleExternalDrop,
       handleTimeSlotClick,
-      handleScheduleConfirm: vi.fn(async () => true),
+      handleScheduleConfirm,
       handleDismiss: vi.fn(async () => true),
       handleComplete: vi.fn(async () => true),
       handleCompleteWithFeedback: vi.fn(async () => true),
@@ -166,7 +168,10 @@ vi.mock("@/components/dashboard/calendar", async () => {
 vi.mock("@/components/dashboard/suggestions", async () => {
   const React = await import("react")
   return {
-    SuggestionDetailDialog: () => React.createElement("div", null),
+    SuggestionDetailDialog: (props: Record<string, unknown>) => {
+      lastSuggestionDetailProps = props
+      return React.createElement("div", { "data-testid": "suggestion-detail" })
+    },
     ScheduleTimeDialog: (props: Record<string, unknown>) => {
       lastScheduleDialogProps = props
       return React.createElement("div", { "data-testid": "schedule-dialog" })
@@ -186,6 +191,7 @@ describe("UnifiedDashboard scheduling wiring", () => {
   beforeEach(() => {
     lastCalendarProps = null
     lastScheduleDialogProps = null
+    lastSuggestionDetailProps = null
     vi.clearAllMocks()
   })
 
@@ -203,5 +209,20 @@ describe("UnifiedDashboard scheduling wiring", () => {
     expect(lastScheduleDialogProps?.defaultDateISO).toBe("2026-01-20")
     expect(lastScheduleDialogProps?.defaultHour).toBe(14)
     expect(lastScheduleDialogProps?.defaultMinute).toBe(15)
+
+    expect(lastSuggestionDetailProps).not.toBeNull()
+    expect(lastSuggestionDetailProps?.onAccept).toEqual(expect.any(Function))
+
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date("2026-02-01T12:34:56.000Z"))
+      ;(lastSuggestionDetailProps?.onAccept as undefined | ((s: Suggestion) => void))?.(scheduleDialogSuggestion)
+      expect(handleScheduleConfirm).toHaveBeenCalledWith(
+        scheduleDialogSuggestion,
+        "2026-02-01T12:34:56.000Z"
+      )
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

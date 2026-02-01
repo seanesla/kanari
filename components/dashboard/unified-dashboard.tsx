@@ -585,6 +585,11 @@ export function UnifiedDashboard() {
           open={!!selectedSuggestion}
           onOpenChange={(open) => !open && handlers.closeDialogs()}
           onSchedule={handlers.handleScheduleFromDialog}
+          onAccept={(suggestion) => {
+            // Low-friction flow: accept schedules the suggestion immediately for "now".
+            // This avoids an extra dialog step; users can still adjust via drag/drop later.
+            void handlers.handleScheduleConfirm(suggestion, new Date().toISOString())
+          }}
           onDismiss={handlers.handleDismiss}
           onComplete={handlers.handleComplete}
           onCompleteWithFeedback={handlers.handleCompleteWithFeedback}

@@ -82,14 +82,18 @@ export function SuggestionDetailDialog({
   // Store the suggestion being completed while feedback dialog is open
   const [completingSuggestion, setCompletingSuggestion] = useState<Suggestion | null>(null)
 
-  if (!suggestion) return null
+  // IMPORTANT: Don't early-return on `!suggestion` while the feedback dialog is open.
+  // The parent clears `suggestion` to close the detail dialog, but we still need to
+  // render the feedback dialog immediately (otherwise it appears only after a second click).
+  // Pattern doc: docs/error-patterns/suggestion-complete-feedback-dialog-hidden.md
+  if (!suggestion && !showFeedbackDialog) return null
 
-  const Icon = categoryIcons[suggestion.category]
-  const colors = categoryColors[suggestion.category]
-  const isPending = suggestion.status === "pending"
-  const isScheduled = suggestion.status === "scheduled"
-  const isCompleted = suggestion.status === "accepted" || suggestion.status === "completed"
-  const isDismissed = suggestion.status === "dismissed"
+  const Icon = suggestion ? categoryIcons[suggestion.category] : Coffee
+  const colors = suggestion ? categoryColors[suggestion.category] : categoryColors.break
+  const isPending = suggestion?.status === "pending"
+  const isScheduled = suggestion?.status === "scheduled"
+  const isCompleted = suggestion?.status === "accepted" || suggestion?.status === "completed"
+  const isDismissed = suggestion?.status === "dismissed"
 
   /**
    * Handle the "Mark Complete" button click.
@@ -134,90 +138,91 @@ export function SuggestionDetailDialog({
 
   return (
   <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="border-border/70 bg-card/95 backdrop-blur-xl max-w-lg">
-        <DialogHeader>
-          {/* Category badge */}
-          <div className="flex items-center gap-3 mb-2">
-            <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", colors.bg)}>
-              <Icon className={cn("h-5 w-5", colors.text)} />
-            </div>
-            <div>
-              <Badge variant="secondary" className={cn("capitalize", colors.text)}>
-                {suggestion.category}
-              </Badge>
-            </div>
-          </div>
-
-          <DialogTitle className="text-lg leading-snug pr-8">
-            {suggestion.content}
-          </DialogTitle>
-
-          <DialogDescription className="text-sm text-muted-foreground mt-2">
-            {suggestion.rationale}
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Why this suggestion? */}
-        <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
-          <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full">
-            <Info className="h-4 w-4" />
-            Why this suggestion?
-            <ChevronDown className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-180")} />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-3 text-sm">
-            {/* Voice patterns detected */}
-            {voicePatterns ? (
-              <div className="rounded-lg bg-muted/50 p-3 space-y-1">
-                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Voice patterns detected</p>
-                <p className="text-foreground">
-                  {voicePatterns.speechRate === "fast" ? "Fast" : voicePatterns.speechRate === "slow" ? "Slow" : "Normal"} speech, {voicePatterns.energyLevel} energy, {voicePatterns.pauseFrequency} pauses, {voicePatterns.voiceTone} tone
-                </p>
+    {suggestion ? (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="border-border/70 bg-card/95 backdrop-blur-xl max-w-lg">
+          <DialogHeader>
+            {/* Category badge */}
+            <div className="flex items-center gap-3 mb-2">
+              <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", colors.bg)}>
+                <Icon className={cn("h-5 w-5", colors.text)} />
               </div>
-            ) : (
-              <div className="rounded-lg bg-muted/50 p-3 space-y-1">
-                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Voice patterns detected</p>
-                <p className="text-muted-foreground">Analysis based on your voice biomarkers</p>
+              <div>
+                <Badge variant="secondary" className={cn("capitalize", colors.text)}>
+                  {suggestion.category}
+                </Badge>
               </div>
-            )}
+            </div>
 
-            {/* Historical comparison */}
-            {history && history.recordingCount > 1 && (
-              <div className="rounded-lg bg-muted/50 p-3 space-y-2">
-                <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Compared to your baseline</p>
-                <div className="text-sm space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span>Stress:</span>
-                    <span className={cn(
-                      history.stressChange.startsWith("+") ? "text-destructive" :
-                      history.stressChange.startsWith("-") ? "text-success" :
-                      "text-muted-foreground"
-                    )}>
-                      {history.stressChange}
-                    </span>
-                    {history.stressChange.startsWith("+") && <TrendingUp className="h-3 w-3 text-destructive" />}
-                    {history.stressChange.startsWith("-") && <TrendingDown className="h-3 w-3 text-success" />}
-                    {history.stressChange === "stable" && <Minus className="h-3 w-3 text-muted-foreground" />}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>Fatigue:</span>
-                    <span className={cn(
-                      history.fatigueChange.startsWith("+") ? "text-destructive" :
-                      history.fatigueChange.startsWith("-") ? "text-success" :
-                      "text-muted-foreground"
-                    )}>
-                      {history.fatigueChange}
-                    </span>
-                    {history.fatigueChange.startsWith("+") && <TrendingUp className="h-3 w-3 text-destructive" />}
-                    {history.fatigueChange.startsWith("-") && <TrendingDown className="h-3 w-3 text-success" />}
-                    {history.fatigueChange === "stable" && <Minus className="h-3 w-3 text-muted-foreground" />}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Based on {history.recordingCount} check-ins over {history.daysOfData} days
+            <DialogTitle className="text-lg leading-snug pr-8">
+              {suggestion.content}
+            </DialogTitle>
+
+            <DialogDescription className="text-sm text-muted-foreground mt-2">
+              {suggestion.rationale}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Why this suggestion? */}
+          <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
+            <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full">
+              <Info className="h-4 w-4" />
+              Why this suggestion?
+              <ChevronDown className={cn("h-4 w-4 transition-transform", showAdvanced && "rotate-180")} />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3 space-y-3 text-sm">
+              {/* Voice patterns detected */}
+              {voicePatterns ? (
+                <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+                  <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Voice patterns detected</p>
+                  <p className="text-foreground">
+                    {voicePatterns.speechRate === "fast" ? "Fast" : voicePatterns.speechRate === "slow" ? "Slow" : "Normal"} speech, {voicePatterns.energyLevel} energy, {voicePatterns.pauseFrequency} pauses, {voicePatterns.voiceTone} tone
                   </p>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="rounded-lg bg-muted/50 p-3 space-y-1">
+                  <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Voice patterns detected</p>
+                  <p className="text-muted-foreground">Analysis based on your voice biomarkers</p>
+                </div>
+              )}
+
+              {/* Historical comparison */}
+              {history && history.recordingCount > 1 && (
+                <div className="rounded-lg bg-muted/50 p-3 space-y-2">
+                  <p className="font-medium text-xs uppercase tracking-wide text-muted-foreground">Compared to your baseline</p>
+                  <div className="text-sm space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span>Stress:</span>
+                      <span className={cn(
+                        history.stressChange.startsWith("+") ? "text-destructive" :
+                        history.stressChange.startsWith("-") ? "text-success" :
+                        "text-muted-foreground"
+                      )}>
+                        {history.stressChange}
+                      </span>
+                      {history.stressChange.startsWith("+") && <TrendingUp className="h-3 w-3 text-destructive" />}
+                      {history.stressChange.startsWith("-") && <TrendingDown className="h-3 w-3 text-success" />}
+                      {history.stressChange === "stable" && <Minus className="h-3 w-3 text-muted-foreground" />}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span>Fatigue:</span>
+                      <span className={cn(
+                        history.fatigueChange.startsWith("+") ? "text-destructive" :
+                        history.fatigueChange.startsWith("-") ? "text-success" :
+                        "text-muted-foreground"
+                      )}>
+                        {history.fatigueChange}
+                      </span>
+                      {history.fatigueChange.startsWith("+") && <TrendingUp className="h-3 w-3 text-destructive" />}
+                      {history.fatigueChange.startsWith("-") && <TrendingDown className="h-3 w-3 text-success" />}
+                      {history.fatigueChange === "stable" && <Minus className="h-3 w-3 text-muted-foreground" />}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Based on {history.recordingCount} check-ins over {history.daysOfData} days
+                    </p>
+                  </div>
+                </div>
+              )}
 
             {/* Burnout warning */}
             {burnoutPrediction && (burnoutPrediction.riskLevel === "moderate" || burnoutPrediction.riskLevel === "high" || burnoutPrediction.riskLevel === "critical") && (
@@ -307,7 +312,11 @@ export function SuggestionDetailDialog({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => onAccept?.(suggestion)}
+                onClick={() => {
+                  // Accept = schedule immediately (parent decides exact scheduling behavior).
+                  onOpenChange(false)
+                  onAccept?.(suggestion)
+                }}
               >
                 <CheckCircle2 className="h-4 w-4 mr-2" />
                 Accept
@@ -354,9 +363,10 @@ export function SuggestionDetailDialog({
               Close
             </Button>
           )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    ) : null}
 
     {/* Effectiveness Feedback Dialog - shown after user clicks "Mark Complete" */}
     <EffectivenessFeedbackDialog

@@ -119,6 +119,7 @@ export class GeminiLiveClient {
   private state: LiveClientState = "disconnected"
   private reconnectAttempts = 0
   private maxReconnectAttempts = 3
+  private static readonly CONNECT_ABORTED_MESSAGE = "CONNECT_ABORTED"
 
   // Prevent duplicate onConnected firing (ready event + setupComplete message)
   private hasAnnouncedConnected = false
@@ -130,6 +131,7 @@ export class GeminiLiveClient {
   private session: Session | null = null
   private sessionId: string | null = null
   private disconnectRequestedDuringConnect = false
+  private connectAbortReject: ((error: Error) => void) | null = null
   private pendingMessages: Array<Record<string, unknown>> = []
   private isSessionInitialized = false
 
@@ -321,6 +323,16 @@ export class GeminiLiveClient {
     this.state = "connecting"
     this.config.events.onConnecting?.()
 
+    // Allow disconnect() to abort a hung SDK connect (e.g., browser WebSocket stuck in CONNECTING).
+    // If disconnect() clears the timeout timer used by connect(), the Promise.race can otherwise
+    // become permanently pending, stranding callers and future reconnect attempts.
+    // Pattern doc: docs/error-patterns/gemini-live-disconnect-during-connect-hangs.md
+    let abortReject!: (error: Error) => void
+    const abortPromise = new Promise<never>((_, reject) => {
+      abortReject = reject
+    })
+    this.connectAbortReject = abortReject
+
     let connectPromise: Promise<Session> | null = null
     let createdSession: Session | null = null
 
@@ -435,7 +447,7 @@ export class GeminiLiveClient {
           callbacks,
         })
 
-        createdSession = await Promise.race([connectPromise, timeoutPromise])
+        createdSession = await Promise.race([connectPromise, timeoutPromise, abortPromise])
       } catch (error) {
         if (!isAffectiveDialogUnsupported(error)) {
           throw error
@@ -460,7 +472,7 @@ export class GeminiLiveClient {
           callbacks,
         })
 
-        createdSession = await Promise.race([connectPromise, timeoutPromise])
+        createdSession = await Promise.race([connectPromise, timeoutPromise, abortPromise])
       } finally {
         clearConnectionTimeout()
       }
@@ -472,8 +484,7 @@ export class GeminiLiveClient {
           logWarn("GeminiLive", "Error closing session after canceled connect:", closeError)
         }
         this.state = "disconnected"
-        this.notifyDisconnected("Manual disconnect")
-        return
+        throw new Error(GeminiLiveClient.CONNECT_ABORTED_MESSAGE)
       }
 
       this.session = createdSession
@@ -491,6 +502,41 @@ export class GeminiLiveClient {
         }
       }
     } catch (error) {
+      if (this.connectionTimeoutId) {
+        clearTimeout(this.connectionTimeoutId)
+        this.connectionTimeoutId = null
+      }
+
+      if (
+        (error instanceof Error && error.message === GeminiLiveClient.CONNECT_ABORTED_MESSAGE) ||
+        this.disconnectRequestedDuringConnect
+      ) {
+        // Best-effort: ensure we don't leak a socket if it opens after we aborted.
+        this.disconnectRequestedDuringConnect = true
+        if (createdSession) {
+          try {
+            createdSession.close()
+          } catch {
+            // best-effort
+          }
+        } else if (connectPromise) {
+          void connectPromise.then((lateSession) => {
+            try {
+              lateSession.close()
+            } catch {
+              // best-effort
+            }
+          })
+        }
+
+        if (this.state !== "error") {
+          this.state = "disconnected"
+        }
+        throw error instanceof Error
+          ? error
+          : new Error(GeminiLiveClient.CONNECT_ABORTED_MESSAGE)
+      }
+
       logError("GeminiLive", "Connection failed:", error)
       this.state = "error"
       const err = error instanceof Error ? error : new Error("Connection failed")
@@ -513,12 +559,12 @@ export class GeminiLiveClient {
           }
         })
       }
-
-      if (this.connectionTimeoutId) {
-        clearTimeout(this.connectionTimeoutId)
-        this.connectionTimeoutId = null
-      }
       throw err
+    } finally {
+      // Clear the connect abort hook for this attempt only.
+      if (this.connectAbortReject === abortReject) {
+        this.connectAbortReject = null
+      }
     }
   }
 
@@ -1142,6 +1188,10 @@ export class GeminiLiveClient {
    */
   disconnect(): void {
     this.disconnectRequestedDuringConnect = true
+
+    if (this.state === "connecting") {
+      this.connectAbortReject?.(new Error(GeminiLiveClient.CONNECT_ABORTED_MESSAGE))
+    }
 
     // Close active WebSocket session (if present)
     if (this.session) {

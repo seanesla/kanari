@@ -339,11 +339,12 @@ export function geminiReducer(state: GeminiLiveData, action: GeminiAction): Gemi
 export function useGeminiLive(
   options: UseGeminiLiveOptions = {}
 ): [GeminiLiveData, GeminiLiveControls] {
-	  const {
-	    onAudioChunk,
-	    onAudioEnd,
-	    onUserTranscript,
-	    onModelTranscript,
+  const CONNECT_ABORTED_MESSAGE = "CONNECT_ABORTED"
+  const {
+    onAudioChunk,
+    onAudioEnd,
+    onUserTranscript,
+    onModelTranscript,
 	    onModelThinking,
 	    onTurnComplete,
 	    onInterrupted,
@@ -494,9 +495,14 @@ export function useGeminiLive(
       } catch (error) {
         const err = error instanceof Error ? error : new Error("Connection failed")
         if (mountedRef.current) {
-          dispatch({ type: "ERROR", error: err.message })
-          if (!didEmitError) {
-            callbacksRef.current.onError?.(err)
+          if (err.message === CONNECT_ABORTED_MESSAGE) {
+            // Disconnect during connect is a cancellation, not a user-visible error.
+            dispatch({ type: "DISCONNECTED" })
+          } else {
+            dispatch({ type: "ERROR", error: err.message })
+            if (!didEmitError) {
+              callbacksRef.current.onError?.(err)
+            }
           }
         }
         throw err

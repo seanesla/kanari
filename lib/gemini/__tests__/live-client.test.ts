@@ -189,10 +189,41 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
     client.disconnect()
 
     resolveGate()
-    await connectPromise
+    await expect(connectPromise).rejects.toEqual(
+      expect.objectContaining({ message: "CONNECT_ABORTED" })
+    )
 
     expect(mockSession.close).toHaveBeenCalled()
     expect(client.getState()).toBe("disconnected")
+  })
+
+  test("disconnect during a hung connect unblocks connect() promptly (no stranded connecting)", async () => {
+    vi.useFakeTimers()
+    try {
+      liveConnectMock.mockImplementationOnce(async () => new Promise(() => {}))
+
+      const connectPromise = client.connect()
+      client.disconnect()
+
+      const outcome = Promise.race([
+        connectPromise.then(
+          () => "settled",
+          () => "settled"
+        ),
+        new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 50)),
+      ])
+
+      await vi.advanceTimersByTimeAsync(50)
+      // Allow any microtask continuations (imports, Promise.race resolution) to flush.
+      await Promise.resolve()
+      await Promise.resolve()
+
+      await expect(outcome).resolves.toBe("settled")
+      expect(client.getState()).toBe("disconnected")
+      expect(config.events.onError).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   test("audio send failures trigger onError after 3 throws and close the session", async () => {

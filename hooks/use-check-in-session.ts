@@ -704,6 +704,20 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
           return
         }
 
+        if (err.message === "CONNECT_ABORTED") {
+          logDebug("useCheckIn", "Gemini connect aborted during initialization")
+          cleanupStartSessionInit({
+            captureInitialized,
+            playbackInitialized,
+            audio,
+            playbackControls,
+          })
+          if (!unmountedRef.current) {
+            dispatch({ type: "RESET" })
+          }
+          return
+        }
+
         // SESSION_SUPERSEDED means a newer session started while this one was initializing.
         if (err.message === "SESSION_SUPERSEDED") {
           logDebug("useCheckIn", "Session superseded by newer initialization")
