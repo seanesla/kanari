@@ -101,6 +101,7 @@ export function SuggestionDetailDialog({
    * Otherwise, fall back to the legacy onComplete callback.
    */
   const handleMarkComplete = () => {
+    if (!suggestion) return
     if (onCompleteWithFeedback) {
       // New flow: close the detail dialog and show feedback dialog
       setCompletingSuggestion(suggestion)

@@ -529,7 +529,7 @@ export class GeminiLiveClient {
           })
         }
 
-        if (this.state !== "error") {
+        if (this.state === "connecting") {
           this.state = "disconnected"
         }
         throw error instanceof Error
