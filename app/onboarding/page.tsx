@@ -35,6 +35,8 @@ import {
 import { usePrefer2DOnboarding } from "@/hooks/use-prefer-2d-onboarding"
 import { useSceneMode } from "@/lib/scene-context"
 import type { UserSettings } from "@/lib/types"
+import { isDemoWorkspace } from "@/lib/workspace"
+import { seedDemoWorkspaceData } from "@/lib/demo/seed-demo-workspace"
 
 export default function OnboardingPage() {
   const router = useRouter()
@@ -43,6 +45,7 @@ export default function OnboardingPage() {
   const { onboardingStep, setOnboardingStep } = useNavbar()
   const prefer2D = usePrefer2DOnboarding()
   const { setMode } = useSceneMode()
+  const [suppressAutoRedirect, setSuppressAutoRedirect] = useState(false)
 
   // Pending settings accumulated during onboarding
   const [pendingSettings, setPendingSettings] = useState<Partial<UserSettings>>({})
@@ -51,10 +54,10 @@ export default function OnboardingPage() {
 
   // Redirect to dashboard if already onboarded
   useEffect(() => {
-    if (!isLoading && hasCompletedOnboarding) {
+    if (!isLoading && hasCompletedOnboarding && !suppressAutoRedirect) {
       router.replace("/overview")
     }
-  }, [isLoading, hasCompletedOnboarding, router])
+  }, [isLoading, hasCompletedOnboarding, router, suppressAutoRedirect])
 
   // Hide landing background elements while onboarding (KanariCore, section accents, etc).
   useEffect(() => {
@@ -107,7 +110,15 @@ export default function OnboardingPage() {
 
   // Handler for final completion
   const handleComplete = useCallback(async () => {
+    setSuppressAutoRedirect(true)
     await completeOnboarding()
+    if (isDemoWorkspace()) {
+      try {
+        await seedDemoWorkspaceData()
+      } catch (error) {
+        console.error("[onboarding] Failed to seed demo workspace data:", error)
+      }
+    }
   }, [completeOnboarding])
 
   // Handle welcome completion

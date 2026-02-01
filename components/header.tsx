@@ -19,11 +19,11 @@ export function Header() {
           <TransitionLink href="/#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Features
           </TransitionLink>
-          <TransitionLink href="/#how-it-works" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            How it Works
-          </TransitionLink>
           <TransitionLink href="/#trust" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Trust
+          </TransitionLink>
+          <TransitionLink href="/#feature-tour" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            Feature Tour
           </TransitionLink>
           <TransitionLink href="/overview" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Overview
@@ -50,11 +50,11 @@ export function Header() {
             <TransitionLink href="/#features" className="text-sm text-muted-foreground">
               Features
             </TransitionLink>
-            <TransitionLink href="/#how-it-works" className="text-sm text-muted-foreground">
-              How it Works
-            </TransitionLink>
             <TransitionLink href="/#trust" className="text-sm text-muted-foreground">
               Trust
+            </TransitionLink>
+            <TransitionLink href="/#feature-tour" className="text-sm text-muted-foreground">
+              Feature Tour
             </TransitionLink>
             <TransitionLink href="/overview" className="text-sm text-muted-foreground">
               Overview

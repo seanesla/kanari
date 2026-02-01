@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { useNavbar, type ActiveSection } from "@/lib/navbar-context"
 
 // Section IDs that map to navbar links
-const OBSERVED_SECTIONS = ["features", "how-it-works", "trust"] as const
+const OBSERVED_SECTIONS = ["features", "trust", "feature-tour"] as const
 
 export function useSectionObserver() {
   const { navbarMode, setActiveSection } = useNavbar()

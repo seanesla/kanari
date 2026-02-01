@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { usePathname } from "next/navigation"
 import { isAppRoute } from "@/lib/app-routes"
 
-type RouteGroup = "landing" | "app" | "onboarding" | "demo"
+type RouteGroup = "landing" | "app" | "onboarding"
 
 type TransitionPlan = {
   visible: boolean
@@ -31,7 +31,6 @@ const RouteTransitionContext = createContext<RouteTransitionContextValue | null>
 
 function getRouteGroup(pathname: string | null | undefined): RouteGroup {
   if (!pathname) return "landing"
-  if (pathname === "/demo" || pathname.startsWith("/demo/")) return "demo"
   if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) return "onboarding"
   if (isAppRoute(pathname)) return "app"
   return "landing"

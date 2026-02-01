@@ -9,14 +9,15 @@ import { useSceneMode } from "@/lib/scene-context"
 import { useNavbar, ONBOARDING_STEPS } from "@/lib/navbar-context"
 import { LiquidGlassNavbar } from "@/components/liquid-glass-navbar"
 import { Logo } from "@/components/logo"
-import { EnterButton } from "@/components/enter-button"
 import { cn } from "@/lib/utils"
+import { Badge } from "@/components/ui/badge"
+import { isDemoWorkspace, setWorkspace } from "@/lib/workspace"
 
 // Link configurations for each mode
 const landingLinks = [
   { id: "features", href: "#features", label: "Features" },
-  { id: "how-it-works", href: "#how-it-works", label: "How It Works" },
   { id: "trust", href: "#trust", label: "Trust" },
+  { id: "feature-tour", href: "#feature-tour", label: "Feature Tour" },
 ]
 
 function resolveLandingHref(pathname: string, href: string): string {
@@ -168,10 +169,43 @@ function LandingNavLinks() {
           isActive={activeSection === link.id}
         />
       ))}
-      <div className="ml-2">
-        <EnterButton variant="nav" />
-      </div>
     </motion.div>
+  )
+}
+
+function DemoModeIndicator({ compact }: { compact?: boolean }) {
+  const [isDemo, setIsDemo] = useState(false)
+
+  useEffect(() => {
+    setIsDemo(isDemoWorkspace())
+  }, [])
+
+  const exitDemo = useCallback(() => {
+    setWorkspace("real")
+    window.location.reload()
+  }, [])
+
+  if (!isDemo) return null
+
+  return (
+    <div className={cn("flex items-center gap-2", compact && "gap-1")} aria-label="Demo Mode">
+      <Badge
+        variant="secondary"
+        className={cn("bg-muted/20 text-muted-foreground", compact && "px-1.5")}
+      >
+        Demo Mode
+      </Badge>
+      <button
+        type="button"
+        onClick={exitDemo}
+        className={cn(
+          "text-xs text-muted-foreground hover:text-foreground transition-colors",
+          compact && "text-[11px]"
+        )}
+      >
+        Exit
+      </button>
+    </div>
   )
 }
 
@@ -351,6 +385,7 @@ export function PersistentNavbar() {
                 <OnboardingNavLinks key="onboarding" />
               )}
             </AnimatePresence>
+            <DemoModeIndicator />
           </div>
         </LiquidGlassNavbar>
       </div>
@@ -368,12 +403,15 @@ export function PersistentNavbar() {
         )}
       >
         <div className="flex items-center justify-between px-5 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-          <TransitionLink
-            href="/"
-            className="flex items-center gap-2 text-accent hover:text-accent-light transition-colors"
-          >
-            <Logo className="h-11 w-auto" />
-          </TransitionLink>
+          <div className="flex items-center gap-2">
+            <TransitionLink
+              href="/"
+              className="flex items-center gap-2 text-accent hover:text-accent-light transition-colors"
+            >
+              <Logo className="h-11 w-auto" />
+            </TransitionLink>
+            <DemoModeIndicator compact />
+          </div>
 
           <button
             ref={hamburgerRef}
@@ -438,14 +476,6 @@ export function PersistentNavbar() {
                         onClick={handleMobileNavClick}
                       />
                     ))}
-                    <motion.div
-                      className="pt-2 px-3"
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.2, delay: 0.1 + landingLinks.length * 0.05 }}
-                    >
-                      <EnterButton variant="nav" />
-                    </motion.div>
                   </>
                 ) : navbarMode === "dashboard" ? (
                   dashboardLinks.map((link, index) => (

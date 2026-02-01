@@ -761,8 +761,6 @@ export function FloatingGeometry({ accentColor }: { accentColor: string }) {
   const profile = useGraphicsProfile()
   const animate = profile.animate && profile.floatingGeometry
 
-  if (!profile.floatingGeometry) return null
-
   const shapes = useMemo(
     () => [
       { pos: [-10, 5, -5] as [number, number, number], scale: 0.35, type: "octahedron" },
@@ -778,6 +776,11 @@ export function FloatingGeometry({ accentColor }: { accentColor: string }) {
     ],
     []
   )
+
+  // Important: don't conditionally skip hooks. We may toggle graphics quality during onboarding,
+  // which can enable/disable floating geometry between renders.
+  // See: docs/error-patterns/react-conditional-return-before-hooks.md
+  if (!profile.floatingGeometry) return null
 
   return (
     <>

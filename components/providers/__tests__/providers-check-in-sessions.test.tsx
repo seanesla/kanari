@@ -24,7 +24,6 @@ vi.mock("@/components/require-user-name", () => ({
 vi.mock("@/components/demo", () => ({
   DemoProvider: ({ children }: { children: React.ReactNode }) => children,
   DemoOverlay: () => null,
-  DemoTriggerButton: () => null,
 }))
 
 vi.mock("@/components/route-transition-overlay", () => ({
@@ -89,4 +88,3 @@ describe("Providers", () => {
     expect(screen.getByTestId("count")).toHaveTextContent("0")
   })
 })
-

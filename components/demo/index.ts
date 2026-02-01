@@ -10,7 +10,6 @@ export { DemoSpotlight } from "./demo-spotlight"
 export { DemoTooltip } from "./demo-tooltip"
 export { DemoControls } from "./demo-controls"
 export { DemoProgress } from "./demo-progress"
-export { DemoTriggerButton } from "./demo-trigger-button"
 
 // Re-export step types and utilities
 export type { DemoStep, DemoPhase, DemoState, DemoContextValue } from "./steps/types"

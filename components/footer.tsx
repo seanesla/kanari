@@ -14,11 +14,11 @@ export function Footer() {
             <Link href="/#features" className="text-sm text-muted-foreground hover:text-foreground">
               Features
             </Link>
-            <Link href="/#how-it-works" className="text-sm text-muted-foreground hover:text-foreground">
-              How It Works
-            </Link>
             <Link href="/#trust" className="text-sm text-muted-foreground hover:text-foreground">
               Trust
+            </Link>
+            <Link href="/#feature-tour" className="text-sm text-muted-foreground hover:text-foreground">
+              Feature Tour
             </Link>
             <Link href="https://github.com/seanesla/kanari" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
               GitHub

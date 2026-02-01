@@ -1,6 +1,7 @@
 "use client"
 
 import Dexie, { type EntityTable } from "dexie"
+import { isDemoWorkspace } from "@/lib/workspace"
 import type {
   Commitment,
   Recording,
@@ -82,7 +83,7 @@ class KanariDB extends Dexie {
   commitments!: EntityTable<DBCommitment, "id">
 
   constructor() {
-    super("kanari")
+    super(isDemoWorkspace() ? "kanari_demo" : "kanari")
 
     // Version 1: Initial schema
     this.version(1).stores({

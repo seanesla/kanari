@@ -13,9 +13,10 @@ import { Footer } from "@/components/footer"
 import { ScrollReveal } from "@/components/scroll-reveal"
 import { KanariTextLogo } from "@/components/kanari-text-logo"
 import { HeroColorPicker } from "@/components/hero-color-picker"
-import { DemoTriggerButton } from "@/components/demo"
+import { DemoModeButton } from "@/components/demo-mode-button"
 import { cn } from "@/lib/utils"
 import { TrustSection } from "@/components/trust-section"
+import { FeatureTour } from "@/components/feature-tour/feature-tour"
 
 export default function LandingPage() {
   const [heroVisible, setHeroVisible] = useState(false)
@@ -227,7 +228,7 @@ export default function LandingPage() {
               whileTap={reduceMotion ? undefined : { scale: 0.99 }}
               className="w-full sm:w-auto"
             >
-              <DemoTriggerButton className="w-full justify-center sm:w-auto sm:justify-start" />
+              <DemoModeButton variant="nav" className="w-full justify-center sm:w-auto sm:justify-start" />
             </motion.div>
           </motion.div>
         </motion.div>
@@ -313,66 +314,16 @@ export default function LandingPage() {
 
           <TrustSection />
 
-          {/* How it works */}
+          {/* Feature Tour */}
           <section
-            id="how-it-works"
-            className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-card/50"
-            data-demo-id="demo-how-it-works"
+            id="feature-tour"
+            className="scroll-mt-28 py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-card/50"
+            data-demo-id="demo-feature-tour"
           >
             <ScrollReveal>
               <div className="max-w-7xl mx-auto">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground mb-16">How It Works</p>
-
-                <div className="space-y-0">
-                  {[
-                    {
-                      num: "01",
-                      title: "Check in",
-                      desc: "Speak naturally for 30-60 seconds about your day. No scripts, no prompts—just talk. Your voice carries the signal.",
-                    },
-                    {
-                      num: "02",
-                      title: "Analyze",
-                      desc: "Acoustic feature extraction runs in your browser (rhythm, pauses, energy, spectrum). During the live check-in, audio is streamed to Gemini for conversation and synthesis.",
-                    },
-                    {
-                      num: "03",
-                      title: "Predict",
-                      desc: "Compare today against your baseline + recent trend. Compute a 3–7 day risk forecast (heuristic, not clinical) and generate evidence-backed insights.",
-                    },
-                    {
-                      num: "04",
-                      title: "Act",
-                      desc: "Receive personalized recovery suggestions. Optionally schedule rest blocks directly to your calendar before you hit the wall.",
-                    },
-                  ].map((step, i) => (
-                    <motion.div
-                      key={i}
-                      className="grid md:grid-cols-12 gap-6 py-12 border-b border-border/50 last:border-b-0 group hover:bg-foreground/5 transition-colors -mx-6 px-6"
-                      initial={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 24, filter: "blur(10px)" }}
-                      whileInView={reduceMotion ? { opacity: 1 } : { opacity: 1, y: 0, filter: "blur(0px)" }}
-                      viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
-                      transition={
-                        reduceMotion
-                          ? { duration: 0 }
-                          : { duration: 0.9, ease: EASE, delay: i * 0.08 }
-                      }
-                    >
-                      <div className="md:col-span-2">
-                        <span className="text-6xl md:text-8xl font-serif text-foreground/10 group-hover:text-accent/30 transition-colors">
-                          {step.num}
-                        </span>
-                      </div>
-                      <div className="md:col-span-4">
-                        <h3 className="text-2xl md:text-3xl font-medium">{step.title}</h3>
-                      </div>
-                      <div className="md:col-span-5 md:col-start-8">
-                        <p className="text-muted-foreground text-lg leading-relaxed">{step.desc}</p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-
+                <p className="text-xs uppercase tracking-widest text-muted-foreground mb-16">Feature Tour</p>
+                <FeatureTour variant="section" />
               </div>
             </ScrollReveal>
           </section>
@@ -385,7 +336,10 @@ export default function LandingPage() {
                 <p className="text-muted-foreground text-base sm:text-lg md:text-xl mb-12 max-w-md mx-auto">
                   Your voice carries signals you may miss. Let it help you plan recovery.
                 </p>
-                <EnterButton variant="cta" />
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                  <EnterButton variant="cta" />
+                  <DemoModeButton variant="cta" />
+                </div>
               </div>
             </ScrollReveal>
           </section>
