@@ -4,7 +4,9 @@ import Image from "next/image"
 import { motion, useReducedMotion } from "framer-motion"
 import { Mic, Brain, TrendingUp, Calendar } from "@/lib/icons"
 
-export function FeaturesSection() {
+export type FeaturesSectionVariant = "standalone" | "embedded"
+
+export function FeaturesSection({ variant = "standalone" }: { variant?: FeaturesSectionVariant }) {
   const reduceMotion = useReducedMotion()
   const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
 
@@ -51,6 +53,38 @@ export function FeaturesSection() {
       description: "Schedule recovery blocks when risk is elevated. Small interventions beat a full crash.",
     },
   ]
+
+  const grid = (
+    <motion.div
+      variants={container}
+      initial="hidden"
+      whileInView="show"
+      viewport={{ once: true, margin: "-120px 0px -80px 0px" }}
+    >
+      <div className="grid gap-6 md:grid-cols-2">
+        {features.map((feature, index) => (
+          <motion.div
+            key={index}
+            variants={item}
+            whileHover={reduceMotion ? undefined : { y: -6, scale: 1.01 }}
+            whileTap={reduceMotion ? undefined : { scale: 0.99 }}
+            transition={reduceMotion ? undefined : { type: "spring", stiffness: 280, damping: 22 }}
+            className="group relative rounded-lg border border-border bg-card p-6 sm:p-8 transition-colors hover:border-accent/50 hover:bg-card/80"
+          >
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-accent/10 text-accent">
+              <feature.icon className="h-6 w-6" />
+            </div>
+            <h3 className="mb-2 text-xl font-semibold">{feature.title}</h3>
+            <p className="text-muted-foreground leading-relaxed">{feature.description}</p>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  )
+
+  if (variant === "embedded") {
+    return grid
+  }
 
   return (
     <div className="py-20 sm:py-24 md:py-32">

@@ -15,9 +15,10 @@ import { isDemoWorkspace, setWorkspace } from "@/lib/workspace"
 
 // Link configurations for each mode
 const landingLinks = [
-  { id: "features", href: "#features", label: "Features" },
+  { id: "problem", href: "#problem", label: "Problem" },
+  { id: "features", href: "#features", label: "Product" },
+  { id: "walkthrough", href: "#walkthrough", label: "Walkthrough" },
   { id: "trust", href: "#trust", label: "Trust" },
-  { id: "feature-tour", href: "#feature-tour", label: "Feature Tour" },
 ]
 
 function resolveLandingHref(pathname: string, href: string): string {

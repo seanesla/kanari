@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation"
 import { isAppRoute } from "@/lib/app-routes"
 
 export type NavbarMode = "landing" | "dashboard" | "onboarding"
-export type ActiveSection = "hero" | "features" | "trust" | "feature-tour" | null
+export type ActiveSection = "hero" | "problem" | "features" | "walkthrough" | "trust" | null
 
 // Onboarding step configuration
 export const ONBOARDING_STEPS = [

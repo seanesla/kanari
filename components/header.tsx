@@ -16,14 +16,17 @@ export function Header() {
         </TransitionLink>
 
         <nav className="hidden items-center gap-8 md:flex">
+          <TransitionLink href="/#problem" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            Problem
+          </TransitionLink>
           <TransitionLink href="/#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Features
+            Product
+          </TransitionLink>
+          <TransitionLink href="/#walkthrough" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            Walkthrough
           </TransitionLink>
           <TransitionLink href="/#trust" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Trust
-          </TransitionLink>
-          <TransitionLink href="/#feature-tour" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
-            Feature Tour
           </TransitionLink>
           <TransitionLink href="/overview" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Overview
@@ -47,14 +50,17 @@ export function Header() {
       {mobileMenuOpen && (
         <div className="border-t border-border bg-background px-6 py-4 md:hidden">
           <nav className="flex flex-col gap-4">
+            <TransitionLink href="/#problem" className="text-sm text-muted-foreground">
+              Problem
+            </TransitionLink>
             <TransitionLink href="/#features" className="text-sm text-muted-foreground">
-              Features
+              Product
+            </TransitionLink>
+            <TransitionLink href="/#walkthrough" className="text-sm text-muted-foreground">
+              Walkthrough
             </TransitionLink>
             <TransitionLink href="/#trust" className="text-sm text-muted-foreground">
               Trust
-            </TransitionLink>
-            <TransitionLink href="/#feature-tour" className="text-sm text-muted-foreground">
-              Feature Tour
             </TransitionLink>
             <TransitionLink href="/overview" className="text-sm text-muted-foreground">
               Overview

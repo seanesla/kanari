@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { useNavbar, type ActiveSection } from "@/lib/navbar-context"
 
 // Section IDs that map to navbar links
-const OBSERVED_SECTIONS = ["features", "trust", "feature-tour"] as const
+const OBSERVED_SECTIONS = ["problem", "features", "walkthrough", "trust"] as const
 
 export function useSectionObserver() {
   const { navbarMode, setActiveSection } = useNavbar()
@@ -13,40 +13,62 @@ export function useSectionObserver() {
     // Only observe on landing page
     if (navbarMode !== "landing") return
 
-    const observerOptions: IntersectionObserverInit = {
-      root: null, // viewport
-      rootMargin: "-40% 0px -40% 0px", // Trigger when section is in middle 20% of viewport
-      threshold: 0,
+    // Use a lightweight scroll-based heuristic instead of IntersectionObserver.
+    // This is more reliable with smooth scrolling and nested anchors.
+    let rafId: number | null = null
+    let lastActive: ActiveSection = null
+
+    const computeActiveSection = (): ActiveSection => {
+      if (window.scrollY < 200) return "hero"
+
+      // Use a "reading line" and pick the last anchor whose top has crossed it.
+      // This behaves like a typical docs sidebar: you stay in a section until the next
+      // section actually scrolls past the reading line.
+      const targetY = window.innerHeight * 0.34
+
+      let active: ActiveSection = null
+      let activeTop = Number.NEGATIVE_INFINITY
+
+      for (const id of OBSERVED_SECTIONS) {
+        const el = document.getElementById(id)
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+
+        // Only consider anchors that have reached the reading line.
+        if (rect.top <= targetY && rect.top > activeTop) {
+          activeTop = rect.top
+          active = id as ActiveSection
+        }
+      }
+
+      return active ?? "hero"
     }
 
-    const handleIntersection = (entries: IntersectionObserverEntry[]) => {
-      // Find the most visible section
-      const visibleEntry = entries.find((entry) => entry.isIntersecting)
-      if (visibleEntry) {
-        setActiveSection(visibleEntry.target.id as ActiveSection)
+    const update = () => {
+      rafId = null
+      const next = computeActiveSection()
+      if (next !== lastActive) {
+        lastActive = next
+        setActiveSection(next)
       }
     }
 
-    const observer = new IntersectionObserver(handleIntersection, observerOptions)
-
-    // Observe each section
-    OBSERVED_SECTIONS.forEach((sectionId) => {
-      const element = document.getElementById(sectionId)
-      if (element) observer.observe(element)
-    })
-
-    // Initial check - set hero if at top
-    const handleScroll = () => {
-      if (window.scrollY < 200) {
-        setActiveSection("hero")
-      }
+    const schedule = () => {
+      if (rafId !== null) return
+      rafId = window.requestAnimationFrame(update)
     }
-    handleScroll()
-    window.addEventListener("scroll", handleScroll, { passive: true })
+
+    // Initial pass + keep in sync during scrolling and hash jumps.
+    schedule()
+    window.addEventListener("scroll", schedule, { passive: true })
+    window.addEventListener("resize", schedule)
+    window.addEventListener("hashchange", schedule)
 
     return () => {
-      observer.disconnect()
-      window.removeEventListener("scroll", handleScroll)
+      if (rafId !== null) window.cancelAnimationFrame(rafId)
+      window.removeEventListener("scroll", schedule)
+      window.removeEventListener("resize", schedule)
+      window.removeEventListener("hashchange", schedule)
     }
   }, [navbarMode, setActiveSection])
 }

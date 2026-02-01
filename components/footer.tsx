@@ -11,14 +11,17 @@ export function Footer() {
           </div>
 
           <nav className="flex flex-wrap items-center justify-center gap-8">
+            <Link href="/#problem" className="text-sm text-muted-foreground hover:text-foreground">
+              Problem
+            </Link>
             <Link href="/#features" className="text-sm text-muted-foreground hover:text-foreground">
-              Features
+              Product
+            </Link>
+            <Link href="/#walkthrough" className="text-sm text-muted-foreground hover:text-foreground">
+              Walkthrough
             </Link>
             <Link href="/#trust" className="text-sm text-muted-foreground hover:text-foreground">
               Trust
-            </Link>
-            <Link href="/#feature-tour" className="text-sm text-muted-foreground hover:text-foreground">
-              Feature Tour
             </Link>
             <Link href="https://github.com/seanesla/kanari" target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground hover:text-foreground">
               GitHub

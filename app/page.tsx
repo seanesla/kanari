@@ -8,7 +8,6 @@ import { useSceneMode } from "@/lib/scene-context"
 import { useLenis } from "@/hooks/use-lenis"
 import { useSectionObserver } from "@/hooks/use-section-observer"
 import { EnterButton } from "@/components/enter-button"
-import { FeaturesSection } from "@/components/features-section"
 import { Footer } from "@/components/footer"
 import { ScrollReveal } from "@/components/scroll-reveal"
 import { KanariTextLogo } from "@/components/kanari-text-logo"
@@ -16,8 +15,9 @@ import { HeroColorPicker } from "@/components/hero-color-picker"
 import { DemoModeButton } from "@/components/demo-mode-button"
 import { cn } from "@/lib/utils"
 import { TrustSection } from "@/components/trust-section"
-import { FeatureTour } from "@/components/feature-tour/feature-tour"
 import { ExitDemoOnLanding } from "@/components/demo/exit-demo-on-landing"
+import { ProductSection } from "@/components/marketing/product-section"
+import { WhySwitcher } from "@/components/marketing/why-switcher"
 
 export default function LandingPage() {
   const [heroVisible, setHeroVisible] = useState(false)
@@ -280,7 +280,7 @@ export default function LandingPage() {
           </section>
 
           {/* The Problem */}
-          <section className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50">
+          <section id="problem" className="scroll-mt-28 py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50">
             <ScrollReveal>
               <div className="max-w-7xl mx-auto">
                 <div className="grid lg:grid-cols-12 gap-12 lg:gap-24">
@@ -297,6 +297,8 @@ export default function LandingPage() {
                       Your voice tells a different story. Speech patterns, pause frequency, vocal energy—these biomarkers
                       can shift before you consciously feel the strain.
                     </p>
+
+                    <WhySwitcher className="mt-2" />
                     <p className="text-foreground font-medium border-l-2 border-accent pl-4">
                       Burnout is common. Most people only recognize it after the crash.
                     </p>
@@ -307,28 +309,9 @@ export default function LandingPage() {
             </ScrollReveal>
           </section>
 
-          {/* Features */}
-          <section id="features" className="bg-background/40">
-            <ScrollReveal>
-              <FeaturesSection />
-            </ScrollReveal>
-          </section>
+          <ProductSection />
 
           <TrustSection />
-
-          {/* Feature Tour */}
-          <section
-            id="feature-tour"
-            className="scroll-mt-28 py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-card/50"
-            data-demo-id="demo-feature-tour"
-          >
-            <ScrollReveal>
-              <div className="max-w-7xl mx-auto">
-                <p className="text-xs uppercase tracking-widest text-muted-foreground mb-16">Feature Tour</p>
-                <FeatureTour variant="section" />
-              </div>
-            </ScrollReveal>
-          </section>
 
           {/* CTA */}
           <section className="py-20 sm:py-24 md:py-32 px-6 md:px-12 bg-background/50">
