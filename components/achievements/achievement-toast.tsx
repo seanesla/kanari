@@ -18,7 +18,7 @@
  * ```
  */
 
-import { useEffect, useCallback, useMemo, useState } from "react"
+ import { useEffect, useCallback, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { CheckCircle, Sparks, Trophy, Xmark } from "iconoir-react"
 import { cn } from "@/lib/utils"
@@ -128,23 +128,40 @@ export function CelebrationToast({
   onOpenChange,
   onDismiss,
   onAfterClose,
-  autoDismissMs = 5000,
+  autoDismissMs = 12000,
 }: CelebrationToastProps) {
-  // Auto-dismiss after timeout
-  useEffect(() => {
-    if (!open || autoDismissMs === 0) return
-
-    const timer = setTimeout(() => {
-      handleDismiss()
-    }, autoDismissMs)
-
-    return () => clearTimeout(timer)
-  }, [open, autoDismissMs])
+  const [remainingMs, setRemainingMs] = useState<number | null>(null)
 
   const handleDismiss = useCallback(() => {
     onOpenChange(false)
     onDismiss?.()
   }, [onOpenChange, onDismiss])
+
+  // Auto-dismiss after timeout + countdown for the dismiss button.
+  useEffect(() => {
+    if (!open || autoDismissMs === 0) {
+      setRemainingMs(null)
+      return
+    }
+
+    const deadline = Date.now() + autoDismissMs
+
+    const tick = () => {
+      setRemainingMs(Math.max(0, deadline - Date.now()))
+    }
+
+    tick()
+
+    const interval = setInterval(tick, 250)
+    const timer = setTimeout(() => {
+      handleDismiss()
+    }, autoDismissMs)
+
+    return () => {
+      clearInterval(interval)
+      clearTimeout(timer)
+    }
+  }, [autoDismissMs, handleDismiss, open])
 
   if (!item) return null
 
@@ -163,6 +180,8 @@ export function CelebrationToast({
         : `+${item.achievement.points} points`
 
   const milestoneIcon = item.kind === "milestone" ? getMilestoneBadgeIcon(item.milestone.type) : null
+
+  const remainingSeconds = remainingMs === null ? null : Math.max(1, Math.ceil(remainingMs / 1000))
 
   return (
     <AnimatePresence onExitComplete={onAfterClose}>
@@ -283,8 +302,14 @@ export function CelebrationToast({
                     onClick={handleDismiss}
                     variant="outline"
                     className="w-full"
+                    aria-label="Awesome!"
                   >
-                    Awesome!
+                    <span>Awesome!</span>
+                    {remainingSeconds !== null && (
+                      <span aria-hidden="true" className="text-muted-foreground tabular-nums">
+                        ({remainingSeconds}s)
+                      </span>
+                    )}
                   </Button>
                 </motion.div>
               </div>
