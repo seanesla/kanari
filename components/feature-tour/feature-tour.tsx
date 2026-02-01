@@ -1,11 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { motion, AnimatePresence } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
-import { X, ArrowLeft, ArrowRight } from "@/lib/icons"
+import { ArrowLeft, ArrowRight, RotateCcw } from "@/lib/icons"
 import { AspectRatio } from "@/components/ui/aspect-ratio"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
@@ -158,7 +157,6 @@ const SLIDES: FeatureTourSlide[] = [
 
 export function FeatureTour({ variant = "section" }: { variant?: FeatureTourVariant }) {
   const isPage = variant === "page"
-  const router = useRouter()
   const { resetToLanding } = useSceneMode()
 
   const [index, setIndex] = useState(0)
@@ -166,7 +164,6 @@ export function FeatureTour({ variant = "section" }: { variant?: FeatureTourVari
   const pendingIndexRef = useRef<number | null>(null)
   const [showSlide, setShowSlide] = useState(true)
   const [isTransitioning, setIsTransitioning] = useState(false)
-  const [isClosing, setIsClosing] = useState(false)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const replayTimerRef = useRef<number | null>(null)
@@ -205,14 +202,8 @@ export function FeatureTour({ variant = "section" }: { variant?: FeatureTourVari
   const canPrev = effectiveIndex > 0
   const canNext = effectiveIndex < SLIDES.length - 1
 
-  const handleExit = useCallback(() => {
-    if (!isPage) return
-    setIsClosing(true)
-  }, [isPage])
-
   const requestIndex = useCallback(
     (nextIndex: number) => {
-      if (isClosing) return
       const clamped = Math.min(Math.max(0, nextIndex), SLIDES.length - 1)
 
       pendingIndexRef.current = clamped
@@ -223,8 +214,12 @@ export function FeatureTour({ variant = "section" }: { variant?: FeatureTourVari
         setShowSlide(false)
       }
     },
-    [isClosing, isTransitioning]
+    [isTransitioning]
   )
+
+  const handleStartOver = useCallback(() => {
+    requestIndex(0)
+  }, [requestIndex])
 
   const goPrev = useCallback(() => {
     const base = pendingIndexRef.current ?? index
@@ -289,13 +284,13 @@ export function FeatureTour({ variant = "section" }: { variant?: FeatureTourVari
         goNext()
       }
       if (e.key === "Escape") {
-        handleExit()
+        handleStartOver()
       }
     }
 
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [goNext, goPrev, handleExit, isPage])
+  }, [goNext, goPrev, handleStartOver, isPage])
 
   const dots = useMemo(() => {
     return SLIDES.map((s, i) => ({ id: s.id, index: i, isActive: i === index }))
@@ -357,13 +352,12 @@ export function FeatureTour({ variant = "section" }: { variant?: FeatureTourVari
               <header className="flex items-center justify-between gap-4 mb-10 md:mb-12">
                 <Button
                   variant="outline"
-                  onClick={handleExit}
-                  disabled={isClosing}
+                  onClick={handleStartOver}
                   className="gap-2 bg-background/70 backdrop-blur border-border/80"
                 >
-                  <X className="h-4 w-4" />
-                  <span className="hidden sm:inline">Exit demo</span>
-                  <span className="sm:hidden">Exit</span>
+                  <RotateCcw className="h-4 w-4" />
+                  <span className="hidden sm:inline">Start over</span>
+                  <span className="sm:hidden">Restart</span>
                 </Button>
 
                 <div className="text-xs uppercase tracking-widest text-foreground/60 tabular-nums">
@@ -553,7 +547,7 @@ export function FeatureTour({ variant = "section" }: { variant?: FeatureTourVari
             {/* Navigation */}
             <div className="mt-10 md:mt-12 flex flex-col gap-4">
               <div className="flex items-center justify-between gap-3">
-                <Button variant="outline" onClick={goPrev} disabled={!canPrev || isClosing} className="min-w-28">
+                <Button variant="outline" onClick={goPrev} disabled={!canPrev} className="min-w-28">
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Prev
                 </Button>
@@ -563,7 +557,6 @@ export function FeatureTour({ variant = "section" }: { variant?: FeatureTourVari
                     <button
                       key={d.id}
                       onClick={() => requestIndex(d.index)}
-                      disabled={isClosing}
                       aria-label={`Go to ${d.id}`}
                       className={cn(
                         "h-2.5 w-2.5 rounded-full transition-all",
@@ -575,16 +568,19 @@ export function FeatureTour({ variant = "section" }: { variant?: FeatureTourVari
 
                 <Button
                   className="min-w-28 bg-foreground text-background hover:bg-accent"
-                  disabled={isClosing}
-                  onClick={canNext ? goNext : handleExit}
+                  onClick={canNext ? goNext : handleStartOver}
                 >
-                  {canNext ? "Next" : "Exit"}
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  {canNext ? "Next" : "Start over"}
+                  {canNext ? (
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  ) : (
+                    <RotateCcw className="h-4 w-4 ml-2" />
+                  )}
                 </Button>
               </div>
 
               {isPage ? (
-                <p className="text-xs text-foreground/60 text-center">Tip: Left/Right to navigate; Esc exits.</p>
+                <p className="text-xs text-foreground/60 text-center">Tip: Left/Right to navigate; Esc restarts.</p>
               ) : null}
             </div>
           </div>
@@ -598,14 +594,7 @@ export function FeatureTour({ variant = "section" }: { variant?: FeatureTourVari
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: isClosing ? 0 : 1 }}
-      transition={{ duration: 0.22, ease: "easeOut" }}
-      onAnimationComplete={() => {
-        if (isClosing) router.push("/")
-      }}
-    >
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.22, ease: "easeOut" }}>
       {deck}
     </motion.div>
   )
