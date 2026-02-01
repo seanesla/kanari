@@ -169,7 +169,11 @@ export function SuggestionCardOverlay({
 }
 
 // Helper to extract short title
-function extractTitle(content: string, maxLength = 60): string {
+function extractTitle(content: unknown, maxLength = 60): string {
+  if (typeof content !== "string") {
+    return "Untitled suggestion"
+  }
+
   const firstSentence = content.split(/[.!?]/)[0]?.trim()
   if (!firstSentence) return content.slice(0, maxLength)
   if (firstSentence.length <= maxLength) return firstSentence
