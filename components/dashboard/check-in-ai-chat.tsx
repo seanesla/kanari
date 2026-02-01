@@ -29,6 +29,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
+import { KanariError } from "@/lib/errors"
 import { logDebug, logError, logWarn } from "@/lib/logger"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -283,6 +284,11 @@ export function AIChatContent({
     },
     // Called on connection or processing errors
     onError: (error) => {
+      // Mic permission failures are common user/environment issues; avoid noisy console.error.
+      if (error instanceof KanariError && error.code.startsWith("MIC_")) {
+        logWarn("AIChatContent", error.message)
+        return
+      }
       logError("AIChatContent", "Error:", error)
     },
   })

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch } from "react"
 import { int16ToBase64 } from "@/lib/audio/pcm-converter"
+import { KanariError } from "@/lib/errors"
 import { logDebug, logWarn } from "@/lib/logger"
 import type { CheckInState } from "@/lib/types"
 import type { CheckInAction } from "./use-check-in-messages"
@@ -32,6 +33,148 @@ export interface UseCheckInAudioResult {
 type ChunkBuffer = {
   chunks: Float32Array[]
   startIndex: number
+}
+
+function safeGetWindowContext(): {
+  isSecureContext: boolean | undefined
+  origin: string | undefined
+  inIframe: boolean | undefined
+} {
+  if (typeof window === "undefined") {
+    return { isSecureContext: undefined, origin: undefined, inIframe: undefined }
+  }
+
+  let inIframe: boolean | undefined
+  try {
+    // Accessing window.top can throw in some cross-origin iframe cases.
+    inIframe = window.self !== window.top
+  } catch {
+    inIframe = true
+  }
+
+  return {
+    isSecureContext: typeof window.isSecureContext === "boolean" ? window.isSecureContext : undefined,
+    origin: typeof window.location?.origin === "string" ? window.location.origin : undefined,
+    inIframe,
+  }
+}
+
+function getMediaErrorName(error: unknown): string | undefined {
+  if (error && typeof error === "object" && "name" in error && typeof (error as { name?: unknown }).name === "string") {
+    const name = (error as { name: string }).name
+    if (name && name !== "Error") return name
+  }
+
+  // Some tests (and some userland mocks) reject with Error("NotAllowedError").
+  if (error instanceof Error && typeof error.message === "string" && error.message.endsWith("Error")) {
+    return error.message
+  }
+
+  return undefined
+}
+
+function toAudioCaptureInitError(error: unknown): Error {
+  const errorMessage = error instanceof Error ? error.message : "Unknown error"
+  const errorName = getMediaErrorName(error)
+  const ctx = safeGetWindowContext()
+
+  // If we're not in a secure context, getUserMedia is blocked regardless of permissions.
+  // This commonly happens on iOS/Android when loading the dev server from a LAN IP over http.
+  if (ctx.isSecureContext === false) {
+    return new KanariError(
+      "Microphone access is blocked because this page is not running in a secure context. Use https (or http://localhost), then try again.",
+      "MIC_INSECURE_CONTEXT",
+      {
+        origin: ctx.origin,
+        isSecureContext: ctx.isSecureContext,
+        inIframe: ctx.inIframe,
+        errorName,
+        errorMessage,
+      }
+    )
+  }
+
+  if (errorName === "NotAllowedError" || errorName === "PermissionDeniedError") {
+    return new KanariError(
+      "Microphone access was blocked. Allow microphone permissions for this site (browser lock icon → Site settings → Microphone), then try again.",
+      "MIC_PERMISSION_DENIED",
+      {
+        origin: ctx.origin,
+        isSecureContext: ctx.isSecureContext,
+        inIframe: ctx.inIframe,
+        errorName,
+        errorMessage,
+      }
+    )
+  }
+
+  if (errorName === "NotFoundError" || errorName === "DevicesNotFoundError") {
+    return new KanariError(
+      "No microphone was found. Plug in a mic/headset (or enable one) and try again.",
+      "MIC_NOT_FOUND",
+      {
+        origin: ctx.origin,
+        isSecureContext: ctx.isSecureContext,
+        inIframe: ctx.inIframe,
+        errorName,
+        errorMessage,
+      }
+    )
+  }
+
+  if (errorName === "NotReadableError" || errorName === "TrackStartError") {
+    return new KanariError(
+      "Your microphone is busy or unavailable (another tab/app may be using it). Close other apps using the mic and try again.",
+      "MIC_NOT_READABLE",
+      {
+        origin: ctx.origin,
+        isSecureContext: ctx.isSecureContext,
+        inIframe: ctx.inIframe,
+        errorName,
+        errorMessage,
+      }
+    )
+  }
+
+  if (errorName === "SecurityError") {
+    return new KanariError(
+      "Microphone access was blocked by the browser security policy. Make sure the page is top-level (not embedded) and running on https, then try again.",
+      "MIC_SECURITY_ERROR",
+      {
+        origin: ctx.origin,
+        isSecureContext: ctx.isSecureContext,
+        inIframe: ctx.inIframe,
+        errorName,
+        errorMessage,
+      }
+    )
+  }
+
+  if (errorName === "OverconstrainedError") {
+    return new KanariError(
+      "Your browser could not satisfy the requested microphone settings. Try a different input device and try again.",
+      "MIC_OVERCONSTRAINED",
+      {
+        origin: ctx.origin,
+        isSecureContext: ctx.isSecureContext,
+        inIframe: ctx.inIframe,
+        errorName,
+        errorMessage,
+      }
+    )
+  }
+
+  return new KanariError(
+    `Failed to initialize microphone audio capture: ${errorMessage}`,
+    "MIC_INIT_FAILED",
+    {
+      origin: ctx.origin,
+      isSecureContext: ctx.isSecureContext,
+      inIframe: ctx.inIframe,
+      errorName,
+      errorMessage,
+    }
+  )
 }
 
 export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudioResult {
@@ -125,10 +268,17 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
     }
 
     try {
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        throw new KanariError(
+          "Microphone capture is not supported in this browser.",
+          "MIC_UNSUPPORTED",
+          safeGetWindowContext()
+        )
+      }
+
       // Get microphone access
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
-          sampleRate: 16000,
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
@@ -392,9 +542,14 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
       ) {
         throw error
       }
-      throw new Error(
-        `Failed to initialize audio capture: ${error instanceof Error ? error.message : "Unknown error"}`
-      )
+
+      // Preserve stable codes for known/user-facing errors.
+      if (error instanceof KanariError) {
+        throw error
+      }
+
+      // Pattern doc: docs/error-patterns/microphone-permission-notallowed.md
+      throw toAudioCaptureInitError(error)
     }
   }, [dispatch, sendAudio])
 

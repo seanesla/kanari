@@ -9,7 +9,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { logDebug, logError } from "@/lib/logger"
+import { KanariError } from "@/lib/errors"
+import { logDebug, logError, logWarn } from "@/lib/logger"
 import { db, fromSuggestion, toJournalEntry } from "@/lib/storage/db"
 import { motion, AnimatePresence } from "framer-motion"
 import {
@@ -280,6 +281,11 @@ export function CheckInDialog({
       logDebug("CheckInDialog", "Mismatch detected:", result)
     },
     onError: (error) => {
+      // Mic permission failures are common user/environment issues; avoid noisy console.error.
+      if (error instanceof KanariError && error.code.startsWith("MIC_")) {
+        logWarn("CheckInDialog", error.message)
+        return
+      }
       logError("CheckInDialog", "Error:", error)
     },
   })

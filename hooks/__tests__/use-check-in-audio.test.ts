@@ -25,6 +25,13 @@ let audioTrack: { stop: () => void; readyState: "live" | "ended"; kind: "audio";
 let lastWorklet: { port: { onmessage: ((event: { data: unknown }) => void) | null } } | null = null
 let audioWorkletAddModuleMock: ReturnType<typeof vi.fn>
 
+type MockAudioTrack = {
+  stop: () => void
+  readyState: "live" | "ended"
+  kind: "audio"
+  enabled: boolean
+}
+
 const connectMock = vi.fn(async () => {})
 const disconnectMock = vi.fn()
 
@@ -46,18 +53,18 @@ beforeEach(async () => {
 
   stopMock = vi.fn()
 
-  const track = {
+  const track: MockAudioTrack = {
     stop: () => {},
     readyState: "live",
     kind: "audio",
     enabled: true,
-  } satisfies { stop: () => void; readyState: "live" | "ended"; kind: "audio"; enabled: boolean }
+  }
   audioTrack = track
 
   stopMock = vi.fn(() => {
     track.readyState = "ended"
   })
-  track.stop = stopMock
+  track.stop = stopMock as unknown as () => void
 
   const stream = {
     getTracks: () => [track],
@@ -233,7 +240,7 @@ describe("useCheckIn microphone lifecycle", () => {
     stopMock.mockClear()
 
     act(() => {
-      geminiCallbacks.onDisconnected("network lost")
+      geminiCallbacks?.onDisconnected?.("network lost")
     })
 
     expect(stopMock).toHaveBeenCalled()
@@ -356,7 +363,7 @@ describe("useCheckIn audio capture", () => {
     })
 
     expect(result.current[0].state).toBe("error")
-    expect(result.current[0].error).toContain("Failed to initialize audio capture")
+    expect(result.current[0].error).toContain("Microphone access was blocked")
   })
 
   it("handles audio worklet module load errors gracefully", async () => {
@@ -369,7 +376,7 @@ describe("useCheckIn audio capture", () => {
     })
 
     expect(result.current[0].state).toBe("error")
-    expect(result.current[0].error).toContain("Failed to initialize audio capture")
+    expect(result.current[0].error).toContain("Failed to initialize microphone")
     expect(result.current[0].error).toContain("module load failed")
   })
 })
