@@ -73,6 +73,25 @@ export function LiquidGlassNavbar({ children, className = "", ...props }: Liquid
 
   const filterId = filterRef.current
 
+  // Keep the heavy glass effect on a separate background layer.
+  // This avoids intermittent text rendering glitches in some browsers when
+  // `backdrop-filter` + transforms/animations are active elsewhere on the page.
+  const glassStyle = {
+    backdropFilter:
+      supportsFilter && displacementMap
+        ? `url(#${filterId}) blur(16px) saturate(200%)`
+        : "blur(24px) saturate(200%)",
+    WebkitBackdropFilter: "blur(24px) saturate(200%)",
+    background: "rgba(255, 255, 255, 0.02)",
+    border: "1px solid rgba(255, 255, 255, 0.05)",
+    boxShadow: `
+      inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 0 rgba(0, 0, 0, 0.02),
+      0 8px 32px rgba(0, 0, 0, 0.25),
+      0 2px 8px rgba(0, 0, 0, 0.1)
+    `,
+  } as const
+
   return (
     <>
       {/* SVG Filter Definition for true refraction (Chromium only) */}
@@ -123,7 +142,7 @@ export function LiquidGlassNavbar({ children, className = "", ...props }: Liquid
 
       <nav
         {...props}
-        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl ${className}`}
+        className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 rounded-2xl isolate ${className}`}
         onMouseMove={(event) => {
           glow.onMouseMove(event)
           setIsHovering(true)
@@ -134,30 +153,23 @@ export function LiquidGlassNavbar({ children, className = "", ...props }: Liquid
         }}
         style={{
           ...glow.style,
-          backdropFilter:
-            supportsFilter && displacementMap
-              ? `url(#${filterId}) blur(16px) saturate(200%)`
-              : "blur(24px) saturate(200%)",
-          WebkitBackdropFilter: "blur(24px) saturate(200%)",
-          background: "rgba(255, 255, 255, 0.02)",
-          border: "1px solid rgba(255, 255, 255, 0.05)",
-          boxShadow: `
-            inset 0 1px 0 0 rgba(255, 255, 255, 0.06),
-            inset 0 -1px 0 0 rgba(0, 0, 0, 0.02),
-            0 8px 32px rgba(0, 0, 0, 0.25),
-            0 2px 8px rgba(0, 0, 0, 0.1)
-          `,
         }}
       >
+        {/* Background glass layer (keeps backdrop-filter off the content layer) */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 rounded-[inherit]"
+          style={glassStyle}
+        />
         <CursorBorderGlow
-          className="rounded-2xl transition-opacity duration-200"
+          className="z-10 rounded-2xl transition-opacity duration-200"
           size={260}
           borderWidth={1}
           style={{ opacity: isHovering ? 1 : 0 }}
         />
         {/* Inner content with subtle gradient overlay */}
         <div
-          className="relative px-6 py-3 flex items-center gap-8"
+          className="relative z-20 px-6 py-3 flex items-center gap-8"
           style={{
             background:
               "linear-gradient(180deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0) 100%)",

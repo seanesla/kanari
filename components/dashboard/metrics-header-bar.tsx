@@ -126,7 +126,7 @@ export function MetricsHeaderBar() {
             <div className="space-y-1">
               <p className="font-medium">Burnout Risk</p>
               <p className="opacity-90">
-                Forecast for the next 3-7 days from your recent daily stress/fatigue trend.
+                Heuristic 3–7 day forecast from your recent daily stress/fatigue trend (not diagnostic).
               </p>
               {burnoutPrediction ? (
                 <>

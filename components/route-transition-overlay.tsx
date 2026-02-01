@@ -1,87 +1,77 @@
 "use client"
 
-import { useLayoutEffect, useRef, useState } from "react"
-import { usePathname } from "next/navigation"
-import { AnimatePresence, motion } from "framer-motion"
-import { isAppRoute } from "@/lib/app-routes"
-
-const TRANSITION_MS = 420
-
-function getRouteGroup(pathname: string) {
-  if (isAppRoute(pathname)) return "app"
-  if (pathname === "/onboarding" || pathname.startsWith("/onboarding/")) return "onboarding"
-  return "landing"
-}
+import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion"
+import { useRouteTransition } from "@/lib/route-transition-context"
 
 export function RouteTransitionOverlay() {
-  const pathname = usePathname()
-  const lastPathnameRef = useRef<string | null>(null)
-  const lastGroupRef = useRef<string | null>(null)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [visible, setVisible] = useState(false)
+  const { visible, enterMs, exitMs } = useRouteTransition()
+  const reduceMotion = useReducedMotion()
 
-  useLayoutEffect(() => {
-    const nextGroup = getRouteGroup(pathname)
+  const EASE: [number, number, number, number] = [0.22, 1, 0.36, 1]
+  const enterTransition = reduceMotion ? { duration: 0 } : { duration: enterMs / 1000, ease: EASE }
+  const exitTransition = reduceMotion ? { duration: 0 } : { duration: exitMs / 1000, ease: EASE }
 
-    if (lastPathnameRef.current === null) {
-      lastPathnameRef.current = pathname
-      lastGroupRef.current = nextGroup
-      return
-    }
-
-    if (lastPathnameRef.current === pathname) return
-
-    const lastGroup = lastGroupRef.current
-    lastPathnameRef.current = pathname
-    lastGroupRef.current = nextGroup
-
-    // Avoid the "page refresh" feel when navigating inside the app.
-    // Keep the existing overlay behavior for other route changes.
-    if (lastGroup === "app" && nextGroup === "app") return
-
-    setVisible(true)
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-    }
-    timeoutRef.current = setTimeout(() => {
-      setVisible(false)
-    }, TRANSITION_MS)
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
-      }
-    }
-  }, [pathname])
+  const variants: Variants = {
+    initial: { opacity: 0 },
+    enter: { opacity: 1, transition: enterTransition },
+    exit: { opacity: 0, transition: exitTransition },
+  }
 
   return (
     <AnimatePresence>
       {visible ? (
         <motion.div
-          className="fixed inset-0 z-[10005] pointer-events-auto"
+          // Never block clicks: transitions should feel cosmetic, not modal.
+          className="fixed inset-0 z-[10005] pointer-events-none"
+          data-route-transition-overlay="true"
           aria-hidden="true"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.14, ease: "easeOut" }}
+          variants={variants}
+          initial="initial"
+          animate="enter"
+          exit="exit"
         >
-          <div className="absolute inset-0 bg-background/70 backdrop-blur-md" />
+          {/*
+            Important: avoid backdrop blur here.
+            A long navigation would look like a "stuck blurry screen", which reads as a refresh.
+          */}
+          <div className="absolute inset-0 bg-background/92 pointer-events-none" />
 
-          {/* Soft glass bloom (no sweeping/strobe) */}
+          {/* Soft accent bloom (no 3D; no strobe) */}
           <motion.div
             className="pointer-events-none absolute inset-0"
-            initial={{ opacity: 0, scale: 0.985 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 1.015 }}
-            transition={{ duration: TRANSITION_MS / 1000, ease: [0.22, 1, 0.36, 1] }}
+            initial={reduceMotion ? { opacity: 1 } : { opacity: 0, scale: 0.99 }}
+            animate={reduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0, scale: 1.01 }}
+            transition={
+              reduceMotion
+                ? { duration: 0 }
+                : {
+                    duration: 0.9,
+                    ease: [0.22, 1, 0.36, 1],
+                  }
+            }
           >
-            <div className="absolute -top-32 left-1/2 h-[520px] w-[780px] -translate-x-1/2 rounded-full bg-accent/12 blur-3xl" />
-            <div className="absolute top-[35vh] -left-32 h-[420px] w-[520px] rounded-full bg-foreground/5 blur-3xl" />
-            <div className="absolute bottom-[-180px] right-[-140px] h-[520px] w-[680px] rounded-full bg-accent/10 blur-3xl" />
+            <div className="absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-accent/14 blur-3xl pointer-events-none" />
+            <div className="absolute top-[30vh] -left-40 h-[480px] w-[580px] rounded-full bg-foreground/6 blur-3xl pointer-events-none" />
+            <div className="absolute bottom-[-220px] right-[-180px] h-[560px] w-[760px] rounded-full bg-accent/12 blur-3xl pointer-events-none" />
+
+            {!reduceMotion ? (
+              <motion.div
+                aria-hidden="true"
+                className="absolute inset-0 pointer-events-none"
+                initial={{ opacity: 0.0 }}
+                animate={{ opacity: [0.0, 0.12, 0.06] }}
+                exit={{ opacity: 0.0 }}
+                transition={{ duration: 1.4, ease: "easeOut" }}
+                style={{
+                  background:
+                    "radial-gradient(900px 520px at 50% 35%, oklch(from var(--accent) l c h / 0.14), transparent 62%)",
+                }}
+              />
+            ) : null}
           </motion.div>
 
-          <div className="absolute inset-0 bg-gradient-to-b from-background/35 via-transparent to-background/35" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/35 via-transparent to-background/35 pointer-events-none" />
         </motion.div>
       ) : null}
     </AnimatePresence>

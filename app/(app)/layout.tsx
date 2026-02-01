@@ -25,9 +25,16 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   // Show loading state while checking onboarding status
   if (!isReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-pulse text-muted-foreground">Loading...</div>
-      </div>
+      <DashboardAnimationProvider isReady={false}>
+        <div className="relative min-h-screen" data-dashboard>
+          <AppSpaceBackground />
+          <div className="relative min-h-screen flex items-center justify-center px-6">
+            <div className="animate-pulse rounded-2xl border border-border/60 bg-card/55 backdrop-blur-xl px-5 py-3 text-sm text-muted-foreground shadow-[0_20px_60px_-40px_rgba(0,0,0,0.9)]">
+              Loading...
+            </div>
+          </div>
+        </div>
+      </DashboardAnimationProvider>
     )
   }
 

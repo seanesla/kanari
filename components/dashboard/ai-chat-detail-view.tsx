@@ -9,7 +9,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
-import { MessageSquare, Calendar, AlertCircle, Trash2, Clock, TrendingUp, TrendingDown, Minus } from "@/lib/icons"
+import { MessageSquare, Calendar, AlertCircle, Trash2 } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { MessageBubble } from "@/components/check-in/message-bubble"
@@ -19,23 +19,19 @@ import { formatDate, formatDurationWithUnits } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import { useCoachAvatar } from "@/hooks/use-coach-avatar"
 import { Deck } from "@/components/dashboard/deck"
+import { VoiceBiomarkerReport } from "@/components/check-in/voice-biomarker-report"
 import type { CheckInSession } from "@/lib/types"
 
 interface AIChatDetailViewProps {
   session: CheckInSession
   onDelete: () => void
-}
-
-function scoreToBand(score: number | undefined): "low" | "medium" | "high" | "unknown" {
-  if (score === undefined) return "unknown"
-  if (score < 34) return "low"
-  if (score < 67) return "medium"
-  return "high"
+  highlightMessageId?: string | null
 }
 
 export function AIChatDetailView({
   session,
   onDelete,
+  highlightMessageId,
 }: AIChatDetailViewProps) {
   const { timeZone } = useTimeZone()
   const { avatarBase64: coachAvatar } = useCoachAvatar()
@@ -47,6 +43,8 @@ export function AIChatDetailView({
 
   const [playheadPosition, setPlayheadPosition] = useState(0)
   const [seekPosition, setSeekPosition] = useState<number | undefined>(undefined)
+
+  const [activeHighlightMessageId, setActiveHighlightMessageId] = useState<string | null>(null)
 
   const waveformWrapRef = useRef<HTMLDivElement | null>(null)
   const [waveformWidth, setWaveformWidth] = useState(() => {
@@ -99,14 +97,22 @@ export function AIChatDetailView({
     return () => observer.disconnect()
   }, [])
 
-  const stressBand = scoreToBand(session.acousticMetrics?.stressScore)
-  const fatigueBand = scoreToBand(session.acousticMetrics?.fatigueScore)
+  useEffect(() => {
+    if (!highlightMessageId) return
 
-  const StressIcon = stressBand !== "unknown"
-    ? stressBand === "high"
-      ? TrendingUp
-      : TrendingDown
-    : Minus
+    setActiveHighlightMessageId(highlightMessageId)
+
+    const timer = window.setTimeout(() => {
+      const el = document.getElementById(`message-${highlightMessageId}`)
+      el?.scrollIntoView({ behavior: "smooth", block: "center" })
+    }, 150)
+
+    const clear = window.setTimeout(() => setActiveHighlightMessageId(null), 2500)
+    return () => {
+      window.clearTimeout(timer)
+      window.clearTimeout(clear)
+    }
+  }, [highlightMessageId])
 
   return (
     <div className="flex flex-col h-full">
@@ -163,27 +169,13 @@ export function AIChatDetailView({
       {/* Messages scroll area */}
       <ScrollArea className="flex-1 min-h-0">
         <div className="px-4 py-4 sm:px-6 sm:py-6 space-y-6">
-          {session.acousticMetrics && (
-            <Deck tone="default" className="p-4">
-              <h3 className="text-sm font-medium mb-3">Voice Analysis</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
-                  <StressIcon className="h-5 w-5 text-destructive" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Stress Level</p>
-                    <p className="text-lg font-semibold capitalize">{stressBand}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 rounded-lg bg-background/50">
-                  <Clock className="h-5 w-5 text-accent" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Fatigue Level</p>
-                    <p className="text-lg font-semibold capitalize">{fatigueBand}</p>
-                  </div>
-                </div>
-              </div>
-            </Deck>
-          )}
+          <Deck tone="default" className="p-4">
+            <VoiceBiomarkerReport
+              metrics={session.acousticMetrics}
+              state="final"
+              title="Voice biomarker report"
+            />
+          </Deck>
 
           {audioDataArray && (
             <Deck tone="default" className="p-4">
@@ -218,7 +210,13 @@ export function AIChatDetailView({
             </div>
           ) : (
             session.messages.map((message) => (
-              <MessageBubble key={message.id} message={message} skipAnimation coachAvatar={coachAvatar} />
+              <MessageBubble
+                key={message.id}
+                message={message}
+                skipAnimation
+                coachAvatar={coachAvatar}
+                highlight={message.id === activeHighlightMessageId}
+              />
             ))
           )}
         </div>

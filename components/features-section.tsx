@@ -33,12 +33,12 @@ export function FeaturesSection() {
     {
       icon: Mic,
       title: "Voice Biomarker Analysis",
-      description: "Extract stress and fatigue signals from speech patterns, pause frequency, and vocal energy—all processed in your browser.",
+      description: "Estimate stress and fatigue signals from speech rhythm, pauses, and vocal energy. Acoustic feature extraction runs in your browser.",
     },
     {
       icon: Brain,
       title: "Predictive Forecasting",
-      description: "AI models detect subtle pattern shifts that precede burnout, giving you 3-7 days of advance warning.",
+      description: "Compute a short-horizon (3–7 day) risk forecast from your recent trend. Heuristic signal, not a diagnosis.",
     },
     {
       icon: TrendingUp,
@@ -48,7 +48,7 @@ export function FeaturesSection() {
     {
       icon: Calendar,
       title: "Calendar Integration",
-      description: "Automatically schedule recovery blocks when risk is elevated. Prevention is better than cure.",
+      description: "Schedule recovery blocks when risk is elevated. Small interventions beat a full crash.",
     },
   ]
 

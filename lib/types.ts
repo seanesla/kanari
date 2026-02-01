@@ -713,6 +713,8 @@ export interface CheckInSynthesis {
     confidence: number
     /** Short, user-safe explanation */
     notes: string
+    /** Evidence quotes from the transcript (links back via messageId) */
+    evidenceQuotes?: CheckInSynthesisEvidenceQuote[]
   }
   meta: {
     model: string

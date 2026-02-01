@@ -12,7 +12,7 @@ import { db } from "@/lib/storage/db"
 import { patchSettings } from "@/lib/settings/patch-settings"
 import { updateCalibrationFromSelfReportSubmission } from "@/lib/ml/personalized-biomarkers"
 import type { CheckInSession, CheckInSynthesis } from "@/lib/types"
-import { BiomarkerIndicator } from "@/components/check-in/biomarker-indicator"
+import { VoiceBiomarkerReport } from "@/components/check-in/voice-biomarker-report"
 import { formatDate } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
 
@@ -151,17 +151,14 @@ export function SynthesisScreen({
             ) : null}
           </div>
 
-          {/* Biomarkers (quick continuity cue) */}
+          {/* Voice biomarker report (judge-friendly proof + explainability) */}
           {session ? (
             <Deck className="p-4">
-              <p className="text-xs font-medium text-muted-foreground mb-2">Voice biomarkers (this check-in)</p>
-              {session.acousticMetrics ? (
-                <BiomarkerIndicator metrics={session.acousticMetrics} compact />
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Not enough speech captured to analyze stress/fatigue. Try speaking for about 1-2 seconds next time.
-                </p>
-              )}
+              <VoiceBiomarkerReport
+                metrics={session.acousticMetrics}
+                state="final"
+                title="Voice biomarkers (this check-in)"
+              />
             </Deck>
           ) : null}
 

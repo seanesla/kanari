@@ -19,6 +19,7 @@ interface MessageBubbleProps {
   message: CheckInMessage
   showMismatchIndicator?: boolean
   skipAnimation?: boolean
+  highlight?: boolean
   className?: string
   /** Base64-encoded coach avatar image (no data: prefix) */
   coachAvatar?: string | null
@@ -28,6 +29,7 @@ export function MessageBubble({
   message,
   showMismatchIndicator = true,
   skipAnimation = false,
+  highlight = false,
   className,
   coachAvatar,
 }: MessageBubbleProps) {
@@ -50,8 +52,10 @@ export function MessageBubble({
 
   return (
     <motion.div
+      id={`message-${message.id}`}
+      data-message-id={message.id}
       className={cn(
-        "flex gap-3 max-w-[85%]",
+        "flex gap-3 max-w-[85%] scroll-mt-24",
         isUser ? "ml-auto flex-row-reverse" : "mr-auto",
         className
       )}
@@ -76,6 +80,7 @@ export function MessageBubble({
             isUser
               ? "bg-accent text-accent-foreground rounded-tr-sm"
               : "bg-muted rounded-tl-sm",
+            highlight ? "ring-2 ring-accent/40 ring-offset-2 ring-offset-background" : "",
           )}
         >
           <p className={cn("whitespace-pre-wrap", isAssistantStreaming && "opacity-90")}>

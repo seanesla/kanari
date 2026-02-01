@@ -314,6 +314,7 @@
   .scale-hover:hover {
     transform: scale(1.005);
   }
+
 }
 
 /* Subtle glitch for failing status */
@@ -348,6 +349,15 @@
 }
 
 /* Route transitions are handled in React (framer-motion overlay). */
+
+/*
+ * Route transition overlay must never block interaction.
+ * Note: `pointer-events` is not reliably inherited across HTML descendants.
+ */
+[data-route-transition-overlay="true"],
+[data-route-transition-overlay="true"] * {
+  pointer-events: none !important;
+}
 
 /*
  * Startup animation (animated logo) can be disabled in Settings.

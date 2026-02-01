@@ -79,8 +79,8 @@ const SLIDES: DemoSlide[] = [
   },
   {
     id: "forecast",
-    title: "Burnout risk forecast (3-7 days)",
-    subtitle: "Trend-based forecasting that flags risk before you consciously feel it.",
+    title: "3-7 day risk forecast",
+    subtitle: "Heuristic trend-based forecasting with confidence (not diagnostic).",
     bullets: [
       "Turns recent biomarker trends into a risk level + confidence",
       "Explains contributing factors so the result feels actionable",

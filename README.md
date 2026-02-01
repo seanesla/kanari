@@ -1,6 +1,6 @@
 # kanari
 
-**Predict burnout before it happens.** A browser-based early warning system that uses AI voice check-ins to analyze vocal biomarkers, forecast risk 3-7 days ahead, and schedule recovery time on your calendar.
+**Track stress + fatigue patterns before you crash.** A browser-based wellness tool that uses AI voice check-ins to extract on-device acoustic features, compute a heuristic 3-7 day risk forecast from trends, and help you schedule recovery time.
 
 [![Gemini 3 Hackathon](https://img.shields.io/badge/Google%20DeepMind-Gemini%203%20Hackathon-4285F4?style=flat-square&logo=google&logoColor=white)](https://gemini3.devpost.com)
 [![Platform](https://img.shields.io/badge/Platform-Browser-orange?style=flat-square)]()
@@ -11,9 +11,9 @@
 
 ## What is kanari?
 
-kanari helps remote workers and professionals detect early signs of burnout through daily AI voice check-ins. Have a 30-60 second conversation with Gemini about your day. The app analyzes acoustic biomarkers in your browser, predicts burnout risk for the coming week, and suggests personalized recovery actions.
+kanari helps remote workers and professionals track stress and fatigue signals through daily AI voice check-ins. Have a 30-60 second conversation with Gemini about your day. The app extracts acoustic features in your browser, trends your scores over time, computes a short-horizon (3-7 day) forecast with confidence, and suggests recovery actions.
 
-Your voice patterns shift days before you consciously feel burnout. kanari detects those signals.
+This is not medical advice and it does not diagnose burnout.
 
 ---
 
@@ -23,7 +23,7 @@ Your voice patterns shift days before you consciously feel burnout. kanari detec
 - **AI Voice Check-ins**: Conversational check-ins powered by Gemini Live - speak naturally, get real-time responses
 - **Acoustic Biomarker Analysis**: Detects stress and fatigue from speech rate, pitch variations, pause patterns, and spectral features
 - **Semantic Fusion**: Combines acoustic signals with conversation content for more accurate scoring
-- **Burnout Forecasting**: Predicts risk 3-7 days ahead based on voice pattern trends
+- **Burnout Forecasting**: Heuristic 3-7 day risk forecast from recent trends (with confidence)
 - **Check-in Synthesis**: AI-generated summaries with insights and journal entries after each session
 
 ### Personalization
@@ -41,7 +41,8 @@ Your voice patterns shift days before you consciously feel burnout. kanari detec
 - **Guided Feature Tour**: Interactive walkthrough at `/demo` showcasing all features with video demos
 
 ### Privacy
-- **Client-side Processing**: Acoustic analysis runs entirely in your browser
+- **On-device Features**: Acoustic feature extraction runs in your browser (voice patterns/biomarkers)
+- **Gemini Usage**: Live check-in audio is streamed to Gemini for conversation and synthesis
 - **Flexible API Keys**: Use the built-in demo key or bring your own Gemini API key (free tier available)
 - **No Account Required**: Data stored locally in IndexedDB
 

@@ -1,9 +1,8 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useSceneMode } from "@/lib/scene-context"
 import { ArrowUpRight } from "@/lib/icons"
 import { cn } from "@/lib/utils"
+import { TransitionLink } from "@/components/transition-link"
 
 interface EnterButtonProps {
   className?: string
@@ -12,34 +11,24 @@ interface EnterButtonProps {
 }
 
 export function EnterButton({ className, variant = "hero", children }: EnterButtonProps) {
-  const { setMode } = useSceneMode()
-  const router = useRouter()
-
-  const handleClick = () => {
-    // Trigger the 3D transition and navigate immediately
-    // The scene will animate during page transition (like app→landing does)
-    setMode("transitioning")
-    router.push("/overview")
-  }
-
   if (variant === "nav") {
     return (
-      <button
-        onClick={handleClick}
+      <TransitionLink
+        href="/overview"
         className={cn(
           "text-sm border border-foreground/20 px-4 py-2 hover:bg-foreground hover:text-background transition-all cursor-pointer",
           className
         )}
       >
         {children || "Enter"}
-      </button>
+      </TransitionLink>
     )
   }
 
   if (variant === "cta") {
     return (
-      <button
-        onClick={handleClick}
+      <TransitionLink
+        href="/overview"
         className={cn(
           "inline-flex items-center gap-2 bg-foreground text-background px-8 py-4 text-lg hover:bg-accent hover:scale-105 transition-all cursor-pointer",
           className
@@ -47,14 +36,14 @@ export function EnterButton({ className, variant = "hero", children }: EnterButt
       >
         {children || "Try kanari"}
         <ArrowUpRight className="h-5 w-5" />
-      </button>
+      </TransitionLink>
     )
   }
 
   // Hero variant (default)
   return (
-    <button
-      onClick={handleClick}
+    <TransitionLink
+      href="/overview"
       className={cn(
         "group inline-flex items-center gap-3 text-lg border-b border-foreground pb-2 hover:text-accent hover:border-accent transition-all cursor-pointer",
         className
@@ -62,6 +51,6 @@ export function EnterButton({ className, variant = "hero", children }: EnterButt
     >
       {children || "Start check-in"}
       <ArrowUpRight className="h-5 w-5 transition-transform group-hover:translate-x-1 group-hover:-translate-y-1" />
-    </button>
+    </TransitionLink>
   )
 }

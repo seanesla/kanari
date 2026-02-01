@@ -861,7 +861,8 @@ You will receive:
 YOUR TASK:
 1) Write a short narrative (2-4 sentences) that captures the arc of the check-in.
 2) Extract 2-3 key insights. Each insight MUST include evidence:
-   - At least 1 short direct quote from the transcript or journal (<= 20 words)
+   - At least 1 short direct quote from the transcript (<= 20 words)
+     - Quotes MUST include the transcript messageId (the id inside brackets in the transcript)
    - At least 1 voice/journal signal in plain language (no raw DSP numbers)
 3) Provide 1-2 targeted suggestions. Each suggestion MUST:
    - Be linked to one or more insights (by insight index)
@@ -871,6 +872,7 @@ YOUR TASK:
    - This is separate from voice biomarkers (HOW they sounded).
    - If evidence is weak or ambiguous, return ~50 with low confidence.
    - Include a short, user-safe explanation in notes.
+   - Include 1-3 short transcript quotes as evidence (with messageId).
 
 IMPORTANT:
 - Do NOT invent quotes; only use provided text.
@@ -916,7 +918,7 @@ export const CHECK_IN_SYNTHESIS_SCHEMA = {
                     role: { type: "string", enum: ["user", "assistant", "system"] },
                     text: { type: "string" },
                   },
-                  required: ["role", "text"],
+                  required: ["messageId", "role", "text"],
                 },
               },
               voice: {
@@ -970,9 +972,23 @@ export const CHECK_IN_SYNTHESIS_SCHEMA = {
         fatigueScore: { type: "number", minimum: 0, maximum: 100 },
         confidence: { type: "number", minimum: 0, maximum: 1 },
         notes: { type: "string" },
+        evidenceQuotes: {
+          type: "array",
+          minItems: 1,
+          maxItems: 3,
+          items: {
+            type: "object",
+            properties: {
+              messageId: { type: "string" },
+              role: { type: "string", enum: ["user", "assistant", "system"] },
+              text: { type: "string" },
+            },
+            required: ["messageId", "role", "text"],
+          },
+        },
       },
-      required: ["stressScore", "fatigueScore", "confidence", "notes"],
+      required: ["stressScore", "fatigueScore", "confidence", "notes", "evidenceQuotes"],
     },
   },
-  required: ["narrative", "insights", "suggestions"],
+  required: ["narrative", "insights", "suggestions", "semanticBiomarkers"],
 }

@@ -7,7 +7,6 @@ import "./fullcalendar-base.css"
 import "./fullcalendar-theme.css"
 import FullCalendar from "@fullcalendar/react"
 import dayGridPlugin from "@fullcalendar/daygrid"
-import timeGridPlugin from "@fullcalendar/timegrid"
 import interactionPlugin, { type DateClickArg } from "@fullcalendar/interaction"
 import type { EventClickArg, EventDropArg, EventInput } from "@fullcalendar/core"
 import { Temporal } from "temporal-polyfill"
@@ -87,15 +86,16 @@ const COMPLETED_COLORS = { bg: "rgba(107, 114, 128, 0.10)", border: "#6b7280", t
 const EMPTY_SUGGESTIONS: Suggestion[] = []
 const EMPTY_SESSIONS: CheckInSession[] = []
 
-const CALENDAR_PLUGINS = [dayGridPlugin, timeGridPlugin, interactionPlugin]
+const CALENDAR_PLUGINS = [dayGridPlugin, interactionPlugin]
 const HEADER_TOOLBAR = {
   left: "prev,next today",
   center: "title",
-  right: "timeGridWeek,dayGridMonth",
+  right: "dayGridMonth",
 } as const
 
 const EVENT_TIME_FORMAT = { hour: "numeric", minute: "2-digit", meridiem: "short" } as const
-const SLOT_LABEL_FORMAT = { hour: "numeric", minute: "2-digit", hour12: true } as const
+
+const DEFAULT_DAY_ACTION_TIME = { hour: 9, minute: 0 } as const
 
 interface FullCalendarViewProps {
   scheduledSuggestions: Suggestion[]
@@ -187,7 +187,7 @@ function toSlotFromFullCalendarDateClick(input: { date: Date; dateStr: string; t
       }
 
       if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-        return { dateISO: raw, hour: 0, minute: 0 }
+        return { dateISO: raw, hour: DEFAULT_DAY_ACTION_TIME.hour, minute: DEFAULT_DAY_ACTION_TIME.minute }
       }
 
       const zdt = Temporal.PlainDateTime.from(raw).toZonedDateTime(input.timeZone)
@@ -388,37 +388,12 @@ export function FullCalendarView({
   const calculateDropTime = useCallback((e: React.DragEvent): { dateISO: string; hour: number; minute: number } | null => {
     if (!containerRef.current) return null
 
-    // Get the time grid element from container
-    const timeGrid = containerRef.current.querySelector(".fc-timegrid-body")
-    if (!timeGrid) return null
+    const hovered = document.elementFromPoint(e.clientX, e.clientY)
+    const dayCell = hovered?.closest?.(".fc-daygrid-day[data-date]") as HTMLElement | null
+    const dayDate = dayCell?.getAttribute("data-date")
+    if (!dayDate) return null
 
-    const rect = timeGrid.getBoundingClientRect()
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-
-    // Calculate which day column
-    const dayHeaders = containerRef.current.querySelectorAll(".fc-col-header-cell")
-    if (dayHeaders.length === 0) return null
-
-    const colWidth = rect.width / dayHeaders.length
-    const dayIndex = Math.floor(x / colWidth)
-    if (dayIndex < 0 || dayIndex >= dayHeaders.length) return null
-
-    // Get the date from the header
-    const dayHeader = dayHeaders[dayIndex]
-    const dateAttr = dayHeader.getAttribute("data-date")
-    if (!dateAttr) return null
-
-    // Calculate the hour based on y position
-    const gridHeight = rect.height
-    const hourHeight = gridHeight / 24
-    const relativeHour = y / hourHeight
-    const hour = Math.floor(relativeHour)
-    const minute = Math.round((relativeHour % 1) * 60 / 15) * 15
-
-    if (hour < 0 || hour >= 24) return null
-
-    return { dateISO: dateAttr, hour, minute: minute % 60 }
+    return { dateISO: dayDate, hour: DEFAULT_DAY_ACTION_TIME.hour, minute: DEFAULT_DAY_ACTION_TIME.minute }
   }, [])
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -480,7 +455,7 @@ export function FullCalendarView({
       <FullCalendar
         ref={calendarRef}
         plugins={CALENDAR_PLUGINS}
-        initialView={isMini ? "dayGridMonth" : "timeGridWeek"}
+        initialView="dayGridMonth"
         headerToolbar={isMini ? false : HEADER_TOOLBAR}
         events={events}
         eventClick={handleEventClick}
@@ -492,13 +467,9 @@ export function FullCalendarView({
         dayMaxEvents={true}
         weekends={true}
         nowIndicator={!isMini}
-        slotMinTime="00:00:00"
-        slotMaxTime="24:00:00"
-        allDaySlot={false}
         height="100%"
         timeZone={timeZone}
         eventTimeFormat={EVENT_TIME_FORMAT}
-        slotLabelFormat={SLOT_LABEL_FORMAT}
       />
 
       {isInteractive && isDragOver && (

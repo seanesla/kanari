@@ -20,6 +20,7 @@ import {
   fromJournalEntry,
   type DBTrendData,
 } from "@/lib/storage/db"
+import { shouldIncludeInTrends } from "@/lib/ml/thresholds"
 import type {
   Recording,
   TrendData,
@@ -37,6 +38,11 @@ function getUtcDayBounds(dateISO: string): { start: Date; end: Date } {
   return { start, end }
 }
 
+function includeInTrend(metrics: { quality?: { quality?: number } } | undefined): boolean {
+  if (!metrics) return false
+  return shouldIncludeInTrends(metrics.quality)
+}
+
 async function recomputeTrendDataForDate(dateISO: string): Promise<void> {
   const { start, end } = getUtcDayBounds(dateISO)
 
@@ -48,14 +54,16 @@ async function recomputeTrendDataForDate(dateISO: string): Promise<void> {
   const points: Array<{ stressScore: number; fatigueScore: number }> = []
 
   for (const session of sessions) {
-    const metrics = (session as { acousticMetrics?: { stressScore: number; fatigueScore: number } }).acousticMetrics
+    const metrics = (session as { acousticMetrics?: { stressScore: number; fatigueScore: number; quality?: { quality?: number } } }).acousticMetrics
     if (!metrics) continue
+    if (!includeInTrend(metrics)) continue
     points.push({ stressScore: metrics.stressScore, fatigueScore: metrics.fatigueScore })
   }
 
   for (const recording of recordings) {
-    const metrics = (recording as { metrics?: { stressScore: number; fatigueScore: number } }).metrics
+    const metrics = (recording as { metrics?: { stressScore: number; fatigueScore: number; quality?: { quality?: number } } }).metrics
     if (!metrics) continue
+    if (!includeInTrend(metrics)) continue
     points.push({ stressScore: metrics.stressScore, fatigueScore: metrics.fatigueScore })
   }
 
@@ -505,28 +513,7 @@ export function useCheckInSessionActions() {
 
     if (session.acousticMetrics) {
       const date = session.startedAt.split("T")[0]
-      const existing = await db.trendData.get(date)
-      if (existing) {
-        const count = (existing.recordingCount || 1) + 1
-        const newStress =
-          ((existing.stressScore * (count - 1)) + session.acousticMetrics.stressScore) / count
-        const newFatigue =
-          ((existing.fatigueScore * (count - 1)) + session.acousticMetrics.fatigueScore) / count
-
-        await db.trendData.update(date, {
-          stressScore: Math.round(newStress),
-          fatigueScore: Math.round(newFatigue),
-          recordingCount: count,
-        })
-      } else {
-        await db.trendData.put({
-          id: date,
-          date: new Date(date),
-          stressScore: session.acousticMetrics.stressScore,
-          fatigueScore: session.acousticMetrics.fatigueScore,
-          recordingCount: 1,
-        })
-      }
+      await recomputeTrendDataForDate(date)
     }
 
     return session.id
@@ -559,7 +546,17 @@ export function useCheckInSessionActions() {
   )
 
   const deleteCheckInSession = useCallback(async (id: string) => {
+    const existing = await db.checkInSessions.get(id)
+    if (!existing) return
+
+    const dateISO = existing.startedAt.toISOString().split("T")[0]
+    const hadMetrics = Boolean(existing.acousticMetrics)
+
     await db.checkInSessions.delete(id)
+
+    if (hadMetrics) {
+      await recomputeTrendDataForDate(dateISO)
+    }
   }, [])
 
   /**

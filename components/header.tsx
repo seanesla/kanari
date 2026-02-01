@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import { TransitionLink } from "@/components/transition-link"
 import { Button } from "@/components/ui/button"
 import { useState } from "react"
 import { Menu, X } from "@/lib/icons"
@@ -11,28 +11,31 @@ export function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2">
+        <TransitionLink href="/" className="flex items-center gap-2">
           <span className="text-xl font-semibold tracking-tight">kanari</span>
-        </Link>
+        </TransitionLink>
 
         <nav className="hidden items-center gap-8 md:flex">
-          <Link href="#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <TransitionLink href="/#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Features
-          </Link>
-          <Link href="#how-it-works" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+          </TransitionLink>
+          <TransitionLink href="/#how-it-works" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             How it Works
-          </Link>
-          <Link href="/overview" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+          </TransitionLink>
+          <TransitionLink href="/#trust" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            Trust
+          </TransitionLink>
+          <TransitionLink href="/overview" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
             Overview
-          </Link>
+          </TransitionLink>
         </nav>
 
         <div className="hidden items-center gap-4 md:flex">
           <Button variant="ghost" size="sm" asChild>
-            <Link href="/login">Log in</Link>
+            <TransitionLink href="/login">Log in</TransitionLink>
           </Button>
           <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" asChild>
-            <Link href="/overview">Get Started</Link>
+            <TransitionLink href="/overview">Get Started</TransitionLink>
           </Button>
         </div>
 
@@ -44,21 +47,24 @@ export function Header() {
       {mobileMenuOpen && (
         <div className="border-t border-border bg-background px-6 py-4 md:hidden">
           <nav className="flex flex-col gap-4">
-            <Link href="#features" className="text-sm text-muted-foreground">
+            <TransitionLink href="/#features" className="text-sm text-muted-foreground">
               Features
-            </Link>
-            <Link href="#how-it-works" className="text-sm text-muted-foreground">
+            </TransitionLink>
+            <TransitionLink href="/#how-it-works" className="text-sm text-muted-foreground">
               How it Works
-            </Link>
-            <Link href="/overview" className="text-sm text-muted-foreground">
+            </TransitionLink>
+            <TransitionLink href="/#trust" className="text-sm text-muted-foreground">
+              Trust
+            </TransitionLink>
+            <TransitionLink href="/overview" className="text-sm text-muted-foreground">
               Overview
-            </Link>
+            </TransitionLink>
             <div className="flex gap-2 pt-4">
               <Button variant="ghost" size="sm" className="flex-1" asChild>
-                <Link href="/login">Log in</Link>
+                <TransitionLink href="/login">Log in</TransitionLink>
               </Button>
               <Button size="sm" className="flex-1 bg-accent text-accent-foreground" asChild>
-                <Link href="/overview">Get Started</Link>
+                <TransitionLink href="/overview">Get Started</TransitionLink>
               </Button>
             </div>
           </nav>

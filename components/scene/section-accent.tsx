@@ -102,39 +102,9 @@ export function SectionAccent({
 }
 
 function StatsAccent({ accentColor }: { accentColor: string }) {
-  const meshRef = useRef<THREE.InstancedMesh>(null)
-  const dummy = useRef(new THREE.Object3D()).current
-
-  // Set up instance matrices once on mount
-  useEffect(() => {
-    if (!meshRef.current) return
-    for (let i = 0; i < 16; i++) {
-      dummy.position.set(
-        ((i % 4) - 1.5) * 0.8,
-        Math.floor(i / 4 - 1.5) * 0.8,
-        0
-      )
-      dummy.scale.setScalar(0.2)
-      dummy.updateMatrix()
-      meshRef.current.setMatrixAt(i, dummy.matrix)
-    }
-    meshRef.current.instanceMatrix.needsUpdate = true
-  }, [dummy])
-
-  return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, 16]}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial
-        color={accentColor}
-        emissive={accentColor}
-        emissiveIntensity={0.5}
-        metalness={0.9}
-        roughness={0.1}
-        transparent
-        opacity={1}
-      />
-    </instancedMesh>
-  )
+  // Intentionally disabled: users found the stats accent distracting.
+  void accentColor
+  return null
 }
 
 function ProblemAccent({ accentColor, accentDark }: { accentColor: string; accentDark: string }) {

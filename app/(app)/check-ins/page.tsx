@@ -246,6 +246,7 @@ function HistoryPageContent() {
 
   // Highlight state for newly created items
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null)
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
 
   // Fetch unified history timeline
   const { items: historyItems, isLoading: isHistoryLoading } = useHistory()
@@ -312,6 +313,8 @@ function HistoryPageContent() {
     if (highlightId) {
       setHighlightedItemId(highlightId)
       setSelectedItemId(highlightId)
+      const messageId = searchParams.get("message")
+      if (messageId) setHighlightedMessageId(messageId)
       window.history.replaceState({}, "", "/check-ins")
     }
   }, [searchParams])
@@ -323,6 +326,16 @@ function HistoryPageContent() {
       return () => clearTimeout(timer)
     }
   }, [highlightedItemId])
+
+  useEffect(() => {
+    if (!highlightedMessageId) return
+    // Wait until the session is actually loaded/mounted, otherwise we can clear
+    // the highlight before the detail view has a chance to scroll.
+    if (!selectedItem) return
+
+    const timer = window.setTimeout(() => setHighlightedMessageId(null), 3000)
+    return () => window.clearTimeout(timer)
+  }, [highlightedMessageId, selectedItem])
 
   // Ensure the detail view can't display items that no longer exist
   useEffect(() => {
@@ -474,6 +487,7 @@ function HistoryPageContent() {
                   <AIChatDetailView
                     session={selectedItem.session}
                     onDelete={() => handleDeleteSession(selectedItem.session.id)}
+                    highlightMessageId={highlightedMessageId}
                   />
                 </motion.div>
               ) : isMobile ? (

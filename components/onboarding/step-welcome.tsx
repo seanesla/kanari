@@ -24,7 +24,7 @@ const features = [
   {
     icon: Brain,
     title: "AI Insights",
-    description: "Gemini analyzes patterns to predict burnout risk",
+    description: "Gemini turns your check-in into evidence-backed insights",
   },
   {
     icon: Calendar,
@@ -34,7 +34,7 @@ const features = [
   {
     icon: Shield,
     title: "Privacy First",
-    description: "All analysis happens locally in your browser",
+    description: "Acoustic features stay on-device; Gemini is used for conversation",
   },
 ]
 
@@ -59,8 +59,8 @@ export function StepWelcome({ onNext }: StepWelcomeProps) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          Your voice knows when you&apos;re heading toward burnout—often before you do.
-          Let&apos;s set things up so kanari can help protect you.
+          Your voice can carry stress and fatigue signals you might miss.
+          Let&apos;s set things up so kanari can help you track patterns and plan recovery.
         </motion.p>
       </div>
 

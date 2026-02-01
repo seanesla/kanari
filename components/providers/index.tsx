@@ -19,6 +19,7 @@ import { IconProvider } from "./icon-provider"
 import { DataPreloader } from "./data-preloader"
 import { DemoProvider, DemoOverlay } from "@/components/demo"
 import { RouteTransitionOverlay } from "@/components/route-transition-overlay"
+import { RouteTransitionProvider } from "@/lib/route-transition-context"
 
 export function Providers({ children }: { children: ReactNode }) {
   useEffect(() => {
@@ -36,12 +37,14 @@ export function Providers({ children }: { children: ReactNode }) {
                 <ColorSync />
                 <DemoProvider>
                   <NavbarProvider>
-                    <SceneBackground />
-                    <PersistentNavbar />
-                    <RouteTransitionOverlay />
-                    <RequireUserName />
-                    {children}
-                    <DemoOverlay />
+                    <RouteTransitionProvider>
+                      <SceneBackground />
+                      <PersistentNavbar />
+                      <RouteTransitionOverlay />
+                      <RequireUserName />
+                      {children}
+                      <DemoOverlay />
+                    </RouteTransitionProvider>
                   </NavbarProvider>
                 </DemoProvider>
               </TimeZoneProvider>

@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from "react"
 import { usePathname } from "next/navigation"
-import Link from "next/link"
+import { TransitionLink } from "@/components/transition-link"
 import { motion, AnimatePresence } from "framer-motion"
 import { Menu, X } from "@/lib/icons"
 import { useSceneMode } from "@/lib/scene-context"
@@ -16,7 +16,13 @@ import { cn } from "@/lib/utils"
 const landingLinks = [
   { id: "features", href: "#features", label: "Features" },
   { id: "how-it-works", href: "#how-it-works", label: "How It Works" },
+  { id: "trust", href: "#trust", label: "Trust" },
 ]
+
+function resolveLandingHref(pathname: string, href: string): string {
+  if (!href.startsWith("#")) return href
+  return pathname === "/" ? href : `/${href}`
+}
 
 // Main app navigation (overview + feature pages)
 const dashboardLinks = [
@@ -58,13 +64,13 @@ function MobileNavLink({
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.2, delay: 0.1 + index * 0.05 }}
     >
-      <Link
+      <TransitionLink
         href={href}
         onClick={onClick}
         className="block text-sm text-muted-foreground hover:text-foreground px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors"
       >
         {label}
-      </Link>
+      </TransitionLink>
     </motion.div>
   )
 }
@@ -121,7 +127,7 @@ interface NavLinkProps {
 
 function NavLink({ href, label, isActive }: NavLinkProps) {
   return (
-    <Link
+    <TransitionLink
       href={href}
       prefetch={true}
       className={cn(
@@ -138,12 +144,13 @@ function NavLink({ href, label, isActive }: NavLinkProps) {
           transition={{ type: "spring", stiffness: 500, damping: 30 }}
         />
       )}
-    </Link>
+    </TransitionLink>
   )
 }
 
 function LandingNavLinks() {
   const { activeSection } = useNavbar()
+  const pathname = usePathname()
 
   return (
     <motion.div
@@ -156,7 +163,7 @@ function LandingNavLinks() {
       {landingLinks.map((link) => (
         <NavLink
           key={link.id}
-          href={link.href}
+          href={resolveLandingHref(pathname, link.href)}
           label={link.label}
           isActive={activeSection === link.id}
         />
@@ -327,12 +334,12 @@ export function PersistentNavbar() {
             visible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
           )}
         >
-          <Link
+          <TransitionLink
             href="/"
             className="flex items-center gap-2 text-accent hover:text-accent-light transition-colors"
           >
             <Logo className="h-9 w-auto" />
-          </Link>
+          </TransitionLink>
 
           <div className="flex items-center gap-6">
             <AnimatePresence mode="wait">
@@ -361,12 +368,12 @@ export function PersistentNavbar() {
         )}
       >
         <div className="flex items-center justify-between px-5 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
-          <Link
+          <TransitionLink
             href="/"
             className="flex items-center gap-2 text-accent hover:text-accent-light transition-colors"
           >
             <Logo className="h-11 w-auto" />
-          </Link>
+          </TransitionLink>
 
           <button
             ref={hamburgerRef}
@@ -425,7 +432,7 @@ export function PersistentNavbar() {
                     {landingLinks.map((link, index) => (
                       <MobileNavLink
                         key={link.id}
-                        href={link.href}
+                        href={resolveLandingHref(_pathname, link.href)}
                         label={link.label}
                         index={index}
                         onClick={handleMobileNavClick}

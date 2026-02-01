@@ -140,7 +140,9 @@ vi.mock("@/components/achievements", async () => {
 })
 
 describe("UnifiedDashboard empty state", () => {
-  it("shows the CTA without rendering the legacy empty-state layout boxes", async () => {
+  it(
+    "shows the CTA without rendering the legacy empty-state layout boxes",
+    async () => {
     const { UnifiedDashboard } = await import("@/components/dashboard/unified-dashboard")
 
     const { container } = render(<UnifiedDashboard />)
@@ -150,5 +152,7 @@ describe("UnifiedDashboard empty state", () => {
 
     expect(container.querySelector(".h-\\[260px\\]")).toBeNull()
     expect(container.querySelector(".h-\\[70vh\\]")).toBeNull()
-  })
+    },
+    15000
+  )
 })

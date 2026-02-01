@@ -71,9 +71,19 @@ export function InsightsPanel({ session, className }: InsightsPanelProps) {
               <p className="text-sm font-medium leading-snug">{insight.title}</p>
               <p className="text-xs text-muted-foreground mt-1">{insight.description}</p>
               {insight.evidence.quotes[0]?.text ? (
-                <p className="text-xs text-muted-foreground mt-2 border-l-2 border-border pl-3">
-                  “{insight.evidence.quotes[0].text}”
-                </p>
+                insight.evidence.quotes[0].messageId ? (
+                  <Link
+                    href={`/check-ins?highlight=${session.id}&message=${encodeURIComponent(insight.evidence.quotes[0].messageId)}`}
+                    className="block text-xs text-muted-foreground mt-2 border-l-2 border-border pl-3 hover:text-foreground"
+                    aria-label="View evidence quote in transcript"
+                  >
+                    “{insight.evidence.quotes[0].text}”
+                  </Link>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-2 border-l-2 border-border pl-3">
+                    “{insight.evidence.quotes[0].text}”
+                  </p>
+                )
               ) : null}
             </div>
           ))}

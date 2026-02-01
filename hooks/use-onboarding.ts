@@ -14,6 +14,8 @@ import { db } from "@/lib/storage/db"
 import { patchSettings } from "@/lib/settings/patch-settings"
 import type { UserSettings } from "@/lib/types"
 
+const LOADING = Symbol("kanari:onboarding-loading")
+
 interface UseOnboardingResult {
   /** Whether onboarding data has loaded */
   isLoading: boolean
@@ -31,24 +33,15 @@ interface UseOnboardingResult {
 
 export function useOnboarding(): UseOnboardingResult {
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(true)
 
   // Query settings from IndexedDB
-  const dbSettings = useLiveQuery(
-    () => db.settings.get("default"),
-    []
-  )
+  const dbSettings = useLiveQuery(() => db.settings.get("default"), [], LOADING) as unknown as
+    | UserSettings
+    | undefined
+    | typeof LOADING
 
-  // Track loading state
-  useEffect(() => {
-    // Give Dexie a moment to load
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 100)
-    return () => clearTimeout(timer)
-  }, [dbSettings])
-
-  const settings = dbSettings || null
+  const isLoading = dbSettings === LOADING
+  const settings = dbSettings === LOADING ? null : dbSettings || null
   const hasCompletedOnboarding = settings?.hasCompletedOnboarding ?? false
 
   /**

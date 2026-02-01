@@ -191,7 +191,7 @@ describe("POST /api/gemini/synthesize", () => {
           title: "You’re carrying more than you admit",
           description: "You downplay stress out loud, but your words and tone suggest real strain.",
           evidence: {
-            quotes: [{ role: "user", text: "I'm honestly stretched thin." }],
+            quotes: [{ messageId: "m1", role: "user", text: "I'm honestly stretched thin." }],
             voice: ["Mismatch detected: neutral words but stressed delivery"],
             journal: ["You wrote that breaks trigger guilt."],
           },
@@ -200,7 +200,7 @@ describe("POST /api/gemini/synthesize", () => {
           title: "Break guilt is a blocker",
           description: "Taking recovery time feels emotionally costly, which makes burnout risk sneakier.",
           evidence: {
-            quotes: [{ role: "user", text: "I feel guilty taking breaks." }],
+            quotes: [{ messageId: "m1", role: "user", text: "I keep saying I'm fine" }],
             voice: ["Stress score was elevated in this session"],
             journal: [],
           },
@@ -215,6 +215,13 @@ describe("POST /api/gemini/synthesize", () => {
           linkedInsightIndexes: [2],
         },
       ],
+      semanticBiomarkers: {
+        stressScore: 70,
+        fatigueScore: 60,
+        confidence: 0.72,
+        notes: "From the transcript, you sound under sustained workload pressure and describe running thin.",
+        evidenceQuotes: [{ messageId: "m1", role: "user", text: "I'm honestly stretched thin." }],
+      },
     }
 
     mockCallGeminiAPI.mockResolvedValueOnce({
@@ -252,6 +259,182 @@ describe("POST /api/gemini/synthesize", () => {
     })
   })
 
+  it("does not fail when a quote is missing messageId and cannot be matched", async () => {
+    const modelOutput = {
+      narrative: "Summary.",
+      insights: [
+        {
+          title: "Insight A",
+          description: "Desc A",
+          evidence: { quotes: [{ role: "user", text: "This quote is not in the transcript." }], voice: [], journal: [] },
+        },
+        {
+          title: "Insight B",
+          description: "Desc B",
+          evidence: { quotes: [{ messageId: "m1", role: "user", text: "stretched thin" }], voice: [], journal: [] },
+        },
+      ],
+      suggestions: [
+        {
+          content: "Suggestion",
+          rationale: "Rationale",
+          duration: 10,
+          category: "break",
+          linkedInsightIndexes: [1],
+        },
+      ],
+      semanticBiomarkers: {
+        stressScore: 50,
+        fatigueScore: 50,
+        confidence: 0.4,
+        notes: "Notes.",
+        evidenceQuotes: [{ role: "user", text: "Also not in transcript" }],
+      },
+    }
+
+    mockCallGeminiAPI.mockResolvedValueOnce({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: JSON.stringify(modelOutput) }],
+            role: "model",
+          },
+          finishReason: "STOP",
+          index: 0,
+        },
+      ],
+    })
+
+    const request = createRequest(validBody, { "X-Gemini-Api-Key": "AIzaTestKey123" })
+    const response = await POST(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.synthesis.insights[0].evidence.quotes[0].messageId).toBeUndefined()
+    expect(data.synthesis.semanticBiomarkers.evidenceQuotes[0].messageId).toBeUndefined()
+  })
+
+  it("does not infer messageId for ambiguous short quotes", async () => {
+    const bodyWithDuplicates = {
+      ...validBody,
+      session: {
+        ...validBody.session,
+        messages: [
+          { id: "m1", role: "user", content: "I'm fine.", timestamp: nowIso },
+          { id: "m2", role: "assistant", content: "Okay.", timestamp: nowIso },
+          { id: "m3", role: "user", content: "I'm fine, really.", timestamp: nowIso },
+          { id: "m4", role: "assistant", content: "Thanks.", timestamp: nowIso },
+        ],
+      },
+    }
+
+    const modelOutput = {
+      narrative: "Summary.",
+      insights: [
+        {
+          title: "Insight A",
+          description: "Desc A",
+          evidence: { quotes: [{ role: "user", text: "I'm fine" }], voice: [], journal: [] },
+        },
+        {
+          title: "Insight B",
+          description: "Desc B",
+          evidence: { quotes: [{ messageId: "m2", role: "assistant", text: "Okay" }], voice: [], journal: [] },
+        },
+      ],
+      suggestions: [
+        {
+          content: "Suggestion",
+          rationale: "Rationale",
+          duration: 10,
+          category: "break",
+          linkedInsightIndexes: [1],
+        },
+      ],
+      semanticBiomarkers: {
+        stressScore: 50,
+        fatigueScore: 50,
+        confidence: 0.4,
+        notes: "Notes.",
+        evidenceQuotes: [{ messageId: "m1", role: "user", text: "I'm fine" }],
+      },
+    }
+
+    mockCallGeminiAPI.mockResolvedValueOnce({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: JSON.stringify(modelOutput) }],
+            role: "model",
+          },
+          finishReason: "STOP",
+          index: 0,
+        },
+      ],
+    })
+
+    const request = createRequest(bodyWithDuplicates, { "X-Gemini-Api-Key": "AIzaTestKey123" })
+    const response = await POST(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.synthesis.insights[0].evidence.quotes[0].messageId).toBeUndefined()
+  })
+
+  it("infers messageId when a quote matches exactly one transcript message", async () => {
+    const modelOutput = {
+      narrative: "Summary.",
+      insights: [
+        {
+          title: "Insight A",
+          description: "Desc A",
+          evidence: { quotes: [{ role: "user", text: "I'm honestly stretched thin" }], voice: [], journal: [] },
+        },
+        {
+          title: "Insight B",
+          description: "Desc B",
+          evidence: { quotes: [{ messageId: "m2", role: "assistant", text: "What's been taking most of your energy" }], voice: [], journal: [] },
+        },
+      ],
+      suggestions: [
+        {
+          content: "Suggestion",
+          rationale: "Rationale",
+          duration: 10,
+          category: "break",
+          linkedInsightIndexes: [1],
+        },
+      ],
+      semanticBiomarkers: {
+        stressScore: 50,
+        fatigueScore: 50,
+        confidence: 0.4,
+        notes: "Notes.",
+        evidenceQuotes: [{ messageId: "m1", role: "user", text: "stretched thin" }],
+      },
+    }
+
+    mockCallGeminiAPI.mockResolvedValueOnce({
+      candidates: [
+        {
+          content: {
+            parts: [{ text: JSON.stringify(modelOutput) }],
+            role: "model",
+          },
+          finishReason: "STOP",
+          index: 0,
+        },
+      ],
+    })
+
+    const request = createRequest(validBody, { "X-Gemini-Api-Key": "AIzaTestKey123" })
+    const response = await POST(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(data.synthesis.insights[0].evidence.quotes[0].messageId).toBe("m1")
+  })
+
   it("sets truncation meta when inputs exceed caps", async () => {
     const bigSession = {
       ...validBody.session,
@@ -282,12 +465,12 @@ describe("POST /api/gemini/synthesize", () => {
         {
           title: "Insight A",
           description: "Desc A",
-          evidence: { quotes: [{ role: "user", text: "Quote" }], voice: [], journal: [] },
+          evidence: { quotes: [{ messageId: "m1", role: "user", text: "Quote" }], voice: [], journal: [] },
         },
         {
           title: "Insight B",
           description: "Desc B",
-          evidence: { quotes: [{ role: "user", text: "Quote" }], voice: [], journal: [] },
+          evidence: { quotes: [{ messageId: "m1", role: "user", text: "Quote" }], voice: [], journal: [] },
         },
       ],
       suggestions: [
@@ -299,6 +482,13 @@ describe("POST /api/gemini/synthesize", () => {
           linkedInsightIndexes: [1],
         },
       ],
+      semanticBiomarkers: {
+        stressScore: 50,
+        fatigueScore: 50,
+        confidence: 0.4,
+        notes: "The transcript is brief and ambiguous, so this estimate is low confidence.",
+        evidenceQuotes: [{ messageId: "m1", role: "user", text: "Quote" }],
+      },
     }
 
     mockCallGeminiAPI.mockResolvedValueOnce({
@@ -328,4 +518,3 @@ describe("POST /api/gemini/synthesize", () => {
     })
   })
 })
-

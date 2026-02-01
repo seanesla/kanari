@@ -20,7 +20,7 @@ function getStressColor(score: number): string {
 }
 
 function getFatigueColor(score: number): string {
-  if (score >= 70) return "bg-purple-500"
+  if (score >= 70) return "bg-[color:var(--accent-light)]"
   if (score >= 50) return "bg-accent"
   return "bg-success"
 }

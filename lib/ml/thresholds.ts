@@ -230,3 +230,21 @@ export const VALIDATION = {
   /** Minimum detected speech duration (seconds) before showing biomarkers */
   MIN_SPEECH_SECONDS: 1,
 } as const
+
+// ============================================
+// Quality Gates
+// ============================================
+
+export const QUALITY_GATES = {
+  /** If quality is below this, don't update trends/forecasting */
+  TREND_MIN_QUALITY: 0.55,
+} as const
+
+export function shouldIncludeInTrends(quality: { quality?: number } | null | undefined): boolean {
+  const q = quality?.quality
+  // Backwards-compat: older sessions/recordings may not have a quality score.
+  if (q === null || q === undefined) return true
+  if (typeof q !== "number") return false
+  if (!Number.isFinite(q)) return false
+  return q >= QUALITY_GATES.TREND_MIN_QUALITY
+}

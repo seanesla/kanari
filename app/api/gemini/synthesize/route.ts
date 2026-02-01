@@ -101,6 +101,61 @@ const SynthesizeRequestSchema = z
 
 type SynthesizeRequest = z.infer<typeof SynthesizeRequestSchema>
 
+const EvidenceQuoteSchema = z
+  .object({
+    messageId: z.string().min(1).max(200).optional(),
+    role: MessageRoleSchema,
+    text: z.string().min(1).max(2000),
+  })
+  .strict()
+
+const ModelSynthesisOutputSchema = z
+  .object({
+    narrative: z.string().min(1).max(10_000),
+    insights: z
+      .array(
+        z
+          .object({
+            title: z.string().min(1).max(200),
+            description: z.string().min(1).max(2000),
+            evidence: z
+              .object({
+                quotes: z.array(EvidenceQuoteSchema).min(1).max(3),
+                voice: z.array(z.string().min(1).max(500)).max(4),
+                journal: z.array(z.string().min(1).max(2000)).max(3),
+              })
+              .strict(),
+          })
+          .strict()
+      )
+      .min(2)
+      .max(3),
+    suggestions: z
+      .array(
+        z
+          .object({
+            content: z.string().min(1).max(5000),
+            rationale: z.string().min(1).max(8000),
+            duration: z.number().min(5).max(60),
+            category: z.enum(["break", "exercise", "mindfulness", "social", "rest"]),
+            linkedInsightIndexes: z.array(z.number().min(1).max(3)).min(1).max(2),
+          })
+          .strict()
+      )
+      .min(1)
+      .max(2),
+    semanticBiomarkers: z
+      .object({
+        stressScore: z.number().min(0).max(100),
+        fatigueScore: z.number().min(0).max(100),
+        confidence: z.number().min(0).max(1),
+        notes: z.string().min(1).max(2000),
+        evidenceQuotes: z.array(EvidenceQuoteSchema).min(1).max(3),
+      })
+      .strict(),
+  })
+  .strict()
+
 // ============================================
 // Helpers
 // ============================================
@@ -116,6 +171,170 @@ function truncateText(text: string, maxChars: number): string {
   const trimmed = text.trim()
   if (trimmed.length <= maxChars) return trimmed
   return trimmed.slice(0, Math.max(0, maxChars - 1)).trimEnd() + "…"
+}
+
+function normalizeForMatching(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[“”]/g, '"')
+    .replace(/[’]/g, "'")
+    .replace(/[^\p{L}\p{N}' ]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function tokenizeForMatching(text: string): string[] {
+  const normalized = normalizeForMatching(text)
+  if (!normalized) return []
+  return normalized.split(" ")
+}
+
+function containsTokenSequence(haystack: string[], needle: string[]): boolean {
+  if (needle.length === 0) return false
+  if (needle.length > haystack.length) return false
+
+  outer: for (let i = 0; i <= haystack.length - needle.length; i++) {
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) continue outer
+    }
+    return true
+  }
+
+  return false
+}
+
+function longestCommonContiguousTokenMatch(a: string[], b: string[]): number {
+  if (a.length === 0 || b.length === 0) return 0
+
+  // DP for longest common substring (token-level).
+  const dp = new Array(b.length + 1).fill(0)
+  let max = 0
+
+  for (let i = 1; i <= a.length; i++) {
+    let prev = 0
+    for (let j = 1; j <= b.length; j++) {
+      const temp = dp[j]
+      if (a[i - 1] === b[j - 1]) {
+        dp[j] = prev + 1
+        if (dp[j] > max) max = dp[j]
+      } else {
+        dp[j] = 0
+      }
+      prev = temp
+    }
+  }
+
+  return max
+}
+
+function inferMessageIdFromQuote(options: {
+  quoteText: string
+  quoteRole?: string
+  messages: Array<{ id: string; role: string; tokens: string[] }>
+}): string | null {
+  const needleTokens = tokenizeForMatching(options.quoteText)
+  if (needleTokens.length === 0) return null
+
+  const roleFilter =
+    options.quoteRole === "user" || options.quoteRole === "assistant" || options.quoteRole === "system"
+      ? options.quoteRole
+      : null
+
+  const candidates = roleFilter
+    ? options.messages.filter((m) => m.role === roleFilter)
+    : options.messages
+
+  const exactMatches = candidates.filter((m) => containsTokenSequence(m.tokens, needleTokens))
+  if (exactMatches.length === 1) return exactMatches[0]!.id
+  if (exactMatches.length > 1) return null
+
+  // Fuzzy fallback: only for long-ish quotes to avoid mislinking common phrases.
+  if (needleTokens.length < 5) return null
+
+  const needleSet = new Set(needleTokens)
+  const scored = candidates
+    .map((m) => {
+      const haySet = new Set(m.tokens)
+      let overlap = 0
+      for (const t of needleSet) if (haySet.has(t)) overlap++
+      const coverage = needleSet.size > 0 ? overlap / needleSet.size : 0
+      const contiguous = longestCommonContiguousTokenMatch(needleTokens, m.tokens)
+      const contiguousRatio = needleTokens.length > 0 ? contiguous / needleTokens.length : 0
+      const score = coverage * 0.55 + contiguousRatio * 0.45
+      return { id: m.id, score, coverage, contiguous }
+    })
+    .sort((a, b) => b.score - a.score)
+
+  const best = scored[0]
+  const second = scored[1]
+  if (!best) return null
+
+  if (best.coverage < 0.75) return null
+  if (best.contiguous < 4) return null
+  if (best.score < 0.8) return null
+  if (second && best.score - second.score < 0.12) return null
+
+  return best.id
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object" && !Array.isArray(value)
+}
+
+function ensureMessageIds(output: unknown, messages: SynthesizeRequest["session"]["messages"]): unknown {
+  if (!isRecord(output)) return output
+
+  const msgIndex = messages.map((m) => ({
+    id: m.id,
+    role: m.role,
+    tokens: tokenizeForMatching(m.content),
+  }))
+  const msgIdSet = new Set(msgIndex.map((m) => m.id))
+
+  const patchQuote = (q: unknown): unknown => {
+    if (!isRecord(q)) return q
+
+    const rawMessageId = typeof q.messageId === "string" ? q.messageId.trim() : ""
+    if (rawMessageId.length > 0 && msgIdSet.has(rawMessageId)) return { ...q, messageId: rawMessageId }
+
+    const text = typeof q.text === "string" ? q.text : ""
+    const role = typeof q.role === "string" ? q.role : undefined
+    const inferred = inferMessageIdFromQuote({ quoteText: text, quoteRole: role, messages: msgIndex })
+
+    // Never hard-fail synthesis on evidence linking; omit messageId if we can't match confidently.
+    return { ...q, messageId: inferred ?? undefined }
+  }
+
+  const next: Record<string, unknown> = { ...output }
+
+  const insights = next.insights
+  if (Array.isArray(insights)) {
+    next.insights = insights.map((insight) => {
+      if (!isRecord(insight)) return insight
+      const evidence = insight.evidence
+      if (!isRecord(evidence)) return insight
+      const quotes = evidence.quotes
+      if (!Array.isArray(quotes)) return insight
+
+      return {
+        ...insight,
+        evidence: {
+          ...evidence,
+          quotes: quotes.map(patchQuote),
+        },
+      }
+    })
+  }
+
+  const semanticBiomarkers = next.semanticBiomarkers
+  if (isRecord(semanticBiomarkers) && Array.isArray(semanticBiomarkers.evidenceQuotes)) {
+    next.semanticBiomarkers = {
+      ...semanticBiomarkers,
+      evidenceQuotes: (semanticBiomarkers.evidenceQuotes as unknown[]).map(patchQuote),
+    }
+  }
+
+  return next
 }
 
 function buildSynthesisUserPrompt(body: SynthesizeRequest & { _meta: { truncated: boolean; messagesUsed: number; journalEntriesUsed: number } }): string {
@@ -200,6 +419,7 @@ type ModelSynthesisOutput = {
     fatigueScore: number
     confidence: number
     notes: string
+    evidenceQuotes?: CheckInSynthesisEvidenceQuote[]
   }
 }
 
@@ -249,6 +469,7 @@ function normalizeModelOutput(sessionId: string, inputMeta: CheckInSynthesis["me
     const fatigueScore = Number(output.semanticBiomarkers.fatigueScore)
     const confidence = Number(output.semanticBiomarkers.confidence)
     const notes = output.semanticBiomarkers.notes
+    const evidenceQuotes = output.semanticBiomarkers.evidenceQuotes
 
     if (!Number.isFinite(stressScore) || !Number.isFinite(fatigueScore) || !Number.isFinite(confidence)) {
       return undefined
@@ -258,11 +479,22 @@ function normalizeModelOutput(sessionId: string, inputMeta: CheckInSynthesis["me
       return undefined
     }
 
+    const normalizedEvidenceQuotes = Array.isArray(evidenceQuotes)
+      ? evidenceQuotes
+          .slice(0, 3)
+          .map((q) => ({
+            ...(q.messageId ? { messageId: String(q.messageId).slice(0, 200) } : {}),
+            role: q.role,
+            text: truncateText(q.text, 200),
+          }))
+      : undefined
+
     return {
       stressScore: Math.max(0, Math.min(100, Math.round(stressScore))),
       fatigueScore: Math.max(0, Math.min(100, Math.round(fatigueScore))),
       confidence: Math.max(0, Math.min(1, confidence)),
       notes: truncateText(notes, 280),
+      ...(normalizedEvidenceQuotes ? { evidenceQuotes: normalizedEvidenceQuotes } : {}),
     }
   })()
 
@@ -325,12 +557,10 @@ async function generateSynthesis(apiKey: string, body: SynthesizeRequest): Promi
 
   const parsed = parseGeminiJson<ModelSynthesisOutput>(text)
 
-  if (
-    typeof parsed.narrative !== "string" ||
-    !Array.isArray(parsed.insights) ||
-    !Array.isArray(parsed.suggestions)
-  ) {
-    throw new Error("Gemini response parse error: Invalid response structure")
+  const patched = ensureMessageIds(parsed, body.session.messages)
+  const validated = ModelSynthesisOutputSchema.safeParse(patched)
+  if (!validated.success) {
+    throw new Error(`Gemini response parse error: Invalid response structure (${validated.error.issues[0]?.message ?? "unknown"})`)
   }
 
   const inputMeta: CheckInSynthesis["meta"]["input"] = {
@@ -341,7 +571,7 @@ async function generateSynthesis(apiKey: string, body: SynthesizeRequest): Promi
     truncated,
   }
 
-  return normalizeModelOutput(body.session.id, inputMeta, parsed)
+  return normalizeModelOutput(body.session.id, inputMeta, validated.data)
 }
 
 // ============================================
