@@ -353,7 +353,7 @@ export default function LandingPage() {
                   className="w-full h-auto object-cover opacity-[0.96] kanari-artwork-image"
                 />
 
-                <div aria-hidden="true" className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-foreground/10" />
+                <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 ring-1 ring-inset ring-foreground/10" />
               </figure>
 
               <motion.figure
@@ -431,7 +431,7 @@ export default function LandingPage() {
                     )}
                   </motion.div>
 
-                  <div aria-hidden="true" className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-foreground/10" />
+                  <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 ring-1 ring-inset ring-foreground/10" />
               </motion.figure>
             </div>
           </section>

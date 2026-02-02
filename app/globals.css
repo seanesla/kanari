@@ -329,8 +329,15 @@
   isolation: isolate;
 }
 
-.kanari-artwork-image {
-  filter: hue-rotate(var(--kanari-artwork-hue-shift, 0deg));
+/* Colorize artwork using the live accent CSS variable (real-time, no JS math required). */
+.kanari-artwork::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--accent);
+  opacity: 0.32;
+  mix-blend-mode: color;
 }
 
 .kanari-artwork-colorize {
@@ -354,6 +361,12 @@
   .kanari-artwork .mix-blend-soft-light,
   .kanari-artwork .mix-blend-color {
     mix-blend-mode: normal;
+  }
+
+  /* WebKit safety: avoid blend-mode artifacts by using a simple tint overlay. */
+  .kanari-artwork::after {
+    mix-blend-mode: normal;
+    opacity: 0.14;
   }
 }
 
