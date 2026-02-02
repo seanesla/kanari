@@ -1,7 +1,7 @@
 "use client"
 
 import { motion, useAnimation } from "framer-motion"
-import { useEffect, useId } from "react"
+import { useEffect, useId, useRef } from "react"
 import { LOGO_PATHS } from "./logo"
 
 interface AnimatedLogoProps {
@@ -12,8 +12,18 @@ interface AnimatedLogoProps {
 export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
   const controls = useAnimation()
   const gradientId = useId()
+  const hasStartedRef = useRef(false)
+  const onCompleteRef = useRef(onComplete)
 
   useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
+
+  useEffect(() => {
+    // See: docs/error-patterns/animated-logo-restarts-on-callback-identity-change.md
+    if (hasStartedRef.current) return
+    hasStartedRef.current = true
+
     const sequence = async () => {
       // Phase 1: Draw stroke (1.05s - 30% faster)
       await controls.start("drawing")
@@ -21,10 +31,10 @@ export function AnimatedLogo({ onComplete, size = 120 }: AnimatedLogoProps) {
       await controls.start("filling")
       // Phase 3: Complete (0.28s - 30% faster)
       await controls.start("complete")
-      onComplete?.()
+      onCompleteRef.current?.()
     }
     sequence()
-  }, [controls, onComplete])
+  }, [controls])
 
   // Aspect ratio: 152.65:173.92 (height is 1.139x width, similar to old 1.1)
   return (

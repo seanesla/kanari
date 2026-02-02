@@ -114,9 +114,14 @@ export function WelcomeParticles({
 }) {
   const startedAt = useRef<number | null>(null)
   const didComplete = useRef(false)
+  const onCompleteRef = useRef(onComplete)
 
   const positionAttr = useRef<THREE.BufferAttribute | null>(null)
   const pointsRef = useRef<THREE.Points | null>(null)
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
 
   const data = useMemo(() => {
     const targets = sampleTextPoints(text)
@@ -167,18 +172,17 @@ export function WelcomeParticles({
 
   useEffect(() => {
     if (!onComplete) return
-
     const timer = setTimeout(() => {
       if (didComplete.current) return
       didComplete.current = true
-      onComplete()
+      onCompleteRef.current?.()
     }, TOTAL_DURATION_MS)
 
     return () => clearTimeout(timer)
-  }, [onComplete])
+  }, [Boolean(onComplete)])
 
   useEffect(() => {
-    if (positionAttr.current) {
+    if (positionAttr.current?.setUsage) {
       positionAttr.current.setUsage(THREE.DynamicDrawUsage)
     }
   }, [])
