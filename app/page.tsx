@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, type CSSProperties } from "react"
+import { useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import { motion, useReducedMotion } from "framer-motion"
 import { useRouter } from "next/navigation"
@@ -353,24 +353,6 @@ export default function LandingPage() {
                   className="w-full h-auto object-cover opacity-[0.96] kanari-artwork-image"
                 />
 
-                {/* Accent colorization pass (disabled on iOS/iPadOS Safari due to WebKit artifacts) */}
-                <Image
-                  src="/landing/kanari-orbital-crystal.png"
-                  alt=""
-                  aria-hidden="true"
-                  width={1120}
-                  height={625}
-                  sizes="(max-width: 768px) 100vw, 1200px"
-                  className="absolute inset-0 w-full h-full object-cover pointer-events-none kanari-artwork-colorize"
-                  style={
-                    {
-                      "--kanari-artwork-colorize-opacity": 0.55,
-                      "--kanari-artwork-colorize-saturate": 2.0,
-                      "--kanari-artwork-colorize-contrast": 1.03,
-                    } as CSSProperties
-                  }
-                />
-
                 <div aria-hidden="true" className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-foreground/10" />
               </figure>
 
@@ -430,24 +412,6 @@ export default function LandingPage() {
                       height={625}
                       sizes="(max-width: 768px) 100vw, 1200px"
                       className="w-full h-auto object-cover opacity-[0.96] kanari-artwork-image"
-                    />
-
-                    {/* Accent colorization pass (disabled on iOS/iPadOS Safari due to WebKit artifacts) */}
-                    <Image
-                      src="/landing/kanari-orbital-crystal.png"
-                      alt=""
-                      aria-hidden="true"
-                      width={1120}
-                      height={625}
-                      sizes="(max-width: 768px) 100vw, 1200px"
-                      className="absolute inset-0 w-full h-full object-cover pointer-events-none kanari-artwork-colorize"
-                      style={
-                        {
-                          "--kanari-artwork-colorize-opacity": 0.6,
-                          "--kanari-artwork-colorize-saturate": 2.2,
-                          "--kanari-artwork-colorize-contrast": 1.05,
-                        } as CSSProperties
-                      }
                     />
 
                     {/* One-time sheen pass (ties to accent color) */}

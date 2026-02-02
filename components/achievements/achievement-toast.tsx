@@ -218,7 +218,11 @@ export function CelebrationToast({
                 item.kind === "milestone" ? "border-accent/40" : "border-border/60"
               )}>
                 {/* Subtle glow */}
-                <div className="absolute inset-0 opacity-10 bg-gradient-to-br from-accent to-transparent" />
+                <div
+                  data-testid="celebration-toast-glow"
+                  aria-hidden="true"
+                  className="absolute inset-0 opacity-10 bg-gradient-to-br from-accent to-transparent pointer-events-none"
+                />
 
                 {/* Close button */}
                 <button
@@ -301,7 +305,11 @@ export function CelebrationToast({
                   <Button
                     onClick={handleDismiss}
                     variant="outline"
-                    className="w-full"
+                    className={cn(
+                      "w-full cursor-pointer border-accent/30 bg-background/10",
+                      "hover:bg-accent/10 hover:border-accent/60 hover:shadow-lg hover:ring-2 hover:ring-accent/20",
+                      "active:shadow-md"
+                    )}
                     aria-label="Awesome!"
                   >
                     <span>Awesome!</span>

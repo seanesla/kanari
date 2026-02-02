@@ -136,6 +136,34 @@ describe("FullCalendarView", () => {
     expect(checkInEvent.classNames).toEqual(["checkin-event"])
   })
 
+  it("does not crash when a scheduled suggestion has missing content", async () => {
+    const { FullCalendarView } = await import("../fullcalendar-view")
+
+    expect(() => {
+      render(
+        <FullCalendarView
+          scheduledSuggestions={[
+            {
+              id: "s_missing_content",
+              content: undefined,
+              rationale: "rationale",
+              duration: 10,
+              category: "exercise",
+              status: "scheduled",
+              createdAt: "2026-01-01T00:00:00Z",
+              scheduledFor: "2026-01-09T10:00:00Z",
+            } as unknown as Suggestion,
+          ]}
+        />
+      )
+    }).not.toThrow()
+
+    const events = (lastFullCalendarProps?.events ?? []) as EventInput[]
+    const event = events.find((e) => e.id === "s_missing_content") as EventInput | undefined
+    expect(event).toBeTruthy()
+    expect(event?.title).toBe("Exercise")
+  })
+
   it("memoizes computed events when inputs are referentially stable", async () => {
     const { FullCalendarView } = await import("../fullcalendar-view")
 

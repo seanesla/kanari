@@ -2,6 +2,7 @@
 
 import Dexie, { type EntityTable } from "dexie"
 import { isDemoWorkspace } from "@/lib/workspace"
+import { logWarn } from "@/lib/logger"
 import type {
   Commitment,
   Recording,
@@ -11,6 +12,8 @@ import type {
   TrendData,
   CheckInSession,
   JournalEntry,
+  SuggestionCategory,
+  SuggestionStatus,
 } from "@/lib/types"
 import type { DailyAchievement, MilestoneBadge, UserProgress } from "@/lib/achievements/types"
 
@@ -203,6 +206,69 @@ class KanariDB extends Dexie {
       journalEntries: "id, createdAt, category, checkInSessionId",
       commitments: "id, checkInSessionId, extractedAt, outcome",
     })
+
+    // Version 10: Repair malformed suggestion records (legacy/demo writes, partial saves, etc.).
+    // Pattern doc: docs/error-patterns/undefined-string-split.md
+    this.version(10).stores({
+      recordings: "id, createdAt, status",
+      suggestions: "id, createdAt, status, category, recordingId, version",
+      recoveryBlocks: "id, suggestionId, scheduledAt, completed",
+      trendData: "id, date",
+      settings: "id",
+      checkInSessions: "id, startedAt, recordingId",
+      achievements: "id, dateISO, type, category, completed, createdAt, seen",
+      milestoneBadges: "id, earnedAt, type, seen",
+      userProgress: "id",
+      journalEntries: "id, createdAt, category, checkInSessionId",
+      commitments: "id, checkInSessionId, extractedAt, outcome",
+    }).upgrade((tx) => {
+      const validCategories: SuggestionCategory[] = ["break", "exercise", "mindfulness", "social", "rest"]
+      const validStatuses: SuggestionStatus[] = ["pending", "accepted", "dismissed", "scheduled", "completed"]
+
+      return tx.table("suggestions").toCollection().modify((suggestion: Record<string, unknown>) => {
+        if (typeof suggestion.content !== "string") suggestion.content = ""
+        if (typeof suggestion.rationale !== "string") suggestion.rationale = ""
+
+        const duration = suggestion.duration
+        if (typeof duration !== "number" || !Number.isFinite(duration) || duration <= 0) {
+          suggestion.duration = 15
+        }
+
+        const category = suggestion.category
+        if (typeof category !== "string" || !validCategories.includes(category as SuggestionCategory)) {
+          suggestion.category = "break"
+        }
+
+        const status = suggestion.status
+        if (typeof status !== "string" || !validStatuses.includes(status as SuggestionStatus)) {
+          suggestion.status = "pending"
+        }
+
+        const createdAt = suggestion.createdAt
+        if (!(createdAt instanceof Date)) {
+          const parsed = typeof createdAt === "string" || typeof createdAt === "number"
+            ? new Date(createdAt)
+            : new Date()
+          suggestion.createdAt = Number.isNaN(parsed.getTime()) ? new Date() : parsed
+        }
+
+        const scheduledFor = suggestion.scheduledFor
+        if (scheduledFor !== undefined && !(scheduledFor instanceof Date)) {
+          const parsed = typeof scheduledFor === "string" || typeof scheduledFor === "number"
+            ? new Date(scheduledFor)
+            : null
+          suggestion.scheduledFor = parsed && !Number.isNaN(parsed.getTime()) ? parsed : undefined
+        }
+
+        const lastUpdatedAt = suggestion.lastUpdatedAt
+        if (lastUpdatedAt !== undefined && !(lastUpdatedAt instanceof Date)) {
+          const parsed = typeof lastUpdatedAt === "string" || typeof lastUpdatedAt === "number"
+            ? new Date(lastUpdatedAt)
+            : null
+          suggestion.lastUpdatedAt = parsed && !Number.isNaN(parsed.getTime()) ? parsed : undefined
+        }
+      })
+    })
   }
 }
 
@@ -218,11 +284,76 @@ export function toRecording(dbRecord: DBRecording): Recording {
 }
 
 export function toSuggestion(dbRecord: DBSuggestion): Suggestion {
-  return {
+  // Defensive normalization: persisted suggestion records can drift from the TypeScript type
+  // (e.g. partial writes, old demo seed data, or legacy schema changes). UI code should never
+  // crash on malformed persisted data.
+  //
+  // Pattern doc: docs/error-patterns/undefined-string-split.md
+  const raw = dbRecord as unknown as Record<string, unknown>
+
+  const validCategories: SuggestionCategory[] = ["break", "exercise", "mindfulness", "social", "rest"]
+  const validStatuses: SuggestionStatus[] = ["pending", "accepted", "dismissed", "scheduled", "completed"]
+
+  const parseDate = (value: unknown): Date | null => {
+    if (value instanceof Date) return value
+    if (typeof value === "string" || typeof value === "number") {
+      const parsed = new Date(value)
+      return Number.isNaN(parsed.getTime()) ? null : parsed
+    }
+    return null
+  }
+
+  const ensureString = (value: unknown): string => (typeof value === "string" ? value : "")
+  const ensureDuration = (value: unknown): number => {
+    if (typeof value !== "number") return 15
+    if (!Number.isFinite(value) || value <= 0) return 15
+    return value
+  }
+  const ensureCategory = (value: unknown): SuggestionCategory => {
+    if (typeof value !== "string") return "break"
+    return validCategories.includes(value as SuggestionCategory) ? (value as SuggestionCategory) : "break"
+  }
+  const ensureStatus = (value: unknown): SuggestionStatus => {
+    if (typeof value !== "string") return "pending"
+    return validStatuses.includes(value as SuggestionStatus) ? (value as SuggestionStatus) : "pending"
+  }
+
+  const createdAtDate = parseDate(raw.createdAt) ?? new Date()
+  const scheduledForDate = parseDate(raw.scheduledFor)
+  const lastUpdatedAtDate = parseDate(raw.lastUpdatedAt)
+
+  const normalized = {
     ...dbRecord,
-    createdAt: dbRecord.createdAt.toISOString(),
-    scheduledFor: dbRecord.scheduledFor?.toISOString(),
-    lastUpdatedAt: dbRecord.lastUpdatedAt?.toISOString(),
+    content: ensureString(raw.content),
+    rationale: ensureString(raw.rationale),
+    duration: ensureDuration(raw.duration),
+    category: ensureCategory(raw.category),
+    status: ensureStatus(raw.status),
+    createdAt: createdAtDate,
+    scheduledFor: scheduledForDate ?? undefined,
+    lastUpdatedAt: lastUpdatedAtDate ?? undefined,
+  } satisfies DBSuggestion
+
+  const repaired = normalized.content !== (raw.content as unknown)
+    || normalized.rationale !== (raw.rationale as unknown)
+    || normalized.duration !== (raw.duration as unknown)
+    || normalized.category !== (raw.category as unknown)
+    || normalized.status !== (raw.status as unknown)
+    || createdAtDate !== raw.createdAt
+
+  if (repaired) {
+    logWarn("storage", "Repairing malformed suggestion record at read-time", {
+      id: raw.id,
+      category: raw.category,
+      status: raw.status,
+    })
+  }
+
+  return {
+    ...normalized,
+    createdAt: normalized.createdAt.toISOString(),
+    scheduledFor: normalized.scheduledFor?.toISOString(),
+    lastUpdatedAt: normalized.lastUpdatedAt?.toISOString(),
   }
 }
 

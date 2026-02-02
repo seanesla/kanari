@@ -69,7 +69,13 @@ describe("CelebrationToast", () => {
       />
     )
 
-    fireEvent.click(screen.getByRole("button", { name: "Awesome!" }))
+    const glow = screen.getByTestId("celebration-toast-glow")
+    expect(glow.getAttribute("class")).toEqual(expect.stringContaining("pointer-events-none"))
+
+    const awesomeButton = screen.getByRole("button", { name: "Awesome!" })
+    expect(awesomeButton.getAttribute("class")).toEqual(expect.stringContaining("hover:bg-accent/10"))
+
+    fireEvent.click(awesomeButton)
 
     expect(onOpenChange).toHaveBeenCalledWith(false)
     expect(onDismiss).toHaveBeenCalledTimes(1)

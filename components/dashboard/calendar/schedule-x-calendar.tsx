@@ -7,13 +7,13 @@ import { createViewWeek, type CalendarEvent } from '@schedule-x/calendar'
 import { createEventsServicePlugin } from '@schedule-x/events-service'
 import { createDragAndDropPlugin } from '@schedule-x/drag-and-drop'
 import { cn } from '@/lib/utils'
-import { logDebug } from '@/lib/logger'
+import { logDebug, logWarn } from '@/lib/logger'
 import { useSceneMode } from '@/lib/scene-context'
 import { useTimeZone } from '@/lib/timezone-context'
 import { generateDarkVariant, generateLightVariant } from '@/lib/color-utils'
 import { CheckInMarker } from './check-in-marker'
 import { CheckInTooltip } from './check-in-tooltip'
-import type { Suggestion, CheckInSession, RecoveryBlock } from '@/lib/types'
+import { extractSuggestionTitle, type Suggestion, type CheckInSession, type RecoveryBlock, type SuggestionCategory } from '@/lib/types'
 import '@schedule-x/theme-default/dist/index.css'
 import './schedule-x-theme.css'
 
@@ -63,26 +63,56 @@ function scoreToBand(score: number): MetricBand {
   return 'high'
 }
 
+function categoryLabel(category: SuggestionCategory): string {
+  switch (category) {
+    case 'break':
+      return 'Break'
+    case 'exercise':
+      return 'Exercise'
+    case 'mindfulness':
+      return 'Mindfulness'
+    case 'social':
+      return 'Social'
+    case 'rest':
+      return 'Rest'
+  }
+}
+
+function safeDurationMinutes(value: unknown): number {
+  if (typeof value !== 'number') return 15
+  if (!Number.isFinite(value) || value <= 0) return 15
+  return value
+}
+
 // Helper to map Suggestion to Schedule-X event format
 function suggestionToEvent(
   suggestion: Suggestion,
   timeZone: string,
   recoveryBlock?: RecoveryBlock
 ): SuggestionEvent | null {
-  if (!suggestion.scheduledFor) return null
+  const scheduledFor = (suggestion as unknown as { scheduledFor?: unknown }).scheduledFor
+  if (typeof scheduledFor !== 'string' || !scheduledFor.trim()) return null
 
   // Schedule-X requires ZonedDateTime for timed events (not PlainDateTime)
   // Source: Context7 - schedule-x/schedule-x docs - "Timed Event Example"
   // https://github.com/schedule-x/schedule-x/blob/main/website/app/docs/calendar/events/page.mdx
-  const instant = Temporal.Instant.from(suggestion.scheduledFor)
-  const startDateTime = instant.toZonedDateTimeISO(timeZone)
-  const endDateTime = startDateTime.add({ minutes: suggestion.duration })
+  let startDateTime: Temporal.ZonedDateTime
+  try {
+    const instant = Temporal.Instant.from(scheduledFor)
+    startDateTime = instant.toZonedDateTimeISO(timeZone)
+  } catch (error) {
+    logWarn('calendar', 'Skipping Schedule-X suggestion event due to invalid instant', { scheduledFor, timeZone, error })
+    return null
+  }
 
-  // Extract first sentence as title, max 30 chars
-  const firstSentence = suggestion.content.split(/[.!?]/)[0]?.trim() || suggestion.content
-  const title = firstSentence.length > 30
-    ? firstSentence.slice(0, 27) + '...'
-    : firstSentence
+  const duration = safeDurationMinutes((suggestion as unknown as { duration?: unknown }).duration)
+  const endDateTime = startDateTime.add({ minutes: duration })
+
+  const contentRaw = (suggestion as unknown as { content?: unknown }).content
+  const content = typeof contentRaw === 'string' && contentRaw.trim()
+    ? contentRaw
+    : categoryLabel(suggestion.category)
+  const title = extractSuggestionTitle(content, 30)
 
   return {
     id: suggestion.id,
@@ -102,16 +132,26 @@ function completedToEvent(
   timeZone: string,
   recoveryBlock?: RecoveryBlock
 ): SuggestionEvent | null {
-  if (!suggestion.scheduledFor) return null
+  const scheduledFor = (suggestion as unknown as { scheduledFor?: unknown }).scheduledFor
+  if (typeof scheduledFor !== 'string' || !scheduledFor.trim()) return null
 
-  const instant = Temporal.Instant.from(suggestion.scheduledFor)
-  const startDateTime = instant.toZonedDateTimeISO(timeZone)
-  const endDateTime = startDateTime.add({ minutes: suggestion.duration })
+  let startDateTime: Temporal.ZonedDateTime
+  try {
+    const instant = Temporal.Instant.from(scheduledFor)
+    startDateTime = instant.toZonedDateTimeISO(timeZone)
+  } catch (error) {
+    logWarn('calendar', 'Skipping Schedule-X completed event due to invalid instant', { scheduledFor, timeZone, error })
+    return null
+  }
 
-  const firstSentence = suggestion.content.split(/[.!?]/)[0]?.trim() || suggestion.content
-  const title = firstSentence.length > 30
-    ? firstSentence.slice(0, 27) + '...'
-    : firstSentence
+  const duration = safeDurationMinutes((suggestion as unknown as { duration?: unknown }).duration)
+  const endDateTime = startDateTime.add({ minutes: duration })
+
+  const contentRaw = (suggestion as unknown as { content?: unknown }).content
+  const content = typeof contentRaw === 'string' && contentRaw.trim()
+    ? contentRaw
+    : categoryLabel(suggestion.category)
+  const title = extractSuggestionTitle(content, 30)
 
   return {
     id: `completed-${suggestion.id}`,
@@ -128,11 +168,18 @@ function completedToEvent(
 
 // Helper to map check-ins to Schedule-X event format (as marker)
 function checkInToEvent(session: CheckInSession, timeZone: string): CheckInEvent | null {
-  if (!session.startedAt) return null
+  const startedAt = (session as unknown as { startedAt?: unknown }).startedAt
+  if (typeof startedAt !== 'string' || !startedAt.trim()) return null
 
   // Source: Context7 - schedule-x/schedule-x docs - "Timed Event Example"
-  const instant = Temporal.Instant.from(session.startedAt)
-  const startDateTime = instant.toZonedDateTimeISO(timeZone)
+  let startDateTime: Temporal.ZonedDateTime
+  try {
+    const instant = Temporal.Instant.from(startedAt)
+    startDateTime = instant.toZonedDateTimeISO(timeZone)
+  } catch (error) {
+    logWarn('calendar', 'Skipping Schedule-X check-in event due to invalid instant', { startedAt, timeZone, error })
+    return null
+  }
   // 20-min duration gives enough height for a proper pill-shaped event (~33px)
   const endDateTime = startDateTime.add({ minutes: 20 })
 

@@ -51,6 +51,27 @@ import { CursorBorderGlow } from "@/components/ui/cursor-border-glow"
 import { useTimeZone } from "@/lib/timezone-context"
 import type { HistoryItem, CheckInSession } from "@/lib/types"
 
+function CollapsedSidebarRevealHandle({ className }: { className?: string }) {
+  const { state, isMobile } = useSidebar()
+
+  if (isMobile || state !== "collapsed") return null
+
+  return (
+    <div
+      className={cn("pointer-events-none absolute inset-y-0 left-0 z-30 hidden md:flex items-center pl-2", className)}
+    >
+      <SidebarTrigger
+        className={cn(
+          "pointer-events-auto size-9 rounded-xl border border-border/50 bg-background/20 backdrop-blur-md",
+          "opacity-20 hover:opacity-100 focus-visible:opacity-100",
+          "hover:bg-background/40 hover:border-accent/40",
+          "transition-opacity transition-colors"
+        )}
+      />
+    </div>
+  )
+}
+
 /**
  * Main sidebar content component
  * Uses offcanvas collapsible - fully hides when collapsed
@@ -455,6 +476,7 @@ function HistoryPageContent() {
 
           {/* Desktop: Edge-hover glow trigger (appears only when collapsed) */}
           <SidebarEdgeTrigger className="hidden md:block" />
+          <CollapsedSidebarRevealHandle />
 
           {/* Main content area */}
           <main className="flex-1 min-h-0 overflow-hidden">

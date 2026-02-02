@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { DraggableSuggestionCard } from "./draggable-suggestion-card"
-import type { Suggestion, SuggestionCategory } from "@/lib/types"
+import { extractSuggestionTitle, type Suggestion, type SuggestionCategory } from "@/lib/types"
 
 const categoryConfig: Record<SuggestionCategory | "all", { label: string; icon: typeof Coffee; color: string }> = {
   all: { label: "All", icon: Filter, color: "text-foreground" },
@@ -280,7 +280,10 @@ export function PendingSidebar({
 // Compact completed item
 function CompletedItem({ suggestion, onClick }: { suggestion: Suggestion; onClick: () => void }) {
   const isDismissed = suggestion.status === "dismissed"
-  const title = suggestion.content.split(/[.!?]/)[0]?.trim().slice(0, 40) || suggestion.content.slice(0, 40)
+  const content = typeof (suggestion as unknown as { content?: unknown }).content === "string"
+    ? suggestion.content
+    : ""
+  const title = extractSuggestionTitle(content, 40)
 
   return (
     <button

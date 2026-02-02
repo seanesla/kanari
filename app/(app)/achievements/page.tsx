@@ -75,7 +75,7 @@ export default function AchievementsPage() {
 
   return (
     <div data-demo-id="demo-achievements-page" className="min-h-screen bg-transparent relative overflow-hidden">
-      <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-24 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10">
+      <main className="px-4 md:px-8 lg:px-12 pt-[calc(env(safe-area-inset-top)+4rem)] md:pt-24 pb-[calc(env(safe-area-inset-bottom)+2rem)] relative z-10 overflow-x-hidden">
         {/* Header */}
         <div
           className={cn(
@@ -99,7 +99,7 @@ export default function AchievementsPage() {
         >
             <div className="grid gap-4 lg:grid-cols-3">
               {/* Today */}
-              <Deck data-demo-id="demo-daily-challenges" className="lg:col-span-2 p-6">
+              <Deck data-demo-id="demo-daily-challenges" className="lg:col-span-2 p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-semibold">Today&apos;s Focus</h2>
@@ -125,9 +125,9 @@ export default function AchievementsPage() {
 
               <div className="mt-4 space-y-2">
                 <Progress value={dailyProgressPct} />
-                <div className="flex justify-between text-xs text-muted-foreground">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground min-w-0">
                   <span>{dayCompletion.isComplete ? "Day complete" : "Auto-tracked"}</span>
-                  <span>{progressToNextLevel} pts to next level</span>
+                  <span className="ml-auto text-right">{progressToNextLevel} pts to next level</span>
                 </div>
               </div>
 
@@ -171,7 +171,7 @@ export default function AchievementsPage() {
 
                         {achievement.type === "challenge" && !achievement.completed && !achievement.expired && tracking && action && trackingProgress && (
                           <div className="rounded-xl border border-border/60 bg-background/35 px-3 py-3">
-                            <div className="flex items-center justify-between gap-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                                   <span className="truncate">{trackingProgress.label}</span>
@@ -181,7 +181,7 @@ export default function AchievementsPage() {
                                 </div>
                                 <Progress value={pct} className="mt-2 h-1.5" />
                               </div>
-                              <Button asChild size="sm" className="shrink-0 bg-accent text-accent-foreground hover:bg-accent/90">
+                              <Button asChild size="sm" className="w-full sm:w-auto shrink-0 bg-accent text-accent-foreground hover:bg-accent/90">
                                 <Link href={action.href}>{action.label}</Link>
                               </Button>
                             </div>
@@ -207,7 +207,7 @@ export default function AchievementsPage() {
 
             {/* Progress + Streak */}
             <div className="space-y-4">
-              <Deck className="p-6">
+              <Deck className="p-4 sm:p-6">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="text-sm font-medium text-muted-foreground">Level</h3>
@@ -225,14 +225,14 @@ export default function AchievementsPage() {
 
                 <div className="mt-4 space-y-2">
                   <Progress value={levelProgressPct} />
-                  <div className="flex justify-between text-xs text-muted-foreground">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground min-w-0">
                     <span className="tabular-nums">{progressThisLevel}/100</span>
-                    <span>{progressToNextLevel} pts to level {progress.level + 1}</span>
+                    <span className="ml-auto text-right">{progressToNextLevel} pts to level {progress.level + 1}</span>
                   </div>
                 </div>
               </Deck>
 
-              <Deck className="p-6">
+              <Deck className="p-4 sm:p-6">
                 <h3 className="text-sm font-medium text-muted-foreground">Streak</h3>
                 <div className="mt-2 flex items-baseline justify-between gap-3">
                   <p className="text-2xl font-semibold tabular-nums">
@@ -259,7 +259,7 @@ export default function AchievementsPage() {
           </div>
 
           {/* Milestones */}
-          <Deck className="mt-6 p-6">
+          <Deck className="mt-6 p-4 sm:p-6">
             <h2 className="text-lg font-semibold">Milestones</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Earn milestone badges at 7, 30, 60, and 90 days of completed daily sets.
@@ -302,7 +302,7 @@ export default function AchievementsPage() {
           </Deck>
 
           {/* History */}
-          <Deck className="mt-6 p-6">
+          <Deck className="mt-6 p-4 sm:p-6">
             <h2 className="text-lg font-semibold">History</h2>
             <p className="text-sm text-muted-foreground mt-1">
               Your full daily achievements log.
@@ -320,11 +320,11 @@ export default function AchievementsPage() {
 
                   return (
                     <div key={dateISO} className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-medium">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <h3 className="text-sm font-medium truncate min-w-0">
                           {getDateLabel(`${dateISO}T00:00:00.000Z`, timeZone)}
                         </h3>
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-muted-foreground shrink-0">
                           {dayItems.filter((a) => a.completed).length}/{dayItems.length}
                         </span>
                       </div>

@@ -13,75 +13,15 @@ import { Temporal } from "temporal-polyfill"
 import { cn } from "@/lib/utils"
 import { useSceneMode } from "@/lib/scene-context"
 import { useTimeZone } from "@/lib/timezone-context"
-import { generateDarkVariant, generateLightVariant } from "@/lib/color-utils"
+import { generateDarkVariant } from "@/lib/color-utils"
 import { CheckInTooltip } from "./check-in-tooltip"
-import type { Suggestion, CheckInSession, RecoveryBlock, SuggestionCategory } from "@/lib/types"
-
-function dedupeEventsById(events: EventInput[]): EventInput[] {
-  const seen = new Set<string>()
-  const unique: EventInput[] = []
-  for (const event of events) {
-    const id = typeof event.id === "string" ? event.id : event.id ? String(event.id) : null
-    // If the upstream data contains duplicates (e.g. duplicated suggestions), FullCalendar will
-    // render them as stacked events. De-dupe defensively.
-    if (!id) {
-      unique.push(event)
-      continue
-    }
-    if (seen.has(id)) continue
-    seen.add(id)
-    unique.push(event)
-  }
-  return unique
-}
-
-function hexToRgba(hex: string, alpha: number): string {
-  const cleaned = hex.replace("#", "").trim()
-  const a = Math.max(0, Math.min(1, alpha))
-
-  const parseChannel = (start: number) => Number.parseInt(cleaned.slice(start, start + 2), 16)
-
-  // #rgb
-  if (cleaned.length === 3) {
-    const r = Number.parseInt(cleaned[0]! + cleaned[0]!, 16)
-    const g = Number.parseInt(cleaned[1]! + cleaned[1]!, 16)
-    const b = Number.parseInt(cleaned[2]! + cleaned[2]!, 16)
-    if ([r, g, b].some((v) => Number.isNaN(v))) return `rgba(0, 0, 0, ${a})`
-    return `rgba(${r}, ${g}, ${b}, ${a})`
-  }
-
-  // #rrggbb
-  if (cleaned.length === 6) {
-    const r = parseChannel(0)
-    const g = parseChannel(2)
-    const b = parseChannel(4)
-    if ([r, g, b].some((v) => Number.isNaN(v))) return `rgba(0, 0, 0, ${a})`
-    return `rgba(${r}, ${g}, ${b}, ${a})`
-  }
-
-  return `rgba(0, 0, 0, ${a})`
-}
-
-// Category colors - fixed colors for each category
-const CATEGORY_COLORS: Record<SuggestionCategory, { bg: string; border: string; text: string }> = {
-  // Use translucent, tinted backgrounds so events match the app's glassy UI.
-  exercise: { bg: "rgba(34, 197, 94, 0.10)", border: "#22c55e", text: "#dcfce7" },
-  mindfulness: { bg: "rgba(168, 85, 247, 0.10)", border: "#a855f7", text: "#f3e8ff" },
-  social: { bg: "rgba(59, 130, 246, 0.10)", border: "#3b82f6", text: "#dbeafe" },
-  rest: { bg: "rgba(99, 102, 241, 0.10)", border: "#6366f1", text: "#e0e7ff" },
-  break: { bg: "rgba(245, 158, 11, 0.10)", border: "#f59e0b", text: "#fef3c7" }, // Will be overridden by accent
-}
-
-function buildAccentEventColors(accentColor: string): { bg: string; border: string; text: string } {
-  return {
-    bg: hexToRgba(accentColor, 0.10),
-    border: accentColor,
-    text: generateLightVariant(accentColor),
-  }
-}
-
-// Completed event colors (gray)
-const COMPLETED_COLORS = { bg: "rgba(107, 114, 128, 0.10)", border: "#6b7280", text: "#9ca3af" }
+import type { Suggestion, CheckInSession, RecoveryBlock } from "@/lib/types"
+import {
+  dedupeEventsById,
+  suggestionToEvent,
+  checkInToEvent,
+  type ExtendedEventProps,
+} from "./fullcalendar-event-mappers"
 
 const EMPTY_SUGGESTIONS: Suggestion[] = []
 const EMPTY_SESSIONS: CheckInSession[] = []
@@ -112,21 +52,7 @@ interface FullCalendarViewProps {
   className?: string
 }
 
-interface ExtendedEventProps {
-  suggestion?: Suggestion
-  session?: CheckInSession
-  isCompleted?: boolean
-  isCheckIn?: boolean
-}
-
-type MetricBand = "low" | "medium" | "high"
-
-function scoreToBand(score: number): MetricBand {
-  if (!Number.isFinite(score)) return "medium"
-  if (score < 34) return "low"
-  if (score < 67) return "medium"
-  return "high"
-}
+// ExtendedEventProps is shared with the event mappers module.
 
 function toInstantFromFullCalendarStart(
   start: Date | null,
@@ -206,89 +132,7 @@ function toSlotFromFullCalendarDateClick(input: { date: Date; dateStr: string; t
   return { dateISO, hour: input.date.getHours(), minute: input.date.getMinutes() }
 }
 
-// Helper to map Suggestion to FullCalendar event format
-function suggestionToEvent(
-  suggestion: Suggestion,
-  timeZone: string,
-  accentColor: string,
-  isCompleted = false
-): EventInput | null {
-  if (!suggestion.scheduledFor) return null
-
-  const instant = Temporal.Instant.from(suggestion.scheduledFor)
-  const startDateTime = instant.toZonedDateTimeISO(timeZone)
-  const endDateTime = startDateTime.add({ minutes: suggestion.duration })
-
-  // Extract first sentence as title, max 30 chars
-  const firstSentence = suggestion.content.split(/[.!?]/)[0]?.trim() || suggestion.content
-  const title = firstSentence.length > 30
-    ? firstSentence.slice(0, 27) + "..."
-    : firstSentence
-
-  // Get category colors, with break using accent color
-  let colors = CATEGORY_COLORS[suggestion.category]
-  if (suggestion.category === "break") {
-    colors = {
-      bg: hexToRgba(accentColor, 0.10),
-      border: accentColor,
-      text: generateLightVariant(accentColor),
-    }
-  }
-
-  if (isCompleted) {
-    colors = COMPLETED_COLORS
-  }
-
-  return {
-    id: isCompleted ? `completed-${suggestion.id}` : suggestion.id,
-    title: isCompleted ? `✓ ${title}` : title,
-    start: startDateTime.toString({ timeZoneName: "never" }),
-    end: endDateTime.toString({ timeZoneName: "never" }),
-    backgroundColor: colors.bg,
-    borderColor: colors.border,
-    textColor: colors.text,
-    extendedProps: {
-      suggestion,
-      isCompleted,
-    } as ExtendedEventProps,
-    editable: !isCompleted, // Can only drag non-completed events
-    classNames: isCompleted ? ["opacity-60"] : [],
-  }
-}
-
-// Helper to map check-ins to FullCalendar event format
-function checkInToEvent(session: CheckInSession, timeZone: string, accentColor: string): EventInput | null {
-  if (!session.startedAt) return null
-
-  const instant = Temporal.Instant.from(session.startedAt)
-  const startDateTime = instant.toZonedDateTimeISO(timeZone)
-  const endDateTime = startDateTime.add({ minutes: 20 })
-
-  const stressScore = session.acousticMetrics?.stressScore
-  const fatigueScore = session.acousticMetrics?.fatigueScore
-  const metrics = stressScore !== undefined
-    ? `S: ${scoreToBand(stressScore)} • F: ${fatigueScore !== undefined ? scoreToBand(fatigueScore) : "?"}`
-    : null
-  const title = metrics ? `✓ Check-in • ${metrics}` : "✓ Check-in"
-
-  const colors = buildAccentEventColors(accentColor)
-
-  return {
-    id: `checkin-${session.id}`,
-    title,
-    start: startDateTime.toString({ timeZoneName: "never" }),
-    end: endDateTime.toString({ timeZoneName: "never" }),
-    backgroundColor: colors.bg,
-    borderColor: colors.border,
-    textColor: colors.text,
-    extendedProps: {
-      session,
-      isCheckIn: true,
-    } as ExtendedEventProps,
-    editable: false, // Check-ins cannot be dragged
-    classNames: ["checkin-event"],
-  }
-}
+// (Event mapping helpers live in fullcalendar-event-mappers.ts)
 
 export function FullCalendarView({
   scheduledSuggestions,
