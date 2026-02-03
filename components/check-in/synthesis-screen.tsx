@@ -2,12 +2,14 @@
 
 import { useMemo, useEffect, useState } from "react"
 import Image from "next/image"
-import { RefreshCw, ArrowRight } from "@/lib/icons"
+import { ArrowRight } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import { Deck } from "@/components/dashboard/deck"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Spinner } from "@/components/ui/spinner"
 import { db } from "@/lib/storage/db"
 import { patchSettings } from "@/lib/settings/patch-settings"
 import { updateCalibrationFromSelfReportSubmission } from "@/lib/ml/personalized-biomarkers"
@@ -225,16 +227,20 @@ export function SynthesisScreen({
 
           {/* Loading */}
           {isLoading && (
-            <Deck className="p-4">
+            <Deck className="p-4" role="status" aria-live="polite">
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 rounded-full bg-muted/40 p-2">
-                  <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                  <Spinner className="size-4 text-muted-foreground" />
                 </div>
                 <div>
                   <p className="text-sm font-semibold">Synthesizing your check-in...</p>
                   <p className="text-sm text-muted-foreground mt-1">
                     Kanari is asking Gemini 3 to connect your conversation, journal, and voice patterns into a clear "why".
                   </p>
+                  <div className="mt-3 space-y-2">
+                    <Skeleton className="h-3 w-5/6 bg-muted/50" />
+                    <Skeleton className="h-3 w-2/3 bg-muted/40" />
+                  </div>
                 </div>
               </div>
             </Deck>

@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils"
 import { useCheckIn } from "@/hooks/use-check-in"
 import { useStrictModeReady } from "@/hooks/use-strict-mode-ready"
 import { useCheckInSessionActions } from "@/hooks/use-storage"
+import { Spinner } from "@/components/ui/spinner"
 import { BiomarkerIndicator } from "@/components/check-in/biomarker-indicator"
 import { ConversationView } from "@/components/check-in/conversation-view"
 import { ChatInput } from "@/components/check-in/chat-input"
@@ -56,6 +57,7 @@ import { db, fromSuggestion, toJournalEntry } from "@/lib/storage/db"
 import { synthesizeCheckInSession } from "@/lib/gemini/synthesis-client"
 import { blendAcousticAndSemanticBiomarkers } from "@/lib/ml/biomarker-fusion"
 import { SynthesisScreen } from "@/components/check-in/synthesis-screen"
+import { Deck } from "@/components/dashboard/deck"
 import type { CheckInSession, CheckInSynthesis, Suggestion } from "@/lib/types"
 import type { InitPhase } from "@/hooks/check-in/state"
 
@@ -121,9 +123,15 @@ export function AIChatContent({
   const [journalDrafts, setJournalDrafts] = useState<Record<string, string>>({})
   const [breathingDrafts, setBreathingDrafts] = useState<Record<string, number>>({})
   const [autoStartStatus, setAutoStartStatus] = useState<"idle" | "starting" | "done">("idle")
+  const [isFinalizing, setIsFinalizing] = useState(false)
+  const finalizeTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     return () => {
+      if (finalizeTimerRef.current) {
+        window.clearTimeout(finalizeTimerRef.current)
+        finalizeTimerRef.current = null
+      }
       synthesisAbortRef.current?.abort()
       synthesisAbortRef.current = null
     }
@@ -388,7 +396,16 @@ export function AIChatContent({
     if (checkIn.messages.length > 0) {
       // User has spoken - end session gracefully
       // This saves the session and transitions to "complete" state
-      await controls.endSession()
+      if (finalizeTimerRef.current) window.clearTimeout(finalizeTimerRef.current)
+      finalizeTimerRef.current = window.setTimeout(() => setIsFinalizing(true), 250)
+
+      try {
+        await controls.endSession()
+      } finally {
+        if (finalizeTimerRef.current) window.clearTimeout(finalizeTimerRef.current)
+        finalizeTimerRef.current = null
+        setIsFinalizing(false)
+      }
     } else {
       // No messages yet - show discard confirmation dialog
       onClose?.()
@@ -458,7 +475,7 @@ export function AIChatContent({
   })()
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="relative flex h-full overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
         {checkIn.state === "error" ? (
           <motion.div
@@ -723,6 +740,7 @@ export function AIChatContent({
                           "hover:rotate-6",
                         ].join(" ")}
                         onClick={handleEndCall}
+                        aria-label="End check-in"
                       >
                         <PhoneOff className="h-6 w-6" />
                       </Button>
@@ -746,6 +764,24 @@ export function AIChatContent({
           </>
         )}
       </div>
+
+      {isFinalizing && checkIn.state !== "complete" && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm p-4">
+          <Deck className="w-full max-w-sm p-4" role="status" aria-live="polite">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-full bg-muted/40 p-2">
+                <Spinner className="size-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Finalizing your check-in...</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Saving your session and preparing the synthesis.
+                </p>
+              </div>
+            </div>
+          </Deck>
+        </div>
+      )}
     </div>
   )
 }

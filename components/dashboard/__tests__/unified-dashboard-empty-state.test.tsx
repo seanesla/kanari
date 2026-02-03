@@ -150,6 +150,12 @@ describe("UnifiedDashboard empty state", () => {
     expect(screen.getByText(/No suggestions yet/i)).toBeInTheDocument()
     expect(screen.getByRole("link", { name: /check in now/i })).toHaveAttribute("href", "/check-ins?newCheckIn=true")
 
+    const calendarDeck = container.querySelector('[data-demo-id="demo-calendar"]')
+    expect(calendarDeck).not.toBeNull()
+    expect(calendarDeck).toHaveClass("cursor-pointer")
+    expect(calendarDeck).toHaveClass("hover:ring-2")
+    expect(calendarDeck).not.toHaveClass("hover:-translate-y-0.5")
+
     expect(container.querySelector(".h-\\[260px\\]")).toBeNull()
     expect(container.querySelector(".h-\\[70vh\\]")).toBeNull()
     },

@@ -496,7 +496,13 @@ export function UnifiedDashboard() {
 
                   <Deck
                     data-demo-id="demo-calendar"
-                    className="overflow-hidden aspect-square w-full max-w-[420px] mx-auto"
+                    className={cn(
+                      "overflow-hidden aspect-square w-full max-w-[420px] mx-auto",
+                      "cursor-pointer",
+                      "transition-[border-color,background-color,ring-color] duration-200",
+                      "hover:bg-card/80 hover:border-accent/50 hover:ring-2 hover:ring-accent/20",
+                      "focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/25"
+                    )}
                   >
                     {calendarContent}
                   </Deck>
@@ -535,12 +541,18 @@ export function UnifiedDashboard() {
                     <div className="space-y-4 min-w-0">
                       <InsightsPanel session={latestSynthesisSession} />
 
-                      <Deck
-                        data-demo-id="demo-calendar"
-                        className="overflow-hidden aspect-square w-full max-w-[420px] mx-auto lg:max-w-none lg:mx-0"
-                      >
-                        {calendarContent}
-                      </Deck>
+                    <Deck
+                      data-demo-id="demo-calendar"
+                      className={cn(
+                        "overflow-hidden aspect-square w-full max-w-[420px] mx-auto lg:max-w-none lg:mx-0",
+                        "cursor-pointer",
+                        "transition-[border-color,background-color,ring-color] duration-200",
+                        "hover:bg-card/80 hover:border-accent/50 hover:ring-2 hover:ring-accent/20",
+                        "focus-within:border-accent/50 focus-within:ring-2 focus-within:ring-accent/25"
+                      )}
+                    >
+                      {calendarContent}
+                    </Deck>
                     </div>
                   </div>
 
