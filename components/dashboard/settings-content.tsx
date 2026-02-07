@@ -337,14 +337,16 @@ export function SettingsContent() {
           }}
         />
 
-        <SettingsGraphicsSection
-          graphicsQuality={(draft.graphicsQuality ?? DEFAULT_USER_SETTINGS.graphicsQuality ?? "auto") as GraphicsQuality}
-          onGraphicsQualityChange={(quality: GraphicsQuality) => {
-            setDraft((prev) => ({ ...prev, graphicsQuality: quality }))
-            setSaveMessage(null)
-            previewGraphicsQuality(quality)
-          }}
-        />
+        <div className="md:col-span-2">
+          <SettingsGraphicsSection
+            graphicsQuality={(draft.graphicsQuality ?? DEFAULT_USER_SETTINGS.graphicsQuality ?? "auto") as GraphicsQuality}
+            onGraphicsQualityChange={(quality: GraphicsQuality) => {
+              setDraft((prev) => ({ ...prev, graphicsQuality: quality }))
+              setSaveMessage(null)
+              previewGraphicsQuality(quality)
+            }}
+          />
+        </div>
 
         <Deck className="md:col-span-2 p-6 transition-colors hover:bg-card/80">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">

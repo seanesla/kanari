@@ -98,4 +98,17 @@ describe("SettingsContent layout", () => {
     expect(screen.getByTestId("timezone-section")).toBeInTheDocument()
     expect(screen.getByTestId("account-section")).toBeInTheDocument()
   })
+
+  it("keeps Graphics full width to avoid an orphan grid gap", async () => {
+    const { SettingsContent } = await import("../settings-content")
+
+    render(<SettingsContent />)
+    await waitFor(() => expect(mockSettingsGet).toHaveBeenCalled())
+
+    const graphicsSection = screen.getByTestId("graphics-section")
+    const graphicsWrapper = graphicsSection.parentElement
+
+    expect(graphicsWrapper).not.toBeNull()
+    expect(graphicsWrapper).toHaveClass("md:col-span-2")
+  })
 })

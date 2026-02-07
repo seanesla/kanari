@@ -24,5 +24,6 @@ The odd card count leaves one empty grid cell. The next full-width card cannot f
 ## How we fix it in this repo
 
 - Keep the top-level settings grid as two columns.
-- Make the combined Time Zone + Account deck span both columns.
-- Use an internal responsive two-column grid inside that deck so desktop space is used intentionally and no orphan cell appears.
+- Ensure the number of single-column cards between full-width cards is even.
+- If a feature removal makes that count odd, promote one nearby card to `md:col-span-2` (for example, the Graphics card) to consume the row.
+- For grouped content (Time Zone + Account), use an internal responsive two-column grid inside a full-width deck when needed.
