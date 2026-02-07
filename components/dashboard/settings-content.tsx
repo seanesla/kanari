@@ -295,6 +295,7 @@ export function SettingsContent() {
 
   return (
     <div className={`w-full space-y-6 ${isDirty ? "pb-24" : ""}`}>
+      {/* Pattern doc: docs/error-patterns/settings-grid-orphan-cell-from-mixed-column-spans.md */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 auto-rows-max">
         <SettingsProfileSection
           userName={draft.userName ?? ""}
@@ -370,42 +371,46 @@ export function SettingsContent() {
           }}
         />
 
-        <Deck className="p-6 transition-colors hover:bg-card/80">
-          <div className="flex items-center gap-2 mb-6">
-            <Globe2 className="h-5 w-5 text-accent" />
-            <h2 className="text-lg font-semibold font-serif">Time Zone</h2>
+        <Deck className="md:col-span-2 p-6 transition-colors hover:bg-card/80">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <Globe2 className="h-5 w-5 text-accent" />
+                <h2 className="text-lg font-semibold font-serif">Time Zone</h2>
+              </div>
+
+              <SettingsTimeZoneSection
+                embedded
+                timeZone={draft.timeZone ?? DEFAULT_USER_SETTINGS.timeZone ?? "UTC"}
+                onTimeZoneChange={(timeZone) => {
+                  setDraft((prev) => ({ ...prev, timeZone }))
+                  setSaveMessage(null)
+                }}
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 mb-6">
+                <User className="h-5 w-5 text-accent" />
+                <h2 className="text-lg font-semibold font-serif">Account</h2>
+              </div>
+
+              <SettingsAccountSection
+                embedded
+                isSaving={isSaving}
+                localStorageOnly={draft.localStorageOnly}
+                onLocalStorageOnlyChange={(checked) => {
+                  setDraft((prev) => ({ ...prev, localStorageOnly: checked }))
+                  setSaveMessage(null)
+                }}
+                shareJournalWithAi={draft.shareJournalWithAi}
+                onShareJournalWithAiChange={(checked: boolean) => {
+                  setDraft((prev) => ({ ...prev, shareJournalWithAi: checked }))
+                  setSaveMessage(null)
+                }}
+              />
+            </div>
           </div>
-
-          <SettingsTimeZoneSection
-            embedded
-            timeZone={draft.timeZone ?? DEFAULT_USER_SETTINGS.timeZone ?? "UTC"}
-            onTimeZoneChange={(timeZone) => {
-              setDraft((prev) => ({ ...prev, timeZone }))
-              setSaveMessage(null)
-            }}
-          />
-
-          <div className="my-6 h-px bg-border/60" />
-
-          <div className="flex items-center gap-2 mb-6">
-            <User className="h-5 w-5 text-accent" />
-            <h2 className="text-lg font-semibold font-serif">Account</h2>
-          </div>
-
-          <SettingsAccountSection
-            embedded
-            isSaving={isSaving}
-            localStorageOnly={draft.localStorageOnly}
-            onLocalStorageOnlyChange={(checked) => {
-              setDraft((prev) => ({ ...prev, localStorageOnly: checked }))
-              setSaveMessage(null)
-            }}
-            shareJournalWithAi={draft.shareJournalWithAi}
-            onShareJournalWithAiChange={(checked: boolean) => {
-              setDraft((prev) => ({ ...prev, shareJournalWithAi: checked }))
-              setSaveMessage(null)
-            }}
-          />
         </Deck>
 
         <div className="md:col-span-2">
