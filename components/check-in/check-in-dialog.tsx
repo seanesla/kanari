@@ -328,6 +328,17 @@ export function CheckInDialog({
     : null
   const isToolFocused = Boolean(focusedWidget)
 
+  const hasVoiceBiomarkers = Boolean(checkIn.session?.acousticMetrics)
+  const modalityHint = (() => {
+    if (checkIn.isMuted) {
+      return "Mic is muted. Typing still works, but voice biomarkers will pause until you unmute and speak."
+    }
+    if (!hasVoiceBiomarkers) {
+      return "Tip: speak for about 1-2 seconds to generate voice biomarkers. Typed messages still work for chat."
+    }
+    return "Typing keeps the chat moving. Speaking gives Kanari richer biomarker context."
+  })()
+
   useEffect(() => {
     if (!showConversation) {
       setFocusedWidgetId(null)
@@ -693,6 +704,7 @@ export function CheckInDialog({
                       disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
                       isMuted={checkIn.isMuted}
                       onToggleMute={() => controls.toggleMute()}
+                      modalityHint={modalityHint}
                     />
                   )}
                 </div>

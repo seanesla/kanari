@@ -474,6 +474,17 @@ export function AIChatContent({
     return "Ready"
   })()
 
+  const hasVoiceBiomarkers = Boolean(checkIn.session?.acousticMetrics)
+  const modalityHint = (() => {
+    if (checkIn.isMuted) {
+      return "Mic is muted. Typing still works, but voice biomarkers will pause until you unmute and speak."
+    }
+    if (!hasVoiceBiomarkers) {
+      return "Tip: speak for about 1-2 seconds to generate voice biomarkers. Typed messages still work for chat."
+    }
+    return "Typing keeps the chat moving. Speaking gives Kanari richer biomarker context."
+  })()
+
   return (
     <div className="relative flex h-full overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -720,6 +731,7 @@ export function AIChatContent({
                             disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
                             isMuted={checkIn.isMuted}
                             onToggleMute={() => controls.toggleMute()}
+                            modalityHint={modalityHint}
                           />
                         )}
                       </div>

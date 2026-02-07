@@ -52,10 +52,19 @@ vi.mock("@/lib/gemini/synthesis-client", () => ({
 }))
 
 vi.mock("@/components/check-in/chat-input", () => ({
-  ChatInput: ({ onSendText }: { onSendText: (text: string) => void }) => (
-    <button type="button" onClick={() => onSendText("hello")}>
-      Send text
-    </button>
+  ChatInput: ({
+    onSendText,
+    modalityHint,
+  }: {
+    onSendText: (text: string) => void
+    modalityHint?: string
+  }) => (
+    <div>
+      <button type="button" onClick={() => onSendText("hello")}>
+        Send text
+      </button>
+      {modalityHint ? <p>{modalityHint}</p> : null}
+    </div>
   ),
 }))
 
@@ -152,8 +161,143 @@ describe("AIChatContent", () => {
     expect(screen.getByText(/listening for voice biomarkers/i).parentElement).toHaveClass("bg-transparent")
   })
 
+  it("shows an info-only hint when voice biomarkers are not available yet", async () => {
+    useCheckInMock.mockReturnValue([
+      {
+        state: "listening",
+        initPhase: null,
+        isActive: true,
+        session: { id: "s1", startedAt: new Date().toISOString(), messages: [], acousticMetrics: null },
+        messages: [],
+        currentUserTranscript: "",
+        widgets: [],
+        error: null,
+        isMuted: false,
+      },
+      {
+        startSession: vi.fn(async () => {}),
+        endSession: vi.fn(async () => {}),
+        cancelSession: vi.fn(),
+        getSession: vi.fn(() => null),
+        toggleMute: vi.fn(),
+        dismissWidget: vi.fn(),
+        undoScheduledActivity: vi.fn(async () => {}),
+        runQuickAction: vi.fn(),
+        saveJournalEntry: vi.fn(async () => {}),
+        triggerManualTool: vi.fn(),
+        sendTextMessage: vi.fn(),
+        preserveSession: vi.fn(),
+        hasPreservedSession: vi.fn(() => false),
+        resumePreservedSession: vi.fn(async () => {}),
+        getContextFingerprint: vi.fn(async () => ""),
+        interruptAssistant: vi.fn(),
+      },
+    ])
+
+    const { AIChatContent } = await import("../check-in-ai-chat")
+    render(<AIChatContent />)
+
+    expect(
+      screen.getByText(/speak for about 1-2 seconds to generate voice biomarkers/i)
+    ).toBeInTheDocument()
+  })
+
+  it("shows a muted hint when the microphone is muted", async () => {
+    useCheckInMock.mockReturnValue([
+      {
+        state: "listening",
+        initPhase: null,
+        isActive: true,
+        session: { id: "s1", startedAt: new Date().toISOString(), messages: [], acousticMetrics: null },
+        messages: [],
+        currentUserTranscript: "",
+        widgets: [],
+        error: null,
+        isMuted: true,
+      },
+      {
+        startSession: vi.fn(async () => {}),
+        endSession: vi.fn(async () => {}),
+        cancelSession: vi.fn(),
+        getSession: vi.fn(() => null),
+        toggleMute: vi.fn(),
+        dismissWidget: vi.fn(),
+        undoScheduledActivity: vi.fn(async () => {}),
+        runQuickAction: vi.fn(),
+        saveJournalEntry: vi.fn(async () => {}),
+        triggerManualTool: vi.fn(),
+        sendTextMessage: vi.fn(),
+        preserveSession: vi.fn(),
+        hasPreservedSession: vi.fn(() => false),
+        resumePreservedSession: vi.fn(async () => {}),
+        getContextFingerprint: vi.fn(async () => ""),
+        interruptAssistant: vi.fn(),
+      },
+    ])
+
+    const { AIChatContent } = await import("../check-in-ai-chat")
+    render(<AIChatContent />)
+
+    expect(
+      screen.getByText(/mic is muted\. typing still works, but voice biomarkers will pause/i)
+    ).toBeInTheDocument()
+  })
+
+  it("shows a speaking-benefit hint after biomarkers are available", async () => {
+    useCheckInMock.mockReturnValue([
+      {
+        state: "listening",
+        initPhase: null,
+        isActive: true,
+        session: {
+          id: "s1",
+          startedAt: new Date().toISOString(),
+          messages: [],
+          acousticMetrics: {
+            stressScore: 42,
+            fatigueScore: 37,
+            stressLevel: "moderate",
+            fatigueLevel: "normal",
+            confidence: 0.8,
+            features: {} as AudioFeatures,
+          },
+        },
+        messages: [],
+        currentUserTranscript: "",
+        widgets: [],
+        error: null,
+        isMuted: false,
+      },
+      {
+        startSession: vi.fn(async () => {}),
+        endSession: vi.fn(async () => {}),
+        cancelSession: vi.fn(),
+        getSession: vi.fn(() => null),
+        toggleMute: vi.fn(),
+        dismissWidget: vi.fn(),
+        undoScheduledActivity: vi.fn(async () => {}),
+        runQuickAction: vi.fn(),
+        saveJournalEntry: vi.fn(async () => {}),
+        triggerManualTool: vi.fn(),
+        sendTextMessage: vi.fn(),
+        preserveSession: vi.fn(),
+        hasPreservedSession: vi.fn(() => false),
+        resumePreservedSession: vi.fn(async () => {}),
+        getContextFingerprint: vi.fn(async () => ""),
+        interruptAssistant: vi.fn(),
+      },
+    ])
+
+    const { AIChatContent } = await import("../check-in-ai-chat")
+    render(<AIChatContent />)
+
+    expect(
+      screen.getByText(/typing keeps the chat moving\. speaking gives kanari richer biomarker context/i)
+    ).toBeInTheDocument()
+  })
+
   it("saves sessions with voice metrics even when message count is <= 1", async () => {
-    let capturedOptions: UseCheckInOptions | null = null
+    let capturedOptions: { onSessionEnd?: UseCheckInOptions["onSessionEnd"] } | null = null
 
     useCheckInMock.mockImplementation((options: UseCheckInOptions) => {
       capturedOptions = options
@@ -194,7 +338,8 @@ describe("AIChatContent", () => {
     const { synthesizeCheckInSession } = await import("@/lib/gemini/synthesis-client")
     render(<AIChatContent />)
 
-    expect(capturedOptions?.onSessionEnd).toEqual(expect.any(Function))
+    const onSessionEnd = (capturedOptions as { onSessionEnd?: (session: CheckInSession) => void } | null)?.onSessionEnd
+    expect(onSessionEnd).toEqual(expect.any(Function))
 
     const features: AudioFeatures = {
       mfcc: [1, 2, 3],
@@ -237,7 +382,7 @@ describe("AIChatContent", () => {
     }
 
     await act(async () => {
-      await Promise.resolve(capturedOptions?.onSessionEnd?.(session))
+      await Promise.resolve(onSessionEnd?.(session))
     })
 
     expect(addCheckInSessionMock).toHaveBeenCalledTimes(1)

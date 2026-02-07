@@ -33,9 +33,18 @@ interface ChatInputProps {
   isMuted?: boolean
   /** Called when user toggles mute */
   onToggleMute?: () => void
+  /** Optional info-only hint about typing vs speaking */
+  modalityHint?: string
 }
 
-export function ChatInput({ onSendText, onTriggerTool, disabled, isMuted, onToggleMute }: ChatInputProps) {
+export function ChatInput({
+  onSendText,
+  onTriggerTool,
+  disabled,
+  isMuted,
+  onToggleMute,
+  modalityHint,
+}: ChatInputProps) {
   const [value, setValue] = useState("")
   const [showCommandMenu, setShowCommandMenu] = useState(false)
   const [selectedTool, setSelectedTool] = useState<ManualToolConfig | null>(null)
@@ -205,6 +214,12 @@ export function ChatInput({ onSendText, onTriggerTool, disabled, isMuted, onTogg
             <span className="sr-only">Send message</span>
           </Button>
         </div>
+
+        {modalityHint ? (
+          <p className="mt-2 px-1 text-[11px] text-muted-foreground" aria-live="polite">
+            {modalityHint}
+          </p>
+        ) : null}
 
         {/* Command menu popup */}
         <PopoverContent
