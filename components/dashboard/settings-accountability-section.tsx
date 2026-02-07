@@ -3,12 +3,19 @@
 import { Heart, Shield, Target } from "@/lib/icons"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { ACCOUNTABILITY_MODE_OPTIONS } from "@/lib/settings/accountability-mode-options"
 import type { AccountabilityMode } from "@/lib/types"
 import { Deck } from "@/components/dashboard/deck"
 
 interface SettingsAccountabilitySectionProps {
   accountabilityMode: AccountabilityMode | undefined
   onAccountabilityModeChange: (mode: AccountabilityMode) => void
+}
+
+function getAccountabilityIcon(mode: AccountabilityMode) {
+  if (mode === "supportive") return Heart
+  if (mode === "balanced") return Shield
+  return Target
 }
 
 export function SettingsAccountabilitySection({
@@ -31,44 +38,27 @@ export function SettingsAccountabilitySection({
         onValueChange={(value) => onAccountabilityModeChange(value as AccountabilityMode)}
         className="gap-4"
       >
-        <div className="flex items-start gap-3 rounded-md border border-border p-4">
-          <RadioGroupItem value="supportive" id="accountability-supportive" className="mt-1" />
-          <Label htmlFor="accountability-supportive" className="cursor-pointer font-sans">
-            <div className="flex items-center gap-2">
-              <Heart className="h-4 w-4 text-accent" />
-              <span className="font-medium text-foreground">Supportive Listener</span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Listen, validate, and don&apos;t push.
-            </p>
-          </Label>
-        </div>
+        {ACCOUNTABILITY_MODE_OPTIONS.map((option) => {
+          const Icon = getAccountabilityIcon(option.value)
+          const optionId = `accountability-${option.value}`
 
-        <div className="flex items-start gap-3 rounded-md border border-border p-4">
-          <RadioGroupItem value="balanced" id="accountability-balanced" className="mt-1" />
-          <Label htmlFor="accountability-balanced" className="cursor-pointer font-sans">
-            <div className="flex items-center gap-2">
-              <Shield className="h-4 w-4 text-accent" />
-              <span className="font-medium text-foreground">Balanced Companion</span>
+          return (
+            <div key={option.value} className="flex items-start gap-3 rounded-md border border-border p-4">
+              <RadioGroupItem value={option.value} id={optionId} className="mt-1" />
+              <Label htmlFor={optionId} className="cursor-pointer font-sans">
+                <div className="flex items-center gap-2">
+                  <Icon className="h-4 w-4 text-accent" />
+                  <span className="font-medium text-foreground">{option.label}</span>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{option.description}</p>
+                <p className="mt-2 rounded-md bg-muted/40 px-2.5 py-2 text-sm leading-relaxed text-muted-foreground">
+                  <span className="font-medium text-foreground">Example response:</span>{" "}
+                  <span>{option.exampleResponse}</span>
+                </p>
+              </Label>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Gentle follow-ups and small next steps.
-            </p>
-          </Label>
-        </div>
-
-        <div className="flex items-start gap-3 rounded-md border border-border p-4">
-          <RadioGroupItem value="accountability" id="accountability-coach" className="mt-1" />
-          <Label htmlFor="accountability-coach" className="cursor-pointer font-sans">
-            <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-accent" />
-              <span className="font-medium text-foreground">Accountability Coach</span>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Direct follow-ups, challenges patterns, and pushes for action.
-            </p>
-          </Label>
-        </div>
+          )
+        })}
       </RadioGroup>
     </Deck>
   )

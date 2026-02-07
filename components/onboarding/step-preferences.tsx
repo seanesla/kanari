@@ -15,12 +15,19 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { useSceneMode } from "@/lib/scene-context"
+import { ACCOUNTABILITY_MODE_OPTIONS } from "@/lib/settings/accountability-mode-options"
 import type { AccountabilityMode, UserSettings } from "@/lib/types"
 
 interface StepPreferencesProps {
   initialSettings: Partial<UserSettings>
   onNext: (settings: Partial<UserSettings>) => void
   onBack: () => void
+}
+
+function getAccountabilityIcon(mode: AccountabilityMode) {
+  if (mode === "supportive") return Heart
+  if (mode === "balanced") return Shield
+  return Target
 }
 
 export function StepPreferences({ initialSettings, onNext, onBack }: StepPreferencesProps) {
@@ -150,44 +157,27 @@ export function StepPreferences({ initialSettings, onNext, onBack }: StepPrefere
               onValueChange={(value) => setAccountabilityMode(value as AccountabilityMode)}
               className="gap-4"
             >
-              <div className="flex items-start gap-3 rounded-md border border-border p-4">
-                <RadioGroupItem value="supportive" id="onboarding-accountability-supportive" className="mt-1" />
-                <Label htmlFor="onboarding-accountability-supportive" className="cursor-pointer font-sans">
-                  <div className="flex items-center gap-2">
-                    <Heart className="h-4 w-4 text-accent" />
-                    <span className="font-medium text-foreground">Supportive</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Gentle, validating, and low-pressure.
-                  </p>
-                </Label>
-              </div>
+              {ACCOUNTABILITY_MODE_OPTIONS.map((option) => {
+                const Icon = getAccountabilityIcon(option.value)
+                const optionId = `onboarding-accountability-${option.value}`
 
-              <div className="flex items-start gap-3 rounded-md border border-border p-4">
-                <RadioGroupItem value="balanced" id="onboarding-accountability-balanced" className="mt-1" />
-                <Label htmlFor="onboarding-accountability-balanced" className="cursor-pointer font-sans">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-accent" />
-                    <span className="font-medium text-foreground">Balanced</span>
+                return (
+                  <div key={option.value} className="flex items-start gap-3 rounded-md border border-border p-4">
+                    <RadioGroupItem value={option.value} id={optionId} className="mt-1" />
+                    <Label htmlFor={optionId} className="cursor-pointer font-sans">
+                      <div className="flex items-center gap-2">
+                        <Icon className="h-4 w-4 text-accent" />
+                        <span className="font-medium text-foreground">{option.label}</span>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">{option.description}</p>
+                      <p className="mt-2 rounded-md bg-muted/40 px-2.5 py-2 text-sm leading-relaxed text-muted-foreground">
+                        <span className="font-medium text-foreground">Example response:</span>{" "}
+                        <span>{option.exampleResponse}</span>
+                      </p>
+                    </Label>
                   </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    A mix of empathy and practical next steps.
-                  </p>
-                </Label>
-              </div>
-
-              <div className="flex items-start gap-3 rounded-md border border-border p-4">
-                <RadioGroupItem value="accountability" id="onboarding-accountability-coach" className="mt-1" />
-                <Label htmlFor="onboarding-accountability-coach" className="cursor-pointer font-sans">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-4 w-4 text-accent" />
-                    <span className="font-medium text-foreground">Accountability</span>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    More direct prompts and follow-through.
-                  </p>
-                </Label>
-              </div>
+                )
+              })}
             </RadioGroup>
           </motion.div>
 
