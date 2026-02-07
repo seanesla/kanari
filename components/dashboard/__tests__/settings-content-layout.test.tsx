@@ -53,10 +53,6 @@ vi.mock("@/components/dashboard/settings-accountability-section", () => ({
   SettingsAccountabilitySection: () => <div data-testid="accountability-section" />,
 }))
 
-vi.mock("@/components/dashboard/settings-notifications", () => ({
-  SettingsNotificationsSection: () => <div data-testid="notifications-section" />,
-}))
-
 vi.mock("@/components/dashboard/settings-appearance", () => ({
   SettingsAppearanceSection: () => <div data-testid="appearance-section" />,
 }))

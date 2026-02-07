@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation"
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion"
 import { useSceneMode } from "@/lib/scene-context"
 import { useOnboardingGuard } from "@/hooks/use-onboarding"
-import { useDailyReminder } from "@/hooks/use-daily-reminder"
 import { DashboardAnimationProvider } from "@/lib/dashboard-animation-context"
 import { AppSpaceBackground } from "@/components/dashboard/app-space-background"
 
@@ -14,8 +13,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
   const { isReady } = useOnboardingGuard()
   const pathname = usePathname()
   const reduceMotion = useReducedMotion()
-
-  useDailyReminder({ enabled: isReady })
 
   // Ensure scene mode stays in dashboard
   useEffect(() => {

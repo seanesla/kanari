@@ -30,7 +30,7 @@ export default function SettingsPage() {
         >
           <PageHeader
             title="Settings"
-            subtitle="Configure check-in preferences, notifications, and appearance."
+            subtitle="Configure check-in preferences and appearance."
           />
         </div>
 

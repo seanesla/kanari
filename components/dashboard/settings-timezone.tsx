@@ -46,7 +46,7 @@ export function SettingsTimeZoneSection({ timeZone, onTimeZoneChange, embedded =
           Display & scheduling timezone
         </Label>
         <p className="text-sm text-muted-foreground font-sans mt-1">
-          Used across Kanari for calendars, reminders, and timestamps.
+          Used across Kanari for calendars, scheduling, and timestamps.
         </p>
       </div>
 

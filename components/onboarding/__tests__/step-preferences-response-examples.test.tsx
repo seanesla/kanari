@@ -10,16 +10,6 @@ vi.mock("@/lib/scene-context", () => ({
   useSceneMode: () => ({ accentColor: "#d4a574" }),
 }))
 
-vi.mock("@/hooks/use-notifications", () => ({
-  useNotifications: () => ({
-    isSupported: true,
-    permission: "granted",
-    canNotify: true,
-    requestPermission: vi.fn(async () => "granted"),
-    notify: vi.fn(),
-  }),
-}))
-
 describe("StepPreferences", () => {
   it("renders static coaching examples in onboarding", async () => {
     const { StepPreferences } = await import("../step-preferences")

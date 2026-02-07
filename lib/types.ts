@@ -502,10 +502,6 @@ export interface UserSettings {
   // User identity
   userName?: string // User's preferred name (for personalization)
 
-  // Notification preferences
-  enableNotifications: boolean
-  dailyReminderTime?: string // HH:mm format
-
   // Timezone
   timeZone?: string // IANA timezone id (e.g., "America/Los_Angeles")
 

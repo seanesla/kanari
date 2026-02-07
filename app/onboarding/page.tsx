@@ -13,7 +13,7 @@
  * - StepGraphicsQuality: Graphics quality selection
  * - StepApiKey: Gemini API key input
  * - StepMeetCoach: Voice selection + avatar generation
- * - StepPreferences: Accountability mode + reminders
+ * - StepPreferences: Accountability mode preferences
  * - StepComplete: Success screen with avatar greeting
  */
 
@@ -174,7 +174,7 @@ export default function OnboardingPage() {
       onNext={handleCoachSubmit}
       onBack={goBack}
     />,
-    // Step 4: Preferences (accountability + reminders)
+    // Step 4: Preferences (accountability)
     <StepPreferences
       key="preferences"
       initialSettings={mergedSettings}

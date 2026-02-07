@@ -10,7 +10,7 @@
  * - StepGraphicsQuality: Graphics quality selection
  * - StepApiKey: Gemini API key input
  * - StepMeetCoach: Voice selection + avatar generation
- * - StepPreferences: Accountability mode + reminders
+ * - StepPreferences: Accountability mode preferences
  * - StepComplete: Success screen with avatar greeting
  */
 

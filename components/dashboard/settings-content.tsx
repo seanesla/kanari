@@ -18,7 +18,6 @@ import { SettingsAccountSection } from "./settings-account"
 import { SettingsApiSection } from "./settings-api"
 import { SettingsAccountabilitySection } from "./settings-accountability-section"
 import { SettingsAppearanceSection } from "./settings-appearance"
-import { SettingsNotificationsSection } from "./settings-notifications"
 import { SettingsTimeZoneSection } from "./settings-timezone"
 import { SettingsVoiceSection } from "./settings-voice-section"
 import { SettingsProfileSection } from "./settings-profile-section"
@@ -39,8 +38,6 @@ import type { AccountabilityMode, FontFamily, GeminiVoice, GraphicsQuality, Seri
 type SettingsDraft = Pick<
   UserSettings,
   | "userName"
-  | "enableNotifications"
-  | "dailyReminderTime"
   | "timeZone"
   | "autoScheduleRecovery"
   | "localStorageOnly"
@@ -58,8 +55,6 @@ type SettingsDraft = Pick<
 
 const DEFAULT_DRAFT: SettingsDraft = {
   userName: DEFAULT_USER_SETTINGS.userName,
-  enableNotifications: DEFAULT_USER_SETTINGS.enableNotifications,
-  dailyReminderTime: DEFAULT_USER_SETTINGS.dailyReminderTime,
   timeZone: DEFAULT_USER_SETTINGS.timeZone,
   autoScheduleRecovery: DEFAULT_USER_SETTINGS.autoScheduleRecovery,
   localStorageOnly: DEFAULT_USER_SETTINGS.localStorageOnly,
@@ -144,8 +139,6 @@ export function SettingsContent() {
 
         const hydrated: SettingsDraft = {
           userName: savedSettings?.userName ?? DEFAULT_USER_SETTINGS.userName,
-          enableNotifications: savedSettings?.enableNotifications ?? DEFAULT_USER_SETTINGS.enableNotifications,
-          dailyReminderTime: savedSettings?.dailyReminderTime,
           timeZone: savedSettings?.timeZone ?? DEFAULT_USER_SETTINGS.timeZone,
           autoScheduleRecovery: savedSettings?.autoScheduleRecovery ?? DEFAULT_USER_SETTINGS.autoScheduleRecovery,
           localStorageOnly: savedSettings?.localStorageOnly ?? DEFAULT_USER_SETTINGS.localStorageOnly,
@@ -192,7 +185,6 @@ export function SettingsContent() {
       userName: trimmedName.length > 0 ? trimmedName : undefined,
       geminiApiKey: trimmedKey.length > 0 ? trimmedKey : undefined,
       geminiApiKeySource,
-      dailyReminderTime: draft.dailyReminderTime ? draft.dailyReminderTime : undefined,
       selectedGeminiVoice: draft.selectedGeminiVoice ?? undefined,
       accountabilityMode: draft.accountabilityMode ?? DEFAULT_USER_SETTINGS.accountabilityMode,
       graphicsQuality,
@@ -203,8 +195,6 @@ export function SettingsContent() {
     if (!baseline) return false
     return (
       baseline.userName !== normalizedDraft.userName ||
-      baseline.enableNotifications !== normalizedDraft.enableNotifications ||
-      baseline.dailyReminderTime !== normalizedDraft.dailyReminderTime ||
       baseline.timeZone !== normalizedDraft.timeZone ||
       baseline.autoScheduleRecovery !== normalizedDraft.autoScheduleRecovery ||
       baseline.localStorageOnly !== normalizedDraft.localStorageOnly ||
@@ -235,8 +225,6 @@ export function SettingsContent() {
     try {
       const updates: Partial<UserSettings> = {
         userName: normalizedDraft.userName,
-        enableNotifications: normalizedDraft.enableNotifications,
-        dailyReminderTime: normalizedDraft.dailyReminderTime,
         timeZone: normalizedDraft.timeZone,
         autoScheduleRecovery: normalizedDraft.autoScheduleRecovery,
         localStorageOnly: normalizedDraft.localStorageOnly,
@@ -319,19 +307,6 @@ export function SettingsContent() {
           accountabilityMode={draft.accountabilityMode}
           onAccountabilityModeChange={(mode) => {
             setDraft((prev) => ({ ...prev, accountabilityMode: mode }))
-            setSaveMessage(null)
-          }}
-        />
-
-        <SettingsNotificationsSection
-          enableNotifications={draft.enableNotifications}
-          onEnableNotificationsChange={(checked) => {
-            setDraft((prev) => ({ ...prev, enableNotifications: checked }))
-            setSaveMessage(null)
-          }}
-          dailyReminderTime={draft.dailyReminderTime}
-          onDailyReminderTimeChange={(time) => {
-            setDraft((prev) => ({ ...prev, dailyReminderTime: time }))
             setSaveMessage(null)
           }}
         />
