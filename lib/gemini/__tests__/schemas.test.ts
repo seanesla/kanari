@@ -518,6 +518,21 @@ describe("Gemini widget tool arg schemas", () => {
     }
   })
 
+  test("ScheduleActivityArgsSchema should accept AM/PM time and normalize to HH:MM", () => {
+    const result = ScheduleActivityArgsSchema.safeParse({
+      title: "Make soup",
+      category: "rest",
+      date: "2025-12-31",
+      time: "9:30 PM",
+      duration: 30,
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.time).toBe("21:30")
+    }
+  })
+
   test("ScheduleActivityArgsSchema should reject invalid category", () => {
     const result = ScheduleActivityArgsSchema.safeParse({
       title: "Break",

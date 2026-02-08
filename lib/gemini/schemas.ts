@@ -15,6 +15,7 @@ import type {
   ScheduleActivityToolArgs,
   StressGaugeToolArgs,
 } from "@/lib/types"
+import { normalizeTimeToHHMM } from "@/lib/scheduling/time"
 
 /**
  * Inline data schema (for audio chunks)
@@ -238,7 +239,20 @@ export type ToolResponseRequest = z.infer<typeof ToolResponseRequestSchema>
 
 // Shared helpers
 const DateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
-const TimeStringSchema = z.string().regex(/^\d{2}:\d{2}$/, "Expected HH:MM (24h)")
+const TimeStringSchema = z.string()
+  .min(1)
+  .max(32)
+  .transform((value, ctx) => {
+    const normalized = normalizeTimeToHHMM(value)
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Expected parseable time (supports HH:MM 24h or AM/PM)",
+      })
+      return z.NEVER
+    }
+    return normalized
+  })
 
 export const ScheduleActivityArgsSchema: z.ZodType<ScheduleActivityToolArgs> = z.object({
   title: z.string().min(1).max(120),

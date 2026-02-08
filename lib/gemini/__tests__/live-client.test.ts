@@ -323,6 +323,49 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
     })
   })
 
+  test("normalizes schedule_activity times with AM/PM before emitting widget", async () => {
+    await client.connect()
+
+    getClientInternals(client).handleMessage({
+      toolCall: {
+        functionCalls: [
+          {
+            id: "call_3",
+            name: "schedule_activity",
+            args: {
+              title: "Make chicken noodle soup",
+              category: "rest",
+              date: "2026-02-07",
+              time: "9:00 PM",
+              duration: 30,
+            },
+          },
+        ],
+      },
+    })
+
+    expect(config.events.onWidget).toHaveBeenCalledWith({
+      widget: "schedule_activity",
+      args: {
+        title: "Make chicken noodle soup",
+        category: "rest",
+        date: "2026-02-07",
+        time: "21:00",
+        duration: 30,
+      },
+    })
+
+    expect(mockSession.sendToolResponse).toHaveBeenCalledWith({
+      functionResponses: [
+        {
+          id: "call_3",
+          name: "schedule_activity",
+          response: { acknowledged: true, shown: true },
+        },
+      ],
+    })
+  })
+
   test("streams model text parts as transcript and routes thought parts to thinking", async () => {
     await client.connect()
 

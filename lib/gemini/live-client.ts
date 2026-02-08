@@ -746,6 +746,10 @@ export class GeminiLiveClient {
       }
 
       if (fc.name === "schedule_activity") {
+        // Models may emit AM/PM time strings here (e.g. "9:00 PM").
+        // The schema normalizes parseable variants to HH:MM so the tool call and
+        // fallback scheduler don't drift into contradictory states.
+        // Pattern doc: docs/error-patterns/scheduled-activity-context-time-loss.md
         const parsed = ScheduleActivityArgsSchema.safeParse(fc.args ?? {})
         if (!parsed.success) {
           logWarn("LiveClient", "Invalid schedule_activity args:", parsed.error.issues)

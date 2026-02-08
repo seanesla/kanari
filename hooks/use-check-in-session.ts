@@ -201,8 +201,27 @@ function extendContextSummary(options: {
 }): SessionContext["contextSummary"] | undefined {
   const { accountabilityMode, contextSummary, pendingCommitments, recentSuggestions } = options
 
+  // In supportive mode, keep follow-up context factual and low-pressure:
+  // include recent suggestions for schedule recall, but avoid commitment nudges.
+  // Pattern doc: docs/error-patterns/scheduled-activity-context-time-loss.md
   if (accountabilityMode === "supportive") {
-    return contextSummary
+    if (recentSuggestions.length === 0) {
+      return contextSummary
+    }
+
+    if (!contextSummary) {
+      return {
+        patternSummary: "No prior check-in summary is available yet.",
+        keyObservations: [],
+        contextNotes: "Use the follow-up context below naturally in conversation.",
+        recentSuggestions,
+      }
+    }
+
+    return {
+      ...contextSummary,
+      recentSuggestions,
+    }
   }
 
   if (pendingCommitments.length === 0 && recentSuggestions.length === 0) {

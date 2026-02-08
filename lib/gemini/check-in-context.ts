@@ -207,10 +207,19 @@ export async function fetchCheckInContext(): Promise<CheckInContextData> {
       .anyOf(["accepted", "scheduled"])
       .toArray()
 
-    recentSuggestions = dbSuggestions
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(0, 8)
-      .map(toSuggestion)
+    // Keep upcoming scheduled items prominent so factual recall questions like
+    // "Do I have anything at 9pm?" are grounded in explicit schedule data.
+    // Pattern doc: docs/error-patterns/scheduled-activity-context-time-loss.md
+    const normalized = dbSuggestions.map(toSuggestion)
+    const scheduled = normalized
+      .filter((s) => s.status === "scheduled" && Boolean(s.scheduledFor))
+      .sort((a, b) => new Date(a.scheduledFor!).getTime() - new Date(b.scheduledFor!).getTime())
+
+    const acceptedOrUnscheduled = normalized
+      .filter((s) => s.status !== "scheduled" || !s.scheduledFor)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+
+    recentSuggestions = [...scheduled, ...acceptedOrUnscheduled].slice(0, 8)
   } catch {
     // Suggestions are optional; ignore failures
   }

@@ -236,6 +236,24 @@ function sanitizeUserName(name: string): string {
     .slice(0, 60)
 }
 
+function formatScheduledForContext(instantISO: string): string {
+  try {
+    const dt = new Date(instantISO)
+    if (Number.isNaN(dt.getTime())) {
+      return sanitizeContextText(instantISO).slice(0, 80)
+    }
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(dt)
+  } catch {
+    return sanitizeContextText(instantISO).slice(0, 80)
+  }
+}
+
 /**
  * Validate and return safe acoustic signal
  */
@@ -621,9 +639,15 @@ Things to be aware of:
 ${contextSummary.contextNotes}`
   }
 
-  // Add follow-up context (only when user opted into more engagement)
-  if (contextSummary && accountabilityMode !== "supportive") {
-    const pendingCommitments = contextSummary.pendingCommitments ?? []
+  // Add follow-up context.
+  // In supportive mode we keep it factual: include recent scheduled/accepted items
+  // for recall questions, but do not inject commitment pressure.
+  // Pattern doc: docs/error-patterns/scheduled-activity-context-time-loss.md
+  if (contextSummary) {
+    const pendingCommitments =
+      accountabilityMode === "supportive"
+        ? []
+        : (contextSummary.pendingCommitments ?? [])
     const recentSuggestions = contextSummary.recentSuggestions ?? []
 
     if (pendingCommitments.length > 0 || recentSuggestions.length > 0) {
@@ -634,7 +658,13 @@ ${contextSummary.contextNotes}`
 
       const safeSuggestions = recentSuggestions
         .slice(0, 8)
-        .map((s) => `- [${s.status}] [${s.category}] ${sanitizeContextText(s.content).slice(0, 200)}`)
+        .map((s) => {
+          const scheduledFor =
+            typeof s.scheduledFor === "string" && s.scheduledFor.trim().length > 0
+              ? ` | Scheduled for: ${formatScheduledForContext(s.scheduledFor)}`
+              : ""
+          return `- [${s.status}] [${s.category}] ${sanitizeContextText(s.content).slice(0, 200)}${scheduledFor}`
+        })
         .join("\n")
 
       instruction += `
