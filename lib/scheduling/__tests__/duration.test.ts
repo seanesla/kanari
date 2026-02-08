@@ -5,11 +5,12 @@ describe("scheduling/duration", () => {
   it("extracts durations in minutes and hours", () => {
     expect(extractDurationMinutesFromText("for 30 minutes")).toBe(30)
     expect(extractDurationMinutesFromText("2 hours")).toBe(120)
+    expect(extractDurationMinutesFromText("for five hours")).toBe(300)
   })
 
   it("clamps durations to a safe range", () => {
     expect(clampDurationMinutes(3)).toBe(5)
-    expect(clampDurationMinutes(260)).toBe(240)
+    expect(clampDurationMinutes(900)).toBe(720)
     expect(clampDurationMinutes(Number.NaN)).toBe(20)
   })
 

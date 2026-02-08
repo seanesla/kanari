@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Clock, Calendar, Coffee, Dumbbell, Brain, Users, Moon, CheckCircle2, X, CalendarPlus, ChevronDown, Info, AlertTriangle, TrendingUp, TrendingDown, Minus } from "@/lib/icons"
 import { cn } from "@/lib/utils"
 import {
@@ -14,6 +14,16 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { formatScheduledTime } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import { EffectivenessFeedbackDialog } from "./effectiveness-feedback-dialog"
@@ -81,12 +91,7 @@ export function SuggestionDetailDialog({
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
   // Store the suggestion being completed while feedback dialog is open
   const [completingSuggestion, setCompletingSuggestion] = useState<Suggestion | null>(null)
-
-  // IMPORTANT: Don't early-return on `!suggestion` while the feedback dialog is open.
-  // The parent clears `suggestion` to close the detail dialog, but we still need to
-  // render the feedback dialog immediately (otherwise it appears only after a second click).
-  // Pattern doc: docs/error-patterns/suggestion-complete-feedback-dialog-hidden.md
-  if (!suggestion && !showFeedbackDialog) return null
+  const [showCancelEventConfirm, setShowCancelEventConfirm] = useState(false)
 
   const Icon = suggestion ? categoryIcons[suggestion.category] : Coffee
   const colors = suggestion ? categoryColors[suggestion.category] : categoryColors.break
@@ -136,6 +141,27 @@ export function SuggestionDetailDialog({
       setCompletingSuggestion(null)
     }
   }
+
+  useEffect(() => {
+    if (!open) {
+      setShowCancelEventConfirm(false)
+    }
+  }, [open])
+
+  const handleRequestCancelEvent = () => {
+    setShowCancelEventConfirm(true)
+  }
+
+  const handleConfirmCancelEvent = () => {
+    if (!suggestion) return
+    onDismiss?.(suggestion)
+  }
+
+  // IMPORTANT: Don't early-return on `!suggestion` while the feedback dialog is open.
+  // The parent clears `suggestion` to close the detail dialog, but we still need to
+  // render the feedback dialog immediately (otherwise it appears only after a second click).
+  // Pattern doc: docs/error-patterns/suggestion-complete-feedback-dialog-hidden.md
+  if (!suggestion && !showFeedbackDialog) return null
 
   return (
   <>
@@ -336,13 +362,12 @@ export function SuggestionDetailDialog({
           {isScheduled && (
             <>
               <Button
-                variant="outline"
+                variant="destructive"
                 size="sm"
-                onClick={() => onDismiss?.(suggestion)}
-                className="text-muted-foreground"
+                onClick={handleRequestCancelEvent}
               >
                 <X className="h-4 w-4 mr-2" />
-                Cancel
+                Cancel Event
               </Button>
               <Button
                 size="sm"
@@ -368,6 +393,26 @@ export function SuggestionDetailDialog({
         </DialogContent>
       </Dialog>
     ) : null}
+
+    <AlertDialog open={showCancelEventConfirm} onOpenChange={setShowCancelEventConfirm}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cancel this event?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will remove the scheduled activity from your calendar timeline.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep Event</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirmCancelEvent}
+            className="bg-destructive text-white hover:bg-destructive/92"
+          >
+            Yes, cancel event
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
 
     {/* Effectiveness Feedback Dialog - shown after user clicks "Mark Complete" */}
     <EffectivenessFeedbackDialog

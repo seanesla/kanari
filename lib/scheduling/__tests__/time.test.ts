@@ -6,6 +6,10 @@ describe("scheduling/time", () => {
     expect(extractExplicitTimeFromText("Schedule at 9:30PM")).toEqual({ hour: 21, minute: 30 })
   })
 
+  it("does not treat leading-zero minutes as a second standalone time", () => {
+    expect(extractExplicitTimeFromText("Schedule at 9:07 PM")).toEqual({ hour: 21, minute: 7 })
+  })
+
   it("handles speech-to-text variants and punctuation", () => {
     expect(extractExplicitTimeFromText("Let's meet at 9.30 p.m.")).toEqual({ hour: 21, minute: 30 })
     expect(extractExplicitTimeFromText("Let's meet at 9 30 pm")).toEqual({ hour: 21, minute: 30 })

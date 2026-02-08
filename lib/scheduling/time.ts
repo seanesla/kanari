@@ -65,6 +65,13 @@ export function extractExplicitTimeFromText(text: string): ParsedTime | null {
 
   // e.g. "9pm", "9 pm", "9 p.m."
   for (const match of input.matchAll(/\b(1[0-2]|0?[1-9])\s*(a\.?m|p\.?m)\b/g)) {
+    // Avoid matching minute fragments from HH:MM strings (e.g. "9:07 PM" -> "07 PM").
+    // Pattern doc: docs/error-patterns/schedule-activity-leading-zero-minute-time-parse.md
+    if ((match.index ?? 0) > 0) {
+      const previousChar = input[(match.index ?? 0) - 1]
+      if (previousChar === ":" || previousChar === ".") continue
+    }
+
     const hour12 = Number(match[1])
     const meridiem = match[2]?.startsWith("p") ? "pm" : "am"
     push({ hour: to24Hour(hour12, meridiem), minute: 0 })

@@ -56,9 +56,24 @@ const GENERIC_ACTIVITY_TITLES = new Set([
   "self-care activity",
 ])
 
+const CHECK_IN_ACTIVITY_TITLES = new Set([
+  "check-in",
+  "check in",
+  "checkin",
+])
+
 function isGenericActivityTitle(title: string): boolean {
   const normalized = title.trim().toLowerCase()
   return GENERIC_ACTIVITY_TITLES.has(normalized)
+}
+
+function isCheckInActivityTitle(title: string): boolean {
+  const normalized = title.trim().toLowerCase()
+  return CHECK_IN_ACTIVITY_TITLES.has(normalized)
+}
+
+function userRequestedCheckIn(text: string): boolean {
+  return /\bcheck[\s-]?in\b/i.test(text)
 }
 
 export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckInWidgetsResult {
@@ -474,13 +489,19 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         const lastUserMessage = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? ""
         const explicitDurationMinutes = extractDurationMinutesFromText(lastUserMessage)
         const inferredUserTitle = inferScheduleTitle(lastUserMessage)
+        const userAskedForCheckIn = userRequestedCheckIn(lastUserMessage)
 
         // Pattern doc: docs/error-patterns/schedule-activity-generic-title-duration-drift.md
-        const resolvedTitle =
-          (isGenericActivityTitle(event.args.title) || !event.args.title.trim())
-          && inferredUserTitle !== "Scheduled activity"
-            ? inferredUserTitle
-            : event.args.title
+        // Pattern doc: docs/error-patterns/schedule-activity-title-duration-override-miss.md
+        const shouldPreferUserTitle =
+          inferredUserTitle !== "Scheduled activity"
+          && (
+            isGenericActivityTitle(event.args.title)
+            || !event.args.title.trim()
+            || (isCheckInActivityTitle(event.args.title) && !userAskedForCheckIn)
+          )
+
+        const resolvedTitle = shouldPreferUserTitle ? inferredUserTitle : event.args.title
 
         const userTime = extractExplicitTimeFromText(lastUserMessage)
         const normalizedToolTime = normalizeTimeToHHMM(event.args.time)

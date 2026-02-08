@@ -373,6 +373,50 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     expect(widget.args.duration).toBe(30)
   })
 
+  it("replaces mismatched check-in titles and preserves long spoken durations", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+      result.current[1].sendTextMessage(
+        "Please schedule watching the Super Bowl with my dad on 2025-02-09 at 9:07 PM for five hours."
+      )
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Check-in",
+          category: "social",
+          date: "2025-02-09",
+          time: "21:07",
+          duration: 30,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+    })
+
+    const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as
+      | { content?: string; duration?: number; scheduledFor?: string }
+      | undefined
+    expect(scheduledSuggestion?.content?.toLowerCase()).toContain("super bowl")
+    expect(scheduledSuggestion?.duration).toBe(300)
+
+    const scheduledAt = Temporal.Instant.from(scheduledSuggestion!.scheduledFor!).toZonedDateTimeISO("UTC")
+    expect(scheduledAt.hour).toBe(21)
+    expect(scheduledAt.minute).toBe(7)
+
+    const widget = result.current[0].widgets[0]
+    expect(widget?.type).toBe("schedule_activity")
+    if (!widget || widget.type !== "schedule_activity") return
+    expect(widget.args.title.toLowerCase()).toContain("super bowl")
+    expect(widget.args.duration).toBe(300)
+  })
+
   it("does not add a duplicate schedule confirmation if the assistant already confirmed", async () => {
     const { result } = renderHook(() => useCheckIn())
 
@@ -554,6 +598,50 @@ describe("useCheckIn schedule_activity calendar sync", () => {
 
       const confirmation = result.current[0].messages.find((m) => m.role === "assistant" && /scheduled/i.test(m.content))
       expect(confirmation?.content.toLowerCase()).toContain("cooking chicken noodle soup")
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("auto-schedules long spoken durations in fallback mode", async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date("2026-01-09T20:00:00Z"))
+
+      const { result } = renderHook(() => useCheckIn())
+
+      act(() => {
+        geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+        result.current[1].sendTextMessage(
+          "Please schedule an activity for watching the Super Bowl with my dad today at 9:07 PM for five hours."
+        )
+      })
+
+      await act(async () => {
+        // Let effects run so the fallback timer is registered.
+        await Promise.resolve()
+      })
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500) // Wait past the fallback window (1200ms)
+      })
+
+      await act(async () => {
+        // Flush the async persistence path.
+        await Promise.resolve()
+      })
+
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+
+      const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as
+        | { content?: string; duration?: number; scheduledFor?: string }
+        | undefined
+      expect(scheduledSuggestion?.content?.toLowerCase()).toContain("super bowl")
+      expect(scheduledSuggestion?.duration).toBe(300)
+
+      const scheduledAt = Temporal.Instant.from(scheduledSuggestion!.scheduledFor!).toZonedDateTimeISO("UTC")
+      expect(scheduledAt.hour).toBe(21)
+      expect(scheduledAt.minute).toBe(7)
     } finally {
       vi.useRealTimers()
     }
