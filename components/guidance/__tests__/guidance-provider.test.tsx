@@ -15,9 +15,13 @@ let mockPathname = "/overview"
 let mockUseLiveQueryReturn: unknown = undefined
 let mockIsDemoWorkspace = false
 const mockPatchSettings = vi.fn()
+const mockRouterPush = vi.fn()
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mockPathname,
+  useRouter: () => ({
+    push: mockRouterPush,
+  }),
 }))
 
 vi.mock("dexie-react-hooks", () => ({
@@ -47,11 +51,12 @@ vi.mock("@/lib/workspace", () => ({
 function GuidanceConsumer() {
   const ctx = useGuidance()
   return (
-    <div>
+    <div data-guidance-allow>
       <span data-testid="active-guide">{ctx.activeGuide ?? "none"}</span>
       <span data-testid="step-index">{ctx.currentStepIndex}</span>
       <span data-testid="total-steps">{ctx.totalSteps}</span>
       <span data-testid="step-title">{ctx.currentStep?.title ?? "none"}</span>
+      <span data-testid="skipped-steps">{ctx.skippedStepIds.join(",")}</span>
       <button data-testid="next" onClick={ctx.next}>Next</button>
       <button data-testid="prev" onClick={ctx.prev}>Prev</button>
       <button data-testid="skip" onClick={ctx.skip}>Skip</button>
@@ -59,6 +64,21 @@ function GuidanceConsumer() {
       <button data-testid="start-demo" onClick={() => ctx.startGuide("demo")}>Start Demo</button>
     </div>
   )
+}
+
+function seedDemoStepTargets() {
+  const ids = [
+    "demo-metrics-header",
+    "demo-suggestions-kanban",
+    "demo-burnout-prediction",
+    "demo-new-checkin-button",
+  ]
+
+  for (const id of ids) {
+    const el = document.createElement("div")
+    el.setAttribute("data-demo-id", id)
+    document.body.appendChild(el)
+  }
 }
 
 function renderWithProvider() {
@@ -78,6 +98,8 @@ beforeEach(() => {
   mockUseLiveQueryReturn = undefined
   mockIsDemoWorkspace = false
   mockPatchSettings.mockReset()
+  mockRouterPush.mockReset()
+  window.localStorage.clear()
 })
 
 describe("GuidanceProvider", () => {
@@ -146,9 +168,125 @@ describe("GuidanceProvider", () => {
       expect(screen.getByTestId("active-guide").textContent).toBe("demo")
       expect(screen.getByTestId("step-title").textContent).toBe(DEMO_STEPS[0].title)
     })
+
+    it("resumes demo guide from saved progress", () => {
+      window.localStorage.setItem(
+        "kanari_demo_guide_progress_v1",
+        JSON.stringify({
+          version: 1,
+          stepIndex: 2,
+          skippedStepIds: ["demo-metrics"],
+        })
+      )
+
+      mockUseLiveQueryReturn = {
+        hasCompletedOnboarding: true,
+        hasCompletedFirstTimeGuide: false,
+      }
+      mockIsDemoWorkspace = true
+      mockPathname = "/overview"
+
+      renderWithProvider()
+
+      expect(screen.getByTestId("active-guide").textContent).toBe("demo")
+      expect(screen.getByTestId("step-index").textContent).toBe("2")
+    })
+
+    it("auto-navigates to step route when demo step requires another page", () => {
+      seedDemoStepTargets()
+
+      mockUseLiveQueryReturn = {
+        hasCompletedOnboarding: true,
+        hasCompletedFirstTimeGuide: false,
+      }
+      mockIsDemoWorkspace = true
+      mockPathname = "/overview"
+
+      renderWithProvider()
+
+      const checkInStepIndex = DEMO_STEPS.findIndex((s) => s.id === "demo-checkins")
+      expect(checkInStepIndex).toBeGreaterThan(0)
+
+      for (let i = 0; i < checkInStepIndex; i++) {
+        act(() => {
+          screen.getByTestId("next").click()
+        })
+      }
+
+      expect(mockRouterPush).toHaveBeenCalledWith("/check-ins")
+    })
+
+    it("blocks next on required-action demo step until completion target exists", async () => {
+      seedDemoStepTargets()
+
+      mockUseLiveQueryReturn = {
+        hasCompletedOnboarding: true,
+        hasCompletedFirstTimeGuide: false,
+      }
+      mockIsDemoWorkspace = true
+      mockPathname = "/overview"
+
+      renderWithProvider()
+
+      const checkInStepIndex = DEMO_STEPS.findIndex((s) => s.id === "demo-checkins")
+      expect(checkInStepIndex).toBeGreaterThan(0)
+
+      for (let i = 0; i < checkInStepIndex; i++) {
+        act(() => {
+          screen.getByTestId("next").click()
+        })
+      }
+
+      expect(screen.getByTestId("step-title").textContent).toBe(
+        DEMO_STEPS[checkInStepIndex]?.title
+      )
+
+      // Should stay on this step until the required target appears.
+      act(() => {
+        screen.getByTestId("next").click()
+      })
+      expect(screen.getByTestId("step-index").textContent).toBe(String(checkInStepIndex))
+
+      // Simulate opening the New Check-in view.
+      const openedView = document.createElement("div")
+      openedView.setAttribute("data-demo-id", "demo-new-checkin-view")
+      openedView.style.width = "100px"
+      openedView.style.height = "100px"
+      document.body.appendChild(openedView)
+
+      await act(async () => {
+        await Promise.resolve()
+      })
+
+      act(() => {
+        screen.getByTestId("next").click()
+      })
+      expect(screen.getByTestId("step-index").textContent).toBe(String(checkInStepIndex + 1))
+    })
   })
 
   describe("navigation", () => {
+    it("does not force route navigation for first-time guide", () => {
+      mockUseLiveQueryReturn = {
+        hasCompletedOnboarding: true,
+        hasCompletedFirstTimeGuide: true,
+      }
+      mockIsDemoWorkspace = false
+      mockPathname = "/settings"
+
+      renderWithProvider()
+
+      act(() => {
+        screen.getByTestId("start-ft").click()
+      })
+
+      act(() => {
+        screen.getByTestId("next").click()
+      })
+
+      expect(mockRouterPush).not.toHaveBeenCalled()
+    })
+
     it("next() advances through steps", () => {
       mockUseLiveQueryReturn = {
         hasCompletedOnboarding: true,
@@ -253,7 +391,7 @@ describe("GuidanceProvider", () => {
       )
     })
 
-    it("skip() closes demo guide without persisting to settings", async () => {
+    it("skip() advances demo guide without persisting to settings", async () => {
       mockUseLiveQueryReturn = {
         hasCompletedOnboarding: true,
       }
@@ -262,12 +400,15 @@ describe("GuidanceProvider", () => {
       renderWithProvider()
 
       expect(screen.getByTestId("active-guide").textContent).toBe("demo")
+      expect(screen.getByTestId("step-index").textContent).toBe("0")
 
       await act(async () => {
         screen.getByTestId("skip").click()
       })
 
-      expect(screen.getByTestId("active-guide").textContent).toBe("none")
+      expect(screen.getByTestId("active-guide").textContent).toBe("demo")
+      expect(screen.getByTestId("step-index").textContent).toBe("1")
+      expect(screen.getByTestId("skipped-steps").textContent).toContain("demo-intro")
       // patchSettings should NOT be called for demo guide
       expect(mockPatchSettings).not.toHaveBeenCalled()
     })

@@ -4,8 +4,14 @@ export interface GuidanceStep {
   id: string
   title: string
   message: string
-  /** Optional route the user should be on (no auto-navigation, just context) */
+  /** Optional route the user should be on */
   route?: string
+  /** Optional demo target element (data-demo-id) for spotlight + anchored card */
+  target?: string
+  /** Optional required element (data-demo-id) that must exist before Next is enabled */
+  completionTarget?: string
+  /** Optional auto-open behavior for responsive UI */
+  autoOpen?: "checkins-mobile-sidebar"
 }
 
 // ---------------------------------------------------------------------------
@@ -55,6 +61,7 @@ export const DEMO_STEPS: GuidanceStep[] = [
     message:
       "You're exploring Kanari with sample data. Everything here is pre-generated so you can see how the app works without doing a real check-in.",
     route: "/overview",
+    target: "demo-metrics-header",
   },
   {
     id: "demo-metrics",
@@ -62,6 +69,7 @@ export const DEMO_STEPS: GuidanceStep[] = [
     message:
       "These cards show stress, energy, and mood scores from past check-ins. In your real workspace, they'll reflect your actual voice biomarkers.",
     route: "/overview",
+    target: "demo-metrics-header",
   },
   {
     id: "demo-suggestions",
@@ -69,19 +77,33 @@ export const DEMO_STEPS: GuidanceStep[] = [
     message:
       "The kanban board organizes recovery suggestions by status. Drag cards between columns or schedule them to your calendar.",
     route: "/overview",
+    target: "demo-suggestions-kanban",
+  },
+  {
+    id: "demo-forecast",
+    title: "Forecast Trends",
+    message:
+      "Kanari can show a 3-7 day burnout forecast from recent voice trends. We'll switch to Trends for this step automatically.",
+    route: "/overview?view=trends",
+    target: "demo-burnout-prediction",
   },
   {
     id: "demo-checkins",
-    title: "Check-in History",
+    title: "Start a Check-in",
     message:
-      "Visit the Check-ins page to see past sessions, journal entries, and detailed biomarker breakdowns for each conversation.",
+      "Use New Check-in to open the live check-in view. You'll move forward once that view is open.",
     route: "/check-ins",
+    target: "demo-new-checkin-button",
+    completionTarget: "demo-new-checkin-view",
+    autoOpen: "checkins-mobile-sidebar",
   },
   {
     id: "demo-done",
     title: "Ready to try it for real?",
     message:
       "Switch back to your real workspace from Settings whenever you want to start tracking your own burnout risk.",
+    route: "/overview",
+    target: "demo-metrics-header",
   },
 ]
 

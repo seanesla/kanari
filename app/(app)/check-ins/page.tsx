@@ -220,7 +220,7 @@ function NewCheckInContent({
   autoStart?: boolean
 }) {
   return (
-    <div className="flex flex-col h-full p-3 md:p-4">
+    <div data-demo-id="demo-new-checkin-view" className="flex flex-col h-full p-3 md:p-4">
       <Deck tone="raised" className={cn("flex flex-col h-full rounded-2xl overflow-hidden")}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-border/60">
