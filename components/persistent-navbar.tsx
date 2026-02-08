@@ -11,7 +11,18 @@ import { LiquidGlassNavbar } from "@/components/liquid-glass-navbar"
 import { Logo } from "@/components/logo"
 import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { isDemoWorkspace, setWorkspace } from "@/lib/workspace"
+import { hardReload } from "@/lib/navigation/hard-reload"
 
 // Link configurations for each mode
 const landingLinks = [
@@ -176,37 +187,60 @@ function LandingNavLinks() {
 
 function DemoModeIndicator({ compact }: { compact?: boolean }) {
   const [isDemo, setIsDemo] = useState(false)
+  const [showExitWarning, setShowExitWarning] = useState(false)
 
   useEffect(() => {
     setIsDemo(isDemoWorkspace())
   }, [])
 
-  const exitDemo = useCallback(() => {
+  const confirmExitDemo = useCallback(() => {
     setWorkspace("real")
-    window.location.reload()
+    hardReload()
+  }, [])
+
+  const requestExitDemo = useCallback(() => {
+    // See: docs/error-patterns/demo-mode-exit-button-without-confirmation.md
+    setShowExitWarning(true)
   }, [])
 
   if (!isDemo) return null
 
   return (
-    <div className={cn("flex items-center gap-2", compact && "gap-1")} aria-label="Demo Mode">
-      <Badge
-        variant="secondary"
-        className={cn("bg-muted/20 text-muted-foreground", compact && "px-1.5")}
-      >
-        Demo Mode
-      </Badge>
-      <button
-        type="button"
-        onClick={exitDemo}
-        className={cn(
-          "text-xs text-muted-foreground hover:text-foreground transition-colors",
-          compact && "text-[11px]"
-        )}
-      >
-        Exit
-      </button>
-    </div>
+    <>
+      <div className={cn("flex items-center gap-2", compact && "gap-1")} aria-label="Demo Mode">
+        <Badge
+          variant="secondary"
+          className={cn("bg-muted/20 text-muted-foreground", compact && "px-1.5")}
+        >
+          Demo Mode
+        </Badge>
+        <button
+          type="button"
+          onClick={requestExitDemo}
+          className={cn(
+            "text-xs text-muted-foreground hover:text-foreground transition-colors",
+            compact && "text-[11px]"
+          )}
+        >
+          Exit
+        </button>
+      </div>
+
+      <AlertDialog open={showExitWarning} onOpenChange={setShowExitWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Exit Demo Mode?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Exiting demo mode restores your real workspace and resets demo data. Continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmExitDemo}>Exit Demo</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 
