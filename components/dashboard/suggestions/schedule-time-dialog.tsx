@@ -22,7 +22,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import type { Suggestion, SuggestionCategory } from "@/lib/types"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import type { RecurringMutationScope, Suggestion, SuggestionCategory } from "@/lib/types"
 
 type DatePickerInstance = ReturnType<typeof createDatePicker> & {
   destroy?: () => void
@@ -72,7 +73,8 @@ interface ScheduleTimeDialogProps {
   suggestion: Suggestion | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSchedule: (suggestion: Suggestion, scheduledFor: string) => void
+  onSchedule: (suggestion: Suggestion, scheduledFor: string, scope?: RecurringMutationScope) => void
+  allSuggestions?: Suggestion[]
   /** Pre-fill date when dropping from calendar */
   defaultDateISO?: string
   /** Pre-fill hour when dropping from calendar */
@@ -86,6 +88,7 @@ export function ScheduleTimeDialog({
   open,
   onOpenChange,
   onSchedule,
+  allSuggestions = [],
   defaultDateISO,
   defaultHour,
   defaultMinute,
@@ -94,8 +97,23 @@ export function ScheduleTimeDialog({
   const [selectedDateISO, setSelectedDateISO] = useState<string | undefined>(undefined)
   const [selectedHour, setSelectedHour] = useState<string>("9")
   const [selectedMinute, setSelectedMinute] = useState<string>("0")
+  const [selectedScope, setSelectedScope] = useState<RecurringMutationScope>("single")
   const datePickerRef = useRef<HTMLDivElement>(null)
   const datePickerInstanceRef = useRef<DatePickerInstance | null>(null)
+
+  const seriesSuggestions = suggestion?.seriesId
+    ? allSuggestions.filter((candidate) => candidate.seriesId === suggestion.seriesId)
+    : []
+  const hasRecurringSeries = suggestion != null && seriesSuggestions.length > 1
+  const futureSeriesOccurrences = hasRecurringSeries && suggestion?.scheduledFor
+    ? seriesSuggestions.filter((candidate) => {
+        if (candidate.id === suggestion.id) return false
+        if (candidate.status === "dismissed") return false
+        if (!candidate.scheduledFor) return false
+        return new Date(candidate.scheduledFor).getTime() > new Date(suggestion.scheduledFor!).getTime()
+      }).length
+    : 0
+  const canApplyFuture = futureSeriesOccurrences > 0
 
   // Initialize defaults when `open` is controlled by the parent.
   // Radix Dialog's `onOpenChange` won't run on programmatic opens, so we must
@@ -104,6 +122,7 @@ export function ScheduleTimeDialog({
   // See: docs/error-patterns/controlled-dialog-state-init.md
   useEffect(() => {
     if (!open || !suggestion) return
+    setSelectedScope("single")
 
     // Use defaults if provided (from calendar drop), otherwise calculate.
     if (defaultDateISO !== undefined) {
@@ -201,13 +220,14 @@ export function ScheduleTimeDialog({
       minute: parseInt(selectedMinute, 10),
     })
 
-    onSchedule(suggestion, scheduled.toInstant().toString())
+    onSchedule(suggestion, scheduled.toInstant().toString(), selectedScope)
   }
 
   if (!suggestion) return null
 
   const Icon = categoryIcons[suggestion.category]
   const colors = categoryColors[suggestion.category]
+  const isReschedule = suggestion.status === "scheduled"
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -285,6 +305,45 @@ export function ScheduleTimeDialog({
           <span>Duration: {suggestion.duration} minutes</span>
         </div>
 
+        {hasRecurringSeries ? (
+          <div className="space-y-2 py-2 border-t border-border/50">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Apply to</p>
+            <RadioGroup
+              value={selectedScope}
+              onValueChange={(value) => setSelectedScope(value as RecurringMutationScope)}
+              className="gap-2"
+            >
+              <label className="flex items-start gap-2 rounded-md border border-border/60 p-2 cursor-pointer">
+                <RadioGroupItem value="single" id="reschedule-scope-single" className="mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">This event only</p>
+                  <p className="text-xs text-muted-foreground">Update only this occurrence.</p>
+                </div>
+              </label>
+
+              {canApplyFuture ? (
+                <label className="flex items-start gap-2 rounded-md border border-border/60 p-2 cursor-pointer">
+                  <RadioGroupItem value="future" id="reschedule-scope-future" className="mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium">This and future</p>
+                    <p className="text-xs text-muted-foreground">
+                      Update this occurrence and {futureSeriesOccurrences} upcoming one{futureSeriesOccurrences === 1 ? "" : "s"}.
+                    </p>
+                  </div>
+                </label>
+              ) : null}
+
+              <label className="flex items-start gap-2 rounded-md border border-border/60 p-2 cursor-pointer">
+                <RadioGroupItem value="all" id="reschedule-scope-all" className="mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Entire series</p>
+                  <p className="text-xs text-muted-foreground">Shift every remaining occurrence in this series.</p>
+                </div>
+              </label>
+            </RadioGroup>
+          </div>
+        ) : null}
+
         {/* Validation message */}
         {selectedDateISO && !isValidTime && (
           <p className="text-xs text-destructive">
@@ -307,7 +366,7 @@ export function ScheduleTimeDialog({
             className="bg-accent text-accent-foreground hover:bg-accent/90"
           >
             <CalendarPlus className="h-4 w-4 mr-2" />
-            Schedule
+            {isReschedule ? "Reschedule" : "Schedule"}
           </Button>
         </DialogFooter>
       </DialogContent>

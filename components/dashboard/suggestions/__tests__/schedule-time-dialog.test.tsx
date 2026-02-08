@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent } from "@testing-library/react"
 import type { Suggestion } from "@/lib/types"
 
-const createDatePickerMock = vi.fn(() => ({
+const createDatePickerMock = vi.fn((_config?: unknown) => ({
   render: vi.fn(),
   destroy: vi.fn(),
 }))
@@ -106,5 +106,59 @@ describe("ScheduleTimeDialog", () => {
     expect(onSchedule).toHaveBeenCalledTimes(1)
     expect(onSchedule.mock.calls[0]?.[0]).toMatchObject({ id: "s2" })
     expect(onSchedule.mock.calls[0]?.[1]).toBe("2026-01-20T14:15:00Z")
+  })
+
+  it("passes recurring scope when rescheduling a series occurrence", async () => {
+    const { ScheduleTimeDialog } = await import("../schedule-time-dialog")
+
+    const suggestion: Suggestion = {
+      id: "s-series-2",
+      content: "Evening wind-down",
+      rationale: "rationale",
+      duration: 20,
+      category: "mindfulness",
+      status: "scheduled",
+      createdAt: "2026-01-16T00:00:00.000Z",
+      scheduledFor: "2026-01-20T20:00:00Z",
+      seriesId: "series-1",
+      occurrenceDate: "2026-01-20",
+      occurrenceIndex: 1,
+    }
+
+    const allSuggestions: Suggestion[] = [
+      {
+        ...suggestion,
+        id: "s-series-1",
+        occurrenceDate: "2026-01-19",
+        occurrenceIndex: 0,
+        scheduledFor: "2026-01-19T20:00:00Z",
+      },
+      suggestion,
+      {
+        ...suggestion,
+        id: "s-series-3",
+        occurrenceDate: "2026-01-21",
+        occurrenceIndex: 2,
+        scheduledFor: "2026-01-21T20:00:00Z",
+      },
+    ]
+
+    const onSchedule = vi.fn()
+
+    render(
+      <ScheduleTimeDialog
+        suggestion={suggestion}
+        open={true}
+        onOpenChange={vi.fn()}
+        onSchedule={onSchedule}
+        allSuggestions={allSuggestions}
+      />
+    )
+
+    fireEvent.click(screen.getByText("Entire series"))
+    fireEvent.click(screen.getByRole("button", { name: "Reschedule" }))
+
+    expect(onSchedule).toHaveBeenCalledTimes(1)
+    expect(onSchedule.mock.calls[0]?.[2]).toBe("all")
   })
 })

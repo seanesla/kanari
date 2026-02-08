@@ -227,6 +227,28 @@ export interface GroundingMetadata {
 export type SuggestionStatus = "pending" | "accepted" | "dismissed" | "scheduled" | "completed"
 export type SuggestionCategory = "break" | "exercise" | "mindfulness" | "social" | "rest"
 export type KanbanColumn = "pending" | "scheduled" | "completed"
+export type RecurringSeriesStatus = "active" | "cancelled"
+export type RecurringMutationScope = "single" | "future" | "all"
+
+export interface RecurringSeries {
+  id: string
+  title: string
+  category: SuggestionCategory
+  duration: number
+  timeZone: string
+  recurrence: {
+    startDate: string
+    time: string
+    frequency: RecurrenceFrequency
+    weekdays?: RecurrenceWeekday[]
+    count?: number
+    untilDate?: string
+  }
+  status: RecurringSeriesStatus
+  createdAt: string
+  updatedAt?: string
+  cancelledAt?: string
+}
 
 /**
  * Effectiveness rating for completed suggestions
@@ -331,6 +353,12 @@ export interface Suggestion {
   recordingId?: string // Links to the recording that generated this suggestion (optional for global suggestions)
   /** Links a suggestion back to a specific check-in session (post-check-in synthesis, AI chat tools, etc.) */
   checkInSessionId?: string
+  /** Optional recurring-series linkage for one occurrence in a series */
+  seriesId?: string
+  /** Local date in series timezone for recurrence-aware operations (YYYY-MM-DD) */
+  occurrenceDate?: string
+  /** 0-based index of the generated recurrence occurrence */
+  occurrenceIndex?: number
   content: string
   rationale: string
   /**
@@ -402,6 +430,8 @@ export interface CalendarEvent {
 export interface RecoveryBlock {
   id: string
   suggestionId: string
+  seriesId?: string
+  occurrenceDate?: string
   calendarEventId: string
   scheduledAt: string
   duration: number // minutes
@@ -847,6 +877,28 @@ export interface ScheduleRecurringActivityToolArgs {
   count?: number
   /** Inclusive end date for the recurrence (YYYY-MM-DD) */
   untilDate?: string
+}
+
+export interface EditRecurringActivityToolArgs {
+  title: string
+  category?: SuggestionCategory
+  scope: RecurringMutationScope
+  /** Required for single/future scope. YYYY-MM-DD in the series timezone. */
+  fromDate?: string
+  /** Optional updated date (YYYY-MM-DD) for the anchor occurrence. */
+  newDate?: string
+  /** Optional updated time (HH:MM 24h or parseable AM/PM) for the anchor occurrence. */
+  newTime?: string
+  /** Optional updated duration (minutes). */
+  duration?: number
+}
+
+export interface CancelRecurringActivityToolArgs {
+  title: string
+  category?: SuggestionCategory
+  scope: RecurringMutationScope
+  /** Required for single/future scope. YYYY-MM-DD in the series timezone. */
+  fromDate?: string
 }
 
 export type BreathingExerciseType = "box" | "478" | "relaxing"

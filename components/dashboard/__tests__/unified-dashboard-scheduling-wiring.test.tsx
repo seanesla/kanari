@@ -219,7 +219,8 @@ describe("UnifiedDashboard scheduling wiring", () => {
       ;(lastSuggestionDetailProps?.onAccept as undefined | ((s: Suggestion) => void))?.(scheduleDialogSuggestion)
       expect(handleScheduleConfirm).toHaveBeenCalledWith(
         scheduleDialogSuggestion,
-        "2026-02-01T12:34:56.000Z"
+        "2026-02-01T12:34:56.000Z",
+        "single"
       )
     } finally {
       vi.useRealTimers()

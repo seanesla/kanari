@@ -105,6 +105,86 @@ export const SCHEDULE_RECURRING_ACTIVITY_TOOL = {
 }
 
 /**
+ * Tool declaration for editing existing recurring series occurrences.
+ */
+export const EDIT_RECURRING_ACTIVITY_TOOL = {
+  functionDeclarations: [{
+    name: "edit_recurring_activity",
+    description: "Update an existing recurring series by title. Supports updating one occurrence, this-and-future occurrences, or the entire series. Use this when the user asks to move, reschedule, or change duration for recurring events.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        title: {
+          type: Type.STRING,
+          description: "Series title to update (match how the user refers to it)."
+        },
+        category: {
+          type: Type.STRING,
+          enum: ["break", "exercise", "mindfulness", "social", "rest"],
+          description: "Optional category disambiguation when title may be ambiguous"
+        },
+        scope: {
+          type: Type.STRING,
+          enum: ["single", "future", "all"],
+          description: "single = one occurrence, future = this and upcoming, all = entire series"
+        },
+        fromDate: {
+          type: Type.STRING,
+          description: "Required for single/future scope. Anchor occurrence date in YYYY-MM-DD (series local date)."
+        },
+        newDate: {
+          type: Type.STRING,
+          description: "Optional new date (YYYY-MM-DD) for the anchor occurrence."
+        },
+        newTime: {
+          type: Type.STRING,
+          description: "Optional new time (HH:MM 24h; parseable AM/PM allowed)."
+        },
+        duration: {
+          type: Type.INTEGER,
+          description: "Optional updated duration in minutes."
+        },
+      },
+      required: ["title", "scope"],
+    },
+  }],
+}
+
+/**
+ * Tool declaration for cancelling recurring series occurrences.
+ */
+export const CANCEL_RECURRING_ACTIVITY_TOOL = {
+  functionDeclarations: [{
+    name: "cancel_recurring_activity",
+    description: "Cancel an existing recurring series by title. Supports cancelling one occurrence, this-and-future occurrences, or the entire series.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        title: {
+          type: Type.STRING,
+          description: "Series title to cancel (match how the user refers to it)."
+        },
+        category: {
+          type: Type.STRING,
+          enum: ["break", "exercise", "mindfulness", "social", "rest"],
+          description: "Optional category disambiguation when title may be ambiguous"
+        },
+        scope: {
+          type: Type.STRING,
+          enum: ["single", "future", "all"],
+          description: "single = one occurrence, future = this and upcoming, all = entire series"
+        },
+        fromDate: {
+          type: Type.STRING,
+          description: "Required for single/future scope. Anchor occurrence date in YYYY-MM-DD (series local date)."
+        },
+      },
+      required: ["title", "scope"],
+    },
+  }],
+}
+
+/**
  * Tool declaration for recording a user commitment for later follow-up.
  */
 export const RECORD_COMMITMENT_TOOL = {
@@ -259,6 +339,8 @@ export const GET_JOURNAL_ENTRIES_TOOL = {
 export const GEMINI_TOOLS = [
   SCHEDULE_ACTIVITY_TOOL,
   SCHEDULE_RECURRING_ACTIVITY_TOOL,
+  EDIT_RECURRING_ACTIVITY_TOOL,
+  CANCEL_RECURRING_ACTIVITY_TOOL,
   RECORD_COMMITMENT_TOOL,
   SHOW_BREATHING_EXERCISE_TOOL,
   SHOW_STRESS_GAUGE_TOOL,
@@ -373,36 +455,49 @@ AVAILABLE TOOLS:
    - After calling schedule_activity, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
 
 2) schedule_recurring_activity({ title, category, startDate, time, duration, frequency, weekdays, count, untilDate })
-   - Use when the user asks for repeated scheduling in one action (e.g., "every weekday", "every Monday and Wednesday", "daily for 2 weeks")
-   - Keep title/time/duration faithful to the user's request
-   - frequency options:
+    - Use when the user asks for repeated scheduling in one action (e.g., "every weekday", "every Monday and Wednesday", "daily for 2 weeks")
+    - Keep title/time/duration faithful to the user's request
+    - frequency options:
      * daily
      * weekdays
      * weekly (same weekday as startDate)
      * custom_weekdays (requires weekdays array: mon/tue/wed/thu/fri/sat/sun)
-   - You MUST include a stop condition: count or untilDate
-   - If recurrence details are unclear, ask ONE clarifying question before calling
-   - After calling schedule_recurring_activity, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
+    - You MUST include a stop condition: count or untilDate
+    - If recurrence details are unclear, ask ONE clarifying question before calling
+    - After calling schedule_recurring_activity, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
 
-3) show_breathing_exercise({ type, duration })
-   - Use for calming and regulation (type: box | 478 | relaxing)
-   - duration is in seconds (e.g., 120)
+3) edit_recurring_activity({ title, category, scope, fromDate, newDate, newTime, duration })
+   - Use when the user asks to move or change an existing recurring plan (e.g., "move my weekday study plan to 9pm", "change my workout series to 45 minutes")
+   - scope must be one of: single, future, all
+   - For single/future scope, include fromDate (YYYY-MM-DD) for the occurrence to anchor from
+   - Provide at least one update field: newDate, newTime, and/or duration
+   - If the target series or scope is unclear, ask ONE clarifying question before calling
 
-4) show_stress_gauge({ stressLevel, fatigueLevel, message })
-   - Use to provide a quick visual check of stress/fatigue (0-100)
+4) cancel_recurring_activity({ title, category, scope, fromDate })
+   - Use when the user asks to cancel a recurring plan or specific occurrences
+   - scope must be one of: single, future, all
+   - For single/future scope, include fromDate (YYYY-MM-DD) for the occurrence to anchor from
+   - If the target series or scope is unclear, ask ONE clarifying question before calling
 
-5) show_quick_actions({ options: [{ label, action }] })
-   - Use to offer 2-6 simple next-step choices
-   - action should be a short phrase the user would say (so the app can send it when tapped)
+5) show_breathing_exercise({ type, duration })
+    - Use for calming and regulation (type: box | 478 | relaxing)
+    - duration is in seconds (e.g., 120)
 
-6) show_journal_prompt({ prompt, placeholder, category })
-   - Use when the user wants to journal or reflection would help
-   - Keep prompts supportive, concrete, and short
+6) show_stress_gauge({ stressLevel, fatigueLevel, message })
+    - Use to provide a quick visual check of stress/fatigue (0-100)
 
-7) get_journal_entries({ limit, offset })
-   - Use when the user asks what is in their journal or wants you to reference past entries
-   - Use offset to request older entries if needed (pagination)
-   - If the tool response says sharing is disabled, ask the user to enable "Share Journal With AI" in Settings
+7) show_quick_actions({ options: [{ label, action }] })
+    - Use to offer 2-6 simple next-step choices
+    - action should be a short phrase the user would say (so the app can send it when tapped)
+
+8) show_journal_prompt({ prompt, placeholder, category })
+    - Use when the user wants to journal or reflection would help
+    - Keep prompts supportive, concrete, and short
+
+9) get_journal_entries({ limit, offset })
+    - Use when the user asks what is in their journal or wants you to reference past entries
+    - Use offset to request older entries if needed (pagination)
+    - If the tool response says sharing is disabled, ask the user to enable "Share Journal With AI" in Settings
 
 ═══════════════════════════════════════════════════════════════════════════════
 CONVERSATIONAL MODE (Only use when NO silence triggers are present)

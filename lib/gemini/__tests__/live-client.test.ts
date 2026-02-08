@@ -413,6 +413,88 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
     })
   })
 
+  test("handles edit_recurring_activity tool calls", async () => {
+    await client.connect()
+
+    getClientInternals(client).handleMessage({
+      toolCall: {
+        functionCalls: [
+          {
+            id: "call_5",
+            name: "edit_recurring_activity",
+            args: {
+              title: "Study session",
+              scope: "future",
+              fromDate: "2026-02-10",
+              newTime: "9:30 PM",
+              duration: 50,
+            },
+          },
+        ],
+      },
+    })
+
+    expect(config.events.onWidget).toHaveBeenCalledWith({
+      widget: "edit_recurring_activity",
+      args: {
+        title: "Study session",
+        scope: "future",
+        fromDate: "2026-02-10",
+        newTime: "21:30",
+        duration: 50,
+      },
+    })
+
+    expect(mockSession.sendToolResponse).toHaveBeenCalledWith({
+      functionResponses: [
+        {
+          id: "call_5",
+          name: "edit_recurring_activity",
+          response: { acknowledged: true, shown: true },
+        },
+      ],
+    })
+  })
+
+  test("handles cancel_recurring_activity tool calls", async () => {
+    await client.connect()
+
+    getClientInternals(client).handleMessage({
+      toolCall: {
+        functionCalls: [
+          {
+            id: "call_6",
+            name: "cancel_recurring_activity",
+            args: {
+              title: "Study session",
+              scope: "single",
+              fromDate: "2026-02-10",
+            },
+          },
+        ],
+      },
+    })
+
+    expect(config.events.onWidget).toHaveBeenCalledWith({
+      widget: "cancel_recurring_activity",
+      args: {
+        title: "Study session",
+        scope: "single",
+        fromDate: "2026-02-10",
+      },
+    })
+
+    expect(mockSession.sendToolResponse).toHaveBeenCalledWith({
+      functionResponses: [
+        {
+          id: "call_6",
+          name: "cancel_recurring_activity",
+          response: { acknowledged: true, shown: true },
+        },
+      ],
+    })
+  })
+
   test("streams model text parts as transcript and routes thought parts to thinking", async () => {
     await client.connect()
 

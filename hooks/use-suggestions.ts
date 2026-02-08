@@ -7,6 +7,7 @@ import type {
   Suggestion,
   VoiceMetrics,
   TrendDirection,
+  RecurringMutationScope,
   SuggestionStatus,
   CheckInSession,
   AudioFeatures,
@@ -22,6 +23,10 @@ import { useSuggestionMemory } from "./use-suggestion-memory"
 import { predictBurnoutRisk, sessionsToTrendData } from "@/lib/ml/forecasting"
 import { createGeminiHeaders } from "@/lib/utils"
 import { useTimeZone } from "@/lib/timezone-context"
+import {
+  dismissSuggestionWithScope,
+  rescheduleSuggestionWithScope,
+} from "@/lib/scheduling/series-store"
 import {
   computeExpiredSuggestionIds,
   LAST_SUGGESTION_AUTOGEN_DATE_KEY,
@@ -70,8 +75,12 @@ interface UseSuggestionsResult {
   updateSuggestion: (id: string, status: SuggestionStatus) => Promise<boolean>
   // Kanban-specific actions
   moveSuggestion: (id: string, newStatus: SuggestionStatus, scheduledFor?: string) => Promise<boolean>
-  scheduleSuggestion: (id: string, scheduledFor: string) => Promise<boolean>
-  dismissSuggestion: (id: string) => Promise<boolean>
+  scheduleSuggestion: (
+    id: string,
+    scheduledFor: string,
+    options?: { scope?: RecurringMutationScope }
+  ) => Promise<boolean>
+  dismissSuggestion: (id: string, options?: { scope?: RecurringMutationScope }) => Promise<boolean>
   /**
    * Mark a suggestion as completed with optional effectiveness feedback.
    * @param id - The suggestion ID to complete
@@ -506,13 +515,17 @@ export function useSuggestions(): UseSuggestionsResult {
    * Schedule a suggestion for a specific time
    * Returns true on success, false on failure
    */
-  const scheduleSuggestion = useCallback(async (id: string, scheduledFor: string): Promise<boolean> => {
+  const scheduleSuggestion = useCallback(async (
+    id: string,
+    scheduledFor: string,
+    options?: { scope?: RecurringMutationScope }
+  ): Promise<boolean> => {
     try {
       setUpdateError(null)
-      await updateSuggestionInDB(id, {
-        status: "scheduled",
-        scheduledFor,
-        lastUpdatedAt: new Date().toISOString(),
+      await rescheduleSuggestionWithScope({
+        suggestionId: id,
+        newScheduledFor: scheduledFor,
+        scope: options?.scope,
       })
       return true
     } catch (err) {
@@ -521,18 +534,21 @@ export function useSuggestions(): UseSuggestionsResult {
       logError("Suggestions", "Error scheduling suggestion:", err)
       return false
     }
-  }, [updateSuggestionInDB])
+  }, [])
 
   /**
    * Dismiss a suggestion (marks as dismissed)
    * Returns true on success, false on failure
    */
-  const dismissSuggestion = useCallback(async (id: string): Promise<boolean> => {
+  const dismissSuggestion = useCallback(async (
+    id: string,
+    options?: { scope?: RecurringMutationScope }
+  ): Promise<boolean> => {
     try {
       setUpdateError(null)
-      await updateSuggestionInDB(id, {
-        status: "dismissed",
-        lastUpdatedAt: new Date().toISOString(),
+      await dismissSuggestionWithScope({
+        suggestionId: id,
+        scope: options?.scope,
       })
       return true
     } catch (err) {
@@ -541,7 +557,7 @@ export function useSuggestions(): UseSuggestionsResult {
       logError("Suggestions", "Error dismissing suggestion:", err)
       return false
     }
-  }, [updateSuggestionInDB])
+  }, [])
 
   /**
    * Mark a scheduled suggestion as completed with optional effectiveness feedback.

@@ -24,10 +24,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { formatScheduledTime } from "@/lib/date-utils"
 import { useTimeZone } from "@/lib/timezone-context"
 import { EffectivenessFeedbackDialog } from "./effectiveness-feedback-dialog"
-import type { Suggestion, SuggestionCategory, VoicePatterns, HistoricalContext, BurnoutPrediction, AudioFeatures, EffectivenessFeedback } from "@/lib/types"
+import type {
+  AudioFeatures,
+  BurnoutPrediction,
+  EffectivenessFeedback,
+  HistoricalContext,
+  RecurringMutationScope,
+  Suggestion,
+  SuggestionCategory,
+  VoicePatterns,
+} from "@/lib/types"
 
 const categoryIcons: Record<SuggestionCategory, typeof Coffee> = {
   break: Coffee,
@@ -51,7 +61,7 @@ interface SuggestionDetailDialogProps {
   onOpenChange: (open: boolean) => void
   onSchedule?: (suggestion: Suggestion) => void
   onAccept?: (suggestion: Suggestion) => void
-  onDismiss?: (suggestion: Suggestion) => void
+  onDismiss?: (suggestion: Suggestion, scope?: RecurringMutationScope) => void
   /** @deprecated Use onCompleteWithFeedback instead for the full flow with feedback collection */
   onComplete?: (suggestion: Suggestion) => void
   /**
@@ -65,6 +75,7 @@ interface SuggestionDetailDialogProps {
   history?: HistoricalContext
   burnoutPrediction?: BurnoutPrediction
   features?: AudioFeatures
+  allSuggestions?: Suggestion[]
 }
 
 export function SuggestionDetailDialog({
@@ -81,6 +92,7 @@ export function SuggestionDetailDialog({
   history,
   burnoutPrediction,
   features,
+  allSuggestions = [],
 }: SuggestionDetailDialogProps) {
   const { timeZone } = useTimeZone()
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -92,6 +104,7 @@ export function SuggestionDetailDialog({
   // Store the suggestion being completed while feedback dialog is open
   const [completingSuggestion, setCompletingSuggestion] = useState<Suggestion | null>(null)
   const [showCancelEventConfirm, setShowCancelEventConfirm] = useState(false)
+  const [cancelScope, setCancelScope] = useState<RecurringMutationScope>("single")
 
   const Icon = suggestion ? categoryIcons[suggestion.category] : Coffee
   const colors = suggestion ? categoryColors[suggestion.category] : categoryColors.break
@@ -99,6 +112,21 @@ export function SuggestionDetailDialog({
   const isScheduled = suggestion?.status === "scheduled"
   const isCompleted = suggestion?.status === "accepted" || suggestion?.status === "completed"
   const isDismissed = suggestion?.status === "dismissed"
+
+  const seriesSuggestions = suggestion?.seriesId
+    ? allSuggestions.filter((candidate) => candidate.seriesId === suggestion.seriesId)
+    : []
+
+  const hasRecurringSeries = suggestion != null && seriesSuggestions.length > 1
+  const futureSeriesOccurrences = hasRecurringSeries && suggestion?.scheduledFor
+    ? seriesSuggestions.filter((candidate) => {
+        if (candidate.id === suggestion.id) return false
+        if (candidate.status === "dismissed") return false
+        if (!candidate.scheduledFor) return false
+        return new Date(candidate.scheduledFor).getTime() > new Date(suggestion.scheduledFor!).getTime()
+      }).length
+    : 0
+  const canCancelFuture = futureSeriesOccurrences > 0
 
   /**
    * Handle the "Mark Complete" button click.
@@ -145,16 +173,18 @@ export function SuggestionDetailDialog({
   useEffect(() => {
     if (!open) {
       setShowCancelEventConfirm(false)
+      setCancelScope("single")
     }
   }, [open])
 
   const handleRequestCancelEvent = () => {
+    setCancelScope("single")
     setShowCancelEventConfirm(true)
   }
 
   const handleConfirmCancelEvent = () => {
     if (!suggestion) return
-    onDismiss?.(suggestion)
+    onDismiss?.(suggestion, cancelScope)
   }
 
   // IMPORTANT: Don't early-return on `!suggestion` while the feedback dialog is open.
@@ -362,6 +392,14 @@ export function SuggestionDetailDialog({
           {isScheduled && (
             <>
               <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onSchedule?.(suggestion)}
+              >
+                <CalendarPlus className="h-4 w-4 mr-2" />
+                Reschedule
+              </Button>
+              <Button
                 variant="destructive"
                 size="sm"
                 onClick={handleRequestCancelEvent}
@@ -397,18 +435,61 @@ export function SuggestionDetailDialog({
     <AlertDialog open={showCancelEventConfirm} onOpenChange={setShowCancelEventConfirm}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Cancel this event?</AlertDialogTitle>
+          <AlertDialogTitle>{hasRecurringSeries ? "Cancel recurring event?" : "Cancel this event?"}</AlertDialogTitle>
           <AlertDialogDescription>
-            This will remove the scheduled activity from your calendar timeline.
+            {hasRecurringSeries
+              ? "Choose how broadly this cancellation should apply."
+              : "This will remove the scheduled activity from your calendar timeline."}
           </AlertDialogDescription>
         </AlertDialogHeader>
+
+        {hasRecurringSeries ? (
+          <RadioGroup
+            value={cancelScope}
+            onValueChange={(value) => setCancelScope(value as RecurringMutationScope)}
+            className="gap-3"
+          >
+            <label className="flex items-start gap-3 rounded-md border border-border/70 p-3 cursor-pointer">
+              <RadioGroupItem value="single" id="cancel-scope-single" className="mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">This event only</p>
+                <p className="text-xs text-muted-foreground">Cancel just this occurrence.</p>
+              </div>
+            </label>
+
+            {canCancelFuture ? (
+              <label className="flex items-start gap-3 rounded-md border border-border/70 p-3 cursor-pointer">
+                <RadioGroupItem value="future" id="cancel-scope-future" className="mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">This and future</p>
+                  <p className="text-xs text-muted-foreground">
+                    Cancel this occurrence and {futureSeriesOccurrences} upcoming one{futureSeriesOccurrences === 1 ? "" : "s"}.
+                  </p>
+                </div>
+              </label>
+            ) : null}
+
+            <label className="flex items-start gap-3 rounded-md border border-border/70 p-3 cursor-pointer">
+              <RadioGroupItem value="all" id="cancel-scope-all" className="mt-0.5" />
+              <div>
+                <p className="text-sm font-medium">Entire series</p>
+                <p className="text-xs text-muted-foreground">Cancel every remaining occurrence in this series.</p>
+              </div>
+            </label>
+          </RadioGroup>
+        ) : null}
+
         <AlertDialogFooter>
           <AlertDialogCancel>Keep Event</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirmCancelEvent}
             className="bg-destructive text-white hover:bg-destructive/92"
           >
-            Yes, cancel event
+            {cancelScope === "single"
+              ? "Yes, cancel event"
+              : cancelScope === "future"
+                ? "Yes, cancel future"
+                : "Yes, cancel series"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

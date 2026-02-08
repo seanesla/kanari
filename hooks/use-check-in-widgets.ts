@@ -2,12 +2,17 @@
 
 import { useCallback, useEffect, useRef } from "react"
 import type { Dispatch } from "react"
+import { Temporal } from "temporal-polyfill"
 import type { GeminiWidgetEvent } from "@/lib/gemini/live-client"
 import { useLocalCalendar } from "@/hooks/use-local-calendar"
 import { useTimeZone } from "@/lib/timezone-context"
 import type {
+  CancelRecurringActivityToolArgs,
   CheckInMessage,
+  EditRecurringActivityToolArgs,
+  RecurringMutationScope,
   JournalEntry,
+  RecurringSeries,
   ScheduleActivityToolArgs,
   ScheduleRecurringActivityToolArgs,
   Suggestion,
@@ -28,6 +33,15 @@ import {
   normalizeTimeToHHMM,
   parseZonedDateTimeInstant,
 } from "@/lib/scheduling"
+import {
+  createRecurringSeriesRecord,
+  deleteRecurringSeriesRecord,
+  dismissSuggestionWithScope,
+  findActiveRecurringSeriesByTitle,
+  findSeriesAnchorSuggestion,
+  getSuggestionsForSeries,
+  rescheduleSuggestionWithScope,
+} from "@/lib/scheduling/series-store"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 
 export interface UseCheckInWidgetsOptions {
@@ -81,6 +95,27 @@ function userRequestedCheckIn(text: string): boolean {
 function normalizeScheduleDedupeTitle(title: string): string {
   const normalized = title.trim().toLowerCase().replace(/\s+/g, " ")
   return normalized || "untitled"
+}
+
+function formatInstantToSeriesParts(
+  instantISO: string,
+  timeZone: string
+): { date: string; time: string } | null {
+  try {
+    const zdt = Temporal.Instant.from(instantISO).toZonedDateTimeISO(timeZone)
+    return {
+      date: zdt.toPlainDate().toString(),
+      time: `${String(zdt.hour).padStart(2, "0")}:${String(zdt.minute).padStart(2, "0")}`,
+    }
+  } catch {
+    return null
+  }
+}
+
+function formatScopeLabel(scope: RecurringMutationScope): string {
+  if (scope === "single") return "this occurrence"
+  if (scope === "future") return "this and future occurrences"
+  return "the entire series"
 }
 
 function resolveScheduleArgsFromUserMessage(
@@ -261,7 +296,11 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
       throw new Error("Failed to save calendar event")
     }
 
-    await addRecoveryBlockToDb(block)
+    await addRecoveryBlockToDb({
+      ...block,
+      seriesId: suggestion.seriesId,
+      occurrenceDate: suggestion.occurrenceDate,
+    })
   }, [addRecoveryBlockToDb, scheduleEvent, timeZone])
 
   const scheduleSingleActivity = useCallback(
@@ -271,6 +310,10 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         rationale: string
         createdAt?: string
         scheduledForOverride?: string
+        checkInSessionId?: string
+        seriesId?: string
+        occurrenceDate?: string
+        occurrenceIndex?: number
       }
     ): Promise<"scheduled" | "failed" | "duplicate"> => {
       const createdAt = options.createdAt ?? new Date().toISOString()
@@ -311,6 +354,10 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
 
       const suggestion: Suggestion = {
         id: suggestionId,
+        checkInSessionId: options.checkInSessionId,
+        seriesId: options.seriesId,
+        occurrenceDate: options.occurrenceDate,
+        occurrenceIndex: options.occurrenceIndex,
         content: resolvedArgs.title,
         rationale: options.rationale,
         duration: resolvedArgs.duration,
@@ -466,6 +513,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           void scheduleSingleActivity(manualArgs, {
             rationale: "Manually scheduled from chat",
             createdAt: now,
+            checkInSessionId: data.session?.id,
           })
           break
         }
@@ -522,7 +570,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           console.warn("[useCheckIn] Unknown manual tool:", toolName)
       }
     },
-    [data.latestMismatch, dispatch, scheduleSingleActivity]
+    [data.latestMismatch, data.session?.id, dispatch, scheduleSingleActivity]
   )
 
   // ========================================
@@ -544,6 +592,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         void scheduleSingleActivity(resolvedArgs, {
           rationale: "Scheduled from AI chat",
           createdAt: now,
+          checkInSessionId: data.session?.id,
         })
         return
       }
@@ -600,8 +649,42 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         }
 
         void (async () => {
+          const seriesId = generateId()
+          const recurringSeries: RecurringSeries = {
+            id: seriesId,
+            title: baseArgs.title,
+            category: baseArgs.category,
+            duration: baseArgs.duration,
+            timeZone,
+            recurrence: {
+              startDate: resolvedRecurringArgs.startDate,
+              time: resolvedRecurringArgs.time,
+              frequency: resolvedRecurringArgs.frequency,
+              weekdays: resolvedRecurringArgs.weekdays,
+              count: resolvedRecurringArgs.count,
+              untilDate: resolvedRecurringArgs.untilDate,
+            },
+            status: "active",
+            createdAt: now,
+          }
+
+          let seriesPersisted = false
+          try {
+            await createRecurringSeriesRecord(recurringSeries)
+            seriesPersisted = true
+          } catch {
+            const failureMessage: CheckInMessage = {
+              id: generateId(),
+              role: "assistant",
+              content: "I couldn't save that recurring plan right now.",
+              timestamp: new Date().toISOString(),
+            }
+            dispatch({ type: "ADD_MESSAGE", message: failureMessage })
+            return
+          }
+
           const results = await Promise.all(
-            expansion.occurrences.map((occurrence) =>
+            expansion.occurrences.map((occurrence, occurrenceIndex) =>
               scheduleSingleActivity(
                 {
                   ...baseArgs,
@@ -612,6 +695,10 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
                   rationale: "Scheduled from AI chat (recurring)",
                   createdAt: now,
                   scheduledForOverride: occurrence.scheduledFor,
+                  checkInSessionId: data.session?.id,
+                  seriesId,
+                  occurrenceDate: occurrence.date,
+                  occurrenceIndex,
                 }
               )
             )
@@ -622,6 +709,10 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
             results.filter((result) => result === "failed").length
             + expansion.skippedInvalidDateTimes
           const duplicateCount = results.filter((result) => result === "duplicate").length
+
+          if (scheduledCount === 0 && seriesPersisted) {
+            await deleteRecurringSeriesRecord(seriesId)
+          }
 
           const summaryParts: string[] = []
           if (scheduledCount > 0) {
@@ -654,6 +745,186 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           }
 
           dispatch({ type: "ADD_MESSAGE", message: summaryMessage })
+        })()
+        return
+      }
+
+      if ((event as { widget: string }).widget === "edit_recurring_activity") {
+        void (async () => {
+          const args = (event as { args: EditRecurringActivityToolArgs }).args
+          const series = await findActiveRecurringSeriesByTitle(args.title, args.category)
+
+          if (!series) {
+            const notFoundMessage: CheckInMessage = {
+              id: generateId(),
+              role: "assistant",
+              content: `I couldn't find an active recurring series named "${args.title}".`,
+              timestamp: new Date().toISOString(),
+            }
+            dispatch({ type: "ADD_MESSAGE", message: notFoundMessage })
+            return
+          }
+
+          const seriesSuggestions = await getSuggestionsForSeries(series.id)
+          const anchor = findSeriesAnchorSuggestion({
+            suggestions: seriesSuggestions,
+            scope: args.scope,
+            fromDate: args.fromDate,
+            timeZone: series.timeZone,
+          })
+
+          if (!anchor || !anchor.scheduledFor) {
+            const noAnchorMessage: CheckInMessage = {
+              id: generateId(),
+              role: "assistant",
+              content: "I couldn't find a matching upcoming occurrence to update.",
+              timestamp: new Date().toISOString(),
+            }
+            dispatch({ type: "ADD_MESSAGE", message: noAnchorMessage })
+            return
+          }
+
+          let nextAnchorScheduledFor = anchor.scheduledFor
+          const changingDateOrTime = Boolean(args.newDate || args.newTime)
+
+          if (changingDateOrTime) {
+            const anchorParts = formatInstantToSeriesParts(anchor.scheduledFor, series.timeZone)
+            if (!anchorParts) {
+              const invalidAnchorMessage: CheckInMessage = {
+                id: generateId(),
+                role: "assistant",
+                content: "I couldn't parse the existing schedule for that series.",
+                timestamp: new Date().toISOString(),
+              }
+              dispatch({ type: "ADD_MESSAGE", message: invalidAnchorMessage })
+              return
+            }
+
+            const nextDate = args.newDate ?? anchorParts.date
+            const nextTime = args.newTime ?? anchorParts.time
+            const parsed = parseZonedDateTimeInstant(nextDate, nextTime, series.timeZone)
+
+            if (!parsed) {
+              const invalidTargetMessage: CheckInMessage = {
+                id: generateId(),
+                role: "assistant",
+                content: "I couldn't parse the updated date/time for that recurring plan.",
+                timestamp: new Date().toISOString(),
+              }
+              dispatch({ type: "ADD_MESSAGE", message: invalidTargetMessage })
+              return
+            }
+
+            nextAnchorScheduledFor = parsed
+          }
+
+          try {
+            const result = await rescheduleSuggestionWithScope({
+              suggestionId: anchor.id,
+              newScheduledFor: nextAnchorScheduledFor,
+              scope: args.scope,
+              durationOverride: args.duration,
+            })
+
+            const summaryText = result.updatedCount === 0
+              ? "I couldn't update any occurrences for that recurring plan."
+              : (() => {
+                  const updatedParts = formatInstantToSeriesParts(nextAnchorScheduledFor, series.timeZone)
+                  const updates: string[] = [
+                    `Updated ${result.updatedCount} occurrence${result.updatedCount === 1 ? "" : "s"} in ${formatScopeLabel(args.scope)} for "${series.title}".`,
+                  ]
+
+                  if (changingDateOrTime && updatedParts) {
+                    updates.push(`New anchor time: ${updatedParts.date} at ${updatedParts.time}.`)
+                  }
+
+                  if (typeof args.duration === "number") {
+                    updates.push(`Duration is now ${Math.max(1, Math.round(args.duration))} minutes.`)
+                  }
+
+                  return updates.join(" ")
+                })()
+
+            const summaryMessage: CheckInMessage = {
+              id: generateId(),
+              role: "assistant",
+              content: summaryText,
+              timestamp: new Date().toISOString(),
+            }
+            dispatch({ type: "ADD_MESSAGE", message: summaryMessage })
+          } catch (error) {
+            const failureMessage: CheckInMessage = {
+              id: generateId(),
+              role: "assistant",
+              content: error instanceof Error ? error.message : "I couldn't update that recurring plan.",
+              timestamp: new Date().toISOString(),
+            }
+            dispatch({ type: "ADD_MESSAGE", message: failureMessage })
+          }
+        })()
+        return
+      }
+
+      if ((event as { widget: string }).widget === "cancel_recurring_activity") {
+        void (async () => {
+          const args = (event as { args: CancelRecurringActivityToolArgs }).args
+          const series = await findActiveRecurringSeriesByTitle(args.title, args.category)
+
+          if (!series) {
+            const notFoundMessage: CheckInMessage = {
+              id: generateId(),
+              role: "assistant",
+              content: `I couldn't find an active recurring series named "${args.title}".`,
+              timestamp: new Date().toISOString(),
+            }
+            dispatch({ type: "ADD_MESSAGE", message: notFoundMessage })
+            return
+          }
+
+          const seriesSuggestions = await getSuggestionsForSeries(series.id)
+          const anchor = findSeriesAnchorSuggestion({
+            suggestions: seriesSuggestions,
+            scope: args.scope,
+            fromDate: args.fromDate,
+            timeZone: series.timeZone,
+          })
+
+          if (!anchor) {
+            const noAnchorMessage: CheckInMessage = {
+              id: generateId(),
+              role: "assistant",
+              content: "I couldn't find a matching upcoming occurrence to cancel.",
+              timestamp: new Date().toISOString(),
+            }
+            dispatch({ type: "ADD_MESSAGE", message: noAnchorMessage })
+            return
+          }
+
+          try {
+            const result = await dismissSuggestionWithScope({
+              suggestionId: anchor.id,
+              scope: args.scope,
+            })
+
+            const summaryMessage: CheckInMessage = {
+              id: generateId(),
+              role: "assistant",
+              content:
+                result.updatedCount === 0
+                  ? "I couldn't cancel any upcoming occurrences for that series."
+                  : `Cancelled ${result.updatedCount} occurrence${result.updatedCount === 1 ? "" : "s"} in ${formatScopeLabel(args.scope)} for "${series.title}".`,
+              timestamp: new Date().toISOString(),
+            }
+            dispatch({ type: "ADD_MESSAGE", message: summaryMessage })
+          } catch (error) {
+            const failureMessage: CheckInMessage = {
+              id: generateId(),
+              role: "assistant",
+              content: error instanceof Error ? error.message : "I couldn't cancel that recurring plan.",
+              timestamp: new Date().toISOString(),
+            }
+            dispatch({ type: "ADD_MESSAGE", message: failureMessage })
+          }
         })()
         return
       }
@@ -710,7 +981,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         })
       }
     },
-    [data.messages, dispatch, scheduleSingleActivity, timeZone]
+    [data.messages, data.session?.id, dispatch, scheduleSingleActivity, timeZone]
   )
 
   // ========================================
@@ -784,6 +1055,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         const result = await scheduleSingleActivity(args, {
           rationale: "Scheduled from chat (fallback)",
           createdAt: now,
+          checkInSessionId: data.session?.id,
         })
 
         if (result === "scheduled") {
@@ -797,7 +1069,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         }
       })()
     }, 1200)
-  }, [data.messages, dispatch, scheduleSingleActivity, timeZone, widgetsRef])
+  }, [data.messages, data.session?.id, dispatch, scheduleSingleActivity, timeZone, widgetsRef])
 
   const handlers: CheckInWidgetsGeminiHandlers = {
     onWidget,

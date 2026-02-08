@@ -35,6 +35,27 @@ type GeminiWidgetEvent =
         untilDate?: string
       }
     }
+  | {
+      widget: "edit_recurring_activity"
+      args: {
+        title: string
+        category?: "break" | "exercise" | "mindfulness" | "social" | "rest"
+        scope: "single" | "future" | "all"
+        fromDate?: string
+        newDate?: string
+        newTime?: string
+        duration?: number
+      }
+    }
+  | {
+      widget: "cancel_recurring_activity"
+      args: {
+        title: string
+        category?: "break" | "exercise" | "mindfulness" | "social" | "rest"
+        scope: "single" | "future" | "all"
+        fromDate?: string
+      }
+    }
 
 type GeminiLiveCallbacks = {
   onWidget?: (event: GeminiWidgetEvent) => void
@@ -46,9 +67,15 @@ let geminiCallbacks: GeminiLiveCallbacks | null = null
 let scheduleEventMock: ReturnType<typeof vi.fn>
 let addSuggestionMock: ReturnType<typeof vi.fn>
 let putRecoveryBlockMock: ReturnType<typeof vi.fn>
+let suggestionsStore: Map<string, Record<string, unknown>>
+let recoveryBlocksStore: Map<string, Record<string, unknown>>
+let recurringSeriesStore: Map<string, Record<string, unknown>>
 
 beforeEach(async () => {
   geminiCallbacks = null
+  suggestionsStore = new Map()
+  recoveryBlocksStore = new Map()
+  recurringSeriesStore = new Map()
   scheduleEventMock = vi.fn(async (suggestion: { id: string; scheduledFor?: string; duration: number }) => ({
     id: "rb_test",
     suggestionId: suggestion.id,
@@ -57,8 +84,14 @@ beforeEach(async () => {
     duration: suggestion.duration,
     completed: false,
   }))
-  addSuggestionMock = vi.fn(async () => {})
-  putRecoveryBlockMock = vi.fn(async () => {})
+  addSuggestionMock = vi.fn(async (suggestion: Record<string, unknown>) => {
+    const id = String(suggestion.id)
+    suggestionsStore.set(id, { ...suggestion })
+  })
+  putRecoveryBlockMock = vi.fn(async (block: Record<string, unknown>) => {
+    const id = String(block.id)
+    recoveryBlocksStore.set(id, { ...block })
+  })
 
   // Allow the widget persistence path to run (we mock Dexie itself below).
   Object.defineProperty(globalThis, "indexedDB", {
@@ -114,22 +147,133 @@ beforeEach(async () => {
 
   vi.doMock("@/lib/storage/db", () => ({
     db: {
-      suggestions: { add: addSuggestionMock, delete: vi.fn(async () => {}) },
+      suggestions: {
+        add: addSuggestionMock,
+        get: vi.fn(async (id: string) => suggestionsStore.get(id)),
+        update: vi.fn(async (id: string, updates: Record<string, unknown>) => {
+          const existing = suggestionsStore.get(id)
+          if (!existing) return 0
+          suggestionsStore.set(id, { ...existing, ...updates })
+          return 1
+        }),
+        where: vi.fn((index: string) => {
+          if (index === "seriesId") {
+            return {
+              equals: vi.fn((seriesId: string) => ({
+                toArray: vi.fn(async () =>
+                  Array.from(suggestionsStore.values()).filter((suggestion) => suggestion.seriesId === seriesId)
+                ),
+              })),
+            }
+          }
+
+          return {
+            equals: vi.fn(() => ({
+              toArray: vi.fn(async () => []),
+            })),
+          }
+        }),
+        delete: vi.fn(async (id: string) => {
+          suggestionsStore.delete(id)
+        }),
+      },
       recoveryBlocks: {
         put: putRecoveryBlockMock,
-        where: vi.fn(() => ({
-          equals: vi.fn(() => ({
-            toArray: vi.fn(async () => []),
-          })),
-        })),
-        delete: vi.fn(async () => {}),
+        where: vi.fn((index: string) => {
+          if (index === "suggestionId") {
+            return {
+              equals: vi.fn((suggestionId: string) => ({
+                toArray: vi.fn(async () =>
+                  Array.from(recoveryBlocksStore.values()).filter(
+                    (block) => block.suggestionId === suggestionId
+                  )
+                ),
+                delete: vi.fn(async () => {
+                  for (const [id, block] of recoveryBlocksStore.entries()) {
+                    if (block.suggestionId === suggestionId) {
+                      recoveryBlocksStore.delete(id)
+                    }
+                  }
+                }),
+                modify: vi.fn(async (modifier: (value: Record<string, unknown>) => void) => {
+                  for (const [id, block] of recoveryBlocksStore.entries()) {
+                    if (block.suggestionId !== suggestionId) continue
+                    const updated = { ...block }
+                    modifier(updated)
+                    recoveryBlocksStore.set(id, updated)
+                  }
+                }),
+              })),
+              anyOf: vi.fn((suggestionIds: string[]) => ({
+                delete: vi.fn(async () => {
+                  const set = new Set(suggestionIds)
+                  for (const [id, block] of recoveryBlocksStore.entries()) {
+                    if (set.has(String(block.suggestionId))) {
+                      recoveryBlocksStore.delete(id)
+                    }
+                  }
+                }),
+              })),
+            }
+          }
+
+          return {
+            equals: vi.fn(() => ({
+              toArray: vi.fn(async () => []),
+              delete: vi.fn(async () => {}),
+              modify: vi.fn(async () => {}),
+            })),
+          }
+        }),
+        delete: vi.fn(async (id: string) => {
+          recoveryBlocksStore.delete(id)
+        }),
       },
       journalEntries: { add: vi.fn(async () => {}) },
       settings: { get: vi.fn(async () => ({ id: "default", calendarConnected: true })) },
+      recurringSeries: {
+        put: vi.fn(async (series: Record<string, unknown>) => {
+          recurringSeriesStore.set(String(series.id), { ...series })
+        }),
+        delete: vi.fn(async (id: string) => {
+          recurringSeriesStore.delete(id)
+        }),
+        update: vi.fn(async (id: string, updates: Record<string, unknown>) => {
+          const existing = recurringSeriesStore.get(id)
+          if (!existing) return 0
+          recurringSeriesStore.set(id, { ...existing, ...updates })
+          return 1
+        }),
+        where: vi.fn((index: string) => {
+          if (index === "status") {
+            return {
+              equals: vi.fn((status: string) => ({
+                toArray: vi.fn(async () =>
+                  Array.from(recurringSeriesStore.values()).filter((series) => series.status === status)
+                ),
+              })),
+            }
+          }
+
+          return {
+            equals: vi.fn(() => ({ toArray: vi.fn(async () => []) })),
+          }
+        }),
+      },
+      transaction: vi.fn(async (_mode: string, ...args: unknown[]) => {
+        const callback = args[args.length - 1]
+        if (typeof callback === "function") {
+          return callback()
+        }
+        return undefined
+      }),
     },
     fromSuggestion: (record: unknown) => record,
+    toSuggestion: (record: unknown) => record,
     fromRecoveryBlock: (record: unknown) => record,
     fromJournalEntry: (record: unknown) => record,
+    fromRecurringSeries: (record: unknown) => record,
+    toRecurringSeries: (record: unknown) => record,
   }))
 
   ;({ useCheckIn } = await import("../use-check-in"))
@@ -885,5 +1029,105 @@ describe("useCheckIn schedule_activity calendar sync", () => {
 
     expect(putRecoveryBlockMock).toHaveBeenCalledTimes(2)
     expect(result.current[0].widgets.some((w) => w.type === "schedule_activity" && w.status === "failed")).toBe(true)
+  })
+
+  it("edits recurring series occurrences with future scope", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_recurring_activity",
+        args: {
+          title: "Study session",
+          category: "rest",
+          startDate: "2026-02-09",
+          time: "20:00",
+          duration: 45,
+          frequency: "weekdays",
+          count: 3,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(3)
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "edit_recurring_activity",
+        args: {
+          title: "Study session",
+          scope: "future",
+          fromDate: "2026-02-10",
+          newTime: "9:00 PM",
+        },
+      })
+    })
+
+    await waitFor(() => {
+      const summary = result.current[0].messages.find(
+        (m) => m.role === "assistant" && /Updated 2 occurrences/i.test(m.content)
+      )
+      expect(summary).toBeTruthy()
+    })
+
+    const normalizeToDate = (value: unknown): Date => {
+      if (value instanceof Date) return value
+      return new Date(String(value))
+    }
+
+    const editedOccurrences = Array.from(suggestionsStore.values())
+      .filter((suggestion) => {
+        return suggestion.seriesId && suggestion.occurrenceDate !== "2026-02-09"
+      })
+      .map((suggestion) => normalizeToDate(suggestion.scheduledFor))
+
+    expect(editedOccurrences).toHaveLength(2)
+    expect(editedOccurrences.every((date) => date.getUTCHours() === 21)).toBe(true)
+  })
+
+  it("cancels recurring series occurrences with all scope", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_recurring_activity",
+        args: {
+          title: "Night walk",
+          category: "exercise",
+          startDate: "2026-02-09",
+          time: "19:30",
+          duration: 30,
+          frequency: "daily",
+          count: 3,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(3)
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "cancel_recurring_activity",
+        args: {
+          title: "Night walk",
+          scope: "all",
+        },
+      })
+    })
+
+    await waitFor(() => {
+      const summary = result.current[0].messages.find(
+        (m) => m.role === "assistant" && /Cancelled 3 occurrences/i.test(m.content)
+      )
+      expect(summary).toBeTruthy()
+    })
+
+    const statuses = Array.from(suggestionsStore.values()).map((suggestion) => suggestion.status)
+    expect(statuses).toHaveLength(3)
+    expect(statuses.every((status) => status === "dismissed")).toBe(true)
   })
 })

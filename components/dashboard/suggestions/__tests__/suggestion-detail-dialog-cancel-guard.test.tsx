@@ -104,4 +104,57 @@ describe("SuggestionDetailDialog cancel guard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Yes, cancel event" }))
     expect(onDismiss).toHaveBeenCalledTimes(1)
   })
+
+  it("supports recurring cancel scopes and forwards selected scope", () => {
+    const onDismiss = vi.fn()
+    const base = createScheduledSuggestion()
+    const recurringSuggestion: Suggestion = {
+      ...base,
+      id: "series-occ-2",
+      seriesId: "series-1",
+      scheduledFor: "2026-02-11T20:00:00.000Z",
+      occurrenceDate: "2026-02-11",
+      occurrenceIndex: 1,
+    }
+
+    const allSuggestions: Suggestion[] = [
+      {
+        ...base,
+        id: "series-occ-1",
+        seriesId: "series-1",
+        scheduledFor: "2026-02-10T20:00:00.000Z",
+        occurrenceDate: "2026-02-10",
+        occurrenceIndex: 0,
+      },
+      recurringSuggestion,
+      {
+        ...base,
+        id: "series-occ-3",
+        seriesId: "series-1",
+        scheduledFor: "2026-02-12T20:00:00.000Z",
+        occurrenceDate: "2026-02-12",
+        occurrenceIndex: 2,
+      },
+    ]
+
+    render(
+      <SuggestionDetailDialog
+        suggestion={recurringSuggestion}
+        open
+        onOpenChange={vi.fn()}
+        onDismiss={onDismiss}
+        allSuggestions={allSuggestions}
+      />
+    )
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel Event" }))
+    expect(screen.getByText("Cancel recurring event?")).toBeInTheDocument()
+
+    fireEvent.click(screen.getByText("Entire series"))
+    fireEvent.click(screen.getByRole("button", { name: "Yes, cancel series" }))
+
+    expect(onDismiss).toHaveBeenCalledTimes(1)
+    expect(onDismiss.mock.calls[0]?.[0]).toMatchObject({ id: "series-occ-2" })
+    expect(onDismiss.mock.calls[0]?.[1]).toBe("all")
+  })
 })

@@ -8,7 +8,9 @@
 import { z } from "zod"
 import type {
   BreathingExerciseToolArgs,
+  CancelRecurringActivityToolArgs,
   CommitmentToolArgs,
+  EditRecurringActivityToolArgs,
   GetJournalEntriesToolArgs,
   JournalPromptToolArgs,
   QuickActionsToolArgs,
@@ -264,6 +266,7 @@ export const ScheduleActivityArgsSchema: z.ZodType<ScheduleActivityToolArgs> = z
 })
 
 const RecurrenceWeekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])
+const RecurringScopeSchema = z.enum(["single", "future", "all"])
 
 export const ScheduleRecurringActivityArgsSchema: z.ZodType<ScheduleRecurringActivityToolArgs> = z
   .object({
@@ -291,6 +294,51 @@ export const ScheduleRecurringActivityArgsSchema: z.ZodType<ScheduleRecurringAct
         code: z.ZodIssueCode.custom,
         message: "custom_weekdays requires weekdays",
         path: ["weekdays"],
+      })
+    }
+  })
+
+export const EditRecurringActivityArgsSchema: z.ZodType<EditRecurringActivityToolArgs> = z
+  .object({
+    title: z.string().min(1).max(120),
+    category: z.enum(["break", "exercise", "mindfulness", "social", "rest"]).optional(),
+    scope: RecurringScopeSchema,
+    fromDate: DateStringSchema.optional(),
+    newDate: DateStringSchema.optional(),
+    newTime: TimeStringSchema.optional(),
+    duration: z.number().int().min(1).max(12 * 60).optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.scope !== "all" && !value.fromDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "single/future scope requires fromDate",
+        path: ["fromDate"],
+      })
+    }
+
+    if (!value.newDate && !value.newTime && value.duration == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "edit_recurring_activity requires at least one update field",
+        path: ["newDate"],
+      })
+    }
+  })
+
+export const CancelRecurringActivityArgsSchema: z.ZodType<CancelRecurringActivityToolArgs> = z
+  .object({
+    title: z.string().min(1).max(120),
+    category: z.enum(["break", "exercise", "mindfulness", "social", "rest"]).optional(),
+    scope: RecurringScopeSchema,
+    fromDate: DateStringSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.scope !== "all" && !value.fromDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "single/future scope requires fromDate",
+        path: ["fromDate"],
       })
     }
   })

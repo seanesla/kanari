@@ -18,6 +18,8 @@ import {
   QuickActionsArgsSchema,
   JournalPromptArgsSchema,
   ScheduleRecurringActivityArgsSchema,
+  EditRecurringActivityArgsSchema,
+  CancelRecurringActivityArgsSchema,
 } from "../schemas"
 
 describe("ServerMessageSchema", () => {
@@ -604,6 +606,59 @@ describe("Gemini widget tool arg schemas", () => {
     })
 
     expect(result.success).toBe(true)
+  })
+
+  test("EditRecurringActivityArgsSchema validates scoped updates", () => {
+    const result = EditRecurringActivityArgsSchema.safeParse({
+      title: "Study session",
+      scope: "future",
+      fromDate: "2026-02-10",
+      newTime: "9:15 PM",
+      duration: 50,
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.newTime).toBe("21:15")
+      expect(result.data.scope).toBe("future")
+    }
+  })
+
+  test("EditRecurringActivityArgsSchema requires fromDate for single/future scope", () => {
+    const result = EditRecurringActivityArgsSchema.safeParse({
+      title: "Study session",
+      scope: "single",
+      newTime: "21:15",
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  test("EditRecurringActivityArgsSchema requires at least one update field", () => {
+    const result = EditRecurringActivityArgsSchema.safeParse({
+      title: "Study session",
+      scope: "all",
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  test("CancelRecurringActivityArgsSchema validates all-scope cancellation", () => {
+    const result = CancelRecurringActivityArgsSchema.safeParse({
+      title: "Study session",
+      scope: "all",
+    })
+
+    expect(result.success).toBe(true)
+  })
+
+  test("CancelRecurringActivityArgsSchema requires fromDate for single/future scope", () => {
+    const result = CancelRecurringActivityArgsSchema.safeParse({
+      title: "Study session",
+      scope: "future",
+    })
+
+    expect(result.success).toBe(false)
   })
 
   test("BreathingExerciseArgsSchema should validate valid args", () => {

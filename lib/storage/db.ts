@@ -6,6 +6,7 @@ import { logWarn } from "@/lib/logger"
 import type {
   Commitment,
   Recording,
+  RecurringSeries,
   Suggestion,
   RecoveryBlock,
   UserSettings,
@@ -71,6 +72,12 @@ export interface DBCommitment extends Omit<Commitment, "extractedAt" | "followed
   followedUpAt?: Date
 }
 
+export interface DBRecurringSeries extends Omit<RecurringSeries, "createdAt" | "updatedAt" | "cancelledAt"> {
+  createdAt: Date
+  updatedAt?: Date
+  cancelledAt?: Date
+}
+
 // Database class
 class KanariDB extends Dexie {
   recordings!: EntityTable<DBRecording, "id">
@@ -84,6 +91,7 @@ class KanariDB extends Dexie {
   userProgress!: EntityTable<DBUserProgress, "id">
   journalEntries!: EntityTable<DBJournalEntry, "id">
   commitments!: EntityTable<DBCommitment, "id">
+  recurringSeries!: EntityTable<DBRecurringSeries, "id">
 
   constructor() {
     super(isDemoWorkspace() ? "kanari_demo" : "kanari")
@@ -269,6 +277,22 @@ class KanariDB extends Dexie {
         }
       })
     })
+
+    // Version 11: Recurring series model + series indexes for occurrence-level mutations.
+    this.version(11).stores({
+      recordings: "id, createdAt, status",
+      suggestions: "id, createdAt, status, category, recordingId, version, seriesId, scheduledFor, [seriesId+scheduledFor]",
+      recoveryBlocks: "id, suggestionId, scheduledAt, completed, seriesId",
+      trendData: "id, date",
+      settings: "id",
+      checkInSessions: "id, startedAt, recordingId",
+      achievements: "id, dateISO, type, category, completed, createdAt, seen",
+      milestoneBadges: "id, earnedAt, type, seen",
+      userProgress: "id",
+      journalEntries: "id, createdAt, category, checkInSessionId",
+      commitments: "id, checkInSessionId, extractedAt, outcome",
+      recurringSeries: "id, status, createdAt, updatedAt",
+    })
   }
 }
 
@@ -436,6 +460,24 @@ export function fromCommitment(record: Commitment): DBCommitment {
     ...record,
     extractedAt: new Date(record.extractedAt),
     followedUpAt: record.followedUpAt ? new Date(record.followedUpAt) : undefined,
+  }
+}
+
+export function toRecurringSeries(dbRecord: DBRecurringSeries): RecurringSeries {
+  return {
+    ...dbRecord,
+    createdAt: dbRecord.createdAt.toISOString(),
+    updatedAt: dbRecord.updatedAt?.toISOString(),
+    cancelledAt: dbRecord.cancelledAt?.toISOString(),
+  }
+}
+
+export function fromRecurringSeries(record: RecurringSeries): DBRecurringSeries {
+  return {
+    ...record,
+    createdAt: new Date(record.createdAt),
+    updatedAt: record.updatedAt ? new Date(record.updatedAt) : undefined,
+    cancelledAt: record.cancelledAt ? new Date(record.cancelledAt) : undefined,
   }
 }
 

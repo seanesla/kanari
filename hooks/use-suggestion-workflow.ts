@@ -1,7 +1,12 @@
 "use client"
 
 import { useState, useCallback, useMemo } from "react"
-import type { Suggestion, RecoveryBlock, EffectivenessFeedback } from "@/lib/types"
+import type {
+  EffectivenessFeedback,
+  RecoveryBlock,
+  RecurringMutationScope,
+  Suggestion,
+} from "@/lib/types"
 import type { LocalCalendarEventOptions } from "@/hooks/use-local-calendar"
 
 /**
@@ -33,8 +38,12 @@ export interface SuggestionWorkflowHandlers {
   handleScheduleFromDialog: (suggestion: Suggestion) => void
   handleExternalDrop: (suggestionId: string, dateISO: string, hour: number, minute: number) => void
   handleTimeSlotClick: (dateISO: string, hour: number, minute: number) => void
-  handleScheduleConfirm: (suggestion: Suggestion, scheduledFor: string) => Promise<boolean>
-  handleDismiss: (suggestion: Suggestion) => Promise<boolean>
+  handleScheduleConfirm: (
+    suggestion: Suggestion,
+    scheduledFor: string,
+    scope?: RecurringMutationScope
+  ) => Promise<boolean>
+  handleDismiss: (suggestion: Suggestion, scope?: RecurringMutationScope) => Promise<boolean>
   /**
    * Complete a suggestion without feedback (legacy flow).
    * For the full flow with feedback dialog, use the suggestion detail dialog's built-in feedback integration.
@@ -55,8 +64,12 @@ export interface SuggestionWorkflowHandlers {
 
 interface UseSuggestionWorkflowParams {
   suggestions: Suggestion[]
-  scheduleSuggestion: (id: string, scheduledFor: string) => Promise<boolean>
-  dismissSuggestion: (id: string) => Promise<boolean>
+  scheduleSuggestion: (
+    id: string,
+    scheduledFor: string,
+    options?: { scope?: RecurringMutationScope }
+  ) => Promise<boolean>
+  dismissSuggestion: (id: string, options?: { scope?: RecurringMutationScope }) => Promise<boolean>
   /** Complete a suggestion with optional effectiveness feedback */
   completeSuggestion: (id: string, feedback?: EffectivenessFeedback) => Promise<boolean>
   scheduleGoogleEvent?: (suggestion: Suggestion, options?: LocalCalendarEventOptions) => Promise<RecoveryBlock | null>
@@ -117,14 +130,23 @@ export function useSuggestionWorkflow({
   }, [suggestions])
 
   // Confirm scheduling and optionally sync to Google Calendar
-  const handleScheduleConfirm = useCallback(async (suggestion: Suggestion, scheduledFor: string) => {
-    const success = await scheduleSuggestion(suggestion.id, scheduledFor)
+  const handleScheduleConfirm = useCallback(async (
+    suggestion: Suggestion,
+    scheduledFor: string,
+    scope: RecurringMutationScope = "single"
+  ) => {
+    const success = await scheduleSuggestion(suggestion.id, scheduledFor, { scope })
     if (success) {
       setScheduleDialogSuggestion(null)
       setDroppedSuggestion(null)
 
       // Optionally sync to Google Calendar
-      if (isCalendarConnected && scheduleGoogleEvent) {
+      // For recurring scope updates (future/all), we mutate existing occurrences in storage
+      // and should not create a fresh calendar block from this single anchor item.
+      const shouldCreateCalendarBlock =
+        scope === "single" && (suggestion.status !== "scheduled" || !suggestion.scheduledFor)
+
+      if (isCalendarConnected && scheduleGoogleEvent && shouldCreateCalendarBlock) {
         const updatedSuggestion = { ...suggestion, status: "scheduled" as const, scheduledFor }
         await scheduleGoogleEvent(updatedSuggestion)
       }
@@ -133,8 +155,11 @@ export function useSuggestionWorkflow({
   }, [scheduleSuggestion, isCalendarConnected, scheduleGoogleEvent])
 
   // Dismiss suggestion from detail dialog
-  const handleDismiss = useCallback(async (suggestion: Suggestion): Promise<boolean> => {
-    const success = await dismissSuggestion(suggestion.id)
+  const handleDismiss = useCallback(async (
+    suggestion: Suggestion,
+    scope: RecurringMutationScope = "single"
+  ): Promise<boolean> => {
+    const success = await dismissSuggestion(suggestion.id, { scope })
     if (success) {
       setSelectedSuggestion(null)
     }

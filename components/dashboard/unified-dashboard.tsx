@@ -600,7 +600,7 @@ export function UnifiedDashboard() {
           onAccept={(suggestion) => {
             // Low-friction flow: accept schedules the suggestion immediately for "now".
             // This avoids an extra dialog step; users can still adjust via drag/drop later.
-            void handlers.handleScheduleConfirm(suggestion, new Date().toISOString())
+            void handlers.handleScheduleConfirm(suggestion, new Date().toISOString(), "single")
           }}
           onDismiss={handlers.handleDismiss}
           onComplete={handlers.handleComplete}
@@ -610,6 +610,7 @@ export function UnifiedDashboard() {
           history={historicalContext}
           burnoutPrediction={burnoutPrediction ?? undefined}
           features={allRecordings?.[0]?.features}
+          allSuggestions={suggestions}
         />
 
         {/* Expanded Calendar Dialog */}
@@ -652,7 +653,7 @@ export function UnifiedDashboard() {
                 onEventClick={handlers.handleSuggestionClick}
                 onTimeSlotClick={handlers.handleTimeSlotClick}
                 onEventUpdate={(suggestion, newScheduledFor) => {
-                  scheduleSuggestion(suggestion.id, newScheduledFor)
+                  void handlers.handleScheduleConfirm(suggestion, newScheduledFor, "single")
                 }}
                 onExternalDrop={handlers.handleExternalDrop}
                 pendingDragActive={pendingDragActive}
@@ -668,6 +669,7 @@ export function UnifiedDashboard() {
           open={!!scheduleDialogSuggestion}
           onOpenChange={(open) => !open && handlers.closeDialogs()}
           onSchedule={handlers.handleScheduleConfirm}
+          allSuggestions={suggestions}
           defaultDateISO={scheduleDefaults?.dateISO}
           defaultHour={scheduleDefaults?.hour}
           defaultMinute={scheduleDefaults?.minute}

@@ -645,6 +645,7 @@ export function useClearAllData() {
       db.milestoneBadges.clear(),
       db.userProgress.clear(),
       db.journalEntries.clear(),
+      db.recurringSeries.clear(),
     ])
   }, [])
 }

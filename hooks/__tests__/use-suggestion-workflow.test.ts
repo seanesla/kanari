@@ -11,11 +11,10 @@ const mockSuggestion: Suggestion = {
   id: "test-1",
   content: "Take a 10-minute break",
   category: "break",
-  priority: "high",
   duration: 10,
   status: "pending",
   createdAt: "2024-12-24T10:00:00Z",
-  reasoning: "Based on stress indicators",
+  rationale: "Based on stress indicators",
 }
 
 const mockScheduledSuggestion: Suggestion = {
@@ -158,7 +157,11 @@ describe("useSuggestionWorkflow", () => {
         expect(success).toBe(true)
       })
 
-      expect(scheduleSuggestion).toHaveBeenCalledWith("test-1", "2024-12-24T15:00:00Z")
+      expect(scheduleSuggestion).toHaveBeenCalledWith(
+        "test-1",
+        "2024-12-24T15:00:00Z",
+        { scope: "single" }
+      )
       expect(result.current.scheduleDialogSuggestion).toBeNull()
     })
 
@@ -178,7 +181,7 @@ describe("useSuggestionWorkflow", () => {
         expect(success).toBe(true)
       })
 
-      expect(dismissSuggestion).toHaveBeenCalledWith("test-1")
+      expect(dismissSuggestion).toHaveBeenCalledWith("test-1", { scope: "single" })
       expect(result.current.selectedSuggestion).toBeNull()
     })
 

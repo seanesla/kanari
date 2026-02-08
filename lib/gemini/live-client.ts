@@ -20,7 +20,9 @@
 
 import {
   BreathingExerciseArgsSchema,
+  CancelRecurringActivityArgsSchema,
   CommitmentArgsSchema,
+  EditRecurringActivityArgsSchema,
   GetJournalEntriesArgsSchema,
   JournalPromptArgsSchema,
   QuickActionsArgsSchema,
@@ -34,7 +36,9 @@ import { logDebug, logWarn, logError } from "@/lib/logger"
 import type {
   AccountabilityMode,
   BreathingExerciseToolArgs,
+  CancelRecurringActivityToolArgs,
   CommitmentToolArgs,
+  EditRecurringActivityToolArgs,
   JournalPromptToolArgs,
   QuickActionsToolArgs,
   ScheduleActivityToolArgs,
@@ -62,6 +66,8 @@ export interface SessionContext {
 export type GeminiWidgetEvent =
   | { widget: "schedule_activity"; args: ScheduleActivityToolArgs }
   | { widget: "schedule_recurring_activity"; args: ScheduleRecurringActivityToolArgs }
+  | { widget: "edit_recurring_activity"; args: EditRecurringActivityToolArgs }
+  | { widget: "cancel_recurring_activity"; args: CancelRecurringActivityToolArgs }
   | { widget: "breathing_exercise"; args: BreathingExerciseToolArgs }
   | { widget: "stress_gauge"; args: StressGaugeToolArgs }
   | { widget: "quick_actions"; args: QuickActionsToolArgs }
@@ -795,6 +801,58 @@ export class GeminiLiveClient {
         }
 
         this.config.events.onWidget?.({ widget: "schedule_recurring_activity", args: parsed.data })
+
+        if (fc.id) {
+          this.sendToolResponse([{
+            id: fc.id,
+            name: fc.name,
+            response: { acknowledged: true, shown: true }
+          }])
+        }
+        continue
+      }
+
+      if (fc.name === "edit_recurring_activity") {
+        const parsed = EditRecurringActivityArgsSchema.safeParse(fc.args ?? {})
+        if (!parsed.success) {
+          logWarn("LiveClient", "Invalid edit_recurring_activity args:", parsed.error.issues)
+          if (fc.id) {
+            this.sendToolResponse([{
+              id: fc.id,
+              name: fc.name,
+              response: { acknowledged: false, error: "invalid_args" }
+            }])
+          }
+          continue
+        }
+
+        this.config.events.onWidget?.({ widget: "edit_recurring_activity", args: parsed.data })
+
+        if (fc.id) {
+          this.sendToolResponse([{
+            id: fc.id,
+            name: fc.name,
+            response: { acknowledged: true, shown: true }
+          }])
+        }
+        continue
+      }
+
+      if (fc.name === "cancel_recurring_activity") {
+        const parsed = CancelRecurringActivityArgsSchema.safeParse(fc.args ?? {})
+        if (!parsed.success) {
+          logWarn("LiveClient", "Invalid cancel_recurring_activity args:", parsed.error.issues)
+          if (fc.id) {
+            this.sendToolResponse([{
+              id: fc.id,
+              name: fc.name,
+              response: { acknowledged: false, error: "invalid_args" }
+            }])
+          }
+          continue
+        }
+
+        this.config.events.onWidget?.({ widget: "cancel_recurring_activity", args: parsed.data })
 
         if (fc.id) {
           this.sendToolResponse([{
