@@ -888,6 +888,8 @@ export type ScheduleActivityWidgetState = WidgetBase<"schedule_activity", Schedu
   status: ScheduleActivityWidgetStatus
   suggestionId?: string
   error?: string
+  /** True while the schedule is being persisted to calendar/storage. */
+  isSyncing?: boolean
 }
 
 export type BreathingExerciseWidgetState = WidgetBase<"breathing_exercise", BreathingExerciseToolArgs>

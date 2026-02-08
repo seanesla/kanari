@@ -942,8 +942,10 @@ export function useCheckInSession(options: UseCheckInSessionOptions): UseCheckIn
 
     try {
       // Preserve the existing session + UI history; only re-establish Gemini.
-      dispatch({ type: "SET_INIT_PHASE", phase: "connecting_gemini" })
-      dispatch({ type: "SET_CONNECTING" })
+      // Keep the conversation UI mounted while reconnecting. Switching to the
+      // full-screen "connecting" state causes visible flicker during transient
+      // post-tool reconnects and makes the chat feel like it refreshed.
+      // Pattern doc: docs/error-patterns/check-in-stale-turn-complete-overwrites-processing.md
 
       // Refresh the user's local time context. Reconnects can happen minutes later,
       // and stale time-of-day can cause the model to greet incorrectly.

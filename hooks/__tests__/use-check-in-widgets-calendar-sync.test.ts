@@ -160,6 +160,64 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     })
   })
 
+  it("marks schedule widgets as syncing while calendar persistence is in-flight", async () => {
+    let resolveSchedule: ((value: { id: string; suggestionId: string; calendarEventId: string; scheduledAt: string; duration: number; completed: boolean }) => void) | null = null
+
+    scheduleEventMock.mockImplementationOnce(
+      async (_suggestion: { id: string; scheduledFor?: string; duration: number }) =>
+        await new Promise((resolve) => {
+          resolveSchedule = resolve
+        })
+    )
+
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Super Bowl game with dad",
+          category: "social",
+          date: "2025-02-09",
+          time: "15:30",
+          duration: 240,
+        },
+      })
+    })
+
+    const pendingWidget = result.current[0].widgets[0]
+    expect(pendingWidget?.type).toBe("schedule_activity")
+    if (!pendingWidget || pendingWidget.type !== "schedule_activity") {
+      throw new Error("Expected schedule_activity widget")
+    }
+
+    expect(pendingWidget.status).toBe("scheduled")
+    expect(pendingWidget.isSyncing).toBe(true)
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+      expect(resolveSchedule).toBeTypeOf("function")
+    })
+
+    act(() => {
+      resolveSchedule?.({
+        id: "rb_test",
+        suggestionId: "suggestion",
+        calendarEventId: "evt_test",
+        scheduledAt: "2025-02-09T15:30:00Z",
+        duration: 240,
+        completed: false,
+      })
+    })
+
+    await waitFor(() => {
+      const widget = result.current[0].widgets[0]
+      expect(widget?.type).toBe("schedule_activity")
+      if (!widget || widget.type !== "schedule_activity") return
+      expect(widget.isSyncing).toBe(false)
+    })
+  })
+
   it("accepts tool args that include AM/PM (e.g., '10:00 PM')", async () => {
     const { result } = renderHook(() => useCheckIn())
 

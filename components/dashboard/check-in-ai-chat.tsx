@@ -445,9 +445,15 @@ export function AIChatContent({
     }
   }, [checkIn.widgets, focusedWidgetId])
 
+  const hasSchedulingInFlight = checkIn.widgets.some(
+    (widget) => widget.type === "schedule_activity" && widget.isSyncing
+  )
+
   const statusDotClass = cn(
     "w-3 h-3 rounded-full transition-colors",
-    checkIn.state === "user_speaking"
+    hasSchedulingInFlight
+      ? "bg-amber-500 ring-2 ring-amber-500/20"
+      : checkIn.state === "user_speaking"
       ? "bg-green-500 ring-2 ring-green-500/25"
       : checkIn.state === "assistant_speaking"
         ? "bg-blue-500 ring-2 ring-blue-500/25"
@@ -464,6 +470,10 @@ export function AIChatContent({
     if (checkIn.state === "idle") {
       return isAutoStarting ? "Starting your check-in..." : "Ready to start"
     }
+    if (hasSchedulingInFlight) return "Scheduling activity..."
+    if (!showInitializing && checkIn.connectionState === "connecting") {
+      return "Reconnecting to kanari..."
+    }
     if (showInitializing) {
       return checkIn.initPhase ? getInitPhaseLabel(checkIn.initPhase) : "Setting up voice conversation..."
     }
@@ -476,6 +486,9 @@ export function AIChatContent({
 
   const hasVoiceBiomarkers = Boolean(checkIn.session?.acousticMetrics)
   const modalityHint = (() => {
+    if (hasSchedulingInFlight) {
+      return "Scheduling your activity now. Chat input will re-enable as soon as it is saved."
+    }
     if (checkIn.isMuted) {
       return "Mic is muted. Typing still works, but voice biomarkers will pause until you unmute and speak."
     }
@@ -728,7 +741,13 @@ export function AIChatContent({
                               controls.sendTextMessage(text)
                             }}
                             onTriggerTool={(toolName, args) => controls.triggerManualTool(toolName, args)}
-                            disabled={!checkIn.isActive || checkIn.state === "ai_greeting" || checkIn.state === "ready"}
+                            disabled={
+                              !checkIn.isActive
+                              || checkIn.state === "ai_greeting"
+                              || checkIn.state === "ready"
+                              || checkIn.state === "processing"
+                              || hasSchedulingInFlight
+                            }
                             isMuted={checkIn.isMuted}
                             onToggleMute={() => controls.toggleMute()}
                             modalityHint={modalityHint}

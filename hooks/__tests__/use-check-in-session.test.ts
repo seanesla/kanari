@@ -271,6 +271,43 @@ describe("useCheckIn session lifecycle", () => {
     expect(onSessionEnd).not.toHaveBeenCalled()
   })
 
+  it("keeps the conversation state stable while a reconnect is in flight", async () => {
+    const reconnectGate = new Promise<void>(() => {})
+
+    connectMock.mockReset()
+    connectMock
+      .mockImplementationOnce(async () => {
+        geminiCallbacks?.onConnected?.()
+      })
+      .mockImplementationOnce(async () => {
+        await reconnectGate
+      })
+
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("hello", false)
+      result.current[1].sendTextMessage("Schedule a break tomorrow at 3:30 PM.")
+    })
+
+    expect(result.current[0].state).toBe("processing")
+
+    act(() => {
+      geminiCallbacks?.onDisconnected?.("network lost")
+    })
+
+    await waitFor(() => {
+      expect(connectMock).toHaveBeenCalledTimes(2)
+    })
+
+    // Reconnect should not force the UI into the full-screen "connecting" state.
+    expect(result.current[0].state).toBe("processing")
+  })
+
   it("surfaces an error when Gemini disconnects before any user participation", async () => {
     const { result } = renderHook(() => useCheckIn())
 

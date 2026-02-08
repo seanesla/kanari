@@ -1,7 +1,7 @@
 "use client"
 
 import { Temporal } from "temporal-polyfill"
-import { CalendarCheck, CalendarX } from "@/lib/icons"
+import { CalendarCheck, CalendarX, Loader2 } from "@/lib/icons"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useTimeZone } from "@/lib/timezone-context"
@@ -59,11 +59,12 @@ export function ScheduleConfirmation({
 }: ScheduleConfirmationProps) {
   const { args } = widget
   const { timeZone } = useTimeZone()
+  const isSyncing = widget.isSyncing === true
 
   return (
     <WidgetContainer
       title="Scheduled activity"
-      description="Added to your in-app calendar"
+      description={isSyncing ? "Saving to your in-app calendar" : "Added to your in-app calendar"}
       onDismiss={onDismiss}
     >
       <div className="flex items-start justify-between gap-3">
@@ -75,13 +76,19 @@ export function ScheduleConfirmation({
         </div>
         <Badge
           className={
-            widget.status === "scheduled"
+            isSyncing
+              ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
+              : widget.status === "scheduled"
               ? "bg-green-500/10 text-green-600 border-green-500/20"
               : "bg-destructive/10 text-destructive border-destructive/20"
           }
           variant="outline"
         >
-          {widget.status === "scheduled" ? (
+          {isSyncing ? (
+            <>
+              <Loader2 className="h-3 w-3 animate-spin" /> Scheduling
+            </>
+          ) : widget.status === "scheduled" ? (
             <>
               <CalendarCheck className="h-3 w-3" /> Scheduled
             </>
@@ -108,7 +115,7 @@ export function ScheduleConfirmation({
         ) : null}
       </div>
 
-      {widget.status === "scheduled" && widget.suggestionId && onUndo ? (
+      {widget.status === "scheduled" && !isSyncing && widget.suggestionId && onUndo ? (
         <div className="mt-4 flex justify-end">
           <Button
             variant="outline"

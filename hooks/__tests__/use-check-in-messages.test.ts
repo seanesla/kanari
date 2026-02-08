@@ -284,6 +284,65 @@ describe("useCheckIn message handling", () => {
     expect(result.current[0].state).toBe("listening")
   })
 
+  it("ignores a stale turnComplete that arrives right after sending a new user turn", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    // Simulate an assistant turn that is still waiting to emit turnComplete.
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("Great news. How do you want to celebrate?", false)
+    })
+
+    act(() => {
+      result.current[1].sendTextMessage("Can you schedule the game tomorrow from 3:30 to 7:30?")
+    })
+
+    expect(result.current[0].state).toBe("processing")
+
+    // Late turnComplete from the previous assistant turn should NOT knock us
+    // back to listening while we are waiting on the newly-sent user turn.
+    act(() => {
+      geminiCallbacks?.onTurnComplete?.()
+    })
+
+    expect(result.current[0].state).toBe("processing")
+  })
+
+  it("does not stream microphone audio while the model is processing", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("Hi there", false)
+      geminiCallbacks?.onTurnComplete?.()
+    })
+
+    const pcm = new Int16Array([0, 1000, -1000, 0])
+
+    sendAudioMock.mockClear()
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "audio", pcm: pcm.buffer } })
+    })
+    expect(sendAudioMock).toHaveBeenCalledTimes(1)
+
+    sendAudioMock.mockClear()
+    act(() => {
+      result.current[1].sendTextMessage("Please schedule the Super Bowl tomorrow from 3:30 to 7:30.")
+    })
+    expect(result.current[0].state).toBe("processing")
+
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "audio", pcm: pcm.buffer } })
+    })
+    expect(sendAudioMock).not.toHaveBeenCalled()
+  })
+
   it("merges user transcript updates into a single message", () => {
     const { result } = renderHook(() => useCheckIn())
 

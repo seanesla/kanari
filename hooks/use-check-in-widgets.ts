@@ -368,6 +368,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
               } as ScheduleActivityToolArgs,
               status: "scheduled",
               suggestionId,
+              isSyncing: true,
             },
           })
 
@@ -375,6 +376,13 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
             try {
               await addSuggestionToDb(suggestion)
               await syncSuggestionToCalendar(widgetId, suggestion)
+              dispatch({
+                type: "UPDATE_WIDGET",
+                widgetId,
+                updates: {
+                  isSyncing: false,
+                },
+              })
             } catch (error) {
               unmarkScheduledInstant(scheduledFor)
               dispatch({
@@ -384,6 +392,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
                   status: "failed",
                   error: error instanceof Error ? error.message : "Failed to save",
                   suggestionId: undefined,
+                  isSyncing: false,
                 },
               })
             }
@@ -528,6 +537,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
             args: resolvedArgs,
             status: "scheduled",
             suggestionId,
+            isSyncing: true,
           },
         })
 
@@ -539,6 +549,13 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
             // assistant replies and can trigger chat auto-scroll jitter while waiting.
             // Pattern doc: docs/error-patterns/schedule-activity-double-confirmation.md
             await syncSuggestionToCalendar(widgetId, suggestion)
+            dispatch({
+              type: "UPDATE_WIDGET",
+              widgetId,
+              updates: {
+                isSyncing: false,
+              },
+            })
           } catch (error) {
             unmarkScheduledInstant(scheduledFor)
             dispatch({
@@ -548,6 +565,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
                 status: "failed",
                 error: error instanceof Error ? error.message : "Failed to save",
                 suggestionId: undefined,
+                isSyncing: false,
               },
             })
           }
@@ -714,6 +732,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           args,
           status: "scheduled",
           suggestionId,
+          isSyncing: true,
         },
       })
 
@@ -721,6 +740,13 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         try {
           await addSuggestionToDb(suggestion)
           const synced = await syncSuggestionToCalendar(widgetId, suggestion)
+          dispatch({
+            type: "UPDATE_WIDGET",
+            widgetId,
+            updates: {
+              isSyncing: false,
+            },
+          })
           if (synced) {
             const confirmationMessage: CheckInMessage = {
               id: generateId(),
@@ -739,6 +765,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
               status: "failed",
               error: error instanceof Error ? error.message : "Failed to save",
               suggestionId: undefined,
+              isSyncing: false,
             },
           })
         }

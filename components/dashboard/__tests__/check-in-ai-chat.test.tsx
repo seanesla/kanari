@@ -55,12 +55,14 @@ vi.mock("@/components/check-in/chat-input", () => ({
   ChatInput: ({
     onSendText,
     modalityHint,
+    disabled,
   }: {
     onSendText: (text: string) => void
     modalityHint?: string
+    disabled?: boolean
   }) => (
     <div>
-      <button type="button" onClick={() => onSendText("hello")}>
+      <button type="button" disabled={disabled} onClick={() => onSendText("hello")}>
         Send text
       </button>
       {modalityHint ? <p>{modalityHint}</p> : null}
@@ -293,6 +295,64 @@ describe("AIChatContent", () => {
 
     expect(
       screen.getByText(/typing keeps the chat moving\. speaking gives kanari richer biomarker context/i)
+    ).toBeInTheDocument()
+  })
+
+  it("disables chat input and shows scheduling copy while schedule sync is in-flight", async () => {
+    useCheckInMock.mockReturnValue([
+      {
+        state: "processing",
+        initPhase: null,
+        isActive: true,
+        session: { id: "s1", startedAt: new Date().toISOString(), messages: [], acousticMetrics: null },
+        messages: [],
+        currentUserTranscript: "",
+        widgets: [
+          {
+            id: "w1",
+            type: "schedule_activity",
+            createdAt: new Date().toISOString(),
+            args: {
+              title: "Super Bowl game with dad",
+              category: "social",
+              date: "2026-02-08",
+              time: "15:30",
+              duration: 240,
+            },
+            status: "scheduled",
+            suggestionId: "sg1",
+            isSyncing: true,
+          },
+        ],
+        error: null,
+        isMuted: false,
+      },
+      {
+        startSession: vi.fn(async () => {}),
+        endSession: vi.fn(async () => {}),
+        cancelSession: vi.fn(),
+        getSession: vi.fn(() => null),
+        toggleMute: vi.fn(),
+        dismissWidget: vi.fn(),
+        undoScheduledActivity: vi.fn(async () => {}),
+        runQuickAction: vi.fn(),
+        saveJournalEntry: vi.fn(async () => {}),
+        triggerManualTool: vi.fn(),
+        sendTextMessage: vi.fn(),
+        preserveSession: vi.fn(),
+        hasPreservedSession: vi.fn(() => false),
+        resumePreservedSession: vi.fn(async () => {}),
+        getContextFingerprint: vi.fn(async () => ""),
+        interruptAssistant: vi.fn(),
+      },
+    ])
+
+    const { AIChatContent } = await import("../check-in-ai-chat")
+    render(<AIChatContent />)
+
+    expect(screen.getByRole("button", { name: /send text/i })).toBeDisabled()
+    expect(
+      screen.getByText(/scheduling your activity now\. chat input will re-enable as soon as it is saved\./i)
     ).toBeInTheDocument()
   })
 

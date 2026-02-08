@@ -72,6 +72,8 @@ export interface UseCheckInMessagesResult {
   handleConnectionInterrupted: (reason?: string) => void
 }
 
+const STALE_TURN_COMPLETE_WINDOW_MS = 1200
+
 export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheckInMessagesResult {
   const {
     data,
@@ -108,6 +110,12 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
   // Track when user started speaking (for correct message timestamp ordering)
   const userSpeechStartRef = useRef<string | null>(null)
+
+  // Tracks a newly-sent user turn while we are waiting for assistant output.
+  // If a delayed turnComplete from the *previous* turn arrives immediately after
+  // sending a new user message, we should ignore it so the UI stays in processing.
+  // Pattern doc: docs/error-patterns/check-in-stale-turn-complete-overwrites-processing.md
+  const pendingAssistantTurnRef = useRef<{ startedAtMs: number; hasModelOutput: boolean } | null>(null)
 
   // Accumulate session-level audio features across utterances
   const sessionFeatureAccumulatorRef = useRef<FeatureAccumulator | null>(null)
@@ -166,6 +174,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       pendingUserUtteranceResetRef.current = false
       userSpeechEndHandledRef.current = false
       userSpeechStartRef.current = null
+      pendingAssistantTurnRef.current = null
     }
   }, [data.session?.id])
 
@@ -352,6 +361,11 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     if (userSpeechEndHandledRef.current) return
     userSpeechEndHandledRef.current = true
 
+    pendingAssistantTurnRef.current = {
+      startedAtMs: Date.now(),
+      hasModelOutput: false,
+    }
+
     dispatch({ type: "SET_PROCESSING" })
 
     const transcript = userTranscriptRef.current.trim()
@@ -459,6 +473,10 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
           messageId: lastUserMessageIdRef.current!,
           isStreaming: false,
         })
+        pendingAssistantTurnRef.current = {
+          startedAtMs: Date.now(),
+          hasModelOutput: false,
+        }
         dispatch({ type: "SET_PROCESSING" })
         void processUserUtterance()
       }
@@ -469,6 +487,10 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
   const onModelTranscript = useCallback(
     (text: string, finished: boolean) => {
       if (!text) return
+
+      if (pendingAssistantTurnRef.current) {
+        pendingAssistantTurnRef.current.hasModelOutput = true
+      }
 
       const mergedAssistant = mergeTranscriptUpdate(currentTranscriptRef.current, text)
       if (debugTranscriptMergeRef.current) {
@@ -513,6 +535,10 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
   const onModelThinking = useCallback(
     (text: string) => {
+      if (pendingAssistantTurnRef.current) {
+        pendingAssistantTurnRef.current.hasModelOutput = true
+      }
+
       // Simple: just accumulate thinking text
       currentThinkingRef.current += text
       dispatch({ type: "APPEND_ASSISTANT_THINKING", text })
@@ -522,6 +548,10 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
   const onAudioChunk = useCallback(
     (base64Audio: string) => {
+      if (pendingAssistantTurnRef.current) {
+        pendingAssistantTurnRef.current.hasModelOutput = true
+      }
+
       // If the model starts speaking and we still have a streaming user message,
       // finalize it so it doesn't look "in-progress" throughout the reply.
       const messageId = lastUserMessageIdRef.current
@@ -539,6 +569,16 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
   )
 
   const onTurnComplete = useCallback(() => {
+    const pendingAssistantTurn = pendingAssistantTurnRef.current
+    if (pendingAssistantTurn && !pendingAssistantTurn.hasModelOutput) {
+      const elapsedMs = Date.now() - pendingAssistantTurn.startedAtMs
+      if (elapsedMs < STALE_TURN_COMPLETE_WINDOW_MS) {
+        return
+      }
+    }
+
+    pendingAssistantTurnRef.current = null
+
     // Finalize the streaming message (just removes isStreaming flag - no DOM change)
     dispatch({ type: "FINALIZE_STREAMING_MESSAGE" })
     // Reset refs for next response
@@ -553,6 +593,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
   const onInterrupted = useCallback(() => {
     // User barged in - clear playback and reset for next response
     clearQueuedAudio()
+    pendingAssistantTurnRef.current = null
     currentTranscriptRef.current = ""
     currentThinkingRef.current = ""
     lastAssistantMessageIdRef.current = null
@@ -569,6 +610,10 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       addUserTextMessage(trimmed)
 
       // Set state to processing
+      pendingAssistantTurnRef.current = {
+        startedAtMs: Date.now(),
+        hasModelOutput: false,
+      }
       dispatch({ type: "SET_PROCESSING" })
 
       // Send to Gemini
@@ -597,6 +642,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       currentTranscriptRef.current = ""
       currentThinkingRef.current = ""
       lastAssistantMessageIdRef.current = null
+      pendingAssistantTurnRef.current = null
 
       // Ensure the next user transcript doesn't keep appending into the last user bubble
       // (especially if VAD speech-start events get lost around reconnects).

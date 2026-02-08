@@ -86,6 +86,7 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
   // Enforce "AI speaks first" at the start of a session.
   // We block user audio/text until the assistant produces *any* output (audio, transcript, or explicit silence).
   const assistantHasStartedRef = useRef(false)
+  const scheduleSyncInFlightRef = useRef(false)
 
   const sessionCallbacksRef = useRef<CheckInSessionCallbacks>({
     onSessionStart,
@@ -117,6 +118,12 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
       assistantHasStartedRef.current = true
     }
   }, [data.messages])
+
+  useEffect(() => {
+    scheduleSyncInFlightRef.current = data.widgets.some(
+      (widget) => widget.type === "schedule_activity" && widget.isSyncing
+    )
+  }, [data.widgets])
 
   // Audio playback hook (assistant output)
   const [_playback, playbackControls] = useAudioPlayback({
@@ -154,6 +161,12 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
   const sendAudio = useCallback((base64Audio: string) => {
     // Block user audio until the assistant starts the conversation.
     if (!assistantHasStartedRef.current) return
+
+    // Keep turn-taking strict while the model is actively processing and while
+    // schedule_activity writes are still being persisted. Streaming mic input in
+    // these windows can interleave turns and produce duplicated/garbled replies.
+    // Pattern doc: docs/error-patterns/check-in-stale-turn-complete-overwrites-processing.md
+    if (stateRef.current === "processing" || scheduleSyncInFlightRef.current) return
 
     // Avoid feedback loops when the assistant audio is playing through speakers.
     // In some environments, echo cancellation isn't strong enough and Gemini will
@@ -337,6 +350,7 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
     triggerManualTool: widgets.triggerManualTool,
     sendTextMessage: (text) => {
       if (!assistantHasStartedRef.current) return
+      if (stateRef.current === "processing" || scheduleSyncInFlightRef.current) return
       messages.sendTextMessage(text)
     },
     preserveSession: session.preserveSession,
