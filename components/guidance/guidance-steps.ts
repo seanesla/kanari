@@ -91,10 +91,9 @@ export const DEMO_STEPS: GuidanceStep[] = [
     id: "demo-checkins",
     title: "Start a Check-in",
     message:
-      "Use New Check-in to open the live check-in view. You'll move forward once that view is open.",
+      "Use New Check-in whenever you're ready to start a live check-in. You can keep going in this walkthrough without opening it.",
     route: "/check-ins",
     target: "demo-new-checkin-button",
-    completionTarget: "demo-new-checkin-view",
     autoOpen: "checkins-mobile-sidebar",
   },
   {

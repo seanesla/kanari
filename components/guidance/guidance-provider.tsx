@@ -39,6 +39,8 @@ interface GuidanceContextValue {
   prev: () => void
   /** Skip the current step (demo) or skip the guide (first-time) */
   skip: () => void
+  /** Exit the active guide immediately */
+  exitGuide: () => void
   /** Whether advancing is allowed for this step */
   canAdvance: boolean
   /** IDs of demo steps skipped during this run */
@@ -274,6 +276,11 @@ export function GuidanceProvider({ children }: { children: ReactNode }) {
     void completeGuide(activeGuide)
   }, [activeGuide, currentStep?.id, stepIndex, totalSteps, completeGuide])
 
+  const exitGuide = useCallback(() => {
+    if (!activeGuide) return
+    void completeGuide(activeGuide)
+  }, [activeGuide, completeGuide])
+
   const startGuide = useCallback((type: GuidanceType, options?: { resume?: boolean }) => {
     const shouldResume = options?.resume === true
 
@@ -411,11 +418,12 @@ export function GuidanceProvider({ children }: { children: ReactNode }) {
       next,
       prev,
       skip,
+      exitGuide,
       canAdvance,
       skippedStepIds,
       startGuide,
     }),
-    [activeGuide, currentStep, stepIndex, totalSteps, next, prev, skip, canAdvance, skippedStepIds, startGuide]
+    [activeGuide, currentStep, stepIndex, totalSteps, next, prev, skip, exitGuide, canAdvance, skippedStepIds, startGuide]
   )
 
   return (

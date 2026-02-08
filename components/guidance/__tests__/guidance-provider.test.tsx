@@ -60,6 +60,7 @@ function GuidanceConsumer() {
       <button data-testid="next" onClick={ctx.next}>Next</button>
       <button data-testid="prev" onClick={ctx.prev}>Prev</button>
       <button data-testid="skip" onClick={ctx.skip}>Skip</button>
+      <button data-testid="exit" onClick={ctx.exitGuide}>Exit</button>
       <button data-testid="start-ft" onClick={() => ctx.startGuide("first-time")}>Start FT</button>
       <button data-testid="start-demo" onClick={() => ctx.startGuide("demo")}>Start Demo</button>
     </div>
@@ -216,7 +217,7 @@ describe("GuidanceProvider", () => {
       expect(mockRouterPush).toHaveBeenCalledWith("/check-ins")
     })
 
-    it("blocks next on required-action demo step until completion target exists", async () => {
+    it("does not block next on the check-in demo step", () => {
       seedDemoStepTargets()
 
       mockUseLiveQueryReturn = {
@@ -241,23 +242,7 @@ describe("GuidanceProvider", () => {
         DEMO_STEPS[checkInStepIndex]?.title
       )
 
-      // Should stay on this step until the required target appears.
-      act(() => {
-        screen.getByTestId("next").click()
-      })
-      expect(screen.getByTestId("step-index").textContent).toBe(String(checkInStepIndex))
-
-      // Simulate opening the New Check-in view.
-      const openedView = document.createElement("div")
-      openedView.setAttribute("data-demo-id", "demo-new-checkin-view")
-      openedView.style.width = "100px"
-      openedView.style.height = "100px"
-      document.body.appendChild(openedView)
-
-      await act(async () => {
-        await Promise.resolve()
-      })
-
+      // Next should move forward immediately without requiring New Check-in view.
       act(() => {
         screen.getByTestId("next").click()
       })
@@ -410,6 +395,26 @@ describe("GuidanceProvider", () => {
       expect(screen.getByTestId("step-index").textContent).toBe("1")
       expect(screen.getByTestId("skipped-steps").textContent).toContain("demo-intro")
       // patchSettings should NOT be called for demo guide
+      expect(mockPatchSettings).not.toHaveBeenCalled()
+    })
+  })
+
+  describe("exitGuide", () => {
+    it("exitGuide() closes the demo guide immediately", async () => {
+      mockUseLiveQueryReturn = {
+        hasCompletedOnboarding: true,
+      }
+      mockIsDemoWorkspace = true
+
+      renderWithProvider()
+
+      expect(screen.getByTestId("active-guide").textContent).toBe("demo")
+
+      await act(async () => {
+        screen.getByTestId("exit").click()
+      })
+
+      expect(screen.getByTestId("active-guide").textContent).toBe("none")
       expect(mockPatchSettings).not.toHaveBeenCalled()
     })
   })

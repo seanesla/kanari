@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useCallback, useMemo } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, ArrowRight, X, Sparkles } from "@/lib/icons"
@@ -28,6 +28,7 @@ export function GuidancePopup() {
     next,
     prev,
     skip,
+    exitGuide,
     canAdvance,
   } = useGuidance()
   const { accentColor } = useSceneMode()
@@ -73,6 +74,15 @@ export function GuidancePopup() {
       y: Math.max(safeTop, Math.min(y, demoPosition.viewport.height - TOOLTIP_MIN_HEIGHT - safeBottom)),
     }
   }, [demoPosition.safeAreas.bottom, demoPosition.safeAreas.top, demoPosition.targetRect, demoPosition.viewport.height, demoPosition.viewport.width, isMobile])
+
+  const handleExitGuide = useCallback(() => {
+    if (typeof window === "undefined") return
+    const shouldExit = window.confirm(
+      "Exit the walkthrough? You can restart it anytime from Settings."
+    )
+    if (!shouldExit) return
+    exitGuide()
+  }, [exitGuide])
 
   if (isDemoGuide) {
     const hasTarget = !!demoPosition.targetRect
@@ -128,8 +138,8 @@ export function GuidancePopup() {
                   </h3>
                 </div>
                 <button
-                  onClick={skip}
-                  aria-label="Skip step"
+                  onClick={handleExitGuide}
+                  aria-label="Exit walkthrough"
                   className="p-1 -m-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors shrink-0"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -217,8 +227,8 @@ export function GuidancePopup() {
                 </h3>
               </div>
               <button
-                onClick={skip}
-                aria-label="Skip guide"
+                onClick={handleExitGuide}
+                aria-label="Exit walkthrough"
                 className="p-1 -m-1 rounded-md text-muted-foreground hover:text-foreground
                   hover:bg-muted/30 transition-colors shrink-0"
               >
