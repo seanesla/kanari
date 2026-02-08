@@ -300,6 +300,17 @@ export function CheckInDialog({
     onOpenChange(false)
   }, [checkIn.isActive, controls, onOpenChange])
 
+  const handleDialogOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      if (!nextOpen) {
+        void handleClose()
+        return
+      }
+      onOpenChange(true)
+    },
+    [handleClose, onOpenChange]
+  )
+
   // Handle end call
   const handleEndCall = useCallback(async () => {
     await controls.endSession()
@@ -360,7 +371,7 @@ export function CheckInDialog({
   }, [checkIn.widgets, focusedWidgetId])
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
       <DialogContent
         className="sm:max-w-2xl h-[80vh] max-h-[700px] flex flex-col p-0 gap-0"
         showCloseButton={false}
