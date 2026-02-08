@@ -366,6 +366,53 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
     })
   })
 
+  test("handles schedule_recurring_activity tool calls", async () => {
+    await client.connect()
+
+    getClientInternals(client).handleMessage({
+      toolCall: {
+        functionCalls: [
+          {
+            id: "call_4",
+            name: "schedule_recurring_activity",
+            args: {
+              title: "Study session",
+              category: "rest",
+              startDate: "2026-02-09",
+              time: "8:00 PM",
+              duration: 45,
+              frequency: "weekdays",
+              count: 5,
+            },
+          },
+        ],
+      },
+    })
+
+    expect(config.events.onWidget).toHaveBeenCalledWith({
+      widget: "schedule_recurring_activity",
+      args: {
+        title: "Study session",
+        category: "rest",
+        startDate: "2026-02-09",
+        time: "20:00",
+        duration: 45,
+        frequency: "weekdays",
+        count: 5,
+      },
+    })
+
+    expect(mockSession.sendToolResponse).toHaveBeenCalledWith({
+      functionResponses: [
+        {
+          id: "call_4",
+          name: "schedule_recurring_activity",
+          response: { acknowledged: true, shown: true },
+        },
+      ],
+    })
+  })
+
   test("streams model text parts as transcript and routes thought parts to thinking", async () => {
     await client.connect()
 

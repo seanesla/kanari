@@ -9,11 +9,14 @@ import type {
   CheckInMessage,
   JournalEntry,
   ScheduleActivityToolArgs,
+  ScheduleRecurringActivityToolArgs,
   Suggestion,
   RecoveryBlock,
 } from "@/lib/types"
 import {
+  MAX_RECURRING_SCHEDULE_OCCURRENCES,
   clampDurationMinutes,
+  expandRecurringScheduleOccurrences,
   extractDurationMinutesFromText,
   extractDateISOFromText,
   extractExplicitTimeFromText,
@@ -75,6 +78,46 @@ function userRequestedCheckIn(text: string): boolean {
   return /\bcheck[\s-]?in\b/i.test(text)
 }
 
+function normalizeScheduleDedupeTitle(title: string): string {
+  const normalized = title.trim().toLowerCase().replace(/\s+/g, " ")
+  return normalized || "untitled"
+}
+
+function resolveScheduleArgsFromUserMessage(
+  toolArgs: ScheduleActivityToolArgs,
+  lastUserMessage: string
+): ScheduleActivityToolArgs {
+  const explicitDurationMinutes = extractDurationMinutesFromText(lastUserMessage)
+  const inferredUserTitle = inferScheduleTitle(lastUserMessage)
+  const userAskedForCheckIn = userRequestedCheckIn(lastUserMessage)
+
+  // Pattern doc: docs/error-patterns/schedule-activity-generic-title-duration-drift.md
+  // Pattern doc: docs/error-patterns/schedule-activity-title-duration-override-miss.md
+  const shouldPreferUserTitle =
+    inferredUserTitle !== "Scheduled activity"
+    && (
+      isGenericActivityTitle(toolArgs.title)
+      || !toolArgs.title.trim()
+      || (isCheckInActivityTitle(toolArgs.title) && !userAskedForCheckIn)
+    )
+
+  const resolvedTitle = shouldPreferUserTitle ? inferredUserTitle : toolArgs.title
+
+  // Pattern doc: docs/error-patterns/schedule-activity-user-time-mismatch.md
+  const userTime = extractExplicitTimeFromText(lastUserMessage)
+  const normalizedToolTime = normalizeTimeToHHMM(toolArgs.time)
+  const resolvedTime = userTime
+    ? formatTimeHHMM(userTime)
+    : normalizedToolTime ?? toolArgs.time
+
+  return {
+    ...toolArgs,
+    title: resolvedTitle,
+    time: resolvedTime,
+    duration: clampDurationMinutes(explicitDurationMinutes ?? toolArgs.duration),
+  }
+}
+
 export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckInWidgetsResult {
   const { data, dispatch, sendText, addUserTextMessage } = options
   const { scheduleEvent } = useLocalCalendar()
@@ -90,28 +133,32 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
   // ========================================
 
   // Pattern doc: docs/error-patterns/schedule-activity-double-schedules.md
-  const scheduledInstantsRef = useRef<Set<string>>(new Set())
+  const scheduledEventKeysRef = useRef<Set<string>>(new Set())
   const lastSessionIdForDedupeRef = useRef<string | null>(null)
 
   useEffect(() => {
     const sessionId = data.session?.id ?? null
     if (sessionId !== lastSessionIdForDedupeRef.current) {
-      scheduledInstantsRef.current.clear()
+      scheduledEventKeysRef.current.clear()
       lastSessionIdForDedupeRef.current = sessionId
     }
   }, [data.session?.id])
 
-  const isDuplicateScheduledInstant = useCallback((scheduledFor: string): boolean => {
-    return scheduledInstantsRef.current.has(scheduledFor)
+  const buildScheduleDedupeKey = useCallback((scheduledFor: string, title: string): string => {
+    return `${scheduledFor}::${normalizeScheduleDedupeTitle(title)}`
   }, [])
 
-  const markScheduledInstant = useCallback((scheduledFor: string) => {
-    scheduledInstantsRef.current.add(scheduledFor)
-  }, [])
+  const isDuplicateScheduledEvent = useCallback((scheduledFor: string, title: string): boolean => {
+    return scheduledEventKeysRef.current.has(buildScheduleDedupeKey(scheduledFor, title))
+  }, [buildScheduleDedupeKey])
 
-  const unmarkScheduledInstant = useCallback((scheduledFor: string) => {
-    scheduledInstantsRef.current.delete(scheduledFor)
-  }, [])
+  const markScheduledEvent = useCallback((scheduledFor: string, title: string) => {
+    scheduledEventKeysRef.current.add(buildScheduleDedupeKey(scheduledFor, title))
+  }, [buildScheduleDedupeKey])
+
+  const unmarkScheduledEvent = useCallback((scheduledFor: string, title: string) => {
+    scheduledEventKeysRef.current.delete(buildScheduleDedupeKey(scheduledFor, title))
+  }, [buildScheduleDedupeKey])
 
   // ========================================
   // Storage Helpers (dynamic import)
@@ -207,37 +254,121 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
     ]
   )
 
-  const syncSuggestionToCalendar = useCallback(async (widgetId: string, suggestion: Suggestion): Promise<boolean> => {
+  const syncSuggestionToCalendar = useCallback(async (suggestion: Suggestion): Promise<void> => {
     // Local calendar is always connected
     const block = await scheduleEvent(suggestion, { timeZone })
     if (!block) {
-      dispatch({
-        type: "UPDATE_WIDGET",
-        widgetId,
-        updates: {
-          error: "Failed to save calendar event",
-        },
-      })
-      return false
+      throw new Error("Failed to save calendar event")
     }
 
-    try {
-      await addRecoveryBlockToDb(block)
-      return true
-    } catch (persistError) {
+    await addRecoveryBlockToDb(block)
+  }, [addRecoveryBlockToDb, scheduleEvent, timeZone])
+
+  const scheduleSingleActivity = useCallback(
+    async (
+      args: ScheduleActivityToolArgs,
+      options: {
+        rationale: string
+        createdAt?: string
+        scheduledForOverride?: string
+      }
+    ): Promise<"scheduled" | "failed" | "duplicate"> => {
+      const createdAt = options.createdAt ?? new Date().toISOString()
+      const normalizedTime = normalizeTimeToHHMM(args.time) ?? args.time
+      const resolvedArgs: ScheduleActivityToolArgs = {
+        ...args,
+        time: normalizedTime,
+        duration: clampDurationMinutes(args.duration),
+      }
+
+      const widgetId = generateId()
+      const suggestionId = generateId()
+      const scheduledFor = options.scheduledForOverride ?? parseZonedDateTimeInstant(
+        resolvedArgs.date,
+        resolvedArgs.time,
+        timeZone
+      )
+
+      if (!scheduledFor) {
+        dispatch({
+          type: "ADD_WIDGET",
+          widget: {
+            id: widgetId,
+            type: "schedule_activity",
+            createdAt,
+            args: resolvedArgs,
+            status: "failed",
+            error: "Invalid date/time",
+          },
+        })
+        return "failed"
+      }
+
+      if (isDuplicateScheduledEvent(scheduledFor, resolvedArgs.title)) {
+        return "duplicate"
+      }
+      markScheduledEvent(scheduledFor, resolvedArgs.title)
+
+      const suggestion: Suggestion = {
+        id: suggestionId,
+        content: resolvedArgs.title,
+        rationale: options.rationale,
+        duration: resolvedArgs.duration,
+        category: resolvedArgs.category,
+        status: "scheduled",
+        createdAt,
+        scheduledFor,
+      }
+
       dispatch({
-        type: "UPDATE_WIDGET",
-        widgetId,
-        updates: {
-          error:
-            persistError instanceof Error
-              ? persistError.message
-              : "Failed to persist calendar event",
+        type: "ADD_WIDGET",
+        widget: {
+          id: widgetId,
+          type: "schedule_activity",
+          createdAt,
+          args: resolvedArgs,
+          status: "scheduled",
+          suggestionId,
+          isSyncing: true,
         },
       })
-      return false
-    }
-  }, [addRecoveryBlockToDb, dispatch, scheduleEvent, timeZone])
+
+      try {
+        await addSuggestionToDb(suggestion)
+        await syncSuggestionToCalendar(suggestion)
+        dispatch({
+          type: "UPDATE_WIDGET",
+          widgetId,
+          updates: {
+            isSyncing: false,
+          },
+        })
+        return "scheduled"
+      } catch (error) {
+        unmarkScheduledEvent(scheduledFor, resolvedArgs.title)
+        dispatch({
+          type: "UPDATE_WIDGET",
+          widgetId,
+          updates: {
+            status: "failed",
+            error: error instanceof Error ? error.message : "Failed to save",
+            suggestionId: undefined,
+            isSyncing: false,
+          },
+        })
+        return "failed"
+      }
+    },
+    [
+      addSuggestionToDb,
+      dispatch,
+      isDuplicateScheduledEvent,
+      markScheduledEvent,
+      syncSuggestionToCalendar,
+      timeZone,
+      unmarkScheduledEvent,
+    ]
+  )
 
   const runQuickAction = useCallback(
     (widgetId: string, action: string, label?: string) => {
@@ -324,93 +455,18 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         }
 
         case "schedule_activity": {
-          const widgetId = generateId()
-          const suggestionId = generateId()
-
-          const normalizedTime = normalizeTimeToHHMM(args.time as string) ?? (args.time as string)
-          const scheduledFor = parseZonedDateTimeInstant(args.date as string, normalizedTime, timeZone)
-
-          if (!scheduledFor) {
-            dispatch({
-              type: "ADD_WIDGET",
-              widget: {
-                id: widgetId,
-                type: "schedule_activity",
-                createdAt: now,
-                args: {
-                  title: args.title,
-                  category: args.category,
-                  date: args.date,
-                  time: normalizedTime,
-                  duration: args.duration,
-                } as ScheduleActivityToolArgs,
-                status: "failed",
-                error: "Invalid date/time",
-              },
-            })
-            return
+          const manualArgs: ScheduleActivityToolArgs = {
+            title: String(args.title ?? "Scheduled activity"),
+            category: (args.category as ScheduleActivityToolArgs["category"]) ?? "rest",
+            date: String(args.date ?? ""),
+            time: String(args.time ?? ""),
+            duration: Number(args.duration ?? 20),
           }
 
-          if (isDuplicateScheduledInstant(scheduledFor)) {
-            return
-          }
-          markScheduledInstant(scheduledFor)
-
-          const suggestion: Suggestion = {
-            id: suggestionId,
-            content: args.title as string,
+          void scheduleSingleActivity(manualArgs, {
             rationale: "Manually scheduled from chat",
-            duration: args.duration as number,
-            category: args.category as "break" | "exercise" | "mindfulness" | "social" | "rest",
-            status: "scheduled",
             createdAt: now,
-            scheduledFor,
-          }
-
-          dispatch({
-            type: "ADD_WIDGET",
-            widget: {
-              id: widgetId,
-              type: "schedule_activity",
-              createdAt: now,
-              args: {
-                title: args.title,
-                category: args.category,
-                date: args.date,
-                time: normalizedTime,
-                duration: args.duration,
-              } as ScheduleActivityToolArgs,
-              status: "scheduled",
-              suggestionId,
-              isSyncing: true,
-            },
           })
-
-          void (async () => {
-            try {
-              await addSuggestionToDb(suggestion)
-              await syncSuggestionToCalendar(widgetId, suggestion)
-              dispatch({
-                type: "UPDATE_WIDGET",
-                widgetId,
-                updates: {
-                  isSyncing: false,
-                },
-              })
-            } catch (error) {
-              unmarkScheduledInstant(scheduledFor)
-              dispatch({
-                type: "UPDATE_WIDGET",
-                widgetId,
-                updates: {
-                  status: "failed",
-                  error: error instanceof Error ? error.message : "Failed to save",
-                  suggestionId: undefined,
-                  isSyncing: false,
-                },
-              })
-            }
-          })()
           break
         }
 
@@ -466,7 +522,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           console.warn("[useCheckIn] Unknown manual tool:", toolName)
       }
     },
-    [addSuggestionToDb, data.latestMismatch, dispatch, syncSuggestionToCalendar, timeZone]
+    [data.latestMismatch, dispatch, scheduleSingleActivity]
   )
 
   // ========================================
@@ -478,117 +534,126 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
       const now = new Date().toISOString()
 
       if (event.widget === "schedule_activity") {
-        const widgetId = generateId()
-        const suggestionId = generateId()
-
-        // Some models occasionally mis-convert (or round) times even when the user
-        // explicitly says "9:30PM" etc. We conservatively prefer the explicit time
-        // from the most recent user message when it is unambiguous.
-        // Pattern doc: docs/error-patterns/schedule-activity-user-time-mismatch.md
         const lastUserMessage = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? ""
-        const explicitDurationMinutes = extractDurationMinutesFromText(lastUserMessage)
-        const inferredUserTitle = inferScheduleTitle(lastUserMessage)
-        const userAskedForCheckIn = userRequestedCheckIn(lastUserMessage)
+        const resolvedArgs = resolveScheduleArgsFromUserMessage(event.args, lastUserMessage)
 
-        // Pattern doc: docs/error-patterns/schedule-activity-generic-title-duration-drift.md
-        // Pattern doc: docs/error-patterns/schedule-activity-title-duration-override-miss.md
-        const shouldPreferUserTitle =
-          inferredUserTitle !== "Scheduled activity"
-          && (
-            isGenericActivityTitle(event.args.title)
-            || !event.args.title.trim()
-            || (isCheckInActivityTitle(event.args.title) && !userAskedForCheckIn)
-          )
-
-        const resolvedTitle = shouldPreferUserTitle ? inferredUserTitle : event.args.title
-
-        const userTime = extractExplicitTimeFromText(lastUserMessage)
-        const normalizedToolTime = normalizeTimeToHHMM(event.args.time)
-        const resolvedTime = userTime
-          ? formatTimeHHMM(userTime)
-          : normalizedToolTime ?? event.args.time
-
-        const resolvedArgs: ScheduleActivityToolArgs = {
-          ...event.args,
-          title: resolvedTitle,
-          time: resolvedTime,
-          duration: clampDurationMinutes(explicitDurationMinutes ?? event.args.duration),
-        }
-
-        const scheduledFor = parseZonedDateTimeInstant(resolvedArgs.date, resolvedArgs.time, timeZone)
-        if (!scheduledFor) {
-          dispatch({
-            type: "ADD_WIDGET",
-            widget: {
-              id: widgetId,
-              type: "schedule_activity",
-              createdAt: now,
-              args: event.args,
-              status: "failed",
-              error: "Invalid date/time",
-            },
-          })
-          return
-        }
-
-        if (isDuplicateScheduledInstant(scheduledFor)) {
-          return
-        }
-        markScheduledInstant(scheduledFor)
-
-        const suggestion: Suggestion = {
-          id: suggestionId,
-          content: resolvedArgs.title,
+        // Gemini already provides a post-tool confirmation in the same turn.
+        // Adding another app-generated confirmation here creates duplicate
+        // assistant replies and can trigger chat auto-scroll jitter while waiting.
+        // Pattern doc: docs/error-patterns/schedule-activity-double-confirmation.md
+        void scheduleSingleActivity(resolvedArgs, {
           rationale: "Scheduled from AI chat",
-          duration: resolvedArgs.duration,
-          category: resolvedArgs.category,
-          status: "scheduled",
           createdAt: now,
-          scheduledFor,
+        })
+        return
+      }
+
+      if (event.widget === "schedule_recurring_activity") {
+        const lastUserMessage = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? ""
+        const baseArgs = resolveScheduleArgsFromUserMessage({
+          title: event.args.title,
+          category: event.args.category,
+          date: event.args.startDate,
+          time: event.args.time,
+          duration: event.args.duration,
+        }, lastUserMessage)
+
+        const resolvedRecurringArgs: ScheduleRecurringActivityToolArgs = {
+          ...event.args,
+          title: baseArgs.title,
+          time: baseArgs.time,
+          duration: baseArgs.duration,
         }
 
-        // Optimistically show confirmation, then mark failed if Dexie write fails.
-        dispatch({
-          type: "ADD_WIDGET",
-          widget: {
-            id: widgetId,
-            type: "schedule_activity",
-            createdAt: now,
-            args: resolvedArgs,
-            status: "scheduled",
-            suggestionId,
-            isSyncing: true,
-          },
-        })
+        let expansion
+        try {
+          expansion = expandRecurringScheduleOccurrences({
+            startDate: resolvedRecurringArgs.startDate,
+            time: resolvedRecurringArgs.time,
+            timeZone,
+            frequency: resolvedRecurringArgs.frequency,
+            weekdays: resolvedRecurringArgs.weekdays,
+            count: resolvedRecurringArgs.count,
+            untilDate: resolvedRecurringArgs.untilDate,
+            maxOccurrences: MAX_RECURRING_SCHEDULE_OCCURRENCES,
+          })
+        } catch (error) {
+          const failureMessage: CheckInMessage = {
+            id: generateId(),
+            role: "assistant",
+            content: error instanceof Error ? error.message : "Couldn't schedule that recurring plan.",
+            timestamp: new Date().toISOString(),
+          }
+          dispatch({ type: "ADD_MESSAGE", message: failureMessage })
+          return
+        }
+
+        if (expansion.occurrences.length === 0) {
+          const noMatchesMessage: CheckInMessage = {
+            id: generateId(),
+            role: "assistant",
+            content: `I couldn't find any valid dates to schedule for "${baseArgs.title}".`,
+            timestamp: new Date().toISOString(),
+          }
+          dispatch({ type: "ADD_MESSAGE", message: noMatchesMessage })
+          return
+        }
 
         void (async () => {
-          try {
-            await addSuggestionToDb(suggestion)
-            // Gemini already provides a post-tool confirmation in the same turn.
-            // Adding another app-generated confirmation here creates duplicate
-            // assistant replies and can trigger chat auto-scroll jitter while waiting.
-            // Pattern doc: docs/error-patterns/schedule-activity-double-confirmation.md
-            await syncSuggestionToCalendar(widgetId, suggestion)
-            dispatch({
-              type: "UPDATE_WIDGET",
-              widgetId,
-              updates: {
-                isSyncing: false,
-              },
-            })
-          } catch (error) {
-            unmarkScheduledInstant(scheduledFor)
-            dispatch({
-              type: "UPDATE_WIDGET",
-              widgetId,
-              updates: {
-                status: "failed",
-                error: error instanceof Error ? error.message : "Failed to save",
-                suggestionId: undefined,
-                isSyncing: false,
-              },
-            })
+          const results = await Promise.all(
+            expansion.occurrences.map((occurrence) =>
+              scheduleSingleActivity(
+                {
+                  ...baseArgs,
+                  date: occurrence.date,
+                  time: occurrence.time,
+                },
+                {
+                  rationale: "Scheduled from AI chat (recurring)",
+                  createdAt: now,
+                  scheduledForOverride: occurrence.scheduledFor,
+                }
+              )
+            )
+          )
+
+          const scheduledCount = results.filter((result) => result === "scheduled").length
+          const failedCount =
+            results.filter((result) => result === "failed").length
+            + expansion.skippedInvalidDateTimes
+          const duplicateCount = results.filter((result) => result === "duplicate").length
+
+          const summaryParts: string[] = []
+          if (scheduledCount > 0) {
+            summaryParts.push(
+              `Scheduled ${scheduledCount} block${scheduledCount === 1 ? "" : "s"} for "${baseArgs.title}".`
+            )
+          } else {
+            summaryParts.push(`I couldn't schedule any blocks for "${baseArgs.title}".`)
           }
+
+          if (failedCount > 0) {
+            summaryParts.push(`${failedCount} failed.`)
+          }
+
+          if (duplicateCount > 0) {
+            summaryParts.push(
+              `${duplicateCount} duplicate${duplicateCount === 1 ? " was" : "s were"} skipped.`
+            )
+          }
+
+          if (expansion.truncated) {
+            summaryParts.push(`Capped at ${MAX_RECURRING_SCHEDULE_OCCURRENCES} occurrences.`)
+          }
+
+          const summaryMessage: CheckInMessage = {
+            id: generateId(),
+            role: "assistant",
+            content: summaryParts.join(" "),
+            timestamp: new Date().toISOString(),
+          }
+
+          dispatch({ type: "ADD_MESSAGE", message: summaryMessage })
         })()
         return
       }
@@ -645,7 +710,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         })
       }
     },
-    [addSuggestionToDb, data.messages, dispatch, syncSuggestionToCalendar, timeZone]
+    [data.messages, dispatch, scheduleSingleActivity, timeZone]
   )
 
   // ========================================
@@ -700,11 +765,8 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
 
       if (alreadyScheduledByGemini) return
 
-      const widgetId = generateId()
-      const suggestionId = generateId()
       const now = new Date().toISOString()
       const timeHHMM = formatTimeHHMM(timeParts)
-      const scheduledFor = parseZonedDateTimeInstant(dateISO, timeHHMM, timeZone)
 
       const title = inferScheduleTitle(lastUserMessage.content)
       const category = inferScheduleCategory(lastUserMessage.content)
@@ -718,86 +780,24 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         duration,
       }
 
-      if (!scheduledFor) {
-        dispatch({
-          type: "ADD_WIDGET",
-          widget: {
-            id: widgetId,
-            type: "schedule_activity",
-            createdAt: now,
-            args,
-            status: "failed",
-            error: "Invalid date/time",
-          },
-        })
-        return
-      }
-
-      if (isDuplicateScheduledInstant(scheduledFor)) {
-        return
-      }
-      markScheduledInstant(scheduledFor)
-
-      const suggestion: Suggestion = {
-        id: suggestionId,
-        content: title,
-        rationale: "Scheduled from chat (fallback)",
-        duration,
-        category,
-        status: "scheduled",
-        createdAt: now,
-        scheduledFor,
-      }
-
-      dispatch({
-        type: "ADD_WIDGET",
-        widget: {
-          id: widgetId,
-          type: "schedule_activity",
-          createdAt: now,
-          args,
-          status: "scheduled",
-          suggestionId,
-          isSyncing: true,
-        },
-      })
-
       void (async () => {
-        try {
-          await addSuggestionToDb(suggestion)
-          const synced = await syncSuggestionToCalendar(widgetId, suggestion)
-          dispatch({
-            type: "UPDATE_WIDGET",
-            widgetId,
-            updates: {
-              isSyncing: false,
-            },
-          })
-          if (synced) {
-            const confirmationMessage: CheckInMessage = {
-              id: generateId(),
-              role: "assistant",
-              content: `Done — scheduled “${title}” for ${formatZonedDateTimeForMessage(args.date, args.time, timeZone)}.`,
-              timestamp: new Date().toISOString(),
-            }
-            dispatch({ type: "ADD_MESSAGE", message: confirmationMessage })
+        const result = await scheduleSingleActivity(args, {
+          rationale: "Scheduled from chat (fallback)",
+          createdAt: now,
+        })
+
+        if (result === "scheduled") {
+          const confirmationMessage: CheckInMessage = {
+            id: generateId(),
+            role: "assistant",
+            content: `Done — scheduled “${title}” for ${formatZonedDateTimeForMessage(args.date, args.time, timeZone)}.`,
+            timestamp: new Date().toISOString(),
           }
-        } catch (error) {
-          unmarkScheduledInstant(scheduledFor)
-          dispatch({
-            type: "UPDATE_WIDGET",
-            widgetId,
-            updates: {
-              status: "failed",
-              error: error instanceof Error ? error.message : "Failed to save",
-              suggestionId: undefined,
-              isSyncing: false,
-            },
-          })
+          dispatch({ type: "ADD_MESSAGE", message: confirmationMessage })
         }
       })()
     }, 1200)
-  }, [addSuggestionToDb, data.messages, dispatch, syncSuggestionToCalendar, timeZone, widgetsRef])
+  }, [data.messages, dispatch, scheduleSingleActivity, timeZone, widgetsRef])
 
   const handlers: CheckInWidgetsGeminiHandlers = {
     onWidget,

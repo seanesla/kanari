@@ -32,8 +32,9 @@ See: `hooks/__tests__/use-check-in-widgets-calendar-sync.test.ts`
 
 ## Fix / prevention
 
-- Maintain a per-session dedupe set keyed by the scheduled instant (`scheduledFor`).
-- When a schedule attempt arrives (fallback/manual/tool), skip it if an identical scheduled instant was already handled in the current session.
+- Maintain a per-session dedupe set keyed by the scheduled instant plus normalized activity title (`scheduledFor + title`).
+- When a schedule attempt arrives (fallback/manual/tool), skip it if an identical instant/title pair was already handled in the current session.
+- This preserves idempotency for duplicate tool calls while still allowing intentionally different activities at the same time.
 - Clear the dedupe map when the check-in session changes.
 
 ## References

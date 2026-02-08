@@ -13,6 +13,7 @@ import type {
   JournalPromptToolArgs,
   QuickActionsToolArgs,
   ScheduleActivityToolArgs,
+  ScheduleRecurringActivityToolArgs,
   StressGaugeToolArgs,
 } from "@/lib/types"
 import { normalizeTimeToHHMM } from "@/lib/scheduling/time"
@@ -261,6 +262,38 @@ export const ScheduleActivityArgsSchema: z.ZodType<ScheduleActivityToolArgs> = z
   time: TimeStringSchema,
   duration: z.number().int().min(1).max(12 * 60), // minutes, cap at 12h
 })
+
+const RecurrenceWeekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])
+
+export const ScheduleRecurringActivityArgsSchema: z.ZodType<ScheduleRecurringActivityToolArgs> = z
+  .object({
+    title: z.string().min(1).max(120),
+    category: z.enum(["break", "exercise", "mindfulness", "social", "rest"]),
+    startDate: DateStringSchema,
+    time: TimeStringSchema,
+    duration: z.number().int().min(1).max(12 * 60), // minutes, cap at 12h
+    frequency: z.enum(["daily", "weekdays", "weekly", "custom_weekdays"]),
+    weekdays: z.array(RecurrenceWeekdaySchema).min(1).max(7).optional(),
+    count: z.number().int().min(1).max(365).optional(),
+    untilDate: DateStringSchema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.count == null && !value.untilDate) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Recurring schedule requires either count or untilDate",
+        path: ["count"],
+      })
+    }
+
+    if (value.frequency === "custom_weekdays" && (!value.weekdays || value.weekdays.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "custom_weekdays requires weekdays",
+        path: ["weekdays"],
+      })
+    }
+  })
 
 export const BreathingExerciseArgsSchema: z.ZodType<BreathingExerciseToolArgs> = z.object({
   type: z.enum(["box", "478", "relaxing"]),

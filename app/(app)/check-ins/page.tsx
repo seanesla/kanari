@@ -241,6 +241,7 @@ function NewCheckInContent({
             onSessionChange={onSessionChange}
             onSessionComplete={onSessionComplete}
             autoStart={autoStart}
+            synthesisLayout="wide"
           />
         </div>
       </Deck>

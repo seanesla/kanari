@@ -10,6 +10,15 @@ describe("buildCheckInSystemInstruction", () => {
     expect(CHECK_IN_SYSTEM_PROMPT).toContain("Preserve explicit user duration exactly")
   })
 
+  it("includes recurring scheduling guidance", async () => {
+    const { CHECK_IN_SYSTEM_PROMPT } = await vi.importActual<
+      typeof import("@/lib/gemini/live-prompts")
+    >("@/lib/gemini/live-prompts")
+
+    expect(CHECK_IN_SYSTEM_PROMPT).toContain("schedule_recurring_activity")
+    expect(CHECK_IN_SYSTEM_PROMPT).toContain("You MUST include a stop condition")
+  })
+
   it("includes time context with an explicit local-time label", async () => {
     const { buildCheckInSystemInstruction } = await vi.importActual<
       typeof import("@/lib/gemini/live-prompts")

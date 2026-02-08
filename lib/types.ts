@@ -828,6 +828,27 @@ export interface ScheduleActivityToolArgs {
   duration: number
 }
 
+export type RecurrenceFrequency = "daily" | "weekdays" | "weekly" | "custom_weekdays"
+export type RecurrenceWeekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun"
+
+export interface ScheduleRecurringActivityToolArgs {
+  title: string
+  category: SuggestionCategory
+  /** YYYY-MM-DD */
+  startDate: string
+  /** HH:MM (24h) */
+  time: string
+  /** Minutes */
+  duration: number
+  frequency: RecurrenceFrequency
+  /** Required when frequency is custom_weekdays */
+  weekdays?: RecurrenceWeekday[]
+  /** Number of occurrences to schedule */
+  count?: number
+  /** Inclusive end date for the recurrence (YYYY-MM-DD) */
+  untilDate?: string
+}
+
 export type BreathingExerciseType = "box" | "478" | "relaxing"
 
 export interface BreathingExerciseToolArgs {

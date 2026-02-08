@@ -25,6 +25,7 @@ import {
   JournalPromptArgsSchema,
   QuickActionsArgsSchema,
   ScheduleActivityArgsSchema,
+  ScheduleRecurringActivityArgsSchema,
   StressGaugeArgsSchema,
   validateServerMessage,
 } from "./schemas"
@@ -37,6 +38,7 @@ import type {
   JournalPromptToolArgs,
   QuickActionsToolArgs,
   ScheduleActivityToolArgs,
+  ScheduleRecurringActivityToolArgs,
   StressGaugeToolArgs,
 } from "@/lib/types"
 import type {
@@ -59,6 +61,7 @@ export interface SessionContext {
 
 export type GeminiWidgetEvent =
   | { widget: "schedule_activity"; args: ScheduleActivityToolArgs }
+  | { widget: "schedule_recurring_activity"; args: ScheduleRecurringActivityToolArgs }
   | { widget: "breathing_exercise"; args: BreathingExerciseToolArgs }
   | { widget: "stress_gauge"; args: StressGaugeToolArgs }
   | { widget: "quick_actions"; args: QuickActionsToolArgs }
@@ -766,6 +769,32 @@ export class GeminiLiveClient {
         }
 
         this.config.events.onWidget?.({ widget: "schedule_activity", args: parsed.data })
+
+        if (fc.id) {
+          this.sendToolResponse([{
+            id: fc.id,
+            name: fc.name,
+            response: { acknowledged: true, shown: true }
+          }])
+        }
+        continue
+      }
+
+      if (fc.name === "schedule_recurring_activity") {
+        const parsed = ScheduleRecurringActivityArgsSchema.safeParse(fc.args ?? {})
+        if (!parsed.success) {
+          logWarn("LiveClient", "Invalid schedule_recurring_activity args:", parsed.error.issues)
+          if (fc.id) {
+            this.sendToolResponse([{
+              id: fc.id,
+              name: fc.name,
+              response: { acknowledged: false, error: "invalid_args" }
+            }])
+          }
+          continue
+        }
+
+        this.config.events.onWidget?.({ widget: "schedule_recurring_activity", args: parsed.data })
 
         if (fc.id) {
           this.sendToolResponse([{

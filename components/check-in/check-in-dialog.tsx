@@ -696,6 +696,8 @@ export function CheckInDialog({
                   onRetry={completedSession ? () => void runSynthesis(completedSession) : undefined}
                   onViewDashboard={handleViewDashboard}
                   onDone={handleClose}
+                  // Pattern doc: docs/error-patterns/synthesis-screen-fixed-width-in-wide-container.md
+                  layout="compact"
                 />
               </motion.div>
             )}

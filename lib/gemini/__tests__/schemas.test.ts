@@ -17,6 +17,7 @@ import {
   StressGaugeArgsSchema,
   QuickActionsArgsSchema,
   JournalPromptArgsSchema,
+  ScheduleRecurringActivityArgsSchema,
 } from "../schemas"
 
 describe("ServerMessageSchema", () => {
@@ -63,8 +64,8 @@ describe("ServerMessageSchema", () => {
         const part = result.data.serverContent?.modelTurn?.parts?.[0]
         expect(part).toHaveProperty("inlineData")
         if (part && "inlineData" in part) {
-          expect(part.inlineData.mimeType).toBe("audio/pcm")
-          expect(part.inlineData.data).toBe("base64audiodata==")
+          expect(part.inlineData?.mimeType).toBe("audio/pcm")
+          expect(part.inlineData?.data).toBe("base64audiodata==")
         }
       }
     })
@@ -543,6 +544,66 @@ describe("Gemini widget tool arg schemas", () => {
     })
 
     expect(result.success).toBe(false)
+  })
+
+  test("ScheduleRecurringActivityArgsSchema should validate daily recurrence with count", () => {
+    const result = ScheduleRecurringActivityArgsSchema.safeParse({
+      title: "Study block",
+      category: "rest",
+      startDate: "2026-02-08",
+      time: "7:30 PM",
+      duration: 60,
+      frequency: "daily",
+      count: 5,
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.time).toBe("19:30")
+      expect(result.data.count).toBe(5)
+    }
+  })
+
+  test("ScheduleRecurringActivityArgsSchema should require stop condition", () => {
+    const result = ScheduleRecurringActivityArgsSchema.safeParse({
+      title: "Study block",
+      category: "rest",
+      startDate: "2026-02-08",
+      time: "19:30",
+      duration: 60,
+      frequency: "daily",
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  test("ScheduleRecurringActivityArgsSchema should require weekdays for custom_weekdays", () => {
+    const result = ScheduleRecurringActivityArgsSchema.safeParse({
+      title: "Workout",
+      category: "exercise",
+      startDate: "2026-02-08",
+      time: "06:30",
+      duration: 45,
+      frequency: "custom_weekdays",
+      count: 4,
+    })
+
+    expect(result.success).toBe(false)
+  })
+
+  test("ScheduleRecurringActivityArgsSchema should validate custom_weekdays recurrence", () => {
+    const result = ScheduleRecurringActivityArgsSchema.safeParse({
+      title: "Workout",
+      category: "exercise",
+      startDate: "2026-02-08",
+      time: "06:30",
+      duration: 45,
+      frequency: "custom_weekdays",
+      weekdays: ["mon", "wed", "fri"],
+      untilDate: "2026-03-08",
+    })
+
+    expect(result.success).toBe(true)
   })
 
   test("BreathingExerciseArgsSchema should validate valid args", () => {

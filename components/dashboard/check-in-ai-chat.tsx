@@ -94,6 +94,9 @@ interface CheckInAIChatProps {
 
   /** When true, auto-starts the session on mount (user-gesture path only). */
   autoStart?: boolean
+
+  /** Layout mode for post-check-in synthesis screen. */
+  synthesisLayout?: "compact" | "wide"
 }
 
 export function AIChatContent({
@@ -104,6 +107,7 @@ export function AIChatContent({
   requestDiscard,
   onDiscardComplete,
   autoStart = false,
+  synthesisLayout = "wide",
 }: CheckInAIChatProps) {
   const isGlassChrome = chrome === "glass"
   // Hook to save completed sessions to IndexedDB
@@ -534,6 +538,8 @@ export function AIChatContent({
               onRetry={completedSession ? () => void runSynthesis(completedSession) : undefined}
               onViewDashboard={handleViewDashboard}
               onDone={handleClose}
+              // Pattern doc: docs/error-patterns/synthesis-screen-fixed-width-in-wide-container.md
+              layout={synthesisLayout}
             />
           </motion.div>
         ) : (

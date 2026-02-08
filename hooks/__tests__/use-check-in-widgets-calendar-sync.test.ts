@@ -21,6 +21,20 @@ type GeminiWidgetEvent =
         duration: number
       }
     }
+  | {
+      widget: "schedule_recurring_activity"
+      args: {
+        title: string
+        category: "break" | "exercise" | "mindfulness" | "social" | "rest"
+        startDate: string
+        time: string
+        duration: number
+        frequency: "daily" | "weekdays" | "weekly" | "custom_weekdays"
+        weekdays?: Array<"mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun">
+        count?: number
+        untilDate?: string
+      }
+    }
 
 type GeminiLiveCallbacks = {
   onWidget?: (event: GeminiWidgetEvent) => void
@@ -724,5 +738,152 @@ describe("useCheckIn schedule_activity calendar sync", () => {
 
     expect(addSuggestionMock).toHaveBeenCalledTimes(1)
     expect(result.current[0].widgets.filter((w) => w.type === "schedule_activity")).toHaveLength(1)
+  })
+
+  it("allows different activities at the same scheduled time", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Study session",
+          category: "rest",
+          date: "2026-02-10",
+          time: "20:00",
+          duration: 45,
+        },
+      })
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Workout",
+          category: "exercise",
+          date: "2026-02-10",
+          time: "20:00",
+          duration: 30,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(2)
+    })
+
+    expect(addSuggestionMock).toHaveBeenCalledTimes(2)
+    expect(result.current[0].widgets.filter((w) => w.type === "schedule_activity")).toHaveLength(2)
+  })
+
+  it("schedules recurring plans as multiple events and posts an aggregate message", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_recurring_activity",
+        args: {
+          title: "Study session",
+          category: "rest",
+          startDate: "2026-02-09",
+          time: "20:00",
+          duration: 45,
+          frequency: "weekdays",
+          count: 3,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(3)
+    })
+
+    await waitFor(() => {
+      const summary = result.current[0].messages.find(
+        (m) => m.role === "assistant" && /Scheduled 3 blocks/i.test(m.content)
+      )
+      expect(summary?.content).toContain("Study session")
+    })
+
+    expect(addSuggestionMock).toHaveBeenCalledTimes(3)
+    expect(result.current[0].widgets.filter((w) => w.type === "schedule_activity")).toHaveLength(3)
+  })
+
+  it("caps recurring schedules at the safety limit", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_recurring_activity",
+        args: {
+          title: "Daily check-in",
+          category: "rest",
+          startDate: "2026-02-01",
+          time: "09:00",
+          duration: 10,
+          frequency: "daily",
+          count: 100,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(30)
+    })
+
+    await waitFor(() => {
+      const summary = result.current[0].messages.find(
+        (m) => m.role === "assistant" && /Capped at 30 occurrences/i.test(m.content)
+      )
+      expect(summary).toBeTruthy()
+    })
+  })
+
+  it("reports partial failures for recurring schedules", async () => {
+    let callCount = 0
+    scheduleEventMock.mockImplementation(async (suggestion: { id: string; scheduledFor?: string; duration: number }) => {
+      callCount += 1
+      if (callCount === 2) return null
+      return {
+        id: `rb_test_${callCount}`,
+        suggestionId: suggestion.id,
+        calendarEventId: `evt_test_${callCount}`,
+        scheduledAt: suggestion.scheduledFor ?? new Date().toISOString(),
+        duration: suggestion.duration,
+        completed: false,
+      }
+    })
+
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_recurring_activity",
+        args: {
+          title: "Wind-down routine",
+          category: "mindfulness",
+          startDate: "2026-02-09",
+          time: "21:00",
+          duration: 15,
+          frequency: "daily",
+          count: 3,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(3)
+    })
+
+    await waitFor(() => {
+      const summary = result.current[0].messages.find(
+        (m) => m.role === "assistant" && /Scheduled 2 blocks/i.test(m.content)
+      )
+      expect(summary?.content).toMatch(/1 failed/i)
+    })
+
+    expect(putRecoveryBlockMock).toHaveBeenCalledTimes(2)
+    expect(result.current[0].widgets.some((w) => w.type === "schedule_activity" && w.status === "failed")).toBe(true)
   })
 })

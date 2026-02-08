@@ -47,6 +47,64 @@ export const SCHEDULE_ACTIVITY_TOOL = {
 }
 
 /**
+ * Tool declaration for scheduling a recurring activity plan.
+ */
+export const SCHEDULE_RECURRING_ACTIVITY_TOOL = {
+  functionDeclarations: [{
+    name: "schedule_recurring_activity",
+    description: "Schedule multiple future blocks in one action (recurring plan), such as study sessions every weekday, workouts every Monday/Wednesday/Friday, or a daily check-in. Use this when the user asks for repeated scheduling. If the recurrence pattern or stop condition is missing, ask one clarifying question before calling.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        title: {
+          type: Type.STRING,
+          description: "Short title for each block. Keep the user's specific wording when possible."
+        },
+        category: {
+          type: Type.STRING,
+          enum: ["break", "exercise", "mindfulness", "social", "rest"],
+          description: "Activity category"
+        },
+        startDate: {
+          type: Type.STRING,
+          description: "Start date in YYYY-MM-DD (user's local date)"
+        },
+        time: {
+          type: Type.STRING,
+          description: "Time in HH:MM 24h (user's local time). Preserve minutes exactly and convert AM/PM precisely."
+        },
+        duration: {
+          type: Type.INTEGER,
+          description: "Duration in minutes. Preserve explicit user duration exactly."
+        },
+        frequency: {
+          type: Type.STRING,
+          enum: ["daily", "weekdays", "weekly", "custom_weekdays"],
+          description: "Recurrence pattern"
+        },
+        weekdays: {
+          type: Type.ARRAY,
+          description: "Required when frequency is custom_weekdays. Allowed values: mon, tue, wed, thu, fri, sat, sun.",
+          items: {
+            type: Type.STRING,
+            enum: ["mon", "tue", "wed", "thu", "fri", "sat", "sun"],
+          },
+        },
+        count: {
+          type: Type.INTEGER,
+          description: "Number of occurrences to schedule. Provide either count or untilDate."
+        },
+        untilDate: {
+          type: Type.STRING,
+          description: "Inclusive end date in YYYY-MM-DD. Provide either count or untilDate."
+        },
+      },
+      required: ["title", "category", "startDate", "time", "duration", "frequency"]
+    }
+  }]
+}
+
+/**
  * Tool declaration for recording a user commitment for later follow-up.
  */
 export const RECORD_COMMITMENT_TOOL = {
@@ -200,6 +258,7 @@ export const GET_JOURNAL_ENTRIES_TOOL = {
 
 export const GEMINI_TOOLS = [
   SCHEDULE_ACTIVITY_TOOL,
+  SCHEDULE_RECURRING_ACTIVITY_TOOL,
   RECORD_COMMITMENT_TOOL,
   SHOW_BREATHING_EXERCISE_TOOL,
   SHOW_STRESS_GAUGE_TOOL,
@@ -313,25 +372,37 @@ AVAILABLE TOOLS:
    - If date/time or duration is unclear/missing, ask ONE clarifying question before calling
    - After calling schedule_activity, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
 
-2) show_breathing_exercise({ type, duration })
+2) schedule_recurring_activity({ title, category, startDate, time, duration, frequency, weekdays, count, untilDate })
+   - Use when the user asks for repeated scheduling in one action (e.g., "every weekday", "every Monday and Wednesday", "daily for 2 weeks")
+   - Keep title/time/duration faithful to the user's request
+   - frequency options:
+     * daily
+     * weekdays
+     * weekly (same weekday as startDate)
+     * custom_weekdays (requires weekdays array: mon/tue/wed/thu/fri/sat/sun)
+   - You MUST include a stop condition: count or untilDate
+   - If recurrence details are unclear, ask ONE clarifying question before calling
+   - After calling schedule_recurring_activity, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
+
+3) show_breathing_exercise({ type, duration })
    - Use for calming and regulation (type: box | 478 | relaxing)
    - duration is in seconds (e.g., 120)
 
-3) show_stress_gauge({ stressLevel, fatigueLevel, message })
+4) show_stress_gauge({ stressLevel, fatigueLevel, message })
    - Use to provide a quick visual check of stress/fatigue (0-100)
 
-4) show_quick_actions({ options: [{ label, action }] })
+5) show_quick_actions({ options: [{ label, action }] })
    - Use to offer 2-6 simple next-step choices
    - action should be a short phrase the user would say (so the app can send it when tapped)
 
-5) show_journal_prompt({ prompt, placeholder, category })
+6) show_journal_prompt({ prompt, placeholder, category })
    - Use when the user wants to journal or reflection would help
    - Keep prompts supportive, concrete, and short
 
- 6) get_journal_entries({ limit, offset })
-    - Use when the user asks what is in their journal or wants you to reference past entries
-    - Use offset to request older entries if needed (pagination)
-    - If the tool response says sharing is disabled, ask the user to enable "Share Journal With AI" in Settings
+7) get_journal_entries({ limit, offset })
+   - Use when the user asks what is in their journal or wants you to reference past entries
+   - Use offset to request older entries if needed (pagination)
+   - If the tool response says sharing is disabled, ask the user to enable "Share Journal With AI" in Settings
 
 ═══════════════════════════════════════════════════════════════════════════════
 CONVERSATIONAL MODE (Only use when NO silence triggers are present)
