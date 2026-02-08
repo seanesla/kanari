@@ -30,6 +30,7 @@ But:
 
 - Add a conservative client-side fallback:
   - Only auto-schedule when the user provides an **explicit** date (e.g., “today/tomorrow” or `YYYY-MM-DD`) and an **explicit** time (AM/PM or 24h).
+  - Require an **explicit duration**; do not infer one from defaults.
   - Give Gemini a short window to call `schedule_activity` first to avoid double scheduling.
-- For non-check-in scheduling, infer a reasonable default title/category/duration from the user's message (and honor an explicit duration like “for 30 minutes” when provided).
+- Infer title/category from user wording when needed, but never assume duration.
 - Make completed check-in markers visually/textually distinct from scheduled items (e.g., prefix with `✓ Check-in`).

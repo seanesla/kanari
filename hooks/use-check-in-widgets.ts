@@ -20,7 +20,6 @@ import {
   formatTimeHHMM,
   formatZonedDateTimeForMessage,
   inferScheduleCategory,
-  inferScheduleDurationMinutes,
   inferScheduleTitle,
   isScheduleRequest,
   normalizeTimeToHHMM,
@@ -676,6 +675,12 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
     const timeParts = extractExplicitTimeFromText(lastUserMessage.content)
     if (!dateISO || !timeParts) return
 
+    // Fallback scheduling must not guess the duration.
+    // If duration is missing, let Gemini ask a clarifying question first.
+    // Pattern doc: docs/error-patterns/schedule-fallback-missing-duration-assumption.md
+    const explicitDurationMinutes = extractDurationMinutesFromText(lastUserMessage.content)
+    if (explicitDurationMinutes === null) return
+
     lastAutoScheduledMessageIdRef.current = lastUserMessage.id
 
     if (autoScheduleTimeoutRef.current) {
@@ -703,7 +708,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
 
       const title = inferScheduleTitle(lastUserMessage.content)
       const category = inferScheduleCategory(lastUserMessage.content)
-      const duration = clampDurationMinutes(inferScheduleDurationMinutes(lastUserMessage.content))
+      const duration = clampDurationMinutes(explicitDurationMinutes)
 
       const args: ScheduleActivityToolArgs = {
         title,

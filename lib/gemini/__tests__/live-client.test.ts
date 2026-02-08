@@ -404,4 +404,26 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
 
     expect(config.events.onModelTranscript).toHaveBeenCalledWith("audio transcript", true)
   })
+
+  test("does not mix outputTranscription and model text transcripts in the same turn", async () => {
+    await client.connect()
+
+    const fallbackTranscript =
+      "Updated! A 10-minute meditation is now scheduled for 11:00 PM. It's been great seeing your energy levels improve this week."
+    const replayedTextPart =
+      "10-minute meditation is now scheduled for 11:00 PM. It's been great seeing your energy levels improve this week."
+
+    getClientInternals(client).handleServerContent({
+      outputTranscription: { text: fallbackTranscript, finished: false },
+    })
+
+    getClientInternals(client).handleServerContent({
+      modelTurn: {
+        parts: [{ text: replayedTextPart }],
+      },
+    })
+
+    expect(config.events.onModelTranscript).toHaveBeenCalledTimes(1)
+    expect(config.events.onModelTranscript).toHaveBeenCalledWith(fallbackTranscript, false)
+  })
 })

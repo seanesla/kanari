@@ -145,6 +145,7 @@ export class GeminiLiveClient {
   // Track whether we've received ordered text output this turn.
   // When available, prefer this over outputAudioTranscription which can be out-of-order.
   private hasTextOutputThisTurn = false
+  private transcriptSourceThisTurn: "none" | "model_text" | "output_transcription" = "none"
 
   // Event deduplication - prevents HMR replay issues
   // Use persistent storage to survive HMR rebuilds
@@ -310,6 +311,7 @@ export class GeminiLiveClient {
     this.pendingMessages = []
     this.isSessionInitialized = false
     this.hasTextOutputThisTurn = false
+    this.transcriptSourceThisTurn = "none"
 
     if (this.connectionTimeoutId) {
       clearTimeout(this.connectionTimeoutId)
@@ -1016,6 +1018,7 @@ export class GeminiLiveClient {
     if (content.interrupted) {
       logDebug("GeminiLive", "Interrupted by user")
       this.hasTextOutputThisTurn = false
+      this.transcriptSourceThisTurn = "none"
       this.config.events.onInterrupted?.()
       return
     }
@@ -1040,6 +1043,14 @@ export class GeminiLiveClient {
             if (isThought) {
               this.config.events.onModelThinking?.(sanitizedText)
             } else {
+              // Keep a single transcript source per turn. Mixing outputTranscription
+              // and model text parts can replay near-identical content and duplicate
+              // phrases in one assistant bubble.
+              // Pattern doc: docs/error-patterns/transcript-mixed-source-duplication.md
+              if (this.transcriptSourceThisTurn === "output_transcription") {
+                continue
+              }
+              this.transcriptSourceThisTurn = "model_text"
               this.hasTextOutputThisTurn = true
               this.config.events.onModelTranscript?.(sanitizedText, false)
             }
@@ -1055,10 +1066,13 @@ export class GeminiLiveClient {
     // This is INDEPENDENT of turnComplete - they can arrive in any order.
     const outputTranscription = content.outputTranscription as { text?: string; finished?: boolean } | undefined
     if (outputTranscription?.text && !this.hasTextOutputThisTurn) {
-      this.config.events.onModelTranscript?.(
-        outputTranscription.text ?? "",
-        outputTranscription.finished ?? false
-      )
+      if (this.transcriptSourceThisTurn !== "model_text") {
+        this.transcriptSourceThisTurn = "output_transcription"
+        this.config.events.onModelTranscript?.(
+          outputTranscription.text ?? "",
+          outputTranscription.finished ?? false
+        )
+      }
     }
 
     // Check for turn complete
@@ -1066,6 +1080,7 @@ export class GeminiLiveClient {
       logDebug("GeminiLive", "Turn complete")
 
       this.hasTextOutputThisTurn = false
+      this.transcriptSourceThisTurn = "none"
       this.config.events.onTurnComplete?.()
       this.config.events.onAudioEnd?.()
       return
@@ -1209,6 +1224,8 @@ export class GeminiLiveClient {
 
     this.isSessionInitialized = false
     this.pendingMessages = []
+    this.hasTextOutputThisTurn = false
+    this.transcriptSourceThisTurn = "none"
 
     // Reset connection signal guard for next session
     this.hasAnnouncedConnected = false

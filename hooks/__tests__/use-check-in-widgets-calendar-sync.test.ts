@@ -491,7 +491,7 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     expect(firstWidget.args.time).toBe("21:30")
   })
 
-  it("auto-schedules next check-in requests when user provides an explicit date/time", async () => {
+  it("does not auto-schedule when the user did not provide an explicit duration", async () => {
     vi.useFakeTimers()
     try {
       vi.setSystemTime(new Date("2026-01-09T21:54:16Z"))
@@ -512,18 +512,9 @@ describe("useCheckIn schedule_activity calendar sync", () => {
         await Promise.resolve()
       })
 
-      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
-
-      const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as { scheduledFor?: string } | undefined
-      expect(scheduledSuggestion?.scheduledFor).toBeTruthy()
-
-      const scheduledAt = Temporal.Instant.from(scheduledSuggestion!.scheduledFor!).toZonedDateTimeISO("UTC")
-      expect(scheduledAt.hour).toBe(22)
-      expect(scheduledAt.minute).toBe(0)
-
-      // Shows a confirmation widget and does NOT end the conversation.
-      expect(result.current[0].widgets.some((w) => w.type === "schedule_activity" && w.status === "scheduled")).toBe(true)
-      expect(result.current[0].messages.some((m) => m.role === "assistant" && /scheduled/i.test(m.content))).toBe(true)
+      expect(scheduleEventMock).not.toHaveBeenCalled()
+      expect(addSuggestionMock).not.toHaveBeenCalled()
+      expect(result.current[0].widgets.some((w) => w.type === "schedule_activity")).toBe(false)
     } finally {
       vi.useRealTimers()
     }
