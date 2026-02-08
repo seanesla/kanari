@@ -19,6 +19,7 @@ import type {
   StressGaugeToolArgs,
 } from "@/lib/types"
 import { normalizeTimeToHHMM } from "@/lib/scheduling/time"
+import { extractDurationMinutesFromText } from "@/lib/scheduling/duration"
 
 /**
  * Inline data schema (for audio chunks)
@@ -241,7 +242,60 @@ export type ToolResponseRequest = z.infer<typeof ToolResponseRequestSchema>
 // ============================================
 
 // Shared helpers
-const DateStringSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Expected YYYY-MM-DD")
+function normalizeDateToISO(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    const strict = new Date(`${trimmed}T00:00:00Z`)
+    if (Number.isNaN(strict.getTime())) return null
+    return strict.toISOString().slice(0, 10) === trimmed ? trimmed : null
+  }
+
+  // Normalize "March 1st, 2026" -> "March 1, 2026"
+  const cleaned = trimmed.replace(/\b(\d{1,2})(st|nd|rd|th)\b/gi, "$1")
+  const parsedMs = Date.parse(cleaned)
+  if (Number.isNaN(parsedMs)) return null
+
+  const parsed = new Date(parsedMs)
+  const year = parsed.getFullYear()
+  const month = String(parsed.getMonth() + 1).padStart(2, "0")
+  const day = String(parsed.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function coerceDurationMinutes(value: number | string): number | null {
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null
+    return Math.round(value)
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) return null
+
+  const numeric = Number(trimmed)
+  if (Number.isFinite(numeric)) {
+    return Math.round(numeric)
+  }
+
+  return extractDurationMinutesFromText(trimmed)
+}
+
+const DateStringSchema = z.string()
+  .min(1)
+  .max(80)
+  .transform((value, ctx) => {
+    const normalized = normalizeDateToISO(value)
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Expected parseable date (YYYY-MM-DD or natural date)",
+      })
+      return z.NEVER
+    }
+    return normalized
+  })
+
 const TimeStringSchema = z.string()
   .min(1)
   .max(32)
@@ -257,27 +311,71 @@ const TimeStringSchema = z.string()
     return normalized
   })
 
-export const ScheduleActivityArgsSchema: z.ZodType<ScheduleActivityToolArgs> = z.object({
+const DurationMinutesSchema = z.union([z.number(), z.string()])
+  .transform((value, ctx) => {
+    const duration = coerceDurationMinutes(value)
+    if (duration === null || !Number.isFinite(duration)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Expected parseable duration (minutes or phrases like '5 hours')",
+      })
+      return z.NEVER
+    }
+
+    if (duration < 1 || duration > 12 * 60) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Duration must be between 1 and 720 minutes",
+      })
+      return z.NEVER
+    }
+
+    return duration
+  })
+
+const CountSchema = z.union([z.number(), z.string()])
+  .transform((value, ctx) => {
+    const numeric = typeof value === "number" ? value : Number(value.trim())
+    if (!Number.isFinite(numeric) || !Number.isInteger(numeric)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Expected integer count",
+      })
+      return z.NEVER
+    }
+
+    if (numeric < 1 || numeric > 365) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Count must be between 1 and 365",
+      })
+      return z.NEVER
+    }
+
+    return numeric
+  })
+
+export const ScheduleActivityArgsSchema: z.ZodType<ScheduleActivityToolArgs, z.ZodTypeDef, unknown> = z.object({
   title: z.string().min(1).max(120),
   category: z.enum(["break", "exercise", "mindfulness", "social", "rest"]),
   date: DateStringSchema,
   time: TimeStringSchema,
-  duration: z.number().int().min(1).max(12 * 60), // minutes, cap at 12h
+  duration: DurationMinutesSchema,
 })
 
 const RecurrenceWeekdaySchema = z.enum(["mon", "tue", "wed", "thu", "fri", "sat", "sun"])
 const RecurringScopeSchema = z.enum(["single", "future", "all"])
 
-export const ScheduleRecurringActivityArgsSchema: z.ZodType<ScheduleRecurringActivityToolArgs> = z
+export const ScheduleRecurringActivityArgsSchema: z.ZodType<ScheduleRecurringActivityToolArgs, z.ZodTypeDef, unknown> = z
   .object({
     title: z.string().min(1).max(120),
     category: z.enum(["break", "exercise", "mindfulness", "social", "rest"]),
     startDate: DateStringSchema,
     time: TimeStringSchema,
-    duration: z.number().int().min(1).max(12 * 60), // minutes, cap at 12h
+    duration: DurationMinutesSchema,
     frequency: z.enum(["daily", "weekdays", "weekly", "custom_weekdays"]),
     weekdays: z.array(RecurrenceWeekdaySchema).min(1).max(7).optional(),
-    count: z.number().int().min(1).max(365).optional(),
+    count: CountSchema.optional(),
     untilDate: DateStringSchema.optional(),
   })
   .superRefine((value, ctx) => {
@@ -298,7 +396,7 @@ export const ScheduleRecurringActivityArgsSchema: z.ZodType<ScheduleRecurringAct
     }
   })
 
-export const EditRecurringActivityArgsSchema: z.ZodType<EditRecurringActivityToolArgs> = z
+export const EditRecurringActivityArgsSchema: z.ZodType<EditRecurringActivityToolArgs, z.ZodTypeDef, unknown> = z
   .object({
     title: z.string().min(1).max(120),
     category: z.enum(["break", "exercise", "mindfulness", "social", "rest"]).optional(),
@@ -306,7 +404,7 @@ export const EditRecurringActivityArgsSchema: z.ZodType<EditRecurringActivityToo
     fromDate: DateStringSchema.optional(),
     newDate: DateStringSchema.optional(),
     newTime: TimeStringSchema.optional(),
-    duration: z.number().int().min(1).max(12 * 60).optional(),
+    duration: DurationMinutesSchema.optional(),
   })
   .superRefine((value, ctx) => {
     if (value.scope !== "all" && !value.fromDate) {

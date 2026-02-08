@@ -60,6 +60,9 @@ type GeminiWidgetEvent =
 type GeminiLiveCallbacks = {
   onWidget?: (event: GeminiWidgetEvent) => void
   onModelTranscript?: (text: string, finished: boolean) => void
+  onUserTranscript?: (text: string, finished: boolean) => void
+  onUserSpeechStart?: () => void
+  onUserSpeechEnd?: () => void
   onTurnComplete?: () => void
 }
 
@@ -573,6 +576,78 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     if (!widget || widget.type !== "schedule_activity") return
     expect(widget.args.title.toLowerCase()).toContain("super bowl")
     expect(widget.args.duration).toBe(300)
+  })
+
+  it("uses combined recent user context when recurring scheduling details are split across pauses", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+      geminiCallbacks?.onTurnComplete?.()
+    })
+
+    act(() => {
+      geminiCallbacks?.onUserSpeechStart?.()
+      geminiCallbacks?.onUserTranscript?.("Please schedule study from 3pm", false)
+      geminiCallbacks?.onUserSpeechEnd?.()
+    })
+
+    act(() => {
+      geminiCallbacks?.onTurnComplete?.()
+    })
+
+    act(() => {
+      geminiCallbacks?.onUserSpeechStart?.()
+      geminiCallbacks?.onUserTranscript?.("to 28pm Monday through Friday", false)
+      geminiCallbacks?.onUserSpeechEnd?.()
+    })
+
+    act(() => {
+      geminiCallbacks?.onTurnComplete?.()
+    })
+
+    act(() => {
+      geminiCallbacks?.onUserSpeechStart?.()
+      geminiCallbacks?.onUserTranscript?.("until March 1st, 2026.", false)
+      geminiCallbacks?.onUserSpeechEnd?.()
+    })
+
+    act(() => {
+      geminiCallbacks?.onTurnComplete?.()
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_recurring_activity",
+        args: {
+          title: "Scheduled activity",
+          category: "rest",
+          startDate: "2026-02-09",
+          time: "15:00",
+          duration: 45,
+          frequency: "weekdays",
+          untilDate: "2026-03-01",
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalled()
+    })
+
+    const firstScheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as
+      | { content?: string; duration?: number }
+      | undefined
+
+    expect(firstScheduledSuggestion?.content?.toLowerCase()).toContain("study")
+    expect(firstScheduledSuggestion?.duration).toBe(300)
+
+    const firstScheduleWidget = result.current[0].widgets.find((widget) => widget.type === "schedule_activity")
+    expect(firstScheduleWidget?.type).toBe("schedule_activity")
+    if (!firstScheduleWidget || firstScheduleWidget.type !== "schedule_activity") {
+      throw new Error("Expected at least one schedule_activity widget")
+    }
+    expect(firstScheduleWidget.args.duration).toBe(300)
   })
 
   it("does not add a duplicate schedule confirmation if the assistant already confirmed", async () => {

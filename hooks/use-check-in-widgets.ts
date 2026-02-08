@@ -120,11 +120,11 @@ function formatScopeLabel(scope: RecurringMutationScope): string {
 
 function resolveScheduleArgsFromUserMessage(
   toolArgs: ScheduleActivityToolArgs,
-  lastUserMessage: string
+  userScheduleContext: string
 ): ScheduleActivityToolArgs {
-  const explicitDurationMinutes = extractDurationMinutesFromText(lastUserMessage)
-  const inferredUserTitle = inferScheduleTitle(lastUserMessage)
-  const userAskedForCheckIn = userRequestedCheckIn(lastUserMessage)
+  const explicitDurationMinutes = extractDurationMinutesFromText(userScheduleContext)
+  const inferredUserTitle = inferScheduleTitle(userScheduleContext)
+  const userAskedForCheckIn = userRequestedCheckIn(userScheduleContext)
 
   // Pattern doc: docs/error-patterns/schedule-activity-generic-title-duration-drift.md
   // Pattern doc: docs/error-patterns/schedule-activity-title-duration-override-miss.md
@@ -139,7 +139,7 @@ function resolveScheduleArgsFromUserMessage(
   const resolvedTitle = shouldPreferUserTitle ? inferredUserTitle : toolArgs.title
 
   // Pattern doc: docs/error-patterns/schedule-activity-user-time-mismatch.md
-  const userTime = extractExplicitTimeFromText(lastUserMessage)
+  const userTime = extractExplicitTimeFromText(userScheduleContext)
   const normalizedToolTime = normalizeTimeToHHMM(toolArgs.time)
   const resolvedTime = userTime
     ? formatTimeHHMM(userTime)
@@ -151,6 +151,37 @@ function resolveScheduleArgsFromUserMessage(
     time: resolvedTime,
     duration: clampDurationMinutes(explicitDurationMinutes ?? toolArgs.duration),
   }
+}
+
+function getLatestScheduleIntentUserContext(messages: CheckInMessage[]): string {
+  // Build context from the latest scheduling intent, not just the latest user bubble.
+  // This preserves details when users provide time/title/duration across short pauses.
+  // Pattern doc: docs/error-patterns/schedule-transcript-short-pause-context-loss.md
+  const userMessages = messages
+    .filter((message) => message.role === "user")
+    .map((message) => message.content.trim())
+    .filter(Boolean)
+
+  if (userMessages.length === 0) return ""
+
+  let latestScheduleRequestIndex = -1
+  for (let index = userMessages.length - 1; index >= 0; index -= 1) {
+    if (isScheduleRequest(userMessages[index] ?? "")) {
+      latestScheduleRequestIndex = index
+      break
+    }
+  }
+
+  const relevantMessages =
+    latestScheduleRequestIndex >= 0
+      ? userMessages.slice(latestScheduleRequestIndex)
+      : userMessages.slice(-1)
+
+  return relevantMessages
+    .slice(-8)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim()
 }
 
 export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckInWidgetsResult {
@@ -582,8 +613,8 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
       const now = new Date().toISOString()
 
       if (event.widget === "schedule_activity") {
-        const lastUserMessage = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? ""
-        const resolvedArgs = resolveScheduleArgsFromUserMessage(event.args, lastUserMessage)
+        const scheduleContext = getLatestScheduleIntentUserContext(data.messages)
+        const resolvedArgs = resolveScheduleArgsFromUserMessage(event.args, scheduleContext)
 
         // Gemini already provides a post-tool confirmation in the same turn.
         // Adding another app-generated confirmation here creates duplicate
@@ -598,14 +629,14 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
       }
 
       if (event.widget === "schedule_recurring_activity") {
-        const lastUserMessage = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? ""
+        const scheduleContext = getLatestScheduleIntentUserContext(data.messages)
         const baseArgs = resolveScheduleArgsFromUserMessage({
           title: event.args.title,
           category: event.args.category,
           date: event.args.startDate,
           time: event.args.time,
           duration: event.args.duration,
-        }, lastUserMessage)
+        }, scheduleContext)
 
         const resolvedRecurringArgs: ScheduleRecurringActivityToolArgs = {
           ...event.args,

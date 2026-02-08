@@ -70,9 +70,12 @@ vi.mock("@google/genai", () => {
   }
 
   const Modality = { AUDIO: "AUDIO", TEXT: "TEXT" }
+  const EndSensitivity = { END_SENSITIVITY_LOW: "END_SENSITIVITY_LOW" }
+  const StartSensitivity = { START_SENSITIVITY_LOW: "START_SENSITIVITY_LOW" }
+  const TurnCoverage = { TURN_INCLUDES_ALL_INPUT: "TURN_INCLUDES_ALL_INPUT" }
   const Type = { OBJECT: "OBJECT", STRING: "STRING", INTEGER: "INTEGER", ARRAY: "ARRAY" }
 
-  return { GoogleGenAI, Modality, Type }
+  return { GoogleGenAI, Modality, EndSensitivity, StartSensitivity, TurnCoverage, Type }
 })
 
 describe("GeminiLiveClient (browser WebSocket)", () => {
@@ -120,6 +123,26 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
     expect(client.isReady()).toBe(true)
 
     expect(liveConnectMock).toHaveBeenCalledTimes(1)
+  })
+
+  test("configures less aggressive speech-end detection for short pauses", async () => {
+    await client.connect()
+
+    const configArg = liveConnectMock.mock.calls[0]?.[0]?.config as
+      | {
+          realtimeInputConfig?: {
+            automaticActivityDetection?: {
+              silenceDurationMs?: number
+              endOfSpeechSensitivity?: string
+            }
+          }
+        }
+      | undefined
+
+    expect(configArg?.realtimeInputConfig?.automaticActivityDetection?.silenceDurationMs).toBe(1600)
+    expect(configArg?.realtimeInputConfig?.automaticActivityDetection?.endOfSpeechSensitivity).toBe(
+      "END_SENSITIVITY_LOW"
+    )
   })
 
   test("forces v1alpha + falls back when affective dialog is unsupported", async () => {
@@ -406,6 +429,53 @@ describe("GeminiLiveClient (browser WebSocket)", () => {
       functionResponses: [
         {
           id: "call_4",
+          name: "schedule_recurring_activity",
+          response: { acknowledged: true, shown: true },
+        },
+      ],
+    })
+  })
+
+  test("normalizes recurring tool args with natural dates and string durations", async () => {
+    await client.connect()
+
+    getClientInternals(client).handleMessage({
+      toolCall: {
+        functionCalls: [
+          {
+            id: "call_4b",
+            name: "schedule_recurring_activity",
+            args: {
+              title: "Study session",
+              category: "rest",
+              startDate: "February 9, 2026",
+              time: "3 PM",
+              duration: "5 hours",
+              frequency: "weekdays",
+              untilDate: "March 1st, 2026",
+            },
+          },
+        ],
+      },
+    })
+
+    expect(config.events.onWidget).toHaveBeenCalledWith({
+      widget: "schedule_recurring_activity",
+      args: {
+        title: "Study session",
+        category: "rest",
+        startDate: "2026-02-09",
+        time: "15:00",
+        duration: 300,
+        frequency: "weekdays",
+        untilDate: "2026-03-01",
+      },
+    })
+
+    expect(mockSession.sendToolResponse).toHaveBeenCalledWith({
+      functionResponses: [
+        {
+          id: "call_4b",
           name: "schedule_recurring_activity",
           response: { acknowledged: true, shown: true },
         },

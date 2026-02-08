@@ -536,6 +536,22 @@ describe("Gemini widget tool arg schemas", () => {
     }
   })
 
+  test("ScheduleActivityArgsSchema should coerce string durations", () => {
+    const result = ScheduleActivityArgsSchema.safeParse({
+      title: "Study block",
+      category: "rest",
+      date: "2026-02-10",
+      time: "3:00 PM",
+      duration: "5 hours",
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.time).toBe("15:00")
+      expect(result.data.duration).toBe(300)
+    }
+  })
+
   test("ScheduleActivityArgsSchema should reject invalid category", () => {
     const result = ScheduleActivityArgsSchema.safeParse({
       title: "Break",
@@ -606,6 +622,26 @@ describe("Gemini widget tool arg schemas", () => {
     })
 
     expect(result.success).toBe(true)
+  })
+
+  test("ScheduleRecurringActivityArgsSchema should coerce natural dates and string durations", () => {
+    const result = ScheduleRecurringActivityArgsSchema.safeParse({
+      title: "Study",
+      category: "rest",
+      startDate: "February 9, 2026",
+      time: "3 PM",
+      duration: "5 hours",
+      frequency: "weekdays",
+      untilDate: "March 1st, 2026",
+    })
+
+    expect(result.success).toBe(true)
+    if (result.success) {
+      expect(result.data.startDate).toBe("2026-02-09")
+      expect(result.data.untilDate).toBe("2026-03-01")
+      expect(result.data.time).toBe("15:00")
+      expect(result.data.duration).toBe(300)
+    }
   })
 
   test("EditRecurringActivityArgsSchema validates scoped updates", () => {

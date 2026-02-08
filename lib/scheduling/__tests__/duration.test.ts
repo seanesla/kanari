@@ -8,6 +8,11 @@ describe("scheduling/duration", () => {
     expect(extractDurationMinutesFromText("for five hours")).toBe(300)
   })
 
+  it("infers duration from explicit time ranges", () => {
+    expect(extractDurationMinutesFromText("Schedule study from 3pm to 8pm Monday through Friday.")).toBe(300)
+    expect(extractDurationMinutesFromText("It's from 3pm to 28pm.")).toBe(300)
+  })
+
   it("clamps durations to a safe range", () => {
     expect(clampDurationMinutes(3)).toBe(5)
     expect(clampDurationMinutes(900)).toBe(720)

@@ -355,7 +355,13 @@ export class GeminiLiveClient {
         throw new Error("Gemini API key not configured. Please add your Gemini API key in Settings.")
       }
 
-      const [{ GoogleGenAI, Modality }, { buildCheckInSystemInstruction, GEMINI_TOOLS }] = await Promise.all(
+      const [{
+        GoogleGenAI,
+        Modality,
+        EndSensitivity,
+        StartSensitivity,
+        TurnCoverage,
+      }, { buildCheckInSystemInstruction, GEMINI_TOOLS }] = await Promise.all(
         [import("@google/genai"), import("./live-prompts")]
       )
 
@@ -422,6 +428,18 @@ export class GeminiLiveClient {
         responseModalities: [Modality.AUDIO],
         outputAudioTranscription: {},
         inputAudioTranscription: {},
+        // Keep short pauses inside a single utterance whenever possible.
+        // Pattern doc: docs/error-patterns/schedule-transcript-short-pause-context-loss.md
+        realtimeInputConfig: {
+          automaticActivityDetection: {
+            // Default is aggressive for conversational overlap; bumping this
+            // reduces premature turn-splits when users pause briefly.
+            silenceDurationMs: 1600,
+            endOfSpeechSensitivity: EndSensitivity.END_SENSITIVITY_LOW,
+            startOfSpeechSensitivity: StartSensitivity.START_SENSITIVITY_LOW,
+          },
+          turnCoverage: TurnCoverage.TURN_INCLUDES_ALL_INPUT,
+        },
         proactivity: { proactiveAudio: true },
         systemInstruction,
         tools: GEMINI_TOOLS,
@@ -738,6 +756,40 @@ export class GeminiLiveClient {
       return
     }
 
+    const formatValidationIssues = (
+      issues: Array<{ path?: Array<string | number>; message?: string }> | undefined
+    ): { summary: string; normalized: Array<{ path: string; message: string }> } => {
+      const normalized = (issues ?? []).map((issue) => ({
+        path: (issue.path ?? []).map(String).join("."),
+        message: issue.message ?? "Invalid value",
+      }))
+
+      const summary = normalized
+        .map((issue) => (issue.path ? `${issue.path}: ${issue.message}` : issue.message))
+        .join("; ")
+        .slice(0, 500)
+
+      return { summary, normalized }
+    }
+
+    const respondInvalidArgs = (
+      call: { id?: string; name: string },
+      issues: Array<{ path?: Array<string | number>; message?: string }> | undefined
+    ) => {
+      if (!call.id) return
+      const { summary, normalized } = formatValidationIssues(issues)
+      this.sendToolResponse([{
+        id: call.id,
+        name: call.name,
+        response: {
+          acknowledged: false,
+          error: "invalid_args",
+          message: summary || "Invalid arguments",
+          issues: normalized,
+        },
+      }])
+    }
+
     for (const fc of functionCalls) {
       logDebug("LiveClient", "Function call:", fc.name, "args:", fc.args)
 
@@ -764,13 +816,7 @@ export class GeminiLiveClient {
         const parsed = ScheduleActivityArgsSchema.safeParse(fc.args ?? {})
         if (!parsed.success) {
           logWarn("LiveClient", "Invalid schedule_activity args:", parsed.error.issues)
-          if (fc.id) {
-            this.sendToolResponse([{
-              id: fc.id,
-              name: fc.name,
-              response: { acknowledged: false, error: "invalid_args" }
-            }])
-          }
+          respondInvalidArgs(fc, parsed.error.issues)
           continue
         }
 
@@ -790,13 +836,7 @@ export class GeminiLiveClient {
         const parsed = ScheduleRecurringActivityArgsSchema.safeParse(fc.args ?? {})
         if (!parsed.success) {
           logWarn("LiveClient", "Invalid schedule_recurring_activity args:", parsed.error.issues)
-          if (fc.id) {
-            this.sendToolResponse([{
-              id: fc.id,
-              name: fc.name,
-              response: { acknowledged: false, error: "invalid_args" }
-            }])
-          }
+          respondInvalidArgs(fc, parsed.error.issues)
           continue
         }
 
@@ -816,13 +856,7 @@ export class GeminiLiveClient {
         const parsed = EditRecurringActivityArgsSchema.safeParse(fc.args ?? {})
         if (!parsed.success) {
           logWarn("LiveClient", "Invalid edit_recurring_activity args:", parsed.error.issues)
-          if (fc.id) {
-            this.sendToolResponse([{
-              id: fc.id,
-              name: fc.name,
-              response: { acknowledged: false, error: "invalid_args" }
-            }])
-          }
+          respondInvalidArgs(fc, parsed.error.issues)
           continue
         }
 
@@ -842,13 +876,7 @@ export class GeminiLiveClient {
         const parsed = CancelRecurringActivityArgsSchema.safeParse(fc.args ?? {})
         if (!parsed.success) {
           logWarn("LiveClient", "Invalid cancel_recurring_activity args:", parsed.error.issues)
-          if (fc.id) {
-            this.sendToolResponse([{
-              id: fc.id,
-              name: fc.name,
-              response: { acknowledged: false, error: "invalid_args" }
-            }])
-          }
+          respondInvalidArgs(fc, parsed.error.issues)
           continue
         }
 

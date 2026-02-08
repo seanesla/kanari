@@ -1,3 +1,5 @@
+import { to24Hour } from "./time"
+
 const DURATION_MAX_HOURS = 12
 const DURATION_MAX_MINUTES = DURATION_MAX_HOURS * 60
 
@@ -28,6 +30,85 @@ function parseDurationToken(token: string | undefined): number | null {
   return DURATION_WORD_TO_NUMBER[trimmed] ?? null
 }
 
+function parseMeridiemToken(token: string | undefined): "am" | "pm" | null {
+  if (!token) return null
+  const normalized = token.trim().toLowerCase()
+  if (normalized.startsWith("a")) return "am"
+  if (normalized.startsWith("p")) return "pm"
+  return null
+}
+
+function parseRangeHourToken(token: string | undefined): number | null {
+  if (!token) return null
+  const normalized = token.trim()
+  if (!/^\d{1,2}$/.test(normalized)) return null
+
+  const parsed = Number(normalized)
+  if (parsed >= 1 && parsed <= 12) return parsed
+
+  // Speech-to-text can collapse "to 8pm" into "28pm".
+  // Pattern doc: docs/error-patterns/schedule-transcript-short-pause-context-loss.md
+  if (/^2[1-9]$/.test(normalized)) {
+    return Number(normalized[1])
+  }
+
+  return null
+}
+
+function parseRangeMinuteToken(token: string | undefined): number | null {
+  if (!token) return 0
+  const normalized = token.trim()
+  if (!/^\d{1,2}$/.test(normalized)) return null
+  const parsed = Number(normalized)
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 59) return null
+  return parsed
+}
+
+function extractDurationMinutesFromTimeRange(input: string): number | null {
+  // Supports variants like:
+  // - "from 3pm to 8pm"
+  // - "3:00 PM - 8:00 PM"
+  // - "from 3 to 8pm"
+  // - "from 3pm to 28pm" (collapsed STT)
+  const rangePattern =
+    /(?:\bfrom\s+)?(\d{1,2})(?::([0-5]?\d))?\s*(a\.?m|p\.?m)?\s*(?:to|through|until|-)\s*(\d{1,2})(?::([0-5]?\d))?\s*(a\.?m|p\.?m)\b/g
+
+  for (const match of input.matchAll(rangePattern)) {
+    const startHour12 = parseRangeHourToken(match[1])
+    const endHour12 = parseRangeHourToken(match[4])
+    const endMeridiem = parseMeridiemToken(match[6])
+    const startMeridiem = parseMeridiemToken(match[3]) ?? endMeridiem
+    const startMinute = parseRangeMinuteToken(match[2])
+    const endMinute = parseRangeMinuteToken(match[5])
+
+    if (
+      startHour12 === null
+      || endHour12 === null
+      || startMeridiem === null
+      || endMeridiem === null
+      || startMinute === null
+      || endMinute === null
+    ) {
+      continue
+    }
+
+    const startTotalMinutes = to24Hour(startHour12, startMeridiem) * 60 + startMinute
+    let endTotalMinutes = to24Hour(endHour12, endMeridiem) * 60 + endMinute
+
+    // Handle ranges that pass midnight.
+    if (endTotalMinutes <= startTotalMinutes) {
+      endTotalMinutes += 24 * 60
+    }
+
+    const durationMinutes = endTotalMinutes - startTotalMinutes
+    if (durationMinutes > 0 && durationMinutes <= DURATION_MAX_MINUTES) {
+      return durationMinutes
+    }
+  }
+
+  return null
+}
+
 export function extractDurationMinutesFromText(text: string): number | null {
   const input = text.toLowerCase()
 
@@ -43,6 +124,13 @@ export function extractDurationMinutesFromText(text: string): number | null {
   if (hours) {
     const value = parseDurationToken(hours[1])
     if (value !== null && value > 0 && value <= DURATION_MAX_HOURS) return value * 60
+  }
+
+  // "from 3pm to 8pm", "3:00 PM - 8:00 PM"
+  // Pattern doc: docs/error-patterns/schedule-transcript-short-pause-context-loss.md
+  const rangeDuration = extractDurationMinutesFromTimeRange(input)
+  if (rangeDuration !== null) {
+    return rangeDuration
   }
 
   return null

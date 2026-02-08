@@ -452,7 +452,9 @@ AVAILABLE TOOLS:
    - Preserve the user's time EXACTLY: do not round minutes; convert AM/PM precisely (e.g., 9:30 PM → 21:30)
    - Preserve explicit user duration exactly (do not silently switch to defaults)
    - If date/time or duration is unclear/missing, ask ONE clarifying question before calling
-   - After calling schedule_activity, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
+   - After calling schedule_activity, wait for the tool response before confirming
+   - Only confirm success if tool response has acknowledged=true; if acknowledged=false, apologize briefly and ask for the missing/corrected detail
+   - After a successful call, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
 
 2) schedule_recurring_activity({ title, category, startDate, time, duration, frequency, weekdays, count, untilDate })
     - Use when the user asks for repeated scheduling in one action (e.g., "every weekday", "every Monday and Wednesday", "daily for 2 weeks")
@@ -464,7 +466,9 @@ AVAILABLE TOOLS:
      * custom_weekdays (requires weekdays array: mon/tue/wed/thu/fri/sat/sun)
     - You MUST include a stop condition: count or untilDate
     - If recurrence details are unclear, ask ONE clarifying question before calling
-    - After calling schedule_recurring_activity, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
+    - After calling schedule_recurring_activity, wait for the tool response before confirming
+    - Only confirm success if tool response has acknowledged=true; if acknowledged=false, apologize briefly and ask for corrected details
+    - After a successful call, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
 
 3) edit_recurring_activity({ title, category, scope, fromDate, newDate, newTime, duration })
    - Use when the user asks to move or change an existing recurring plan (e.g., "move my weekday study plan to 9pm", "change my workout series to 45 minutes")

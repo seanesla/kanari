@@ -73,6 +73,7 @@ export interface UseCheckInMessagesResult {
 }
 
 const STALE_TURN_COMPLETE_WINDOW_MS = 1200
+const USER_SPEECH_END_MERGE_WINDOW_MS = 600
 
 export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheckInMessagesResult {
   const {
@@ -110,6 +111,10 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
   // Track when user started speaking (for correct message timestamp ordering)
   const userSpeechStartRef = useRef<string | null>(null)
+
+  // Delay speech-end finalization to merge short pauses into one utterance.
+  // Pattern doc: docs/error-patterns/schedule-transcript-short-pause-context-loss.md
+  const pendingSpeechEndFinalizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Tracks a newly-sent user turn while we are waiting for assistant output.
   // If a delayed turnComplete from the *previous* turn arrives immediately after
@@ -175,8 +180,25 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       userSpeechEndHandledRef.current = false
       userSpeechStartRef.current = null
       pendingAssistantTurnRef.current = null
+
+      if (pendingSpeechEndFinalizeTimeoutRef.current) {
+        clearTimeout(pendingSpeechEndFinalizeTimeoutRef.current)
+        pendingSpeechEndFinalizeTimeoutRef.current = null
+      }
     }
   }, [data.session?.id])
+
+  const clearPendingSpeechEndFinalize = useCallback(() => {
+    if (!pendingSpeechEndFinalizeTimeoutRef.current) return
+    clearTimeout(pendingSpeechEndFinalizeTimeoutRef.current)
+    pendingSpeechEndFinalizeTimeoutRef.current = null
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      clearPendingSpeechEndFinalize()
+    }
+  }, [clearPendingSpeechEndFinalize])
 
   const addUserTextMessage = useCallback(
     (content: string) => {
@@ -344,29 +366,25 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     }
   }, [callbacksRef, data.currentUserTranscript, dispatch, drainAudioChunks, injectContext])
 
-  const onUserSpeechStart = useCallback(() => {
-    dispatch({ type: "SET_USER_SPEAKING" })
-    resetAudioChunks() // Start collecting audio for this utterance
-    userTranscriptRef.current = "" // Reset accumulated transcript for new utterance
-    dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
-    // Clear the active voice message ID for this new utterance
-    lastUserMessageIdRef.current = null
-    pendingUserUtteranceResetRef.current = false
-    userSpeechEndHandledRef.current = false
-    userSpeechStartRef.current = new Date().toISOString() // Capture timestamp when user STARTS speaking
-  }, [dispatch, resetAudioChunks])
+  const finalizeUserSpeechTurn = useCallback((options?: {
+    setProcessingState?: boolean
+    refreshPendingAssistantTurn?: boolean
+  }) => {
+    const setProcessingState = options?.setProcessingState ?? true
+    const refreshPendingAssistantTurn = options?.refreshPendingAssistantTurn ?? true
 
-  const onUserSpeechEnd = useCallback(() => {
-    // Guard against double-handling (some SDKs send both a final transcript and a speech-end event)
-    if (userSpeechEndHandledRef.current) return
-    userSpeechEndHandledRef.current = true
+    pendingSpeechEndFinalizeTimeoutRef.current = null
 
-    pendingAssistantTurnRef.current = {
-      startedAtMs: Date.now(),
-      hasModelOutput: false,
+    if (refreshPendingAssistantTurn) {
+      pendingAssistantTurnRef.current = {
+        startedAtMs: Date.now(),
+        hasModelOutput: false,
+      }
     }
 
-    dispatch({ type: "SET_PROCESSING" })
+    if (setProcessingState) {
+      dispatch({ type: "SET_PROCESSING" })
+    }
 
     const transcript = userTranscriptRef.current.trim()
     const messageId = lastUserMessageIdRef.current
@@ -401,6 +419,44 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     void processUserUtterance()
   }, [callbacksRef, dispatch, processUserUtterance])
 
+  const flushPendingSpeechEndFinalize = useCallback(() => {
+    if (!pendingSpeechEndFinalizeTimeoutRef.current) return
+    clearPendingSpeechEndFinalize()
+    finalizeUserSpeechTurn()
+  }, [clearPendingSpeechEndFinalize, finalizeUserSpeechTurn])
+
+  const onUserSpeechStart = useCallback(() => {
+    // If speech resumes quickly after EOS, treat it as the same utterance.
+    if (pendingSpeechEndFinalizeTimeoutRef.current) {
+      clearPendingSpeechEndFinalize()
+      pendingUserUtteranceResetRef.current = false
+      userSpeechEndHandledRef.current = false
+      dispatch({ type: "SET_USER_SPEAKING" })
+      return
+    }
+
+    dispatch({ type: "SET_USER_SPEAKING" })
+    resetAudioChunks() // Start collecting audio for this utterance
+    userTranscriptRef.current = "" // Reset accumulated transcript for new utterance
+    dispatch({ type: "SET_USER_TRANSCRIPT", text: "" })
+    // Clear the active voice message ID for this new utterance
+    lastUserMessageIdRef.current = null
+    pendingUserUtteranceResetRef.current = false
+    userSpeechEndHandledRef.current = false
+    userSpeechStartRef.current = new Date().toISOString() // Capture timestamp when user STARTS speaking
+  }, [clearPendingSpeechEndFinalize, dispatch, resetAudioChunks])
+
+  const onUserSpeechEnd = useCallback(() => {
+    // Guard against double-handling (some SDKs send both a final transcript and a speech-end event)
+    if (userSpeechEndHandledRef.current) return
+    userSpeechEndHandledRef.current = true
+
+    clearPendingSpeechEndFinalize()
+    pendingSpeechEndFinalizeTimeoutRef.current = setTimeout(() => {
+      finalizeUserSpeechTurn()
+    }, USER_SPEECH_END_MERGE_WINDOW_MS)
+  }, [clearPendingSpeechEndFinalize, finalizeUserSpeechTurn])
+
   const onUserTranscript = useCallback(
     (text: string, finished: boolean) => {
       // If the previous turn ended and we never received a VAD "speech start" for
@@ -413,6 +469,12 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
         lastUserMessageIdRef.current = null
         userSpeechEndHandledRef.current = false
         userSpeechStartRef.current = null
+      }
+
+      if (pendingSpeechEndFinalizeTimeoutRef.current && text.trim()) {
+        clearPendingSpeechEndFinalize()
+        userSpeechEndHandledRef.current = false
+        dispatch({ type: "SET_USER_SPEAKING" })
       }
 
       // Capture timestamp on FIRST chunk of user speech
@@ -468,25 +530,20 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       // finished flag is rarely sent by Gemini, but handle it if it comes
       if (finished && !userSpeechEndHandledRef.current) {
         userSpeechEndHandledRef.current = true
-        dispatch({
-          type: "SET_MESSAGE_STREAMING",
-          messageId: lastUserMessageIdRef.current!,
-          isStreaming: false,
-        })
-        pendingAssistantTurnRef.current = {
-          startedAtMs: Date.now(),
-          hasModelOutput: false,
-        }
-        dispatch({ type: "SET_PROCESSING" })
-        void processUserUtterance()
+        clearPendingSpeechEndFinalize()
+        pendingSpeechEndFinalizeTimeoutRef.current = setTimeout(() => {
+          finalizeUserSpeechTurn()
+        }, USER_SPEECH_END_MERGE_WINDOW_MS)
       }
     },
-    [dispatch, processUserUtterance, resetAudioChunks]
+    [clearPendingSpeechEndFinalize, dispatch, finalizeUserSpeechTurn, resetAudioChunks]
   )
 
   const onModelTranscript = useCallback(
     (text: string, finished: boolean) => {
       if (!text) return
+
+      flushPendingSpeechEndFinalize()
 
       if (pendingAssistantTurnRef.current) {
         pendingAssistantTurnRef.current.hasModelOutput = true
@@ -530,11 +587,13 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       // the actual turnComplete event. Do NOT set isStreaming: false here - only onTurnComplete should.
       // REMOVED: if (finished && lastAssistantMessageIdRef.current) { ... }
     },
-    [dispatch]
+    [dispatch, flushPendingSpeechEndFinalize]
   )
 
   const onModelThinking = useCallback(
     (text: string) => {
+      flushPendingSpeechEndFinalize()
+
       if (pendingAssistantTurnRef.current) {
         pendingAssistantTurnRef.current.hasModelOutput = true
       }
@@ -543,11 +602,13 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       currentThinkingRef.current += text
       dispatch({ type: "APPEND_ASSISTANT_THINKING", text })
     },
-    [dispatch]
+    [dispatch, flushPendingSpeechEndFinalize]
   )
 
   const onAudioChunk = useCallback(
     (base64Audio: string) => {
+      flushPendingSpeechEndFinalize()
+
       if (pendingAssistantTurnRef.current) {
         pendingAssistantTurnRef.current.hasModelOutput = true
       }
@@ -565,10 +626,18 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       // to show thinking indicators.
       queueAudio(base64Audio)
     },
-    [dispatch, queueAudio]
+    [dispatch, flushPendingSpeechEndFinalize, queueAudio]
   )
 
   const onTurnComplete = useCallback(() => {
+    if (pendingSpeechEndFinalizeTimeoutRef.current) {
+      clearPendingSpeechEndFinalize()
+      finalizeUserSpeechTurn({
+        setProcessingState: false,
+        refreshPendingAssistantTurn: false,
+      })
+    }
+
     const pendingAssistantTurn = pendingAssistantTurnRef.current
     if (pendingAssistantTurn && !pendingAssistantTurn.hasModelOutput) {
       const elapsedMs = Date.now() - pendingAssistantTurn.startedAtMs
@@ -588,10 +657,11 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     // Transition to listening - this handles both AI greeting and regular responses
     dispatch({ type: "SET_LISTENING" })
     pendingUserUtteranceResetRef.current = true
-  }, [dispatch])
+  }, [clearPendingSpeechEndFinalize, dispatch, finalizeUserSpeechTurn])
 
   const onInterrupted = useCallback(() => {
     // User barged in - clear playback and reset for next response
+    clearPendingSpeechEndFinalize()
     clearQueuedAudio()
     pendingAssistantTurnRef.current = null
     currentTranscriptRef.current = ""
@@ -599,7 +669,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
     lastAssistantMessageIdRef.current = null
     dispatch({ type: "CLEAR_CURRENT_TRANSCRIPTS" })
     dispatch({ type: "SET_USER_SPEAKING" })
-  }, [clearQueuedAudio, dispatch])
+  }, [clearPendingSpeechEndFinalize, clearQueuedAudio, dispatch])
 
   const sendTextMessage = useCallback(
     (text: string) => {
@@ -624,6 +694,8 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
 
   const handleConnectionInterrupted = useCallback(
     (_reason?: string) => {
+      clearPendingSpeechEndFinalize()
+
       // Treat disconnects like an abrupt "turn end" so new sessions don't
       // merge transcripts into a previously streaming bubble.
       // Finalize any in-flight assistant message.
@@ -653,7 +725,7 @@ export function useCheckInMessages(options: UseCheckInMessagesOptions): UseCheck
       // Clear preview transcripts so the UI doesn't show stale partials.
       dispatch({ type: "CLEAR_CURRENT_TRANSCRIPTS" })
     },
-    [dispatch]
+    [clearPendingSpeechEndFinalize, dispatch]
   )
 
   const handlers: CheckInMessagesGeminiHandlers = {

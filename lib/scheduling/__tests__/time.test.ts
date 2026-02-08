@@ -15,6 +15,13 @@ describe("scheduling/time", () => {
     expect(extractExplicitTimeFromText("Let's meet at 9 30 pm")).toEqual({ hour: 21, minute: 30 })
   })
 
+  it("handles collapsed speech-to-text artifacts like 28pm", () => {
+    expect(extractExplicitTimeFromText("28pm"))
+      // Common STT artifact for "to 8pm".
+      .toEqual({ hour: 20, minute: 0 })
+    expect(extractExplicitTimeFromText("2 8pm")).toEqual({ hour: 20, minute: 0 })
+  })
+
   it("returns null when multiple distinct times are present", () => {
     expect(extractExplicitTimeFromText("at 9pm or 10pm")).toBeNull()
   })

@@ -8,6 +8,7 @@ import type { AudioFeatures } from "@/lib/types"
 let useCheckIn: typeof import("../use-check-in").useCheckIn
 
 type GeminiLiveCallbacks = {
+  onUserSpeechStart?: () => void
   onUserTranscript?: (text: string, isFinal: boolean) => void
   onUserSpeechEnd?: () => void
   onModelTranscript?: (text: string, isFinal: boolean) => void
@@ -395,6 +396,53 @@ describe("useCheckIn message handling", () => {
       expect(detectMismatchMock).toHaveBeenCalled()
       expect(result.current[0].latestMismatch).not.toBeNull()
     })
+  })
+
+  it("keeps short pause fragments in one user message", async () => {
+    vi.useFakeTimers()
+    try {
+      const { result } = renderHook(() => useCheckIn())
+
+      await act(async () => {
+        await result.current[1].startSession()
+      })
+
+      act(() => {
+        geminiCallbacks?.onModelTranscript?.("Hi", true)
+        geminiCallbacks?.onTurnComplete?.()
+      })
+
+      act(() => {
+        geminiCallbacks?.onUserSpeechStart?.()
+        geminiCallbacks?.onUserTranscript?.("It's from 3pm", false)
+        geminiCallbacks?.onUserSpeechEnd?.()
+      })
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250)
+      })
+
+      act(() => {
+        geminiCallbacks?.onUserSpeechStart?.()
+        geminiCallbacks?.onUserTranscript?.("to 8pm Monday through Friday", false)
+      })
+
+      expect(result.current[0].messages.filter((m) => m.role === "user")).toHaveLength(1)
+      expect(result.current[0].messages[0]?.content.toLowerCase()).toContain("3pm")
+      expect(result.current[0].messages[0]?.content.toLowerCase()).toContain("8pm")
+
+      act(() => {
+        geminiCallbacks?.onUserSpeechEnd?.()
+      })
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2000)
+      })
+
+      expect(result.current[0].state).toBe("processing")
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("keeps assistant message streaming until onTurnComplete (prevents premature placeholder removal)", async () => {

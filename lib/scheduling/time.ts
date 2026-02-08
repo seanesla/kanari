@@ -24,6 +24,23 @@ export function to24Hour(hour12: number, meridiem: "am" | "pm"): number {
   return meridiem === "pm" ? normalized + 12 : normalized
 }
 
+function parseHour12Token(value: string | undefined): number | null {
+  if (!value) return null
+  const token = value.trim()
+  if (!/^\d{1,2}$/.test(token)) return null
+
+  const parsed = Number(token)
+  if (parsed >= 1 && parsed <= 12) return parsed
+
+  // Speech-to-text can collapse "to 8pm" into "28pm".
+  // Pattern doc: docs/error-patterns/schedule-transcript-short-pause-context-loss.md
+  if (/^2[1-9]$/.test(token)) {
+    return Number(token[1])
+  }
+
+  return null
+}
+
 export function normalizeTimeToHHMM(time: string): string | null {
   const direct = parseTimeHHMM(time)
   if (direct) return formatTimeHHMM(direct)
@@ -64,7 +81,7 @@ export function extractExplicitTimeFromText(text: string): ParsedTime | null {
   }
 
   // e.g. "9pm", "9 pm", "9 p.m."
-  for (const match of input.matchAll(/\b(1[0-2]|0?[1-9])\s*(a\.?m|p\.?m)\b/g)) {
+  for (const match of input.matchAll(/\b([0-2]?\d)\s*(a\.?m|p\.?m)\b/g)) {
     // Avoid matching minute fragments from HH:MM strings (e.g. "9:07 PM" -> "07 PM").
     // Pattern doc: docs/error-patterns/schedule-activity-leading-zero-minute-time-parse.md
     if ((match.index ?? 0) > 0) {
@@ -72,6 +89,14 @@ export function extractExplicitTimeFromText(text: string): ParsedTime | null {
       if (previousChar === ":" || previousChar === ".") continue
     }
 
+    const hour12 = parseHour12Token(match[1])
+    if (hour12 === null) continue
+    const meridiem = match[2]?.startsWith("p") ? "pm" : "am"
+    push({ hour: to24Hour(hour12, meridiem), minute: 0 })
+  }
+
+  // e.g. "2 8pm" (collapsed STT for "to 8pm")
+  for (const match of input.matchAll(/\b2\s+([1-9])\s*(a\.?m|p\.?m)\b/g)) {
     const hour12 = Number(match[1])
     const meridiem = match[2]?.startsWith("p") ? "pm" : "am"
     push({ hour: to24Hour(hour12, meridiem), minute: 0 })
