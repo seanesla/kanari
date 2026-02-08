@@ -20,4 +20,10 @@ describe("scheduling/infer", () => {
   it("prefers quoted titles", () => {
     expect(inferScheduleTitle('Schedule "Doctor" today')).toBe("Doctor")
   })
+
+  it("extracts a specific activity title from free-form scheduling text", () => {
+    expect(
+      inferScheduleTitle("Can you schedule an activity for cooking chicken noodle soup today at 10:00 PM for 30 minutes?")
+    ).toBe("Cooking chicken noodle soup")
+  })
 })

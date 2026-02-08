@@ -14,6 +14,7 @@ import type {
 } from "@/lib/types"
 import {
   clampDurationMinutes,
+  extractDurationMinutesFromText,
   extractDateISOFromText,
   extractExplicitTimeFromText,
   formatTimeHHMM,
@@ -45,6 +46,19 @@ export interface UseCheckInWidgetsResult {
   saveJournalEntry: (widgetId: string, content: string) => Promise<void>
   triggerManualTool: (toolName: string, args: Record<string, unknown>) => void
   handlers: CheckInWidgetsGeminiHandlers
+}
+
+const GENERIC_ACTIVITY_TITLES = new Set([
+  "activity",
+  "scheduled activity",
+  "rest activity",
+  "recovery activity",
+  "self-care activity",
+])
+
+function isGenericActivityTitle(title: string): boolean {
+  const normalized = title.trim().toLowerCase()
+  return GENERIC_ACTIVITY_TITLES.has(normalized)
 }
 
 export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckInWidgetsResult {
@@ -449,6 +463,16 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         // from the most recent user message when it is unambiguous.
         // Pattern doc: docs/error-patterns/schedule-activity-user-time-mismatch.md
         const lastUserMessage = [...data.messages].reverse().find((m) => m.role === "user")?.content ?? ""
+        const explicitDurationMinutes = extractDurationMinutesFromText(lastUserMessage)
+        const inferredUserTitle = inferScheduleTitle(lastUserMessage)
+
+        // Pattern doc: docs/error-patterns/schedule-activity-generic-title-duration-drift.md
+        const resolvedTitle =
+          (isGenericActivityTitle(event.args.title) || !event.args.title.trim())
+          && inferredUserTitle !== "Scheduled activity"
+            ? inferredUserTitle
+            : event.args.title
+
         const userTime = extractExplicitTimeFromText(lastUserMessage)
         const normalizedToolTime = normalizeTimeToHHMM(event.args.time)
         const resolvedTime = userTime
@@ -457,7 +481,9 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
 
         const resolvedArgs: ScheduleActivityToolArgs = {
           ...event.args,
+          title: resolvedTitle,
           time: resolvedTime,
+          duration: clampDurationMinutes(explicitDurationMinutes ?? event.args.duration),
         }
 
         const scheduledFor = parseZonedDateTimeInstant(resolvedArgs.date, resolvedArgs.time, timeZone)

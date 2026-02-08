@@ -1,6 +1,15 @@
 import { describe, it, expect, vi } from "vitest"
 
 describe("buildCheckInSystemInstruction", () => {
+  it("instructs schedule_activity to preserve specific titles and explicit durations", async () => {
+    const { CHECK_IN_SYSTEM_PROMPT } = await vi.importActual<
+      typeof import("@/lib/gemini/live-prompts")
+    >("@/lib/gemini/live-prompts")
+
+    expect(CHECK_IN_SYSTEM_PROMPT).toContain("avoid generic titles")
+    expect(CHECK_IN_SYSTEM_PROMPT).toContain("Preserve explicit user duration exactly")
+  })
+
   it("includes time context with an explicit local-time label", async () => {
     const { buildCheckInSystemInstruction } = await vi.importActual<
       typeof import("@/lib/gemini/live-prompts")

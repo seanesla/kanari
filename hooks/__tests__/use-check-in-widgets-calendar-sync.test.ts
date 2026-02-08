@@ -143,8 +143,12 @@ describe("useCheckIn schedule_activity calendar sync", () => {
       })
     })
 
-    expect(result.current[0].widgets[0]?.type).toBe("schedule_activity")
-    expect(result.current[0].widgets[0]?.status).toBe("scheduled")
+    const firstWidget = result.current[0].widgets[0]
+    expect(firstWidget?.type).toBe("schedule_activity")
+    if (!firstWidget || firstWidget.type !== "schedule_activity") {
+      throw new Error("Expected schedule_activity widget")
+    }
+    expect(firstWidget.status).toBe("scheduled")
 
     await waitFor(() => {
       expect(scheduleEventMock).toHaveBeenCalledTimes(1)
@@ -188,8 +192,12 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     expect(scheduledAt.minute).toBe(0)
 
     // Widget args should be normalized to HH:MM (24h) for consistent UI formatting.
-    expect(result.current[0].widgets[0]?.type).toBe("schedule_activity")
-    expect(result.current[0].widgets[0]?.args.time).toBe("22:00")
+    const firstWidget = result.current[0].widgets[0]
+    expect(firstWidget?.type).toBe("schedule_activity")
+    if (!firstWidget || firstWidget.type !== "schedule_activity") {
+      throw new Error("Expected schedule_activity widget")
+    }
+    expect(firstWidget.args.time).toBe("22:00")
   })
 
   it("uses explicit user-provided time (e.g., 9:30PM) over tool args", async () => {
@@ -225,8 +233,12 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     expect(scheduledAt.minute).toBe(30)
 
     // UI widget args should also reflect the corrected time.
-    expect(result.current[0].widgets[0]?.type).toBe("schedule_activity")
-    expect(result.current[0].widgets[0]?.args.time).toBe("21:30")
+    const firstWidget = result.current[0].widgets[0]
+    expect(firstWidget?.type).toBe("schedule_activity")
+    if (!firstWidget || firstWidget.type !== "schedule_activity") {
+      throw new Error("Expected schedule_activity widget")
+    }
+    expect(firstWidget.args.time).toBe("21:30")
   })
 
   it("does not round minutes when the user says a specific time", async () => {
@@ -262,6 +274,46 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     expect(scheduledAt.minute).toBe(30)
   })
 
+  it("replaces generic tool title/duration with the user's explicit activity details", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+      result.current[1].sendTextMessage(
+        "Please schedule an activity for cooking chicken noodle soup on 2025-01-01 at 10:00 PM for 30 minutes."
+      )
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Rest activity",
+          category: "rest",
+          date: "2025-01-01",
+          time: "22:00",
+          duration: 20,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+    })
+
+    const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as
+      | { content?: string; duration?: number }
+      | undefined
+    expect(scheduledSuggestion?.content?.toLowerCase()).toContain("cooking chicken noodle soup")
+    expect(scheduledSuggestion?.duration).toBe(30)
+
+    const widget = result.current[0].widgets[0]
+    expect(widget?.type).toBe("schedule_activity")
+    if (!widget || widget.type !== "schedule_activity") return
+    expect(widget.args.title.toLowerCase()).toContain("cooking chicken noodle soup")
+    expect(widget.args.duration).toBe(30)
+  })
+
   it("does not override ambiguous times without AM/PM", async () => {
     const { result } = renderHook(() => useCheckIn())
 
@@ -294,8 +346,12 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     expect(scheduledAt.hour).toBe(21)
     expect(scheduledAt.minute).toBe(30)
 
-    expect(result.current[0].widgets[0]?.type).toBe("schedule_activity")
-    expect(result.current[0].widgets[0]?.args.time).toBe("21:30")
+    const firstWidget = result.current[0].widgets[0]
+    expect(firstWidget?.type).toBe("schedule_activity")
+    if (!firstWidget || firstWidget.type !== "schedule_activity") {
+      throw new Error("Expected schedule_activity widget")
+    }
+    expect(firstWidget.args.time).toBe("21:30")
   })
 
   it("auto-schedules next check-in requests when user provides an explicit date/time", async () => {
@@ -367,6 +423,44 @@ describe("useCheckIn schedule_activity calendar sync", () => {
       expect(result.current[0].widgets.some((w) => w.type === "schedule_activity" && w.status === "scheduled")).toBe(true)
       const confirmation = result.current[0].messages.find((m) => m.role === "assistant" && /scheduled/i.test(m.content))
       expect(confirmation?.content.toLowerCase()).toContain("appointment")
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("auto-schedules free-form activities with a specific title and explicit duration", async () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date("2026-01-09T21:54:16Z"))
+
+      const { result } = renderHook(() => useCheckIn())
+
+      act(() => {
+        geminiCallbacks?.onModelTranscript?.("Hi", true) // Unblock user input ("AI speaks first")
+        result.current[1].sendTextMessage(
+          "Please schedule an activity for cooking chicken noodle soup today at 10:00 PM for 30 minutes."
+        )
+      })
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1500) // Wait past the fallback window (1200ms)
+      })
+
+      await act(async () => {
+        // Flush the async persistence path.
+        await Promise.resolve()
+      })
+
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+
+      const scheduledSuggestion = scheduleEventMock.mock.calls[0]?.[0] as
+        | { content?: string; duration?: number }
+        | undefined
+      expect(scheduledSuggestion?.content?.toLowerCase()).toContain("cooking chicken noodle soup")
+      expect(scheduledSuggestion?.duration).toBe(30)
+
+      const confirmation = result.current[0].messages.find((m) => m.role === "assistant" && /scheduled/i.test(m.content))
+      expect(confirmation?.content.toLowerCase()).toContain("cooking chicken noodle soup")
     } finally {
       vi.useRealTimers()
     }

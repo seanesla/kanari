@@ -21,7 +21,7 @@ export const SCHEDULE_ACTIVITY_TOOL = {
       properties: {
         title: {
           type: Type.STRING,
-          description: "Short title for the activity (e.g., '10-minute walk', 'Breathing break')"
+          description: "Short title for the activity (e.g., '10-minute walk', 'Breathing break'). Keep user wording when specific; avoid generic labels like 'Scheduled activity' if the user named a concrete activity."
         },
         category: {
           type: Type.STRING,
@@ -38,7 +38,7 @@ export const SCHEDULE_ACTIVITY_TOOL = {
         },
         duration: {
           type: Type.INTEGER,
-          description: "Duration in minutes"
+          description: "Duration in minutes. Preserve explicit user duration when provided."
         }
       },
       required: ["title", "category", "date", "time", "duration"]
@@ -307,7 +307,9 @@ AVAILABLE TOOLS:
    - Use when the user asks to schedule something time-bound (e.g., "schedule a break tomorrow at 3", "schedule an appointment at 9:30PM")
    - If the user asks to schedule a "check-in" later, schedule it as an activity titled "Check-in" (category: rest, duration: 20 minutes unless the user specifies otherwise)
    - Date must be YYYY-MM-DD and time must be HH:MM (24h), in the user's local time
+   - Keep title faithful to the user's requested activity (e.g., "cooking chicken noodle soup"); avoid generic titles like "Rest activity" or "Scheduled activity" when the user gave specifics
    - Preserve the user's time EXACTLY: do not round minutes; convert AM/PM precisely (e.g., 9:30 PM → 21:30)
+   - Preserve explicit user duration exactly (do not silently switch to defaults)
    - If date/time is unclear, ask ONE clarifying question before calling
    - After calling schedule_activity, give a brief confirmation and continue the conversation (do NOT say goodbye or assume the user is done)
 
