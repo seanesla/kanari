@@ -534,16 +534,11 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         void (async () => {
           try {
             await addSuggestionToDb(suggestion)
-            const synced = await syncSuggestionToCalendar(widgetId, suggestion)
-            if (synced) {
-              const confirmationMessage: CheckInMessage = {
-                id: generateId(),
-                role: "assistant",
-                content: `Done — scheduled “${resolvedArgs.title}” for ${formatZonedDateTimeForMessage(resolvedArgs.date, resolvedArgs.time, timeZone)}.`,
-                timestamp: new Date().toISOString(),
-              }
-              dispatch({ type: "ADD_MESSAGE", message: confirmationMessage })
-            }
+            // Gemini already provides a post-tool confirmation in the same turn.
+            // Adding another app-generated confirmation here creates duplicate
+            // assistant replies and can trigger chat auto-scroll jitter while waiting.
+            // Pattern doc: docs/error-patterns/schedule-activity-double-confirmation.md
+            await syncSuggestionToCalendar(widgetId, suggestion)
           } catch (error) {
             unmarkScheduledInstant(scheduledFor)
             dispatch({

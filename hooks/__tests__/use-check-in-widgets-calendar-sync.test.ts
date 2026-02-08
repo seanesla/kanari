@@ -25,6 +25,7 @@ type GeminiWidgetEvent =
 type GeminiLiveCallbacks = {
   onWidget?: (event: GeminiWidgetEvent) => void
   onModelTranscript?: (text: string, finished: boolean) => void
+  onTurnComplete?: () => void
 }
 
 let geminiCallbacks: GeminiLiveCallbacks | null = null
@@ -312,6 +313,40 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     if (!widget || widget.type !== "schedule_activity") return
     expect(widget.args.title.toLowerCase()).toContain("cooking chicken noodle soup")
     expect(widget.args.duration).toBe(30)
+  })
+
+  it("does not add a duplicate schedule confirmation if the assistant already confirmed", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.(
+        "Done — scheduled \"Journaling exercise\" for Sat, Feb 7 at 10:00 PM.",
+        false
+      )
+      geminiCallbacks?.onTurnComplete?.()
+    })
+
+    act(() => {
+      geminiCallbacks?.onWidget?.({
+        widget: "schedule_activity",
+        args: {
+          title: "Journaling exercise",
+          category: "mindfulness",
+          date: "2025-02-07",
+          time: "22:00",
+          duration: 5,
+        },
+      })
+    })
+
+    await waitFor(() => {
+      expect(scheduleEventMock).toHaveBeenCalledTimes(1)
+    })
+
+    const scheduleConfirmations = result.current[0].messages.filter(
+      (m) => m.role === "assistant" && /scheduled/i.test(m.content)
+    )
+    expect(scheduleConfirmations).toHaveLength(1)
   })
 
   it("does not override ambiguous times without AM/PM", async () => {

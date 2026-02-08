@@ -250,6 +250,23 @@ describe("useCheckIn message handling", () => {
     expect(result.current[0].messages[0]?.content).toBe(second)
   })
 
+  it("does not append replayed assistant subsets that are already in the current message", () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    const first =
+      "Got it, I've scheduled that 5-minute journaling exercise for 10:00 PM tonight. Now, circling back to your commitment for tomorrow, how are you feeling about sticking to the plan?"
+    const replayedSubset =
+      "I've scheduled that 5-minute journaling exercise for 10:00 PM tonight. Now, circling back to your commitment for tomorrow, how are you feeling about sticking to the plan?"
+
+    act(() => {
+      geminiCallbacks?.onModelTranscript?.(first, false)
+      geminiCallbacks?.onModelTranscript?.(replayedSubset, false)
+    })
+
+    expect(result.current[0].messages).toHaveLength(1)
+    expect(result.current[0].messages[0]?.content).toBe(first)
+  })
+
   it("finalizes the streaming assistant message on turn completion", () => {
     const { result } = renderHook(() => useCheckIn())
 

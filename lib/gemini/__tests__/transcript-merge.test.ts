@@ -104,6 +104,17 @@ describe("mergeTranscriptUpdate", () => {
     expect(result.delta).toBe("")
   })
 
+  it("ignores replayed subset chunks that are already present in the transcript", () => {
+    const previous =
+      "Got it, I've scheduled that 5-minute journaling exercise for 10:00 PM tonight. Now, circling back to your commitment for tomorrow, how are you feeling about sticking to the plan?"
+    const incoming =
+      "I've scheduled that 5-minute journaling exercise for 10:00 PM tonight. Now, circling back to your commitment for tomorrow, how are you feeling about sticking to the plan?"
+
+    const result = mergeTranscriptUpdate(previous, incoming)
+    expect(result.next).toBe(previous)
+    expect(result.delta).toBe("")
+  })
+
   // Tests for short message restart detection (garbled greeting bug)
   // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
   describe("short message restart detection", () => {

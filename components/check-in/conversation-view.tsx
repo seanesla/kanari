@@ -41,16 +41,54 @@ export function ConversationView({
 }: ConversationViewProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const lastAutoScrollSignatureRef = useRef<{
+    messageCount: number
+    lastMessageId: string | null
+    lastMessageContent: string
+    hasUserTranscript: boolean
+  } | null>(null)
 
-  // Auto-scroll to bottom on new messages or content changes
-  // Track last message content to detect streaming updates
-  const lastMessageContent = messages[messages.length - 1]?.content || ""
-
+  // Auto-scroll policy:
+  // - New messages: smooth scroll
+  // - Streaming updates (same message ID, content grows): immediate scroll
+  // - Quiet state-only updates: no scroll
+  // Pattern doc: docs/error-patterns/check-in-quiet-period-autoscroll-jitter.md
   useEffect(() => {
     const el = bottomRef.current
     if (!el || typeof el.scrollIntoView !== "function") return
-    el.scrollIntoView({ behavior: "smooth" })
-  }, [messages.length, state, currentUserTranscript, lastMessageContent])
+
+    const lastMessage = messages[messages.length - 1]
+    const signature = {
+      messageCount: messages.length,
+      lastMessageId: lastMessage?.id ?? null,
+      lastMessageContent: lastMessage?.content ?? "",
+      hasUserTranscript: Boolean(currentUserTranscript.trim()),
+    }
+
+    const previous = lastAutoScrollSignatureRef.current
+    lastAutoScrollSignatureRef.current = signature
+
+    if (!previous) {
+      if (signature.messageCount > 0 || signature.hasUserTranscript) {
+        el.scrollIntoView({ behavior: "auto" })
+      }
+      return
+    }
+
+    const messageAdded = signature.messageCount > previous.messageCount
+    const activeMessageChanged = signature.lastMessageId !== previous.lastMessageId
+    const streamingUpdate =
+      signature.lastMessageId !== null
+      && signature.lastMessageId === previous.lastMessageId
+      && signature.lastMessageContent !== previous.lastMessageContent
+    const transcriptPreviewStarted = !previous.hasUserTranscript && signature.hasUserTranscript
+
+    if (!(messageAdded || activeMessageChanged || streamingUpdate || transcriptPreviewStarted)) {
+      return
+    }
+
+    el.scrollIntoView({ behavior: messageAdded || activeMessageChanged ? "smooth" : "auto" })
+  }, [messages, currentUserTranscript])
 
   const isProcessing = state === "processing"
   const isUserSpeaking = state === "user_speaking"

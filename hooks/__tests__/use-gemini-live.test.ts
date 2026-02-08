@@ -240,6 +240,19 @@ describe("geminiReducer", () => {
       expect(result.modelTranscript).toBe(action.text)
     })
 
+    test("MODEL_TRANSCRIPT ignores replayed subset chunks already present in transcript", () => {
+      state.modelTranscript =
+        "Got it, I've scheduled that 5-minute journaling exercise for 10:00 PM tonight. Now, circling back to your commitment for tomorrow, how are you feeling about sticking to the plan?"
+      const action: GeminiAction = {
+        type: "MODEL_TRANSCRIPT",
+        text:
+          "I've scheduled that 5-minute journaling exercise for 10:00 PM tonight. Now, circling back to your commitment for tomorrow, how are you feeling about sticking to the plan?",
+      }
+      const result = geminiReducer(state, action)
+
+      expect(result.modelTranscript).toBe(state.modelTranscript)
+    })
+
     test("MODEL_TRANSCRIPT truncates when exceeding MAX_TRANSCRIPT_LENGTH", () => {
       const MAX_TRANSCRIPT_LENGTH = 10000
       // Create transcript that's already at max length

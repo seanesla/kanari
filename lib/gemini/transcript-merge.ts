@@ -232,6 +232,23 @@ export function mergeTranscriptUpdate(previous: string, incoming: string): Trans
   const previousTokens = tokenize(previous)
   const incomingTokens = tokenize(incoming)
 
+  // Some transcript streams replay a long subset of text that is already present
+  // in the current message (e.g., drops the first clause and re-sends the rest).
+  // Appending that chunk duplicates sentences in the same bubble.
+  // Pattern doc: docs/error-patterns/transcript-replayed-subset-duplication.md
+  if (
+    incomingTokens.length >= 8
+    && incomingTokens.length <= previousTokens.length
+    && normalizedIncoming.length >= 32
+    && (` ${normalizedPrevious} `).includes(` ${normalizedIncoming} `)
+  ) {
+    return {
+      next: previous,
+      delta: "",
+      kind: "delta",
+    }
+  }
+
   // Detect greeting restart: incoming starts with capital and looks like a new sentence.
   // This catches cases where the model restarts with a different greeting variant.
   // Pattern doc: docs/error-patterns/transcript-stream-duplication.md
