@@ -552,6 +552,10 @@ export interface UserSettings {
   hasCompletedOnboarding?: boolean // Whether user has completed the onboarding flow
   onboardingCompletedAt?: string // ISO timestamp when onboarding was completed
 
+  // Guidance
+  hasCompletedFirstTimeGuide?: boolean // Whether user has seen the first-time guidance popups
+  firstTimeGuideCompletedAt?: string // ISO timestamp when first-time guide was completed/skipped
+
   /** Optional: per-user voice baseline used to personalize biomarkers */
   voiceBaseline?: VoiceBaseline
 

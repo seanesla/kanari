@@ -18,6 +18,7 @@ import { JankLogger } from "@/components/perf/jank-logger"
 import { IconProvider } from "./icon-provider"
 import { DataPreloader } from "./data-preloader"
 import { DemoProvider, DemoOverlay } from "@/components/demo"
+import { GuidanceProvider, GuidancePopup } from "@/components/guidance"
 import { RouteTransitionOverlay } from "@/components/route-transition-overlay"
 import { RouteTransitionProvider } from "@/lib/route-transition-context"
 
@@ -36,16 +37,19 @@ export function Providers({ children }: { children: ReactNode }) {
               <TimeZoneProvider>
                 <ColorSync />
                 <DemoProvider>
-                  <NavbarProvider>
-                    <RouteTransitionProvider>
-                      <SceneBackground />
-                      <PersistentNavbar />
-                      <RouteTransitionOverlay />
-                      <RequireUserName />
-                      {children}
-                      <DemoOverlay />
-                    </RouteTransitionProvider>
-                  </NavbarProvider>
+                  <GuidanceProvider>
+                    <NavbarProvider>
+                      <RouteTransitionProvider>
+                        <SceneBackground />
+                        <PersistentNavbar />
+                        <RouteTransitionOverlay />
+                        <RequireUserName />
+                        {children}
+                        <DemoOverlay />
+                        <GuidancePopup />
+                      </RouteTransitionProvider>
+                    </NavbarProvider>
+                  </GuidanceProvider>
                 </DemoProvider>
               </TimeZoneProvider>
             </SceneProvider>

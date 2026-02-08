@@ -14,11 +14,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
-import { Loader2, RefreshCw, Trash2, User } from "@/lib/icons"
+import { Loader2, RefreshCw, Trash2, User, Play } from "@/lib/icons"
 import { useClearAllData } from "@/hooks/use-storage"
 import { db } from "@/lib/storage/db"
 import { Deck } from "@/components/dashboard/deck"
 import { Switch } from "@/components/ui/switch"
+import { useGuidance } from "@/components/guidance"
+import { isDemoWorkspace } from "@/lib/workspace"
 
 interface SettingsAccountSectionProps {
   isSaving: boolean
@@ -39,6 +41,8 @@ export function SettingsAccountSection({
 }: SettingsAccountSectionProps) {
   const router = useRouter()
   const clearAllData = useClearAllData()
+  const { startGuide, activeGuide } = useGuidance()
+  const isDemo = isDemoWorkspace()
 
   const [showResetDialog, setShowResetDialog] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
@@ -118,6 +122,47 @@ export function SettingsAccountSection({
                 onCheckedChange={onShareJournalWithAiChange}
                 aria-label="Share Journal With AI"
               />
+            </div>
+          </div>
+
+          {/* Replay Guide */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Play className="h-4 w-4 text-muted-foreground" />
+              <Label className="text-base font-sans">Replay Guide</Label>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3 font-sans">
+              Replay the in-app walkthrough to revisit tips and feature highlights.
+            </p>
+            <div className="flex flex-col gap-2">
+              {isDemo ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    router.push("/overview")
+                    // Small delay so the route change happens first
+                    setTimeout(() => startGuide("demo"), 300)
+                  }}
+                  disabled={isSaving || isResetting || activeGuide !== null}
+                  className="w-full"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Replay Demo Guide
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    router.push("/overview")
+                    setTimeout(() => startGuide("first-time"), 300)
+                  }}
+                  disabled={isSaving || isResetting || activeGuide !== null}
+                  className="w-full"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Replay Guide
+                </Button>
+              )}
             </div>
           </div>
 

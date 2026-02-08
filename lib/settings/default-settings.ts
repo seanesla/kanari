@@ -40,6 +40,9 @@ export const DEFAULT_USER_SETTINGS: UserSettings = {
 
   hasCompletedOnboarding: false,
   onboardingCompletedAt: undefined,
+
+  hasCompletedFirstTimeGuide: false,
+  firstTimeGuideCompletedAt: undefined,
 }
 
 export function createDefaultSettingsRecord(
