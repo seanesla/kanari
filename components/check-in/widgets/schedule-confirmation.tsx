@@ -12,12 +12,13 @@ function formatCategory(category: SuggestionCategory): string {
   return category.charAt(0).toUpperCase() + category.slice(1)
 }
 
-function formatZonedDateTime(date: string, time: string, timeZone: string): string {
+function formatScheduleWindow(date: string, time: string, duration: number, timeZone: string): string {
   const [year, month, day] = date.split("-").map(Number)
   const [hour, minute] = time.split(":").map(Number)
+  const safeDurationMinutes = Math.max(1, Math.round(duration))
 
   try {
-    const zdt = Temporal.ZonedDateTime.from({
+    const start = Temporal.ZonedDateTime.from({
       timeZone,
       year,
       month,
@@ -25,24 +26,44 @@ function formatZonedDateTime(date: string, time: string, timeZone: string): stri
       hour,
       minute,
     })
+    const end = start.add({ minutes: safeDurationMinutes })
 
-    return new Intl.DateTimeFormat([], {
+    const dateText = new Intl.DateTimeFormat("en-US", {
       timeZone,
       weekday: "short",
       month: "short",
       day: "numeric",
-      hour: "2-digit",
+    }).format(new Date(start.epochMilliseconds))
+
+    const timeText = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour: "numeric",
       minute: "2-digit",
-    }).format(new Date(zdt.epochMilliseconds))
+    })
+
+    const startText = timeText.format(new Date(start.epochMilliseconds))
+    const endText = timeText.format(new Date(end.epochMilliseconds))
+
+    return `${dateText}, ${startText} to ${endText}`
   } catch {
-    const dt = new Date(year, month - 1, day, hour, minute, 0, 0)
-    return dt.toLocaleString([], {
+    const start = new Date(year, month - 1, day, hour, minute, 0, 0)
+    const end = new Date(start.getTime() + safeDurationMinutes * 60_000)
+
+    const dateText = start.toLocaleDateString("en-US", {
       weekday: "short",
       month: "short",
       day: "numeric",
-      hour: "2-digit",
+    })
+    const startText = start.toLocaleTimeString("en-US", {
+      hour: "numeric",
       minute: "2-digit",
     })
+    const endText = end.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+    })
+
+    return `${dateText}, ${startText} to ${endText}`
   }
 }
 
@@ -71,7 +92,7 @@ export function ScheduleConfirmation({
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{args.title}</p>
           <p className="text-xs text-muted-foreground mt-1">
-            {formatZonedDateTime(args.date, args.time, timeZone)} • {args.duration}m
+            {formatScheduleWindow(args.date, args.time, args.duration, timeZone)}
           </p>
         </div>
         <Badge

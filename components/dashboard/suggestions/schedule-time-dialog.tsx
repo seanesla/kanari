@@ -69,6 +69,40 @@ const MINUTES = [
   { value: "45", label: "45" },
 ]
 
+function formatTimeWindow(
+  dateISO: string,
+  hour: string,
+  minute: string,
+  durationMinutes: number,
+  timeZone: string
+): string | null {
+  try {
+    const plainDate = Temporal.PlainDate.from(dateISO)
+    const start = Temporal.ZonedDateTime.from({
+      timeZone,
+      year: plainDate.year,
+      month: plainDate.month,
+      day: plainDate.day,
+      hour: parseInt(hour, 10),
+      minute: parseInt(minute, 10),
+    })
+    const end = start.add({ minutes: Math.max(1, Math.round(durationMinutes)) })
+
+    const timeFormatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour: "numeric",
+      minute: "2-digit",
+    })
+
+    const startText = timeFormatter.format(new Date(start.epochMilliseconds))
+    const endText = timeFormatter.format(new Date(end.epochMilliseconds))
+
+    return `${startText} to ${endText}`
+  } catch {
+    return null
+  }
+}
+
 interface ScheduleTimeDialogProps {
   suggestion: Suggestion | null
   open: boolean
@@ -207,6 +241,18 @@ export function ScheduleTimeDialog({
     }
   }, [selectedDateISO, selectedHour, selectedMinute, timeZone])
 
+  const selectedTimeWindow = useMemo(() => {
+    if (!selectedDateISO || !suggestion) return null
+
+    return formatTimeWindow(
+      selectedDateISO,
+      selectedHour,
+      selectedMinute,
+      suggestion.duration,
+      timeZone
+    )
+  }, [selectedDateISO, selectedHour, selectedMinute, suggestion, timeZone])
+
   const handleSchedule = () => {
     if (!suggestion || !selectedDateISO || !isValidTime) return
 
@@ -302,7 +348,11 @@ export function ScheduleTimeDialog({
         {/* Duration info */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground py-2 border-t border-border/50">
           <Clock className="h-4 w-4" />
-          <span>Duration: {suggestion.duration} minutes</span>
+          <span>
+            {selectedTimeWindow
+              ? `From ${selectedTimeWindow}`
+              : `Duration: ${suggestion.duration} minutes`}
+          </span>
         </div>
 
         {hasRecurringSeries ? (

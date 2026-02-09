@@ -108,6 +108,35 @@ describe("ScheduleTimeDialog", () => {
     expect(onSchedule.mock.calls[0]?.[1]).toBe("2026-01-20T14:15:00Z")
   })
 
+  it("shows a from/to time window instead of duration minutes", async () => {
+    const { ScheduleTimeDialog } = await import("../schedule-time-dialog")
+
+    const suggestion: Suggestion = {
+      id: "s-range",
+      content: "Deep focus block",
+      rationale: "rationale",
+      duration: 120,
+      category: "rest",
+      status: "pending",
+      createdAt: "2026-01-16T00:00:00.000Z",
+    }
+
+    render(
+      <ScheduleTimeDialog
+        suggestion={suggestion}
+        open={true}
+        onOpenChange={vi.fn()}
+        onSchedule={vi.fn()}
+        defaultDateISO="2026-01-20"
+        defaultHour={8}
+        defaultMinute={0}
+      />
+    )
+
+    expect(screen.getByText(/From 8:00 AM to 10:00 AM/i)).toBeInTheDocument()
+    expect(screen.queryByText(/Duration:/i)).not.toBeInTheDocument()
+  })
+
   it("passes recurring scope when rescheduling a series occurrence", async () => {
     const { ScheduleTimeDialog } = await import("../schedule-time-dialog")
 
