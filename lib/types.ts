@@ -535,8 +535,7 @@ export interface UserSettings {
   // Timezone
   timeZone?: string // IANA timezone id (e.g., "America/Los_Angeles")
 
-  // Calendar integration
-  calendarConnected: boolean
+  // Scheduling
   autoScheduleRecovery: boolean
   preferredRecoveryTimes: string[] // Array of HH:mm
 

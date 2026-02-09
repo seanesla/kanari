@@ -10,7 +10,6 @@ const DEFAULT_GEMINI_API_KEY_SOURCE: UserSettings["geminiApiKeySource"] =
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   userName: undefined,
 
-  calendarConnected: false,
   autoScheduleRecovery: false,
   preferredRecoveryTimes: [],
 

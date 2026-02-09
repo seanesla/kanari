@@ -561,7 +561,6 @@ function ScheduleXWeekCalendarInner({
       // Render suggestion events with default-like styling
       // We need to render this ourselves since customComponents replaces the default
       const isCompleted = (event as SuggestionEvent)._isCompleted
-      const isSynced = !!(event as SuggestionEvent)._recoveryBlock
       return (
         <div
           className={cn(
@@ -576,14 +575,6 @@ function ScheduleXWeekCalendarInner({
         >
           <div className="flex items-center gap-1">
             <div className="truncate">{calendarEvent.title}</div>
-            {isSynced && (
-              <span
-                className="text-[10px] font-medium text-muted-foreground/80"
-                title="Synced to Google Calendar"
-              >
-                GC
-              </span>
-            )}
           </div>
         </div>
       )

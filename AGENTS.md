@@ -28,7 +28,7 @@ pnpm test:run     # Vitest single run
 ## Environment
 
 Copy `.env.example` to `.env.local` with:
-- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` - For Calendar integration
+- `NEXT_PUBLIC_GEMINI_API_KEY` (optional) - Use a built-in Gemini key for demos/hackathons
 
 Note: `NEXT_PUBLIC_GEMINI_API_KEY` is exposed to the browser. Prefer BYO key for production.
 
@@ -40,7 +40,7 @@ Note: `NEXT_PUBLIC_GEMINI_API_KEY` is exposed to the browser. Prefer BYO key for
 1. **AI Voice Check-in**: `use-check-in` captures mic audio → Meyda features (client-side) → Gemini Live API (real-time conversation) → IndexedDB session storage
 2. **Synthesis**: Post-check-in API generates insights, journal entries, and recovery suggestions
 3. **Forecasting**: `lib/ml/forecasting.ts` predicts 3-7 day burnout risk from acoustic biomarker trends
-4. **Scheduling**: User schedules recovery suggestions via Google Calendar
+4. **Scheduling**: User schedules recovery suggestions in the local in-app calendar
 
 ### Key Directories
 - `app/(app)/` - Dashboard routes: overview, check-ins, analytics, achievements, settings (URLs: `/overview`, `/check-ins`, etc.)
@@ -68,7 +68,6 @@ Note: `NEXT_PUBLIC_GEMINI_API_KEY` is exposed to the browser. Prefer BYO key for
 ### APIs
 - **Gemini Flash**: REST API for async analysis
 - **Gemini Live**: WebSocket at `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent`
-- **Google Calendar**: OAuth 2.0 PKCE flow
 
 ## Key Patterns
 

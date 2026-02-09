@@ -69,7 +69,6 @@ interface SuggestionDetailDialogProps {
    * This is the preferred completion flow - shows a feedback dialog after the user clicks "Mark Complete".
    */
   onCompleteWithFeedback?: (suggestion: Suggestion, feedback: EffectivenessFeedback) => void
-  isCalendarConnected?: boolean
   // Enriched context for "Why this suggestion?"
   voicePatterns?: VoicePatterns
   history?: HistoricalContext
@@ -87,7 +86,6 @@ export function SuggestionDetailDialog({
   onDismiss,
   onComplete,
   onCompleteWithFeedback,
-  isCalendarConnected: _isCalendarConnected = false,
   voicePatterns,
   history,
   burnoutPrediction,

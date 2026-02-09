@@ -72,8 +72,7 @@ interface UseSuggestionWorkflowParams {
   dismissSuggestion: (id: string, options?: { scope?: RecurringMutationScope }) => Promise<boolean>
   /** Complete a suggestion with optional effectiveness feedback */
   completeSuggestion: (id: string, feedback?: EffectivenessFeedback) => Promise<boolean>
-  scheduleGoogleEvent?: (suggestion: Suggestion, options?: LocalCalendarEventOptions) => Promise<RecoveryBlock | null>
-  isCalendarConnected?: boolean
+  scheduleCalendarEvent?: (suggestion: Suggestion, options?: LocalCalendarEventOptions) => Promise<RecoveryBlock | null>
 }
 
 /**
@@ -89,8 +88,7 @@ export function useSuggestionWorkflow({
   scheduleSuggestion,
   dismissSuggestion,
   completeSuggestion,
-  scheduleGoogleEvent,
-  isCalendarConnected,
+  scheduleCalendarEvent,
 }: UseSuggestionWorkflowParams): SuggestionWorkflowState & { handlers: SuggestionWorkflowHandlers } {
   // Dialog state
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
@@ -129,7 +127,7 @@ export function useSuggestionWorkflow({
     }
   }, [suggestions])
 
-  // Confirm scheduling and optionally sync to Google Calendar
+  // Confirm scheduling and persist a corresponding local recovery block
   const handleScheduleConfirm = useCallback(async (
     suggestion: Suggestion,
     scheduledFor: string,
@@ -140,19 +138,18 @@ export function useSuggestionWorkflow({
       setScheduleDialogSuggestion(null)
       setDroppedSuggestion(null)
 
-      // Optionally sync to Google Calendar
       // For recurring scope updates (future/all), we mutate existing occurrences in storage
       // and should not create a fresh calendar block from this single anchor item.
       const shouldCreateCalendarBlock =
         scope === "single" && (suggestion.status !== "scheduled" || !suggestion.scheduledFor)
 
-      if (isCalendarConnected && scheduleGoogleEvent && shouldCreateCalendarBlock) {
+      if (scheduleCalendarEvent && shouldCreateCalendarBlock) {
         const updatedSuggestion = { ...suggestion, status: "scheduled" as const, scheduledFor }
-        await scheduleGoogleEvent(updatedSuggestion)
+        await scheduleCalendarEvent(updatedSuggestion)
       }
     }
     return success
-  }, [scheduleSuggestion, isCalendarConnected, scheduleGoogleEvent])
+  }, [scheduleSuggestion, scheduleCalendarEvent])
 
   // Dismiss suggestion from detail dialog
   const handleDismiss = useCallback(async (

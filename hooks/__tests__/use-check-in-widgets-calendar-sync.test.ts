@@ -233,7 +233,7 @@ beforeEach(async () => {
         }),
       },
       journalEntries: { add: vi.fn(async () => {}) },
-      settings: { get: vi.fn(async () => ({ id: "default", calendarConnected: true })) },
+      settings: { get: vi.fn(async () => ({ id: "default" })) },
       recurringSeries: {
         put: vi.fn(async (series: Record<string, unknown>) => {
           recurringSeriesStore.set(String(series.id), { ...series })

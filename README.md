@@ -33,7 +33,7 @@ This is not medical advice and it does not diagnose burnout.
 - **Recovery Suggestions**: Context-aware recommendations based on your conversation and biomarkers
 
 ### Integration
-- **Calendar Sync**: Schedule recovery blocks directly to Google Calendar
+- **Local Calendar**: Schedule recovery blocks directly in Kanari
 - **Week View**: Visual scheduler showing your recovery activities
 - **Achievement System**: Track streaks and milestones
 
@@ -66,7 +66,7 @@ This is not medical advice and it does not diagnose burnout.
 | Audio | Web Audio API, Meyda, @ricky0123/vad-web |
 | AI | Gemini 3 Flash (REST), Gemini Live (WebSocket) |
 | Storage | IndexedDB (Dexie), Web Crypto API |
-| Integration | Google Calendar API, Google OAuth 2.0 |
+| Integration | Local calendar scheduler |
 
 ---
 
@@ -76,7 +76,7 @@ This is not medical advice and it does not diagnose burnout.
 git clone https://github.com/seanesla/kanari.git
 cd kanari
 pnpm install
-cp .env.example .env.local  # Optional: Google Calendar OAuth
+cp .env.example .env.local
 pnpm dev
 ```
 

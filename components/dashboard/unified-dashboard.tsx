@@ -52,10 +52,7 @@ export function UnifiedDashboard() {
   // Keep a longer window for the Trends tab, but use the most-recent week for forecasting.
   const storedTrendData = useTrendData(30)
   const allRecordings = useRecordings(14)
-  const {
-    isConnected: isCalendarConnected,
-    scheduleEvent,
-  } = useLocalCalendar()
+  const { scheduleEvent } = useLocalCalendar()
   const { addRecoveryBlock } = useRecoveryBlockActions()
   const recoveryBlocks = useRecoveryBlocks()
 
@@ -107,8 +104,7 @@ export function UnifiedDashboard() {
     scheduleSuggestion,
     dismissSuggestion,
     completeSuggestion,
-    scheduleGoogleEvent: scheduleLocalEventAndPersist,
-    isCalendarConnected,
+    scheduleCalendarEvent: scheduleLocalEventAndPersist,
   })
 
   // Trigger entry animation
@@ -605,7 +601,6 @@ export function UnifiedDashboard() {
           onDismiss={handlers.handleDismiss}
           onComplete={handlers.handleComplete}
           onCompleteWithFeedback={handlers.handleCompleteWithFeedback}
-          isCalendarConnected={isCalendarConnected}
           voicePatterns={voicePatterns}
           history={historicalContext}
           burnoutPrediction={burnoutPrediction ?? undefined}

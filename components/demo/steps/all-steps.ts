@@ -53,7 +53,7 @@ export const ALL_DEMO_STEPS: DemoStep[] = [
     phase: "dashboard",
     target: "demo-calendar",
     title: "Calendar",
-    content: "Schedule recovery time and sync with Google Calendar. Block time for self-care.",
+    content: "Schedule recovery time directly in Kanari. Block time for self-care.",
     position: "top",
     scrollBehavior: "center",
   },

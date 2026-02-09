@@ -126,7 +126,7 @@ const SLIDES: FeatureTourSlide[] = [
     bullets: [
       "Schedule blocks with drag/drop + quick time picker",
       "Persists scheduled recovery blocks locally",
-      "Optional Google Calendar integration for real-world follow-through",
+      "Visual week/month calendar keeps recovery plans visible",
     ],
     media: {
       kind: "video",

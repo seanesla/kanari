@@ -38,7 +38,7 @@ export const FIRST_TIME_STEPS: GuidanceStep[] = [
     id: "ft-suggestions",
     title: "Recovery Suggestions",
     message:
-      "After each check-in, Kanari generates personalized recovery suggestions. You can schedule them directly to your Google Calendar.",
+      "After each check-in, Kanari generates personalized recovery suggestions. You can schedule them directly in your Kanari calendar.",
     route: "/overview",
   },
   {

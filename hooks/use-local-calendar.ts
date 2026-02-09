@@ -1,7 +1,7 @@
 "use client"
 
 /**
- * Local calendar hook - replaces Google Calendar integration
+ * Local calendar hook
  *
  * Manages scheduling of suggestions to a local calendar (stored in IndexedDB).
  * Events are displayed in the FullCalendar component.
@@ -62,7 +62,7 @@ export function useLocalCalendar(): UseLocalCalendarReturn {
           timeZone,
         })
 
-        // Create a local recovery block (no external calendar event ID needed)
+        // Create a local recovery block
         const recoveryBlock: RecoveryBlock = {
           id: generateRecoveryBlockId(),
           suggestionId: suggestion.id,
