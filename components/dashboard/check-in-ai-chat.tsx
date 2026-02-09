@@ -506,8 +506,8 @@ export function AIChatContent({
   })()
 
   return (
-    <div className="relative flex h-full overflow-hidden">
-      <div className="flex-1 flex flex-col overflow-hidden">
+    <div className="relative flex h-full min-w-0 overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {checkIn.state === "error" ? (
           <motion.div
             className="flex-1 flex flex-col items-center justify-center gap-4 p-8"
@@ -574,7 +574,7 @@ export function AIChatContent({
             {/* Biomarkers */}
             <div
               className={cn(
-                "px-6 py-3 border-b",
+                "min-w-0 border-b px-4 py-3 sm:px-6",
                 isGlassChrome
                   ? "border-border/40 bg-transparent"
                   : "border-border/50 bg-background/40"
@@ -588,7 +588,7 @@ export function AIChatContent({
 
             {/* Conversation */}
             {showConversation && focusedWidget ? (
-              <div className="flex-1 overflow-hidden p-4">
+              <div className="flex-1 min-w-0 overflow-hidden p-4">
                 {focusedWidget.type === "journal_prompt" ? (
                   <JournalPrompt
                     key={focusedWidget.id}

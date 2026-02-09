@@ -62,5 +62,8 @@ describe("SynthesisScreen layout", () => {
 
     expect(hasClassToken(container, "max-w-6xl")).toBe(true)
     expect(hasClassToken(container, "lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]")).toBe(true)
+    expect(hasClassToken(container, "min-w-0")).toBe(true)
+    expect(hasClassToken(container, "overflow-x-visible")).toBe(true)
+    expect(hasClassToken(container, "flex-wrap")).toBe(true)
   })
 })

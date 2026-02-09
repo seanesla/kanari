@@ -128,7 +128,7 @@ export function SynthesisScreen({
   }, [session?.id, session?.acousticMetrics, selfStress, selfFatigue, isSavingSelfReport])
 
   const headerPanel = (
-    <div className="flex items-start justify-between gap-3">
+    <div className="flex min-w-0 items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2">
           <div className="h-9 w-9 rounded-full bg-accent/10 flex items-center justify-center">
@@ -147,7 +147,7 @@ export function SynthesisScreen({
       </div>
 
       {synthesis?.meta?.input ? (
-        <Badge variant="secondary" className="shrink-0">
+        <Badge variant="secondary" className="shrink-0 max-w-full">
           {synthesis.meta.input.messagesUsed}/{synthesis.meta.input.messagesTotal} msgs
           {synthesis.meta.input.truncated ? " • trimmed" : ""}
         </Badge>
@@ -358,15 +358,15 @@ export function SynthesisScreen({
   const hasContextPanels = Boolean(session)
 
   return (
-    <div className={cn("flex-1 flex flex-col overflow-hidden", className)}>
-      <div className="flex-1 overflow-auto px-4 py-5 sm:px-6 sm:py-6">
-        <div className={cn("mx-auto w-full space-y-4", contentMaxWidthClass)}>
+    <div className={cn("flex min-w-0 flex-1 flex-col overflow-y-hidden overflow-x-visible", className)}>
+      <div className="flex-1 min-w-0 overflow-y-auto overflow-x-visible px-4 py-5 sm:px-6 sm:py-6">
+        <div className={cn("mx-auto w-full min-w-0 space-y-4", contentMaxWidthClass)}>
           {headerPanel}
 
           {isWideLayout && hasContextPanels ? (
-            <div className="grid gap-4 lg:items-start lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
-              <div className="space-y-4">{contextPanels}</div>
-              <div className="space-y-4">{analysisPanels}</div>
+            <div className="grid min-w-0 gap-4 lg:items-start lg:grid-cols-[minmax(18rem,24rem)_minmax(0,1fr)]">
+              <div className="min-w-0 space-y-4">{contextPanels}</div>
+              <div className="min-w-0 space-y-4">{analysisPanels}</div>
             </div>
           ) : (
             <>
@@ -378,7 +378,7 @@ export function SynthesisScreen({
       </div>
 
       <div className="flex-shrink-0 border-t border-border/70 bg-background/60 px-4 py-4 sm:px-6">
-        <div className={cn("mx-auto w-full flex items-center justify-between gap-2", contentMaxWidthClass)}>
+        <div className={cn("mx-auto flex w-full min-w-0 flex-wrap items-center justify-between gap-2", contentMaxWidthClass)}>
           {onDone ? (
             <Button variant="outline" onClick={onDone}>
               Done

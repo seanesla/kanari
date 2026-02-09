@@ -479,8 +479,8 @@ export function VoiceBiomarkerReport({
   }
 
   return (
-    <div className={cn("space-y-3", className)}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <div className={cn("min-w-0 space-y-3", className)}>
+      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-xs font-medium text-muted-foreground">{title}</p>
           <p className="mt-1 text-xs text-muted-foreground/80">

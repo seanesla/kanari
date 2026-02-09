@@ -41,9 +41,9 @@ function MetricBar({
   const score = clampScore(value)
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="min-w-0 flex flex-col gap-1">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>{label}</span>
+        <span className="min-w-0 truncate pr-2">{label}</span>
         <span className="tabular-nums">{showNumbers ? score : ""}</span>
       </div>
       <div className="h-2 w-full rounded-full bg-muted/40 overflow-hidden">
@@ -78,12 +78,12 @@ export function BiomarkerIndicator({ metrics, className, compact = false }: Biom
   return (
     <div
       className={cn(
-        "rounded-lg border border-border/50 bg-background/60 px-4 py-3",
+        "min-w-0 rounded-lg border border-border/50 bg-background/60 px-4 py-3",
         compact ? "text-xs" : "text-sm",
         className
       )}
     >
-      <div className={cn("grid gap-3", compact ? "grid-cols-1" : "grid-cols-2")}>
+      <div className={cn("grid gap-3", compact ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-2")}>
         <MetricBar
           label="Stress"
           value={stressScore}

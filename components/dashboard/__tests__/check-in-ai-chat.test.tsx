@@ -11,6 +11,12 @@ const useCheckInMock = vi.fn()
 const addCheckInSessionMock = vi.fn(async () => {})
 const updateCheckInSessionMock = vi.fn(async () => {})
 
+function hasClassToken(container: HTMLElement, token: string): boolean {
+  return Array.from(container.querySelectorAll("div")).some(
+    (element) => typeof element.className === "string" && element.className.includes(token)
+  )
+}
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: vi.fn(),
@@ -163,6 +169,45 @@ describe("AIChatContent", () => {
     expect(screen.getByText(/listening for voice biomarkers/i).parentElement).toHaveClass("bg-transparent")
   })
 
+  it("uses mobile-safe biomarker container classes in the check-in flow", async () => {
+    useCheckInMock.mockReturnValue([
+      {
+        state: "listening",
+        initPhase: null,
+        isActive: true,
+        session: { id: "s1", startedAt: new Date().toISOString(), messages: [], acousticMetrics: null },
+        messages: [],
+        currentUserTranscript: "",
+        widgets: [],
+        error: null,
+        isMuted: false,
+      },
+      {
+        startSession: vi.fn(async () => {}),
+        endSession: vi.fn(async () => {}),
+        cancelSession: vi.fn(),
+        getSession: vi.fn(() => null),
+        toggleMute: vi.fn(),
+        dismissWidget: vi.fn(),
+        undoScheduledActivity: vi.fn(async () => {}),
+        runQuickAction: vi.fn(),
+        saveJournalEntry: vi.fn(async () => {}),
+        triggerManualTool: vi.fn(),
+        sendTextMessage: vi.fn(),
+        preserveSession: vi.fn(),
+        hasPreservedSession: vi.fn(() => false),
+        resumePreservedSession: vi.fn(async () => {}),
+        getContextFingerprint: vi.fn(async () => ""),
+        interruptAssistant: vi.fn(),
+      },
+    ])
+
+    const { AIChatContent } = await import("../check-in-ai-chat")
+    const { container } = render(<AIChatContent />)
+
+    expect(hasClassToken(container, "min-w-0 border-b px-4 py-3 sm:px-6")).toBe(true)
+  })
+
   it("uses the wide synthesis layout after a completed check-in", async () => {
     useCheckInMock.mockReturnValue([
       {
@@ -199,13 +244,8 @@ describe("AIChatContent", () => {
     const { AIChatContent } = await import("../check-in-ai-chat")
     const { container } = render(<AIChatContent />)
 
-    const hasClassToken = (token: string) =>
-      Array.from(container.querySelectorAll("div")).some(
-        (element) => typeof element.className === "string" && element.className.includes(token)
-      )
-
-    expect(hasClassToken("max-w-6xl")).toBe(true)
-    expect(hasClassToken("max-w-2xl")).toBe(false)
+    expect(hasClassToken(container, "max-w-6xl")).toBe(true)
+    expect(hasClassToken(container, "max-w-2xl")).toBe(false)
   })
 
   it("shows an info-only hint when voice biomarkers are not available yet", async () => {

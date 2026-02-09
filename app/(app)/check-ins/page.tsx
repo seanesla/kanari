@@ -220,8 +220,8 @@ function NewCheckInContent({
   autoStart?: boolean
 }) {
   return (
-    <div data-demo-id="demo-new-checkin-view" className="flex flex-col h-full p-3 md:p-4">
-      <Deck tone="raised" className={cn("flex flex-col h-full rounded-2xl overflow-hidden")}>
+    <div data-demo-id="demo-new-checkin-view" className="flex h-full min-w-0 flex-col p-3 md:p-4">
+      <Deck tone="raised" className={cn("flex h-full min-w-0 flex-col rounded-2xl overflow-hidden")}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-border/60">
           <div className="flex items-center gap-3">
@@ -235,7 +235,7 @@ function NewCheckInContent({
           </Button>
         </div>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="min-w-0 flex-1 overflow-hidden">
           <AIChatContent
             onClose={onClose}
             onSessionChange={onSessionChange}
@@ -480,7 +480,7 @@ function HistoryPageContent() {
           <CollapsedSidebarRevealHandle />
 
           {/* Main content area */}
-          <main className="flex-1 min-h-0 overflow-hidden">
+          <main className="flex-1 min-h-0 min-w-0 overflow-hidden">
             <AnimatePresence mode="wait">
               {isCreatingNew ? (
                 <motion.div
@@ -489,7 +489,7 @@ function HistoryPageContent() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                   transition={{ duration: 0.3 }}
-                  className="h-full"
+                  className="h-full min-w-0"
                 >
                     <NewCheckInContent
                       onClose={handleCloseNewCheckIn}
@@ -505,7 +505,7 @@ function HistoryPageContent() {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -50 }}
                   transition={{ duration: 0.3 }}
-                  className="h-full"
+                  className="h-full min-w-0"
                 >
                   <AIChatDetailView
                     session={selectedItem.session}
