@@ -427,9 +427,10 @@ describe("useCheckIn message handling", () => {
         geminiCallbacks?.onUserTranscript?.("to 8pm Monday through Friday", false)
       })
 
-      expect(result.current[0].messages.filter((m) => m.role === "user")).toHaveLength(1)
-      expect(result.current[0].messages[0]?.content.toLowerCase()).toContain("3pm")
-      expect(result.current[0].messages[0]?.content.toLowerCase()).toContain("8pm")
+      const userMessages = result.current[0].messages.filter((m) => m.role === "user")
+      expect(userMessages).toHaveLength(1)
+      expect(userMessages[0]?.content.toLowerCase()).toContain("3pm")
+      expect(userMessages[0]?.content.toLowerCase()).toContain("8pm")
 
       act(() => {
         geminiCallbacks?.onUserSpeechEnd?.()

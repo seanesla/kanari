@@ -44,6 +44,8 @@ import {
 } from "@/lib/scheduling/series-store"
 import { generateId, type CheckInAction, type CheckInData } from "./use-check-in-messages"
 
+type StorageDbModule = typeof import("@/lib/storage/db")
+
 export interface UseCheckInWidgetsOptions {
   data: CheckInData
   dispatch: Dispatch<CheckInAction>
@@ -194,6 +196,13 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
     widgetsRef.current = data.widgets
   }, [data.widgets])
 
+  // Cache one dynamic storage-module import per hook instance.
+  // Concurrent scheduling writes can otherwise resolve mixed module instances in
+  // tests, which may bypass mocks and call real Dexie (`indexedDB.open`).
+  // Pattern doc: docs/error-patterns/check-in-widgets-dynamic-db-import-race.md
+  const storageDbModuleRef = useRef<StorageDbModule | null>(null)
+  const storageDbImportPromiseRef = useRef<Promise<StorageDbModule> | null>(null)
+
   // ========================================
   // Scheduling dedupe (prevents double events)
   // ========================================
@@ -234,7 +243,24 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
     if (typeof indexedDB === "undefined") {
       throw new Error("IndexedDB not available")
     }
-    return import("@/lib/storage/db")
+
+    if (storageDbModuleRef.current) {
+      return storageDbModuleRef.current
+    }
+
+    if (!storageDbImportPromiseRef.current) {
+      storageDbImportPromiseRef.current = import("@/lib/storage/db")
+        .then((module) => {
+          storageDbModuleRef.current = module
+          return module
+        })
+        .catch((error) => {
+          storageDbImportPromiseRef.current = null
+          throw error
+        })
+    }
+
+    return storageDbImportPromiseRef.current
   }, [])
 
   const addSuggestionToDb = useCallback(async (suggestion: Suggestion) => {

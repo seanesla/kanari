@@ -26,6 +26,11 @@ vi.mock("@/components/demo", () => ({
   DemoOverlay: () => null,
 }))
 
+vi.mock("@/components/guidance", () => ({
+  GuidanceProvider: ({ children }: { children: React.ReactNode }) => children,
+  GuidancePopup: () => null,
+}))
+
 vi.mock("@/components/route-transition-overlay", () => ({
   RouteTransitionOverlay: () => null,
 }))
