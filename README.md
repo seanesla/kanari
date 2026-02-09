@@ -112,8 +112,8 @@ Uses Gemini 3 Flash for:
 | Resource | URL |
 |----------|-----|
 | Live Demo | https://kanari.space |
-| Demo Video | `[VIDEO_URL]` |
-| Devpost | `[DEVPOST_URL]` |
+| Demo Video | https://www.youtube.com/watch?v=zg9RFpMWOKM&t=38s |
+| Devpost | https://devpost.com/software/kanari-catch-the-crash-before-it-hits?ref_content=user-portfolio&ref_feature=in_progress |
 
 ---
 
