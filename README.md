@@ -58,13 +58,38 @@ This is not medical advice and it does not diagnose burnout.
 
 ---
 
+## Architecture
+
+### 1) End-to-End System Overview
+
+[![Kanari end-to-end architecture diagram (dark theme)](readmestuff/kanari-architecture-dark.png)](readmestuff/kanari-architecture-dark-4k.png)
+
+This diagram shows the full flow across frontend routes, hooks orchestration, local storage, server routes, Gemini integration, forecasting, and scheduling.
+
+### 2) Gemini Model Architecture (Hackathon Focus)
+
+[![Kanari Gemini model architecture diagram (dark theme)](readmestuff/kanari-gemini-model-architecture-dark.png)](readmestuff/kanari-gemini-model-architecture-dark-4k.png)
+
+Model usage in Kanari:
+- **`gemini-3-flash-preview`**: Primary non-audio runtime model (context, synthesis, suggestions, semantic analysis, achievements, summarize-thinking)
+- **`gemini-2.5-flash-native-audio-preview-12-2025`**: Real-time bidirectional voice conversation (Gemini Live WebSocket)
+- **`gemini-2.5-flash-preview-tts`**: Offline voice sample generation script (`scripts/generate-voice-samples.ts`)
+
+### 3) Biomarker Pipeline (Deep Dive)
+
+[![Kanari biomarker architecture diagram (dark theme)](readmestuff/kanari-biomarker-architecture-dark.png)](readmestuff/kanari-biomarker-architecture-dark-4k.png)
+
+This diagram goes deep into the biomarker path: mic capture -> feature extraction -> acoustic scoring -> personalization/calibration -> semantic fusion -> trend aggregation -> burnout forecasting.
+
+---
+
 ## Tech Stack
 
 | Category | Technologies |
 |----------|-------------|
 | Frontend | Next.js 16, React 19, Tailwind CSS 4, Framer Motion |
 | Audio | Web Audio API, Meyda, @ricky0123/vad-web |
-| AI | Gemini 3 Flash (REST), Gemini Live (WebSocket) |
+| AI | Gemini 3 Flash (REST), Gemini 2.5 Flash Native Audio (Live WebSocket) |
 | Storage | IndexedDB (Dexie), Web Crypto API |
 | Integration | Local calendar scheduler |
 
@@ -99,11 +124,11 @@ All acoustic analysis (speech rate, spectral features, pause patterns) happens l
 
 Built for the **Google DeepMind Gemini 3 Hackathon** (Dec 2025 - Feb 2026).
 
-Uses Gemini 3 Flash for:
-- Real-time voice conversations (Gemini Live WebSocket)
-- Burnout risk prediction and forecasting
-- Personalized recovery suggestion generation
-- Check-in synthesis and journaling
+Gemini usage for this submission:
+- **Gemini 3 Flash** (`gemini-3-flash-preview`) for non-audio runtime intelligence (check-in context, synthesis, suggestions, semantic analysis, achievements, and summarize-thinking)
+- **Gemini 2.5 Flash Native Audio** (`gemini-2.5-flash-native-audio-preview-12-2025`) for real-time voice conversations via Gemini Live
+
+Note: burnout forecasting itself is computed locally from biomarker trends (heuristic trend analysis), not by an LLM call.
 
 ---
 

@@ -1,0 +1,119 @@
+digraph KanariBiomarkers {
+  graph [
+    rankdir=LR,
+    bgcolor="#030101",
+    pad="0.06",
+    margin="0.04",
+    splines=spline,
+    overlap=false,
+    nodesep="0.62",
+    ranksep="0.86",
+    fontname="Avenir Next",
+    fontcolor="#dff5ff",
+    fontsize=28,
+    label="Kanari - Burnout Biomarker Flow",
+    labelloc=t,
+    labeljust=l
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Avenir Next",
+    fontsize=15,
+    color="#4abfff",
+    fillcolor="#0f1a26",
+    fontcolor="#dff5ff",
+    penwidth=2.0,
+    margin="0.20,0.14"
+  ];
+
+  edge [
+    fontname="Avenir Next",
+    fontsize=13,
+    color="#69ccff",
+    fontcolor="#9fdbff",
+    penwidth=1.9,
+    arrowsize=0.88
+  ];
+
+  capture [
+    label="1) Voice Check-In Capture\n\nBrowser mic records your speech\nLive turn chunks + full-session fallback\n(useCheckInAudio, processAudio)",
+    fillcolor="#132236",
+    color="#5fc8ff",
+    penwidth=2.3
+  ];
+
+  acoustic [
+    label="2) Acoustic Signal Scoring\n\nExtract pace, pauses, energy, and tone\nScore stress/fatigue with confidence\n(analyzeVoiceMetrics, computeVoiceDataQuality)",
+    fillcolor="#13263a",
+    color="#73d6ff"
+  ];
+
+  semantic [
+    label="3) Meaning + Voice Fusion\n\nRead transcript cues from what you said\nBlend semantic and acoustic biomarkers\n(blendAcousticAndSemanticBiomarkers)",
+    fillcolor="#15304a",
+    color="#61cbff",
+    penwidth=2.5
+  ];
+
+  storage [
+    label="4) Session Save + Daily Trends\n\nSave CheckInSession.acousticMetrics locally\nUpdate trend data when quality is good\n(shouldIncludeInTrends: quality >= 0.55)",
+    fillcolor="#132236",
+    color="#5fc8ff",
+    penwidth=2.3
+  ];
+
+  forecast [
+    label="5) Short-Horizon Burnout Forecast\n\nUse trend direction + volatility + burden\nOutput risk level, days ahead, confidence\nShown in dashboard and suggestion flows",
+    fillcolor="#15304a",
+    color="#61cbff",
+    penwidth=2.4
+  ];
+
+  settings [
+    label="Personal baseline tuning\nSettings store voice baseline + calibration\nUsed in future acoustic scoring",
+    fillcolor="#142536",
+    color="#79d9ff"
+  ];
+
+  synth_loop [
+    label="Post-check-in AI refinement\n/api/gemini/synthesize (Gemini 3)\nReturns semantic biomarkers\nSession metrics are re-blended",
+    fillcolor="#13263a",
+    color="#73d6ff"
+  ];
+
+  calibration_loop [
+    label="Self-report learning loop\nSynthesisScreen stress/fatigue sliders\nupdateCalibrationFromSelfReportSubmission()\npatchSettings()",
+    fillcolor="#13263a",
+    color="#73d6ff"
+  ];
+
+  { rank=same; capture; settings; calibration_loop }
+  { rank=same; acoustic; semantic }
+  { rank=same; storage; synth_loop }
+
+  capture -> acoustic [label="voice features"];
+  acoustic -> semantic [label="acoustic signals", constraint=false];
+  semantic -> storage [label="session biomarkers"];
+  storage -> forecast [label="trend history"];
+
+  settings -> acoustic [label="baseline tuning"];
+
+  storage -> synth_loop [
+    dir=both,
+    label="two-way refinement",
+    style=dashed,
+    color="#9bb7c9",
+    fontcolor="#9bb7c9",
+    constraint=false
+  ];
+
+  calibration_loop -> settings [
+    label="future-session tuning",
+    style=dashed,
+    color="#9bb7c9",
+    fontcolor="#9bb7c9",
+    constraint=false
+  ];
+}
