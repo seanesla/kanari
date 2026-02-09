@@ -6,6 +6,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, fireEvent, screen, waitFor } from "@testing-library/react"
 
 let lastAudioContext: MockAudioContext | null = null
+let isMobileMock = false
+
+vi.mock("@/hooks/use-mobile", () => ({
+  useIsMobile: () => isMobileMock,
+}))
 
 function setLastAudioContext(ctx: MockAudioContext) {
   lastAudioContext = ctx
@@ -53,6 +58,7 @@ class MockAudioContext {
 describe("AudioPlayer", () => {
   beforeEach(() => {
     lastAudioContext = null
+    isMobileMock = false
 
     // @ts-expect-error - test doubles
     global.AudioContext = MockAudioContext
@@ -115,5 +121,24 @@ describe("AudioPlayer", () => {
 
     const secondSource = lastAudioContext!.createdSources[1]
     expect(secondSource.start).toHaveBeenCalledWith(0, 5)
+  })
+
+  it("uses a stacked mobile layout with a full-width progress bar", async () => {
+    isMobileMock = true
+
+    const { AudioPlayer } = await import("../audio-player")
+    const audioData = new Float32Array(16000)
+
+    render(
+      <AudioPlayer
+        audioData={audioData}
+        sampleRate={16000}
+        duration={10}
+      />
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId("audio-player-mobile-progress")).toBeInTheDocument()
+    })
   })
 })

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { formatDuration } from "@/lib/date-utils"
 import { logUnexpectedError } from "@/lib/logger"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export interface AudioPlayerProps {
   audioData: Float32Array | number[]
@@ -27,6 +28,7 @@ export function AudioPlayer({
   seekPosition,
   className,
 }: AudioPlayerProps) {
+  const isMobile = useIsMobile()
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [isReady, setIsReady] = useState(false)
@@ -238,6 +240,60 @@ export function AudioPlayer({
   }, [seekPosition, seek])
 
   const progress = duration > 0 ? currentTime / duration : 0
+
+  if (isMobile) {
+    // Keep controls stacked on small screens so time labels/buttons do not
+    // compress the seek bar into an unusable target.
+    // Pattern doc: docs/error-patterns/check-in-review-missing-audio-fallback.md
+    return (
+      <div className={cn("w-full", className)}>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-10 w-10 rounded-full bg-accent/10 hover:bg-accent/20"
+            onClick={togglePlayPause}
+            disabled={!isReady}
+          >
+            {isPlaying ? (
+              <Pause className="h-5 w-5 text-accent" />
+            ) : (
+              <Play className="h-5 w-5 text-accent ml-0.5" />
+            )}
+          </Button>
+
+          <span className="text-xs tabular-nums text-muted-foreground min-w-[3.25rem]">
+            {formatDuration(currentTime)}
+          </span>
+
+          <span className="ml-auto text-xs tabular-nums text-muted-foreground min-w-[3.25rem] text-right">
+            {formatDuration(duration)}
+          </span>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={reset}
+            disabled={currentTime === 0}
+          >
+            <RotateCcw className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </div>
+
+        <div
+          data-testid="audio-player-mobile-progress"
+          className="mt-2 h-2 w-full bg-muted/30 rounded-full cursor-pointer relative overflow-hidden"
+          onClick={handleProgressClick}
+        >
+          <div
+            className="absolute inset-y-0 left-0 bg-accent rounded-full transition-all duration-75"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={cn("flex items-center gap-4", className)}>

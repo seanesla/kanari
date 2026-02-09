@@ -336,6 +336,29 @@ describe("useCheckIn audio capture", () => {
     expect(sendAudioMock).toHaveBeenCalledWith("base64audiodata==")
   })
 
+  it("does not treat ambient input as barge-in during ai_greeting", async () => {
+    const { result } = renderHook(() => useCheckIn())
+
+    await act(async () => {
+      await result.current[1].startSession()
+    })
+
+    act(() => {
+      geminiCallbacks?.onConnected?.()
+    })
+
+    expect(result.current[0].state).toBe("ai_greeting")
+    expect(lastWorklet?.port.onmessage).toEqual(expect.any(Function))
+
+    const loudPcm = new Int16Array([30000, -30000, 30000, -30000])
+    act(() => {
+      lastWorklet?.port.onmessage?.({ data: { type: "audio", pcm: loudPcm.buffer } })
+      lastWorklet?.port.onmessage?.({ data: { type: "audio", pcm: loudPcm.buffer } })
+    })
+
+    expect(result.current[0].state).toBe("ai_greeting")
+  })
+
   it("updates input audio levels from capture worklet audio", async () => {
     const { result } = renderHook(() => useCheckIn())
 

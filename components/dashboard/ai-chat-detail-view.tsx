@@ -9,6 +9,7 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useLiveQuery } from "dexie-react-hooks"
 import { MessageSquare, Calendar, AlertCircle, Trash2 } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -21,6 +22,7 @@ import { useCoachAvatar } from "@/hooks/use-coach-avatar"
 import { Deck } from "@/components/dashboard/deck"
 import { VoiceBiomarkerReport } from "@/components/check-in/voice-biomarker-report"
 import type { CheckInSession } from "@/lib/types"
+import { db } from "@/lib/storage/db"
 
 interface AIChatDetailViewProps {
   session: CheckInSession
@@ -49,22 +51,79 @@ export function AIChatDetailView({
   const waveformWrapRef = useRef<HTMLDivElement | null>(null)
   const [waveformWidth, setWaveformWidth] = useState(() => {
     if (typeof window === "undefined") return 400
-    return Math.max(240, Math.min(640, Math.floor(window.innerWidth - 48)))
+    return Math.max(180, Math.min(720, Math.floor(window.innerWidth - 40)))
   })
 
-  const audioDataArray = useMemo(() => {
-    const stored = session.audioData
+  const normalizeStoredAudio = useCallback((stored: unknown): Float32Array | null => {
     if (!stored) return null
 
-    // New storage format: Float32Array (no copy)
     if (stored instanceof Float32Array) {
       return stored.length > 0 ? stored : null
     }
 
-    // Legacy storage format: number[]
-    if (stored.length === 0) return null
-    return new Float32Array(stored)
-  }, [session.audioData])
+    if (Array.isArray(stored)) {
+      if (stored.length === 0) return null
+      return new Float32Array(stored)
+    }
+
+    if (
+      typeof stored === "object"
+      && stored !== null
+      && "length" in stored
+      && typeof (stored as { length: unknown }).length === "number"
+    ) {
+      try {
+        const values = Array.from(stored as ArrayLike<number>)
+        return values.length > 0 ? new Float32Array(values) : null
+      } catch {
+        return null
+      }
+    }
+
+    return null
+  }, [])
+
+  const linkedRecordingAudio = useLiveQuery(async () => {
+    if (!session.recordingId) return null
+
+    const recording = await db.recordings.get(session.recordingId)
+    if (!recording?.audioData) return null
+
+    const audioData = normalizeStoredAudio(recording.audioData)
+    if (!audioData) return null
+
+    return {
+      audioData,
+      sampleRate: recording.sampleRate || 16000,
+    }
+  }, [session.id, session.recordingId, normalizeStoredAudio])
+
+  const playbackAudio = useMemo(() => {
+    const sessionAudio = normalizeStoredAudio(session.audioData)
+    if (sessionAudio) {
+      return {
+        audioData: sessionAudio,
+        sampleRate: session.sampleRate || 16000,
+        source: "session" as const,
+      }
+    }
+
+    // Legacy sessions may only carry `recordingId` (without copied session audio).
+    // Use recording audio as a fallback so historical check-ins remain playable.
+    // Pattern doc: docs/error-patterns/check-in-review-missing-audio-fallback.md
+    if (linkedRecordingAudio?.audioData) {
+      return {
+        audioData: linkedRecordingAudio.audioData,
+        sampleRate: linkedRecordingAudio.sampleRate,
+        source: "recording" as const,
+      }
+    }
+
+    return null
+  }, [linkedRecordingAudio, normalizeStoredAudio, session.audioData, session.sampleRate])
+
+  const audioDataArray = playbackAudio?.audioData ?? null
+  const playbackSampleRate = playbackAudio?.sampleRate || 16000
 
   const handleTimeUpdate = useCallback(
     (currentTime: number) => {
@@ -84,11 +143,11 @@ export function AIChatDetailView({
     const el = waveformWrapRef.current
     if (!el || typeof ResizeObserver === "undefined") return
 
-    const update = () => {
-      const rect = el.getBoundingClientRect()
-      if (!rect.width) return
-      setWaveformWidth(Math.max(240, Math.min(640, Math.floor(rect.width))))
-    }
+      const update = () => {
+        const rect = el.getBoundingClientRect()
+        if (!rect.width) return
+        setWaveformWidth(Math.max(180, Math.min(720, Math.floor(rect.width))))
+      }
 
     update()
 
@@ -117,14 +176,14 @@ export function AIChatDetailView({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-accent/30">
+      <div className="flex items-center justify-between px-3 py-2.5 sm:px-6 sm:py-4 border-b border-accent/30">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-full bg-accent/10">
-            <MessageSquare className="h-5 w-5 text-accent" />
+          <div className="p-1.5 sm:p-2 rounded-full bg-accent/10">
+            <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
           </div>
           <div>
-            <h2 className="text-base sm:text-lg font-semibold">AI Chat</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="text-sm sm:text-lg font-semibold">AI Chat</h2>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {session.messages.length} messages{duration && ` • ${duration}`}
             </p>
           </div>
@@ -141,8 +200,8 @@ export function AIChatDetailView({
       </div>
 
       {/* Session info bar */}
-      <div className="px-4 py-3 sm:px-6 border-b border-border/60">
-        <Deck tone="quiet" className="p-3 space-y-2">
+      <div className="px-3 py-2.5 sm:px-6 border-b border-border/60">
+        <Deck tone="quiet" className="p-2.5 sm:p-3 space-y-2">
         {/* Date */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Calendar className="h-4 w-4" />
@@ -168,8 +227,8 @@ export function AIChatDetailView({
 
       {/* Messages scroll area */}
       <ScrollArea className="flex-1 min-h-0">
-        <div className="px-4 py-4 sm:px-6 sm:py-6 space-y-6">
-          <Deck tone="default" className="p-4">
+        <div className="px-3 py-3 sm:px-6 sm:py-6 space-y-4 sm:space-y-6">
+          <Deck tone="default" className="p-3 sm:p-4">
             <VoiceBiomarkerReport
               metrics={session.acousticMetrics}
               state="final"
@@ -178,28 +237,33 @@ export function AIChatDetailView({
           </Deck>
 
           {audioDataArray && (
-            <Deck tone="default" className="p-4">
-              <div className="flex justify-center mb-4">
+            <Deck tone="default" className="p-3 sm:p-4">
+              <div className="flex justify-center mb-3 sm:mb-4">
                 <div ref={waveformWrapRef} className="w-full max-w-xl">
                   <RecordingWaveform
                     mode="static"
                     audioData={audioDataArray}
                     width={waveformWidth}
-                    height={80}
+                    height={72}
                     playheadPosition={playheadPosition}
                     onSeek={handleSeek}
                     className="border border-border/30 bg-background/50"
                   />
                 </div>
               </div>
-              <div className="max-w-md mx-auto">
+              <div className="max-w-xl mx-auto w-full">
                 <AudioPlayer
                   audioData={audioDataArray}
-                  sampleRate={session.sampleRate || 16000}
-                  duration={session.duration ?? audioDataArray.length / 16000}
+                  sampleRate={playbackSampleRate}
+                  duration={session.duration ?? audioDataArray.length / playbackSampleRate}
                   onTimeUpdate={handleTimeUpdate}
                   seekPosition={seekPosition}
                 />
+                {playbackAudio?.source === "recording" ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Playback source: linked recording audio.
+                  </p>
+                ) : null}
               </div>
             </Deck>
           )}

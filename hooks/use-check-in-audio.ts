@@ -374,7 +374,10 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
           const inputLevel = Math.min(rms * 5, 1)
 
           const state = getCheckInState?.()
-          const assistantSpeaking = state === "assistant_speaking" || state === "ai_greeting"
+          // Do not trigger barge-in during ai_greeting before playback starts.
+          // On mobile, ambient mic noise here can suppress the first greeting audio turn.
+          // Pattern doc: docs/error-patterns/check-in-greeting-no-audio-until-user-replies.md
+          const assistantSpeaking = state === "assistant_speaking"
           if (!assistantSpeaking) {
             bargeInTriggeredRef.current = false
             bargeInConsecutiveRef.current = 0
@@ -479,7 +482,10 @@ export function useCheckInAudio(options: UseCheckInAudioOptions): UseCheckInAudi
           // Barge-in: if the assistant is speaking and the user starts talking,
           // trigger an interrupt BEFORE we forward this chunk.
           const state = getCheckInState?.()
-          const assistantSpeaking = state === "assistant_speaking" || state === "ai_greeting"
+          // Do not trigger barge-in during ai_greeting before playback starts.
+          // On mobile, ambient mic noise here can suppress the first greeting audio turn.
+          // Pattern doc: docs/error-patterns/check-in-greeting-no-audio-until-user-replies.md
+          const assistantSpeaking = state === "assistant_speaking"
           if (!assistantSpeaking) {
             bargeInTriggeredRef.current = false
             bargeInConsecutiveRef.current = 0

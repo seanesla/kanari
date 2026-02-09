@@ -211,7 +211,11 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
 
   const handleUserBargeIn = useCallback(() => {
     const state = stateRef.current
-    if (state !== "assistant_speaking" && state !== "ai_greeting") return
+    // Ignore barge-in until assistant audio is actually playing.
+    // During ai_greeting (pre-playback), mobile ambient noise can incorrectly
+    // mute the first assistant turn.
+    // Pattern doc: docs/error-patterns/check-in-greeting-no-audio-until-user-replies.md
+    if (state !== "assistant_speaking") return
 
     // Stop assistant audio immediately and allow mic audio through.
     suppressAssistantAudioRef.current = true
@@ -363,14 +367,17 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
     },
     getContextFingerprint: session.getContextFingerprint,
     interruptAssistant: () => {
+      const state = stateRef.current
+      if (state !== "assistant_speaking" && state !== "processing") {
+        return
+      }
+
       suppressAssistantAudioRef.current = true
       playbackControls.clearQueue()
-      const state = stateRef.current
-      if (state === "assistant_speaking" || state === "ai_greeting" || state === "processing") {
-        // Sync ref immediately so mic audio is unblocked without waiting for a render.
-        stateRef.current = "listening"
-        dispatch({ type: "SET_LISTENING" })
-      }
+
+      // Sync ref immediately so mic audio is unblocked without waiting for a render.
+      stateRef.current = "listening"
+      dispatch({ type: "SET_LISTENING" })
     },
   }
 
