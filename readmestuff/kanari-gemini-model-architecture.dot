@@ -1,0 +1,104 @@
+digraph KanariGeminiModels {
+  graph [
+    rankdir=LR,
+    bgcolor="#030101",
+    pad="0.06",
+    margin="0.04",
+    splines=spline,
+    overlap=false,
+    nodesep="0.70",
+    ranksep="0.78",
+    fontname="Avenir Next",
+    fontcolor="#dff5ff",
+    fontsize=28,
+    label="Kanari - Gemini Model Architecture",
+    labelloc=t,
+    labeljust=l
+  ];
+
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="Avenir Next",
+    fontsize=18,
+    color="#4abfff",
+    fillcolor="#0f1a26",
+    fontcolor="#dff5ff",
+    penwidth=2.2,
+    margin="0.18,0.14"
+  ];
+
+  edge [
+    fontname="Avenir Next",
+    fontsize=14,
+    color="#69ccff",
+    fontcolor="#9fdbff",
+    penwidth=2.0,
+    arrowsize=0.9
+  ];
+
+  subgraph cluster_runtime {
+    label="Kanari Runtime Flows";
+    color="#213446";
+    style="rounded";
+    penwidth=1.8;
+
+    ui [label="Kanari UI\n/check-ins + /overview", fillcolor="#132236", color="#5fc8ff", penwidth=2.4];
+
+    live_client [label="useGeminiLive + GeminiLiveClient\nlib/gemini/live-client.ts", fillcolor="#152a40", color="#72d6ff"];
+    legacy_live [label="Legacy live bridge (inactive)\n/api/gemini/session + /api/gemini/live/*", fillcolor="#172637", color="#95b9cf", style="rounded,dashed"];
+
+    route_context [label="/api/gemini/check-in-context\n(warm opener context)"];
+    route_synth [label="/api/gemini/synthesize\n(post-check-in synthesis)"];
+    route_suggest [label="/api/gemini\n(suggestions + diff-aware)"];
+    route_semantic [label="/api/gemini/semantic\n(audio semantic analysis)"];
+    route_achievements [label="/api/gemini/achievements\n(daily challenges/badges)"];
+
+    call_api [label="callGeminiAPI() wrapper\nlib/gemini/client.ts", fillcolor="#122033", color="#67c9f8", penwidth=2.4];
+
+    route_summary [label="/api/gemini/summarize-thinking\n(thinking panel summary)", fillcolor="#15253a", color="#8fc5e8"];
+    avatar_recipe [label="Avatar recipe picker\nlib/gemini/avatar-client.ts\n(optional)", fillcolor="#15253a", color="#8fc5e8"];
+
+    tts_script [label="scripts/generate-voice-samples.ts\n(off-line voice asset generation)", fillcolor="#132031", color="#8cb4cc", style="rounded,dashed"];
+  }
+
+  subgraph cluster_models {
+    label="Gemini Models Used In Kanari";
+    color="#213446";
+    style="rounded";
+    penwidth=1.8;
+
+    model_g3 [label="gemini-3-flash-preview\nPrimary runtime model (Gemini 3)", fillcolor="#15304a", color="#61cbff", penwidth=2.8];
+    model_live [label="gemini-2.5-flash-native-audio-preview-12-2025\nRealtime Live native audio", fillcolor="#13324a", color="#76dbff", penwidth=2.6];
+    model_25_tts [label="gemini-2.5-flash-preview-tts\nTTS script for voice sample WAVs", fillcolor="#162738", color="#91bad4"];
+
+    grounding [label="Google Search grounding tool\n(enabled for /api/gemini suggestions)", fillcolor="#142536", color="#85d4ff", shape=ellipse];
+  }
+
+  ui -> live_client [label="real-time voice check-ins"];
+  ui -> route_context;
+  ui -> route_synth;
+  ui -> route_suggest;
+  ui -> route_semantic;
+  ui -> route_achievements;
+  ui -> route_summary [label="thinking summary UI"];
+  ui -> avatar_recipe [label="coach avatar setup"];
+
+  route_context -> call_api;
+  route_synth -> call_api;
+  route_semantic -> call_api [label="audio inlineData"];
+  route_achievements -> call_api;
+  route_suggest -> call_api [label="legacy + diff-aware"];
+
+  call_api -> model_g3 [label="v1beta generateContent\ncontext + synth + suggestions + semantic + achievements"];
+  route_suggest -> grounding [label="tools: google_search"];
+  grounding -> model_g3 [style=dashed];
+
+  live_client -> model_live [label="Live WebSocket: audio in/out + tools", color="#7ad8ff", fontcolor="#a5e6ff", penwidth=2.2];
+  legacy_live -> model_live [style=dashed, label="inactive server-proxy path", color="#9bb7c9", fontcolor="#9bb7c9"];
+
+  route_summary -> model_g3 [label="direct generateContent\n(summarize-thinking now on Gemini 3)", color="#8fd3ff", fontcolor="#8fd3ff"];
+  avatar_recipe -> model_g3 [label="direct JSON style+seed", color="#8fcfff", fontcolor="#8fcfff"];
+  tts_script -> model_25_tts [style=dashed, label="offline asset script", color="#9bb7c9", fontcolor="#9bb7c9"];
+
+}

@@ -5,7 +5,7 @@ import { maybeRateLimitKanariGeminiKey } from "@/lib/gemini/server-rate-limit"
 /**
  * POST /api/gemini/summarize-thinking
  *
- * Summarize AI thinking/chain-of-thought text using Gemini 2.5 Flash.
+ * Summarize AI thinking/chain-of-thought text using Gemini 3 Flash.
  * Used to provide a concise summary of what the AI is "thinking about"
  * during the processing state.
  *
@@ -45,8 +45,9 @@ export async function POST(request: NextRequest) {
 
     const apiKey = validateAPIKey(getAPIKeyFromRequest(request))
 
-    // Use Gemini 2.5 Flash for fast summarization
-    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent"
+    // Keep non-audio runtime summarization on Gemini 3 Flash.
+    // Pattern doc: docs/error-patterns/non-audio-runtime-model-drift.md
+    const endpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent"
 
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10_000) // 10s timeout

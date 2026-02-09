@@ -5,7 +5,7 @@
  *
  * Shows AI's chain-of-thought reasoning during the "processing" state.
  * Features:
- * - Collapsed view: Shows a summarized version (via Gemini 2.5 Flash)
+ * - Collapsed view: Shows a summarized version (via Gemini 3 Flash)
  * - Expanded view: Shows raw thinking text
  * - Fallback: Animated dots when no thinking text available
  */
