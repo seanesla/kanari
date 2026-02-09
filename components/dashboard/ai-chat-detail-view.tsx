@@ -174,9 +174,9 @@ export function AIChatDetailView({
   }, [highlightMessageId])
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full min-w-0 flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2.5 sm:px-6 sm:py-4 border-b border-accent/30">
+      <div className="flex min-w-0 items-center justify-between border-b border-accent/30 px-3 py-2.5 sm:px-6 sm:py-4">
         <div className="flex items-center gap-3">
           <div className="p-1.5 sm:p-2 rounded-full bg-accent/10">
             <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 text-accent" />
@@ -200,8 +200,8 @@ export function AIChatDetailView({
       </div>
 
       {/* Session info bar */}
-      <div className="px-3 py-2.5 sm:px-6 border-b border-border/60">
-        <Deck tone="quiet" className="p-2.5 sm:p-3 space-y-2">
+      <div className="min-w-0 border-b border-border/60 px-3 py-2.5 sm:px-6">
+        <Deck tone="quiet" className="min-w-0 space-y-2 p-2.5 sm:p-3">
         {/* Date */}
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Calendar className="h-4 w-4" />
@@ -226,9 +226,9 @@ export function AIChatDetailView({
       </div>
 
       {/* Messages scroll area */}
-      <ScrollArea className="flex-1 min-h-0">
-        <div className="px-3 py-3 sm:px-6 sm:py-6 space-y-4 sm:space-y-6">
-          <Deck tone="default" className="p-3 sm:p-4">
+      <ScrollArea className="min-w-0 flex-1 min-h-0">
+        <div className="min-w-0 space-y-4 px-3 py-3 sm:space-y-6 sm:px-6 sm:py-6">
+          <Deck tone="default" className="min-w-0 p-3 sm:p-4">
             <VoiceBiomarkerReport
               metrics={session.acousticMetrics}
               state="final"
@@ -237,7 +237,7 @@ export function AIChatDetailView({
           </Deck>
 
           {audioDataArray && (
-            <Deck tone="default" className="p-3 sm:p-4">
+            <Deck tone="default" className="min-w-0 p-3 sm:p-4">
               <div className="flex justify-center mb-3 sm:mb-4">
                 <div ref={waveformWrapRef} className="w-full max-w-xl">
                   <RecordingWaveform

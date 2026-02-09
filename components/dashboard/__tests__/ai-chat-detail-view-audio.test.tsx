@@ -9,6 +9,12 @@ import type { CheckInSession } from "@/lib/types"
 const useLiveQueryMock = vi.fn()
 const audioPlayerSpy = vi.fn()
 
+function hasClassToken(container: HTMLElement, token: string): boolean {
+  return Array.from(container.querySelectorAll("*")).some(
+    (element) => typeof element.className === "string" && element.className.includes(token)
+  )
+}
+
 vi.mock("dexie-react-hooks", () => ({
   useLiveQuery: (...args: unknown[]) => useLiveQueryMock(...args),
 }))
@@ -103,5 +109,28 @@ describe("AIChatDetailView audio playback", () => {
     expect(values[0]).toBeCloseTo(0.01, 6)
     expect(values[1]).toBeCloseTo(-0.02, 6)
     expect(values[2]).toBeCloseTo(0.03, 6)
+  })
+
+  it("keeps detail containers min-width safe to prevent right-edge clipping", async () => {
+    const { AIChatDetailView } = await import("../ai-chat-detail-view")
+
+    const { container } = render(
+      <AIChatDetailView
+        session={{
+          ...baseSession,
+          acousticMetrics: {
+            stressScore: 55,
+            fatigueScore: 62,
+            stressLevel: "moderate",
+            fatigueLevel: "tired",
+            confidence: 0.8,
+            features: {} as NonNullable<CheckInSession["acousticMetrics"]>["features"],
+          },
+        }}
+        onDelete={() => {}}
+      />
+    )
+
+    expect(hasClassToken(container, "min-w-0")).toBe(true)
   })
 })

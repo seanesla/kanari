@@ -507,10 +507,10 @@ export function VoiceBiomarkerReport({
         {evidence.map((chip) => (
           <Tooltip key={chip.label}>
             <TooltipTrigger asChild>
-              <span>
+              <span className="max-w-full">
                 <Badge
                   variant="outline"
-                  className="bg-muted/15 border-border/60 text-muted-foreground"
+                  className="max-w-full bg-muted/15 border-border/60 text-muted-foreground"
                 >
                   {chip.label}
                 </Badge>
@@ -530,29 +530,31 @@ export function VoiceBiomarkerReport({
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: "easeInOut" }}
-            className="overflow-hidden"
+            // Keep height animation clipping, but avoid horizontal clipping on mobile.
+            // Pattern doc: docs/error-patterns/mobile-report-right-edge-clipping.md
+            className="min-w-0 overflow-y-hidden"
           >
-            <div className="pt-4 mt-4 border-t border-border/50 space-y-4">
+            <div className="mt-4 min-w-0 space-y-4 border-t border-border/50 pt-4">
               {/* Pipeline */}
-              <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
+              <div className="min-w-0 rounded-xl border border-border/60 bg-muted/10 p-4">
                 <p className="text-xs font-medium text-muted-foreground">Pipeline</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/30 px-2 py-1">
+                <div className="mt-2 flex min-w-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/60 bg-background/30 px-2 py-1">
                     <Mic className="h-3.5 w-3.5 text-muted-foreground" />
                     mic
                   </span>
                   <span className="text-muted-foreground/70">→</span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/30 px-2 py-1">
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/60 bg-background/30 px-2 py-1">
                     <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
                     features in-browser
                   </span>
                   <span className="text-muted-foreground/70">→</span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/30 px-2 py-1">
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/60 bg-background/30 px-2 py-1">
                     <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
                     stress + fatigue
                   </span>
                   <span className="text-muted-foreground/70">→</span>
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-background/30 px-2 py-1">
+                  <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/60 bg-background/30 px-2 py-1">
                     trends + forecast
                   </span>
                 </div>
@@ -566,8 +568,8 @@ export function VoiceBiomarkerReport({
                 <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
                   <p className="text-xs font-medium text-muted-foreground">Score breakdown</p>
 
-                  <div className="mt-3 rounded-lg border border-border/60 bg-background/30 overflow-hidden">
-                    <Table>
+                  <div className="mt-3 rounded-lg border border-border/60 bg-background/30 overflow-x-auto">
+                    <Table className="table-fixed [&_th]:whitespace-normal [&_td]:whitespace-normal sm:[&_th]:whitespace-nowrap sm:[&_td]:whitespace-nowrap">
                       <TableHeader>
                         <TableRow className="border-border/60">
                           <TableHead className="text-xs text-muted-foreground">Signal</TableHead>
@@ -642,8 +644,8 @@ export function VoiceBiomarkerReport({
                   <div className="mt-4 grid gap-4 md:grid-cols-2">
                     <div className="rounded-lg border border-border/60 bg-background/30 p-3">
                       <p className="text-xs font-medium text-muted-foreground">Heuristic stress (feature contributions)</p>
-                      <div className="mt-2 rounded-md border border-border/60 overflow-hidden">
-                        <Table>
+                      <div className="mt-2 rounded-md border border-border/60 overflow-x-auto">
+                        <Table className="table-fixed [&_th]:whitespace-normal [&_td]:whitespace-normal sm:[&_th]:whitespace-nowrap sm:[&_td]:whitespace-nowrap">
                           <TableHeader>
                             <TableRow className="border-border/60">
                               <TableHead className="text-xs text-muted-foreground">Feature</TableHead>
@@ -676,8 +678,8 @@ export function VoiceBiomarkerReport({
 
                     <div className="rounded-lg border border-border/60 bg-background/30 p-3">
                       <p className="text-xs font-medium text-muted-foreground">Heuristic fatigue (feature contributions)</p>
-                      <div className="mt-2 rounded-md border border-border/60 overflow-hidden">
-                        <Table>
+                      <div className="mt-2 rounded-md border border-border/60 overflow-x-auto">
+                        <Table className="table-fixed [&_th]:whitespace-normal [&_td]:whitespace-normal sm:[&_th]:whitespace-nowrap sm:[&_td]:whitespace-nowrap">
                           <TableHeader>
                             <TableRow className="border-border/60">
                               <TableHead className="text-xs text-muted-foreground">Feature</TableHead>
@@ -711,12 +713,12 @@ export function VoiceBiomarkerReport({
 
                   <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                     {metrics?.explanations?.mode === "baseline" ? (
-                      <span className="inline-flex items-center rounded-full border border-border/60 bg-background/30 px-2 py-1">
+                      <span className="inline-flex max-w-full flex-wrap items-center rounded-full border border-border/60 bg-background/30 px-2 py-1 [overflow-wrap:anywhere]">
                         Baseline blend: stress 65% / 35%, fatigue 70% / 30%
                       </span>
                     ) : null}
                     {calibration ? (
-                      <span className="inline-flex items-center rounded-full border border-border/60 bg-background/30 px-2 py-1">
+                      <span className="inline-flex max-w-full flex-wrap items-center rounded-full border border-border/60 bg-background/30 px-2 py-1 [overflow-wrap:anywhere]">
                         Calibration: stress bias {calibration.stressBias >= 0 ? "+" : ""}
                         {calibration.stressBias}, scale {formatNumber(calibration.stressScale, 2)} • fatigue bias {calibration.fatigueBias >= 0 ? "+" : ""}
                         {calibration.fatigueBias}, scale {formatNumber(calibration.fatigueScale, 2)}
@@ -729,8 +731,8 @@ export function VoiceBiomarkerReport({
               {/* Feature table */}
               {features ? (
                 <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
                       <p className="text-xs font-medium text-muted-foreground">Measured features (this check-in)</p>
                       <p className="mt-1 text-xs text-muted-foreground/80">
                         Values are raw-ish signals; comparisons are most meaningful.
@@ -743,8 +745,8 @@ export function VoiceBiomarkerReport({
                     ) : null}
                   </div>
 
-                  <div className="mt-3 rounded-lg border border-border/60 bg-background/30 overflow-hidden">
-                    <Table>
+                  <div className="mt-3 rounded-lg border border-border/60 bg-background/30 overflow-x-auto">
+                    <Table className="table-fixed [&_th]:whitespace-normal [&_td]:whitespace-normal sm:[&_th]:whitespace-nowrap sm:[&_td]:whitespace-nowrap">
                       <TableHeader>
                         <TableRow className="border-border/60">
                           <TableHead className="text-xs text-muted-foreground">Biomarker</TableHead>
@@ -797,7 +799,7 @@ export function VoiceBiomarkerReport({
                   </div>
 
                   {!baseline ? (
-                    <div className="mt-3 flex items-center justify-between gap-3">
+                    <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-xs text-muted-foreground">
                         Want personal “vs you” comparisons? Set a baseline.
                       </p>
