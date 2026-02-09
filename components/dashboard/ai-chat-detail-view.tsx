@@ -12,7 +12,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useLiveQuery } from "dexie-react-hooks"
 import { MessageSquare, Calendar, AlertCircle, Trash2 } from "@/lib/icons"
 import { Button } from "@/components/ui/button"
-import { ScrollArea } from "@/components/ui/scroll-area"
 import { MessageBubble } from "@/components/check-in/message-bubble"
 import { RecordingWaveform } from "@/components/dashboard/recording-waveform"
 import { AudioPlayer } from "@/components/dashboard/audio-player"
@@ -226,7 +225,10 @@ export function AIChatDetailView({
       </div>
 
       {/* Messages scroll area */}
-      <ScrollArea className="min-w-0 flex-1 min-h-0">
+      <div
+        // Pattern doc: docs/error-patterns/mobile-report-right-edge-clipping.md
+        className="min-w-0 flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+      >
         <div className="min-w-0 space-y-4 px-3 py-3 sm:space-y-6 sm:px-6 sm:py-6">
           <Deck tone="default" className="min-w-0 p-3 sm:p-4">
             <VoiceBiomarkerReport
@@ -284,7 +286,7 @@ export function AIChatDetailView({
             ))
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }

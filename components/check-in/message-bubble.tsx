@@ -55,7 +55,7 @@ export function MessageBubble({
       id={`message-${message.id}`}
       data-message-id={message.id}
       className={cn(
-        "flex gap-3 max-w-[85%] scroll-mt-24",
+        "flex min-w-0 gap-3 max-w-[85%] scroll-mt-24",
         isUser ? "ml-auto flex-row-reverse" : "mr-auto",
         className
       )}
@@ -73,17 +73,17 @@ export function MessageBubble({
       )}
 
       {/* Message content */}
-      <div className="flex flex-col gap-1">
+      <div className="min-w-0 flex flex-col gap-1">
         <div
           className={cn(
-            "rounded-2xl px-4 py-2.5 text-sm",
+            "min-w-0 rounded-2xl px-4 py-2.5 text-sm",
             isUser
               ? "bg-accent text-accent-foreground rounded-tr-sm"
               : "bg-muted rounded-tl-sm",
             highlight ? "ring-2 ring-accent/40 ring-offset-2 ring-offset-background" : "",
           )}
         >
-          <p className={cn("whitespace-pre-wrap", isAssistantStreaming && "opacity-90")}>
+          <p className={cn("whitespace-pre-wrap [overflow-wrap:anywhere]", isAssistantStreaming && "opacity-90")}>
             {message.content}
             {isAssistantStreaming && (
               <span className="inline-block opacity-60">▍</span>
@@ -127,7 +127,7 @@ export function MessageBubble({
         {/* Metadata row */}
         <div
           className={cn(
-            "flex items-center gap-2 text-xs text-muted-foreground px-1",
+            "flex flex-wrap items-center gap-2 px-1 text-xs text-muted-foreground",
             isUser ? "flex-row-reverse" : ""
           )}
         >

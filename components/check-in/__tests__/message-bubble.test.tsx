@@ -12,6 +12,12 @@ import { render, screen } from "@testing-library/react"
 import { MessageBubble } from "../message-bubble"
 import type { CheckInMessage } from "@/lib/types"
 
+function hasClassToken(container: HTMLElement, token: string): boolean {
+  return Array.from(container.querySelectorAll("*")).some(
+    (element) => typeof element.className === "string" && element.className.includes(token)
+  )
+}
+
 describe("MessageBubble", () => {
   it("shows assistant content while streaming (no Speaking... placeholder)", () => {
     const message: CheckInMessage = {
@@ -43,5 +49,18 @@ describe("MessageBubble", () => {
     expect(screen.getByText("All set")).toBeInTheDocument()
     expect(screen.queryByText("▍")).not.toBeInTheDocument()
   })
-})
 
+  it("applies wrapping safety for long mobile text", () => {
+    const message: CheckInMessage = {
+      id: "asst-3",
+      role: "assistant",
+      content: "superlongtokenwithoutspaces-superlongtokenwithoutspaces-superlongtokenwithoutspaces",
+      timestamp: new Date().toISOString(),
+    }
+
+    const { container } = render(<MessageBubble message={message} />)
+
+    expect(hasClassToken(container, "[overflow-wrap:anywhere]")).toBe(true)
+    expect(hasClassToken(container, "min-w-0")).toBe(true)
+  })
+})
