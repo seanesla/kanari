@@ -943,6 +943,7 @@ export interface GetJournalEntriesToolArgs {
 
 export type WidgetType =
   | "schedule_activity"
+  | "schedule_recurring_summary"
   | "breathing_exercise"
   | "stress_gauge"
   | "quick_actions"
@@ -965,6 +966,24 @@ export type ScheduleActivityWidgetState = WidgetBase<"schedule_activity", Schedu
   isSyncing?: boolean
 }
 
+export type ScheduleRecurringSummaryWidgetStatus = "pending" | "scheduled" | "partial" | "failed"
+
+export type ScheduleRecurringSummaryWidgetState = WidgetBase<
+  "schedule_recurring_summary",
+  ScheduleRecurringActivityToolArgs
+> & {
+  status: ScheduleRecurringSummaryWidgetStatus
+  requestedCount: number
+  scheduledCount: number
+  failedCount: number
+  duplicateCount: number
+  skippedInvalidDateTimes: number
+  truncated: boolean
+  error?: string
+  /** True while recurring schedules are still being persisted. */
+  isSyncing?: boolean
+}
+
 export type BreathingExerciseWidgetState = WidgetBase<"breathing_exercise", BreathingExerciseToolArgs>
 
 export type StressGaugeWidgetState = WidgetBase<"stress_gauge", StressGaugeToolArgs>
@@ -981,6 +1000,7 @@ export type JournalPromptWidgetState = WidgetBase<"journal_prompt", JournalPromp
 
 export type WidgetState =
   | ScheduleActivityWidgetState
+  | ScheduleRecurringSummaryWidgetState
   | BreathingExerciseWidgetState
   | StressGaugeWidgetState
   | QuickActionsWidgetState

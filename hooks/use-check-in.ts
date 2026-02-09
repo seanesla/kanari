@@ -121,7 +121,9 @@ export function useCheckIn(options: UseCheckInOptions = {}): [CheckInData, Check
 
   useEffect(() => {
     scheduleSyncInFlightRef.current = data.widgets.some(
-      (widget) => widget.type === "schedule_activity" && widget.isSyncing
+      (widget) =>
+        (widget.type === "schedule_activity" || widget.type === "schedule_recurring_summary")
+        && widget.isSyncing
     )
   }, [data.widgets])
 

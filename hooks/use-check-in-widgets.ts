@@ -345,9 +345,12 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         seriesId?: string
         occurrenceDate?: string
         occurrenceIndex?: number
+        emitWidget?: boolean
       }
     ): Promise<"scheduled" | "failed" | "duplicate"> => {
       const createdAt = options.createdAt ?? new Date().toISOString()
+      // Pattern doc: docs/error-patterns/recurring-schedule-per-occurrence-confirmation-spam.md
+      const emitWidget = options.emitWidget ?? true
       const normalizedTime = normalizeTimeToHHMM(args.time) ?? args.time
       const resolvedArgs: ScheduleActivityToolArgs = {
         ...args,
@@ -355,7 +358,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         duration: clampDurationMinutes(args.duration),
       }
 
-      const widgetId = generateId()
+      const widgetId = emitWidget ? generateId() : null
       const suggestionId = generateId()
       const scheduledFor = options.scheduledForOverride ?? parseZonedDateTimeInstant(
         resolvedArgs.date,
@@ -364,17 +367,19 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
       )
 
       if (!scheduledFor) {
-        dispatch({
-          type: "ADD_WIDGET",
-          widget: {
-            id: widgetId,
-            type: "schedule_activity",
-            createdAt,
-            args: resolvedArgs,
-            status: "failed",
-            error: "Invalid date/time",
-          },
-        })
+        if (emitWidget && widgetId) {
+          dispatch({
+            type: "ADD_WIDGET",
+            widget: {
+              id: widgetId,
+              type: "schedule_activity",
+              createdAt,
+              args: resolvedArgs,
+              status: "failed",
+              error: "Invalid date/time",
+            },
+          })
+        }
         return "failed"
       }
 
@@ -398,42 +403,48 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         scheduledFor,
       }
 
-      dispatch({
-        type: "ADD_WIDGET",
-        widget: {
-          id: widgetId,
-          type: "schedule_activity",
-          createdAt,
-          args: resolvedArgs,
-          status: "scheduled",
-          suggestionId,
-          isSyncing: true,
-        },
-      })
+      if (emitWidget && widgetId) {
+        dispatch({
+          type: "ADD_WIDGET",
+          widget: {
+            id: widgetId,
+            type: "schedule_activity",
+            createdAt,
+            args: resolvedArgs,
+            status: "scheduled",
+            suggestionId,
+            isSyncing: true,
+          },
+        })
+      }
 
       try {
         await addSuggestionToDb(suggestion)
         await syncSuggestionToCalendar(suggestion)
-        dispatch({
-          type: "UPDATE_WIDGET",
-          widgetId,
-          updates: {
-            isSyncing: false,
-          },
-        })
+        if (emitWidget && widgetId) {
+          dispatch({
+            type: "UPDATE_WIDGET",
+            widgetId,
+            updates: {
+              isSyncing: false,
+            },
+          })
+        }
         return "scheduled"
       } catch (error) {
         unmarkScheduledEvent(scheduledFor, resolvedArgs.title)
-        dispatch({
-          type: "UPDATE_WIDGET",
-          widgetId,
-          updates: {
-            status: "failed",
-            error: error instanceof Error ? error.message : "Failed to save",
-            suggestionId: undefined,
-            isSyncing: false,
-          },
-        })
+        if (emitWidget && widgetId) {
+          dispatch({
+            type: "UPDATE_WIDGET",
+            widgetId,
+            updates: {
+              status: "failed",
+              error: error instanceof Error ? error.message : "Failed to save",
+              suggestionId: undefined,
+              isSyncing: false,
+            },
+          })
+        }
         return "failed"
       }
     },
@@ -680,6 +691,28 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
         }
 
         void (async () => {
+          const summaryWidgetId = generateId()
+          const requestedCount = expansion.occurrences.length + expansion.skippedInvalidDateTimes
+
+          // Pattern doc: docs/error-patterns/recurring-schedule-per-occurrence-confirmation-spam.md
+          dispatch({
+            type: "ADD_WIDGET",
+            widget: {
+              id: summaryWidgetId,
+              type: "schedule_recurring_summary",
+              createdAt: now,
+              args: resolvedRecurringArgs,
+              status: "pending",
+              requestedCount,
+              scheduledCount: 0,
+              failedCount: 0,
+              duplicateCount: 0,
+              skippedInvalidDateTimes: expansion.skippedInvalidDateTimes,
+              truncated: expansion.truncated,
+              isSyncing: true,
+            },
+          })
+
           const seriesId = generateId()
           const recurringSeries: RecurringSeries = {
             id: seriesId,
@@ -703,7 +736,23 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           try {
             await createRecurringSeriesRecord(recurringSeries)
             seriesPersisted = true
-          } catch {
+          } catch (error) {
+            dispatch({
+              type: "UPDATE_WIDGET",
+              widgetId: summaryWidgetId,
+              updates: {
+                status: "failed",
+                requestedCount,
+                scheduledCount: 0,
+                failedCount: requestedCount,
+                duplicateCount: 0,
+                skippedInvalidDateTimes: expansion.skippedInvalidDateTimes,
+                truncated: expansion.truncated,
+                error: error instanceof Error ? error.message : "Failed to save recurring plan",
+                isSyncing: false,
+              },
+            })
+
             const failureMessage: CheckInMessage = {
               id: generateId(),
               role: "assistant",
@@ -730,6 +779,7 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
                   seriesId,
                   occurrenceDate: occurrence.date,
                   occurrenceIndex,
+                  emitWidget: false,
                 }
               )
             )
@@ -742,8 +792,35 @@ export function useCheckInWidgets(options: UseCheckInWidgetsOptions): UseCheckIn
           const duplicateCount = results.filter((result) => result === "duplicate").length
 
           if (scheduledCount === 0 && seriesPersisted) {
-            await deleteRecurringSeriesRecord(seriesId)
+            try {
+              await deleteRecurringSeriesRecord(seriesId)
+            } catch {
+              // Best effort: scheduling already failed and user already receives the summary.
+            }
           }
+
+          const summaryStatus =
+            scheduledCount === 0
+              ? "failed"
+              : failedCount > 0 || duplicateCount > 0
+                ? "partial"
+                : "scheduled"
+
+          dispatch({
+            type: "UPDATE_WIDGET",
+            widgetId: summaryWidgetId,
+            updates: {
+              status: summaryStatus,
+              requestedCount,
+              scheduledCount,
+              failedCount,
+              duplicateCount,
+              skippedInvalidDateTimes: expansion.skippedInvalidDateTimes,
+              truncated: expansion.truncated,
+              error: undefined,
+              isSyncing: false,
+            },
+          })
 
           const summaryParts: string[] = []
           if (scheduledCount > 0) {

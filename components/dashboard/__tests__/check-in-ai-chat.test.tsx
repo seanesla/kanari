@@ -401,6 +401,71 @@ describe("AIChatContent", () => {
     ).toBeInTheDocument()
   })
 
+  it("disables chat input while recurring schedule sync is in-flight", async () => {
+    useCheckInMock.mockReturnValue([
+      {
+        state: "processing",
+        initPhase: null,
+        isActive: true,
+        session: { id: "s1", startedAt: new Date().toISOString(), messages: [], acousticMetrics: null },
+        messages: [],
+        currentUserTranscript: "",
+        widgets: [
+          {
+            id: "w1",
+            type: "schedule_recurring_summary",
+            createdAt: new Date().toISOString(),
+            args: {
+              title: "Study session",
+              category: "rest",
+              startDate: "2026-02-09",
+              time: "20:00",
+              duration: 45,
+              frequency: "weekdays",
+              untilDate: "2026-03-01",
+            },
+            status: "pending",
+            requestedCount: 15,
+            scheduledCount: 4,
+            failedCount: 0,
+            duplicateCount: 0,
+            skippedInvalidDateTimes: 0,
+            truncated: false,
+            isSyncing: true,
+          },
+        ],
+        error: null,
+        isMuted: false,
+      },
+      {
+        startSession: vi.fn(async () => {}),
+        endSession: vi.fn(async () => {}),
+        cancelSession: vi.fn(),
+        getSession: vi.fn(() => null),
+        toggleMute: vi.fn(),
+        dismissWidget: vi.fn(),
+        undoScheduledActivity: vi.fn(async () => {}),
+        runQuickAction: vi.fn(),
+        saveJournalEntry: vi.fn(async () => {}),
+        triggerManualTool: vi.fn(),
+        sendTextMessage: vi.fn(),
+        preserveSession: vi.fn(),
+        hasPreservedSession: vi.fn(() => false),
+        resumePreservedSession: vi.fn(async () => {}),
+        getContextFingerprint: vi.fn(async () => ""),
+        interruptAssistant: vi.fn(),
+      },
+    ])
+
+    const { AIChatContent } = await import("../check-in-ai-chat")
+    render(<AIChatContent />)
+
+    expect(screen.getByRole("button", { name: /send text/i })).toBeDisabled()
+    expect(
+      screen.getByText(/scheduling your activity now\. chat input will re-enable as soon as it is saved\./i)
+    ).toBeInTheDocument()
+  })
+
   it("saves sessions with voice metrics even when message count is <= 1", async () => {
     let capturedOptions: { onSessionEnd?: UseCheckInOptions["onSessionEnd"] } | null = null
 

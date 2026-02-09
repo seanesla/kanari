@@ -642,12 +642,14 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     expect(firstScheduledSuggestion?.content?.toLowerCase()).toContain("study")
     expect(firstScheduledSuggestion?.duration).toBe(300)
 
-    const firstScheduleWidget = result.current[0].widgets.find((widget) => widget.type === "schedule_activity")
-    expect(firstScheduleWidget?.type).toBe("schedule_activity")
-    if (!firstScheduleWidget || firstScheduleWidget.type !== "schedule_activity") {
-      throw new Error("Expected at least one schedule_activity widget")
+    const recurringSummaryWidget = result.current[0].widgets.find(
+      (widget) => widget.type === "schedule_recurring_summary"
+    )
+    expect(recurringSummaryWidget?.type).toBe("schedule_recurring_summary")
+    if (!recurringSummaryWidget || recurringSummaryWidget.type !== "schedule_recurring_summary") {
+      throw new Error("Expected one recurring summary widget")
     }
-    expect(firstScheduleWidget.args.duration).toBe(300)
+    expect(recurringSummaryWidget.args.duration).toBe(300)
   })
 
   it("does not add a duplicate schedule confirmation if the assistant already confirmed", async () => {
@@ -1026,7 +1028,19 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     })
 
     expect(addSuggestionMock).toHaveBeenCalledTimes(3)
-    expect(result.current[0].widgets.filter((w) => w.type === "schedule_activity")).toHaveLength(3)
+    expect(result.current[0].widgets.filter((w) => w.type === "schedule_activity")).toHaveLength(0)
+
+    const recurringSummaryWidgets = result.current[0].widgets.filter(
+      (w) => w.type === "schedule_recurring_summary"
+    )
+    expect(recurringSummaryWidgets).toHaveLength(1)
+
+    const [summaryWidget] = recurringSummaryWidgets
+    if (!summaryWidget || summaryWidget.type !== "schedule_recurring_summary") {
+      throw new Error("Expected one recurring summary widget")
+    }
+    expect(summaryWidget.status).toBe("scheduled")
+    expect(summaryWidget.scheduledCount).toBe(3)
   })
 
   it("caps recurring schedules at the safety limit", async () => {
@@ -1103,7 +1117,19 @@ describe("useCheckIn schedule_activity calendar sync", () => {
     })
 
     expect(putRecoveryBlockMock).toHaveBeenCalledTimes(2)
-    expect(result.current[0].widgets.some((w) => w.type === "schedule_activity" && w.status === "failed")).toBe(true)
+    expect(result.current[0].widgets.filter((w) => w.type === "schedule_activity")).toHaveLength(0)
+
+    const recurringSummaryWidget = result.current[0].widgets.find(
+      (w) => w.type === "schedule_recurring_summary"
+    )
+    expect(recurringSummaryWidget?.type).toBe("schedule_recurring_summary")
+    if (!recurringSummaryWidget || recurringSummaryWidget.type !== "schedule_recurring_summary") {
+      throw new Error("Expected one recurring summary widget")
+    }
+
+    expect(recurringSummaryWidget.status).toBe("partial")
+    expect(recurringSummaryWidget.scheduledCount).toBe(2)
+    expect(recurringSummaryWidget.failedCount).toBe(1)
   })
 
   it("edits recurring series occurrences with future scope", async () => {

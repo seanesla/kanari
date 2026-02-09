@@ -47,6 +47,7 @@ import {
   JournalPrompt,
   QuickActions,
   ScheduleConfirmation,
+  ScheduleRecurringSummary,
   StressGauge,
 } from "@/components/check-in/widgets"
 import {
@@ -450,7 +451,9 @@ export function AIChatContent({
   }, [checkIn.widgets, focusedWidgetId])
 
   const hasSchedulingInFlight = checkIn.widgets.some(
-    (widget) => widget.type === "schedule_activity" && widget.isSyncing
+    (widget) =>
+      (widget.type === "schedule_activity" || widget.type === "schedule_recurring_summary")
+      && widget.isSyncing
   )
 
   const statusDotClass = cn(
@@ -670,6 +673,14 @@ export function AIChatContent({
                           onUndo={(suggestionId) =>
                             controls.undoScheduledActivity(widget.id, suggestionId)
                           }
+                        />
+                      )
+                    case "schedule_recurring_summary":
+                      return (
+                        <ScheduleRecurringSummary
+                          key={widget.id}
+                          widget={widget}
+                          onDismiss={() => controls.dismissWidget(widget.id)}
                         />
                       )
                     case "breathing_exercise":

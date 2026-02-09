@@ -37,6 +37,7 @@ import {
   JournalPrompt,
   QuickActions,
   ScheduleConfirmation,
+  ScheduleRecurringSummary,
   StressGauge,
 } from "./widgets"
 import { ChatInput } from "./chat-input"
@@ -339,7 +340,9 @@ export function CheckInDialog({
     : null
   const isToolFocused = Boolean(focusedWidget)
   const hasSchedulingInFlight = checkIn.widgets.some(
-    (widget) => widget.type === "schedule_activity" && widget.isSyncing
+    (widget) =>
+      (widget.type === "schedule_activity" || widget.type === "schedule_recurring_summary")
+      && widget.isSyncing
   )
 
   const hasVoiceBiomarkers = Boolean(checkIn.session?.acousticMetrics)
@@ -596,6 +599,14 @@ export function CheckInDialog({
                                     onUndo={(suggestionId) =>
                                       controls.undoScheduledActivity(widget.id, suggestionId)
                                     }
+                                  />
+                                )
+                              case "schedule_recurring_summary":
+                                return (
+                                  <ScheduleRecurringSummary
+                                    key={widget.id}
+                                    widget={widget}
+                                    onDismiss={() => controls.dismissWidget(widget.id)}
                                   />
                                 )
                               case "breathing_exercise":
